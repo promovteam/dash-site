@@ -5219,39 +5219,33 @@ function renderLeads() {
   });
   h += '<div class="hint" style="margin-top:8px;">Clique numa etapa para ver os leads · agendou/realizou/vendido = telefone do lead casado com a aba Vendas</div></div>';
 
-  // ===== média de tempo da primeira resposta (vem da Clint) =====
-  // conta só os leads já consultados na Clint que têm conversa com resposta nossa
-  var tempos = [], esperando = 0, consultados = 0;
-  rows.forEach(function(l) {
-    var c = CLINT[ldTel8(l.tel)];
-    if (!c || !c.success || !c.temConversa) return;
-    consultados++;
-    if (c.quem === 'lead') esperando++;
-    if (typeof c.minutosPrimeira === 'number') tempos.push(c.minutosPrimeira);
-  });
-  if (consultados) {
-    var media = tempos.length ? tempos.reduce(function(s, x){ return s + x; }, 0) / tempos.length : null;
-    var ord = tempos.slice().sort(function(a, b){ return a - b; });
-    var mediana = ord.length ? ord[Math.floor(ord.length / 2)] : null;
-    var ate5 = tempos.filter(function(m){ return m <= 5; }).length;
+  // ===== ⚡ velocidade de resposta — agora vem PRONTA do robô (centenas de conversas) =====
+  var prPainel = (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.primeiraResposta && CLINT_PAINEL.primeiraResposta.length)
+    ? CLINT_PAINEL.primeiraResposta : null;
+  if (prPainel) {
     function tMin(m) {
-      if (m === null) return '—';
+      if (m === null || isNaN(m)) return '—';
       if (m < 60) return Math.round(m) + ' min';
       if (m < 1440) return (m / 60).toFixed(1).replace('.', ',') + ' h';
       return Math.round(m / 1440) + ' dias';
     }
+    var somaMin = 0, somaN = 0;
+    prPainel.forEach(function(p){ somaMin += p.minutos * p.qtd; somaN += p.qtd; });
+    var mediaGeral = somaN ? somaMin / somaN : null;
+    var maisRapido = prPainel[0];   // o robô já manda ordenado do mais rápido
+    var esperandoAgora = (esp && esp.rec) ? esp.rec.length : 0;
     h += '<div class="panel" style="margin-bottom:18px;"><h3>⚡ Velocidade de resposta (Clint)</h3>'
       + '<div style="display:flex;gap:9px;flex-wrap:wrap;margin:10px 0;">'
       + '<div style="flex:1;min-width:130px;padding:13px;border-radius:14px;background:rgba(110,168,255,.12);border:1px solid rgba(110,168,255,.35);">'
-      + '<b style="font-size:1.35rem;color:#6ea8ff;display:block;">' + tMin(media) + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">⏱ MÉDIA DA 1ª RESPOSTA</span></div>'
+      + '<b style="font-size:1.35rem;color:#6ea8ff;display:block;">' + tMin(mediaGeral) + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">⏱ MÉDIA DA 1ª RESPOSTA</span></div>'
       + '<div style="flex:1;min-width:130px;padding:13px;border-radius:14px;background:rgba(61,220,151,.12);border:1px solid rgba(61,220,151,.35);">'
-      + '<b style="font-size:1.35rem;color:#3ddc97;display:block;">' + tMin(mediana) + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">📊 TEMPO TÍPICO (MEDIANA)</span></div>'
+      + '<b style="font-size:1.35rem;color:#3ddc97;display:block;">🏆 ' + tMin(maisRapido.minutos) + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">MAIS RÁPIDO: ' + (maisRapido.dono || '').toUpperCase() + '</span></div>'
       + '<div style="flex:1;min-width:130px;padding:13px;border-radius:14px;background:rgba(246,163,80,.12);border:1px solid rgba(246,163,80,.35);">'
-      + '<b style="font-size:1.35rem;color:#f6a350;display:block;">' + (tempos.length ? Math.round(ate5 / tempos.length * 100) + '%' : '—') + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">🚀 RESPONDIDOS EM ATÉ 5 MIN</span></div>'
-      + '<div class="click" style="flex:1;min-width:130px;padding:13px;border-radius:14px;cursor:pointer;background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.35);" onclick="ldLimparF();LD_F.sit=\'\';renderLeads();">'
-      + '<b style="font-size:1.35rem;color:#ff6b6b;display:block;">' + esperando + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">🔴 ESPERANDO RESPOSTA AGORA</span></div>'
+      + '<b style="font-size:1.35rem;color:#f6a350;display:block;">' + somaN + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">📊 CONVERSAS MEDIDAS</span></div>'
+      + '<div class="click" style="flex:1;min-width:130px;padding:13px;border-radius:14px;cursor:pointer;background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.35);" onclick="window._espAberto=true;window._espIgAberto=true;renderLeads();window.scrollTo(0,0);">'
+      + '<b style="font-size:1.35rem;color:#ff6b6b;display:block;">' + esperandoAgora + '</b><span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">🔴 ESPERANDO RESPOSTA AGORA</span></div>'
       + '</div>'
-      + '<div class="hint">Baseado em <b>' + tempos.length + '</b> conversa' + (tempos.length === 1 ? '' : 's') + ' com resposta, de ' + consultados + ' consultada' + (consultados === 1 ? '' : 's') + ' na Clint · a média conta do primeiro "oi" do lead até a primeira resposta de vocês</div></div>';
+      + '<div class="hint">Medição do robô nas conversas recentes da Clint · do primeiro "oi" do lead até a primeira resposta de vocês · clique no vermelho para abrir as listas</div></div>';
   }
 
   // ===== 🟣 FUNIL DA CLINT: as etapas de negócio, como estão lá =====
@@ -6036,7 +6030,7 @@ function alternarEdicaoPag() {
 // equipe@ideiaspromov.com.br. O jeito do Bruno publicar é criar uma
 // implantação NOVA (endereço novo) — quando isso acontecer, conferir a
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
-// Endereço atual: implantação de 17/08/2026, código v13-leads-certos.
+// Endereço atual: implantação de 17/08/2026, código v15-gaveta-nova.
 // Endereços antigos (reserva, código velho):
 // https://script.google.com/macros/s/AKfycbyqly_ropHDltIHMDxk9beDflwnrtLj2XY0lVSAyTJz5_ocuaaDNDHSxg2qj28TUQ/exec (1ª implantação)
 // https://script.google.com/macros/s/AKfycbwJHmHNTkeisb7xHQgdUqW-AEpIuJDC1_D6HDVGYp4T7LHcXYHSmj3IMsFrns0-VWVN/exec (2ª implantação)
@@ -6045,7 +6039,8 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbwDCBCfVb_62C-19Uuam7dBKDeBSAjSzVqzLbCoKnq8N5b2deedvOOXwuaqogdebobl/exec (5ª implantação, v9)
 // https://script.google.com/macros/s/AKfycbwclIrrcDOEyyBivWiJ-hFJMHubjJmQNgM986bdCjJqTwhOb4LFOeudYUQ-DXNnTs8A/exec (6ª implantação, v11)
 // https://script.google.com/macros/s/AKfycbyrQGbQyMRE-lEbsDqZh4HoVqS8hUmFBDg2pewtYvDVyzk_jFEryknXQbmYxxWBRVzO/exec (7ª implantação, v12)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby_m8yMzH_yq8RXmJjqHLqd4tkaCHkXeA886wZAGagVhQDpys3lEWjr4ssLxMkTedKy/exec';
+// https://script.google.com/macros/s/AKfycby_m8yMzH_yq8RXmJjqHLqd4tkaCHkXeA886wZAGagVhQDpys3lEWjr4ssLxMkTedKy/exec (8ª implantação, v13)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwf783hSUFgLik3AnTNcYCp2ms5d60ihBA8Bu4fFcRqHyukOG4Ly9ZMkvoQhBDcCKLE/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
