@@ -6846,6 +6846,7 @@ var ACESSOS = [
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
+  { nome: 'Adm',           pin: '8520', adm: true },     // acesso geral; não vira "Você" sozinho
   { nome: 'Visitante',     pin: '4802', soOlha: true }   // vê tudo, não mexe em nada
 ];
 // visitante: pode olhar, não pode mexer (os botões avisam e não fazem nada)
@@ -6880,7 +6881,7 @@ function montarLogin() {
     var b = document.createElement('button');
     b.className = 'btn';
     b.style.cssText = 'padding:13px;font-size:.85rem;width:100%;';
-    b.textContent = (a.soOlha ? '👁 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : '');
+    b.textContent = (a.soOlha ? '👁 ' : a.adm ? '🛡 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : '');
     b.onclick = function() {
       window._lgEscolhido = a.nome;
       ov.querySelector('#lg-quem').textContent = a.nome;
@@ -6904,7 +6905,8 @@ function loginConferir() {
   ACESSOS.forEach(function(a){ if (a.nome === window._lgEscolhido && a.pin === senha) quem = a; });
   if (!quem) { alert('Senha errada. Tente de novo (ou peça a sua senha para o Bruno).'); return; }
   localStorage.setItem('v2Login', quem.nome);
-  if (!quem.soOlha) localStorage.setItem('v2LeadEu', quem.nome);   // o "Você" já entra certo (visitante não assume nada)
+  // o "Você" já entra certo — menos para visitante (não mexe) e Adm (escolhe na mão se quiser)
+  if (!quem.soOlha && !quem.adm) localStorage.setItem('v2LeadEu', quem.nome);
   var ov = document.getElementById('tela-login');
   if (ov) ov.remove();
   montarSeletorEu();
