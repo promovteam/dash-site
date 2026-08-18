@@ -3368,7 +3368,7 @@ function csvFunilSdr() {
 //   alta  = R$2mil a R$4mil  → selo "CHAMAR RÁPIDO"
 //   media = R$500 a R$1mil   → prioridade menor
 //   nda   = "não tenho disponibilidade" · sem = não respondeu
-//   MQL   = alta + media (investimento de 500 a 4.000)
+//   MQL   = declarou QUALQUER investimento (alta + media) · HT = R$2 a R$4mil (alta)
 var LEADS_GID = '975100334';
 var LD = { rows: [], semData: [], carregado: false };
 var LD_PER = 'hoje', LD_BUSCA = '';
@@ -4062,8 +4062,8 @@ function marcarLeadsVistos() {
 }
 // qualificação em palavras simples (usada no aviso e no toast)
 var LD_QUALI = {
-  alta:  { nome:'Lead quente',      ico:'🔥', cor:'#f6a350', acao:'chamar agora no WhatsApp' },
-  media: { nome:'Lead morno',       ico:'🟡', cor:'#6ea8ff', acao:'chamar depois dos quentes' },
+  alta:  { nome:'Perfil HT (R$2–4mil)', ico:'🔥', cor:'#f6a350', acao:'chamar agora no WhatsApp' },
+  media: { nome:'MQL (R$500–1mil)',  ico:'🟡', cor:'#6ea8ff', acao:'chamar depois dos HT' },
   nda:   { nome:'Sem verba',        ico:'⚪', cor:'#8b8fa3', acao:'sem disponibilidade de investimento' },
   sem:   { nome:'Sem qualificação', ico:'❔', cor:'#8b8fa3', acao:'não respondeu quanto pode investir' }
 };
@@ -4615,15 +4615,24 @@ function renderAnuncios() {
       return '<span class="chart-chip' + (AN_PER === o[0] ? ' on' : '') + '" style="cursor:pointer;" onclick="AN_PER=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>';
     }).join('') + '<span style="flex:1;"></span><span class="hint">' + per.label + '</span>';
   }
-  if (!V2.carregado || !LD.carregado) { el.innerHTML = '<div class="hint">⏳ Carregando as planilhas…</div>'; return; }
+  // não trava a tela: mostra o que já chegou e avisa o que falta
+  if (!V2.carregado && !LD.carregado) {
+    el.innerHTML = '<div class="hint">⏳ Lendo os dados… <span style="opacity:.7;">(a primeira leitura do histórico leva alguns segundos)</span></div>';
+    setTimeout(renderAnuncios, 1500);
+    return;
+  }
+  var faltando = [];
+  if (!LD.carregado) faltando.push('leads');
+  if (!V2.carregado) faltando.push('vendas');
+  if (faltando.length) setTimeout(renderAnuncios, 1500);
 
   // ---- reuniões e vendas do período, por origem ----
   var REAL = ['vendido','nao vendido','bloqueio de oferta','entrada','estorno'];
   var FECHOU = ['vendido','entrada','bloqueio de oferta'];
   var porTelLead = {};
-  LD.rows.forEach(function(l){ if (l.tel8 && !porTelLead[l.tel8]) porTelLead[l.tel8] = l; });
+  (LD.rows || []).forEach(function(l){ if (l.tel8 && !porTelLead[l.tel8]) porTelLead[l.tel8] = l; });
   var org = {}, totO = { ag:0, re:0, fe:0, vd:0, fat:0 };
-  V2.rows.forEach(function(r) {
+  (V2.rows || []).forEach(function(r) {
     var d = r.date instanceof Date ? r.date : (r.date ? new Date(r.date) : null);
     if (!d || isNaN(d.getTime())) return;
     var t = d.getTime();
@@ -4640,7 +4649,9 @@ function renderAnuncios() {
   var lista = Object.keys(org).sort(function(a,b){ return org[b].fat - org[a].fat || org[b].ag - org[a].ag; });
   function rs(v){ return 'R$ ' + Math.round(v||0).toLocaleString('pt-BR'); }
 
-  var h = '<div class="panel" style="margin-bottom:18px;">'
+  var h = '';
+  if (faltando.length) h += '<div class="hint" style="margin-bottom:10px;color:#f6a350;">⏳ ainda chegando: ' + faltando.join(' e ') + ' — os números abaixo completam em instantes</div>';
+  h += '<div class="panel" style="margin-bottom:18px;">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">🧲 Detalhamento por origem</h3>'
     + '<span style="flex:1;"></span><span class="hint">' + per.label + '</span></div>'
     + '<div style="overflow-x:auto;margin-top:12px;"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">'
@@ -4670,7 +4681,7 @@ function renderAnuncios() {
 
   // ---- criativos: cada anúncio com leads, reuniões, vendas ----
   var an = {};
-  LD.rows.forEach(function(l) {
+  (LD.rows || []).forEach(function(l) {
     if (!l.date) return;
     var t = l.date.getTime();
     if (per.ini !== null && t < per.ini) return;
@@ -4682,7 +4693,7 @@ function renderAnuncios() {
     var a = an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo });
     a.n++;
     if (l.faixa === 'alta') a.q++;
-    if (l.faixa === 'alta' || l.faixa === 'media') a.mql++;   // MQL = declarou R$500 a R$4mil
+    if (l.faixa === 'alta' || l.faixa === 'media') a.mql++;   // MQL = declarou qualquer investimento
     var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
     if (st) {
       a.ag++;
@@ -4740,7 +4751,7 @@ function renderAnuncios() {
       + '<div style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
       +   '<b style="font-size:.74rem;line-height:1.3;">' + k + '</b>'
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:' + (a.tipo === 'pago' ? 'rgba(255,107,107,.13);color:#ff6b6b' : 'rgba(61,220,151,.13);color:#3ddc97') + ';">' + (a.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
-      +   '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · <b style="color:#f6a350;">' + a.mql + ' MQL</b> · ' + (a.n?Math.round(a.q/a.n*100):0) + '% quentes' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>'
+      +   '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · <b style="color:#f6a350;">' + a.mql + ' MQL</b> · <b style="color:#ff6b6b;">' + a.q + ' HT</b>' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>'
       +   '<div style="display:flex;gap:5px;margin-top:9px;">'
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(255,209,102,.1);"><b style="color:#ffd166;font-size:.95rem;display:block;">' + a.ag + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">AGEND.</span></div>'
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(185,138,255,.1);"><b style="color:#b98aff;font-size:.95rem;display:block;">' + a.re + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">REUNIÕES</span></div>'
@@ -4880,13 +4891,13 @@ function abrirCriativo(nome) {
     +   '<div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:9px;">'
     +     '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
     +       cardMini(d.n, 'LEADS', '#6ea8ff') + cardMini(d.mql, 'MQL', '#f6a350')
-    +       cardMini(d.q, 'R$2–4MIL', '#ff6b6b')
+    +       cardMini(d.q, 'PERFIL HT', '#ff6b6b')
     +     '</div>'
     +     '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
     +       cardMini(d.ag, 'AGENDOU', '#ffd166')
     +       cardMini(d.re, 'REUNIÕES', '#b98aff') + cardMini(d.vd, 'VENDAS', '#3ddc97')
     +     '</div>'
-    +     '<div class="hint">MQL = declarou investir de R$500 a R$4mil'
+    +     '<div class="hint">MQL = declarou qualquer investimento · HT = R$2 a R$4mil'
     +       + (d.n ? ' · ' + Math.round(d.mql / d.n * 100) + '% dos leads deste anúncio' : '') + '</div>'
     +     (m.gasto ? '<div class="card" style="padding:12px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.28);border-radius:13px;">'
     +       '<b style="color:#ff6b6b;font-size:1.1rem;">' + rs(m.gasto) + '</b><div class="hint">investido'
@@ -5339,7 +5350,7 @@ function ldUnicos(rows) {
 }
 function abrirEtapaLeads(k) {
   if (!_ldEtapas) return;
-  var cfg = { tot:['📥','Leads que chegaram'], mql:['🎯','MQLs (R$500 a R$4mil)'], ag:['📅','Agendaram reunião'], re:['✅','Realizaram reunião'], vd:['💰','Vendidos'] }[k];
+  var cfg = { tot:['📥','Leads que chegaram'], mql:['🎯','MQL — declarou investimento'], ag:['📅','Agendaram reunião'], re:['✅','Realizaram reunião'], vd:['💰','Vendidos'] }[k];
   var rows = _ldEtapas[k] || [];
   document.getElementById('mb-titulo').textContent = cfg[1] + ' — ' + rows.length;
   document.getElementById('mb-ico').textContent = cfg[0];
@@ -5370,8 +5381,8 @@ function renderAvisoNovos() {
   novos.forEach(function(l){ (porQ[l.faixa] || porQ.sem).push(l); });
   var quentes = porQ.alta.length, mornos = porQ.media.length, resto = porQ.nda.length + porQ.sem.length;
   var pills = '';
-  if (quentes) pills += '<span class="nb-pill q" onclick="verLeadsNovos(\'alta\')">🔥 ' + quentes + ' quente' + (quentes === 1 ? '' : 's') + ' · R$2–4mil</span>';
-  if (mornos) pills += '<span class="nb-pill m" onclick="verLeadsNovos(\'media\')">🟡 ' + mornos + ' morno' + (mornos === 1 ? '' : 's') + ' · R$500–1mil</span>';
+  if (quentes) pills += '<span class="nb-pill q" onclick="verLeadsNovos(\'alta\')">🔥 ' + quentes + ' perfil HT · R$2–4mil</span>';
+  if (mornos) pills += '<span class="nb-pill m" onclick="verLeadsNovos(\'media\')">🟡 ' + mornos + ' MQL · R$500–1mil</span>';
   if (resto) pills += '<span class="nb-pill f" onclick="verLeadsNovos(\'\')">⚪ ' + resto + ' sem verba / sem resposta</span>';
   if (comHoje) pills += '<span class="nb-pill m" style="background:rgba(110,168,255,.16);border:1px solid rgba(110,168,255,.4);" onclick="verComentariosHoje()">💬 ' + comHoje + ' comentário' + (comHoje === 1 ? '' : 's') + ' no post</span>';
   var titulo = novos.length
@@ -5491,7 +5502,7 @@ function toastLeadNovo(lista) {
   // 🚨 sirene + aviso do sistema
   tocarSirene(quentes.length > 0);
   notificarLead(
-    quentes.length ? '🔥 Lead QUENTE chegou!' : (novos.length === 1 ? '📥 Lead novo chegou!' : '📥 ' + novos.length + ' leads novos!'),
+    quentes.length ? '🔥 Lead perfil HT chegou!' : (novos.length === 1 ? '📥 Lead novo chegou!' : '📥 ' + novos.length + ' leads novos!'),
     (alvo.nome || 'Sem nome') + ' · ' + q.nome + (quentes.length ? ' · ' + q.acao : '')
   );
   var velho = document.getElementById('toast-novo'); if (velho) velho.remove();
@@ -5536,7 +5547,7 @@ function renderLeads() {
 
   var ET = [
     { k:'tot', nome:'Leads que chegaram', ico:'📥', cor:'#6ea8ff', sub:'todos que preencheram a pesquisa', q: rows.length, base: 0 },
-    { k:'mql', nome:'MQL — investimento R$500 a R$4mil', ico:'🎯', cor:'#f6a350', sub:'leads com verba declarada', q: mql.length, base: rows.length },
+    { k:'mql', nome:'MQL — declarou investimento', ico:'🎯', cor:'#f6a350', sub:'qualquer valor declarado (dentro deles estão os de perfil HT)', q: mql.length, base: rows.length },
     { k:'ag',  nome:'Agendaram reunião', ico:'📅', cor:'#ffd166', sub:'telefone encontrado na aba Vendas', q: ag.length, base: mql.length },
     { k:'re',  nome:'Realizaram reunião', ico:'✅', cor:'#b98aff', sub:'vendido + não vendido + bloqueio + entrada + estorno', q: re.length, base: ag.length },
     { k:'vd',  nome:'Vendido', ico:'💰', cor:'#3ddc97', sub:'fechou de verdade', q: vd.length, base: re.length }
@@ -5808,8 +5819,8 @@ function renderLeads() {
     h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;">'
       + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._quenteAberto=!window._quenteAberto;renderLeads();">'
       + '<span style="font-size:1.4rem;">🚨</span>'
-      + '<div style="flex:1;"><b style="font-size:.84rem;color:#ff6b6b;">' + parados.length + ' lead' + (parados.length === 1 ? ' quente está' : 's quentes estão') + ' há mais de 2 horas sem ninguém assumir</b>'
-      + '<div class="hint" style="margin-top:3px;">São leads de R$2–4mil sem dono aqui e sem dono na Clint — ninguém chamou ainda</div></div>'
+      + '<div style="flex:1;"><b style="font-size:.84rem;color:#ff6b6b;">' + parados.length + ' lead' + (parados.length === 1 ? ' de perfil HT está' : 's de perfil HT estão') + ' há mais de 2 horas sem ninguém assumir</b>'
+      + '<div class="hint" style="margin-top:3px;">São leads de perfil HT (R$2–4mil) sem dono aqui e sem dono na Clint — ninguém chamou ainda</div></div>'
       + '<span style="color:#ff6b6b;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (qAberto ? '▲ fechar' : '▼ ver agora') + '</span></div>';
     if (qAberto) {
       h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
@@ -5849,7 +5860,7 @@ function renderLeads() {
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 4px;">'
     +   '<span class="ld-selo' + (modoAc ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._funilModo=\'chegaram\';renderLeads();" title="Segue só os leads que preencheram a pesquisa neste período">📥 Leads que chegaram no período</span>'
     +   '<span class="ld-selo' + (modoAc ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._funilModo=\'aconteceu\';renderLeads();" title="Tudo que aconteceu no período, inclusive com leads que chegaram antes">📆 Tudo que aconteceu no período (leads de qualquer época)</span>'
-    +   '<span class="ld-selo' + (LD_F.faixa.indexOf('alta') !== -1 ? '' : ' morno') + '" style="cursor:pointer;" onclick="ldSetF(\'faixa\',\'alta\')" title="Mostra só quem declarou investir de R$2mil a R$4mil">🔥 Só leads R$2–4mil</span>'
+    +   '<span class="ld-selo' + (LD_F.faixa.indexOf('alta') !== -1 ? '' : ' morno') + '" style="cursor:pointer;" onclick="ldSetF(\'faixa\',\'alta\')" title="Perfil HT: declarou investir de R$2mil a R$4mil">🔥 Só perfil HT (R$2–4mil)</span>'
     + '</div>'
     + (per.aviso ? '<div class="hint" style="margin:8px 0;color:#f6a350;">' + per.aviso + '</div>' : '');
   ET.forEach(function(e) {
@@ -7753,7 +7764,7 @@ carregarClintPainel();
 carregarComentarios();
 setInterval(carregarComentarios, 180000);
 // base do site do diagnóstico: relê a cada 2 minutos (leads ao vivo)
-setInterval(function(){ SB.carregado = false; carregarSupabase(); }, 120000);
+setInterval(function(){ SB.carregado = false; LD._fundido = null; carregarSupabase(); }, 180000);
 // fica de olho: a cada 3 minutos relê a planilha de leads e avisa se chegou alguém;
 // a cada 5 minutos atualiza o painel da Clint (etapas, donos e esperando resposta)
 setInterval(carregarLeads, 180000);
