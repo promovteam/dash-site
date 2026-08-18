@@ -4797,6 +4797,44 @@ function carregarCriativos() {
 function criativoDe(nomeAnuncio, adId) {
   return (adId && META_CRI.porId[adId]) || META_CRI.porNome[_chaveAnuncio(nomeAnuncio)] || null;
 }
+// junta as duas fontes: a base do site (ao vivo, desde 21/07) manda no período
+// que ela cobre; a planilha continua guardando todo o histórico anterior.
+// Ninguém aparece duas vezes (casamos pelo telefone).
+var SB_CORTE = null;   // a data do lead mais antigo da base do site
+function ldFundirSupabase() {
+  if (!SB.carregado || !SB.rows.length || !LD.rows) return;
+  if (LD._fundido === SB.rows.length) return;   // já fiz esta fusão
+  var maisAntigo = null;
+  SB.rows.forEach(function(r){ if (r.date && (!maisAntigo || r.date < maisAntigo)) maisAntigo = r.date; });
+  if (!maisAntigo) return;
+  SB_CORTE = maisAntigo;
+  var vistos = {};
+  var novos = SB.rows.map(function(r) {
+    if (r.tel8) vistos[r.tel8] = 1;
+    return {
+      i: 'sb', nome: r.nome, tel: r.whatsapp, insta: r.insta, email: r.email,
+      seg: r.seg, obj: '', renda: '', invest: r.invest,
+      score: 0, date: r.date, dataTxt: r.date ? r.date.toLocaleString('pt-BR') : '', aprox: false,
+      status: r.completa ? 'Completa' : 'Pendente',
+      origem: r.origemForm || r.origem, url: '',
+      utm: [r.fonte, r.campanha].filter(Boolean).join(' · '),
+      anuncio: r.anuncio, conjunto: '', campanha: r.campanha, fonte: r.fonte,
+      meio: /organic|bio|manychat/i.test(r.origem || '') ? '' : 'paid',
+      dono: '', situacao: '', quando: '', motivo: '',
+      faixa: leadFaixa(r.invest), tel8: r.tel8,
+      pendente: !r.completa, aoVivo: true
+    };
+  });
+  // da planilha, mantém só o que é ANTERIOR à base do site (histórico) e quem não repetiu
+  var historico = LD.rows.filter(function(l) {
+    if (l.date && l.date >= SB_CORTE) return false;
+    return !(l.tel8 && vistos[l.tel8]);
+  });
+  LD.rows = novos.concat(historico).sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
+  LD._fundido = SB.rows.length;
+  _ldIdx = null; _nomeTelIdx = null;
+}
+
 // ===== 🟠 BASE DO SITE DO DIAGNÓSTICO (Supabase, via robô) =====
 // Traz quem começou o diagnóstico — inclusive os que NÃO terminaram,
 // que a planilha não registra. São leads pagos e nunca trabalhados.
@@ -4826,6 +4864,7 @@ function carregarSupabase() {
         };
       });
       SB.carregado = true; SB.erro = ''; SB.atualizado = d.atualizado || '';
+      ldFundirSupabase();
     } else { SB.erro = (d && (d.detalhe || d.error)) || 'sem resposta'; }
     renderLeads();
   };
@@ -5720,6 +5759,11 @@ function renderLeads() {
       { k:'acVd', nome:'Vendas', ico:'💰', cor:'#3ddc97', sub:'fechou de verdade' + (acFun.valor ? ' · R$ ' + Math.round(acFun.valor).toLocaleString('pt-BR') : ''), q: acFun.vd.length, base: acFun.re.length }
     ];
     topo = Math.max(acFun.ag.length, 1);
+  }
+  if (SB.carregado && SB_CORTE) {
+    h += '<div class="hint" style="margin-bottom:10px;">🟢 <b style="color:#3ddc97;">Ao vivo</b> desde '
+      + SB_CORTE.toLocaleDateString('pt-BR') + ' (base do site do diagnóstico, relida a cada 2 min · '
+      + SB.rows.length + ' leads, inclusive quem não terminou) · antes disso, histórico da planilha</div>';
   }
   h += '<div class="panel" style="margin-bottom:18px;">'
     + '<h3>' + (modoAc ? '📆 Funil do período' : '📥 Funil de Leads') + ' — ' + per.label + (LD_RANGE ? ' <span class="ld-selo morno" style="cursor:pointer;" onclick="escolherBucketLeads(' + LD_RANGE.ini + ')">✕ limpar</span>' : '')
@@ -7629,6 +7673,8 @@ carregarLeads();
 carregarClintPainel();
 carregarComentarios();
 setInterval(carregarComentarios, 180000);
+// base do site do diagnóstico: relê a cada 2 minutos (leads ao vivo)
+setInterval(function(){ SB.carregado = false; carregarSupabase(); }, 120000);
 // fica de olho: a cada 3 minutos relê a planilha de leads e avisa se chegou alguém;
 // a cada 5 minutos atualiza o painel da Clint (etapas, donos e esperando resposta)
 setInterval(carregarLeads, 180000);
