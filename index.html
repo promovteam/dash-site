@@ -4679,9 +4679,10 @@ function renderAnuncios() {
     if (nome === '(sem anúncio)') return;
     var tipo = ldTipoTrafego(l);
     if (AN_TIPO !== 'todos' && tipo !== AN_TIPO) return;
-    var a = an[nome] || (an[nome] = { n:0, q:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo });
+    var a = an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo });
     a.n++;
     if (l.faixa === 'alta') a.q++;
+    if (l.faixa === 'alta' || l.faixa === 'media') a.mql++;   // MQL = declarou R$500 a R$4mil
     var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
     if (st) {
       a.ag++;
@@ -4726,19 +4727,20 @@ function renderAnuncios() {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {};
     var cri = criativoDe(k, m.adId);
     if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post }; }
+    _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m };
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
-    h += '<div style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;">'
+    h += '<div class="click" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
       + '<div style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
       +   (m.foto ? '<img src="' + m.foto + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : '')
       +   '<span class="semfoto" style="position:absolute;inset:0;display:' + (m.foto ? 'none' : 'flex') + ';align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>'
       +   (m.post ? '<a href="https://www.facebook.com/' + m.post.replace('_', '/posts/') + '" target="_blank" style="position:absolute;inset:0;" title="ver a publicação"></a>' : '')
       +   '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.65);color:#fff;font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:99px;">#' + (i+1) + '</span>'
-      +   (m.link ? '<a href="' + m.link + '" target="_blank" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : '')
+      +   (m.link ? '<a href="' + m.link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : '')
       + '</div>'
       + '<div style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
       +   '<b style="font-size:.74rem;line-height:1.3;">' + k + '</b>'
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:' + (a.tipo === 'pago' ? 'rgba(255,107,107,.13);color:#ff6b6b' : 'rgba(61,220,151,.13);color:#3ddc97') + ';">' + (a.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
-      +   '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · ' + (a.n?Math.round(a.q/a.n*100):0) + '% quentes' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>'
+      +   '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · <b style="color:#f6a350;">' + a.mql + ' MQL</b> · ' + (a.n?Math.round(a.q/a.n*100):0) + '% quentes' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>'
       +   '<div style="display:flex;gap:5px;margin-top:9px;">'
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(255,209,102,.1);"><b style="color:#ffd166;font-size:.95rem;display:block;">' + a.ag + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">AGEND.</span></div>'
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(185,138,255,.1);"><b style="color:#b98aff;font-size:.95rem;display:block;">' + a.re + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">REUNIÕES</span></div>'
@@ -4834,6 +4836,82 @@ function ldFundirSupabase() {
   LD._fundido = SB.rows.length;
   _ldIdx = null; _nomeTelIdx = null;
 }
+
+// ===== ▶ VER O CRIATIVO DENTRO DO DASH (imagem grande / vídeo tocando) =====
+var _anAtual = null;
+function abrirCriativo(nome) {
+  var d = _anDados[nome];
+  if (!d) return;
+  _anAtual = nome;
+  var m = d.meta || {};
+  var cx = document.getElementById('modal-criativo');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-criativo';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(6,6,16,.88);display:flex;align-items:center;justify-content:center;padding:22px;';
+    cx.onclick = function(e){ if (e.target === cx) fecharCriativo(); };
+    document.body.appendChild(cx);
+  }
+  // o vídeo/post do Facebook tocando aqui dentro
+  var player = '';
+  if (m.post) {
+    var partes = String(m.post).split('_');
+    if (partes.length === 2) {
+      var urlPost = 'https://www.facebook.com/' + partes[0] + '/posts/' + partes[1];
+      player = '<iframe src="https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent(urlPost)
+        + '&show_text=false&width=500" width="500" height="580" style="border:none;overflow:hidden;border-radius:12px;background:#111;"'
+        + ' scrolling="no" frameborder="0" allowfullscreen="true"'
+        + ' allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>';
+    }
+  }
+  var rs = function(v){ return 'R$ ' + Math.round(v||0).toLocaleString('pt-BR'); };
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,255,255,.14);border-radius:20px;max-width:960px;width:100%;max-height:92vh;overflow-y:auto;padding:20px;">'
+    + '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;">'
+    +   '<div style="flex:1;"><b style="font-size:1.02rem;">' + nome + '</b>'
+    +     '<div class="hint" style="margin-top:3px;">' + (d.camp || '') + '</div></div>'
+    +   '<span class="ld-tag" style="background:' + (d.tipo === 'pago' ? 'rgba(255,107,107,.14);color:#ff6b6b' : 'rgba(61,220,151,.14);color:#3ddc97') + ';">' + (d.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
+    +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;padding:0 4px;" onclick="fecharCriativo()">✕</span>'
+    + '</div>'
+    + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+    +   '<div style="flex:1;min-width:300px;">'
+    +     (player || (m.foto ? '<img src="' + m.foto + '" style="width:100%;border-radius:12px;">' : '<div class="hint">Sem prévia disponível</div>'))
+    +     (player ? '' : '<div class="hint" style="margin-top:8px;">Este criativo não tem prévia para tocar aqui.</div>')
+    +   '</div>'
+    +   '<div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:9px;">'
+    +     '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
+    +       cardMini(d.n, 'LEADS', '#6ea8ff') + cardMini(d.mql, 'MQL', '#f6a350')
+    +       cardMini(d.q, 'R$2–4MIL', '#ff6b6b')
+    +     '</div>'
+    +     '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
+    +       cardMini(d.ag, 'AGENDOU', '#ffd166')
+    +       cardMini(d.re, 'REUNIÕES', '#b98aff') + cardMini(d.vd, 'VENDAS', '#3ddc97')
+    +     '</div>'
+    +     '<div class="hint">MQL = declarou investir de R$500 a R$4mil'
+    +       + (d.n ? ' · ' + Math.round(d.mql / d.n * 100) + '% dos leads deste anúncio' : '') + '</div>'
+    +     (m.gasto ? '<div class="card" style="padding:12px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.28);border-radius:13px;">'
+    +       '<b style="color:#ff6b6b;font-size:1.1rem;">' + rs(m.gasto) + '</b><div class="hint">investido'
+    +       + (d.n ? ' · ' + rs(m.gasto/d.n) + ' por lead' : '')
+    +       + (d.vd ? ' · ' + rs(m.gasto/d.vd) + ' por venda' : '') + '</div></div>' : '')
+    +     (d.fat ? '<div class="card" style="padding:12px;background:rgba(61,220,151,.08);border:1px solid rgba(61,220,151,.28);border-radius:13px;">'
+    +       '<b style="color:#3ddc97;font-size:1.1rem;">' + rs(d.fat) + '</b><div class="hint">faturamento gerado'
+    +       + (m.gasto ? ' · retorno de ' + (d.fat/m.gasto).toFixed(1) + 'x' : '') + '</div></div>' : '')
+    +     (m.link ? '<a class="btn primary" href="' + m.link + '" target="_blank" style="text-align:center;padding:10px;text-decoration:none;">ver no Facebook ↗</a>' : '')
+    +   '</div>'
+    + '</div></div>';
+  cx.style.display = 'flex';
+}
+function cardMini(v, l, cor) {
+  return '<div style="flex:1;min-width:70px;text-align:center;padding:9px 5px;border-radius:11px;background:rgba(255,255,255,.05);">'
+    + '<b style="color:' + cor + ';font-size:1.15rem;display:block;">' + (v || 0) + '</b>'
+    + '<span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">' + l + '</span></div>';
+}
+function fecharCriativo() {
+  var cx = document.getElementById('modal-criativo');
+  if (cx) { cx.innerHTML = ''; cx.style.display = 'none'; }
+  _anAtual = null;
+}
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') fecharCriativo(); });
+var _anDados = {};
 
 // ===== 🟠 BASE DO SITE DO DIAGNÓSTICO (Supabase, via robô) =====
 // Traz quem começou o diagnóstico — inclusive os que NÃO terminaram,
