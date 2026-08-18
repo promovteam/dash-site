@@ -4721,8 +4721,11 @@ function renderAnuncios() {
   }
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
   if (!chaves.length) h += '<div class="hint">Nenhum anúncio no período.</div>';
+  carregarCriativos();
   chaves.slice(0, 40).forEach(function(k, i) {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {};
+    var cri = criativoDe(k, m.adId);
+    if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post }; }
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
     h += '<div style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;">'
       + '<div style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
@@ -4757,6 +4760,91 @@ function _valorDoTel(t8) {
     });
   }
   return _valTel[t8] || 0;
+}
+
+// imagens dos anúncios: busca em páginas, sem travar a tela
+var META_CRI = { porId: {}, porNome: {}, pagina: 0, buscando: false, fim: false };
+function carregarCriativos() {
+  if (META_CRI.buscando || META_CRI.fim || META_CRI.pagina >= 8) return;
+  META_CRI.buscando = true;
+  var pag = META_CRI.pagina + 1;
+  var nome = 'criCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  var pronto = false;
+  var fim = function(d) {
+    if (pronto) return;
+    pronto = true; META_CRI.buscando = false;
+    try { sc.remove(); } catch (e) {}
+    try { delete window[nome]; } catch (e) {}
+    if (d && d.success) {
+      META_CRI.pagina = pag;
+      (d.itens || []).forEach(function(it) {
+        if (it.id) META_CRI.porId[it.id] = it;
+        if (it.nome) META_CRI.porNome[_chaveAnuncio(it.nome)] = it;
+      });
+      if (!d.temMais) META_CRI.fim = true;
+      renderAnuncios();
+      if (!META_CRI.fim) setTimeout(carregarCriativos, 900);   // próxima página
+    } else { META_CRI.fim = true; }
+  };
+  window[nome] = fim;
+  sc.onerror = function(){ fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
+    + encodeURIComponent(JSON.stringify({ action: 'metaCriativos', pagina: pag }));
+  document.body.appendChild(sc);
+  setTimeout(function(){ fim(null); }, 90000);
+}
+function criativoDe(nomeAnuncio, adId) {
+  return (adId && META_CRI.porId[adId]) || META_CRI.porNome[_chaveAnuncio(nomeAnuncio)] || null;
+}
+// ===== 🟠 BASE DO SITE DO DIAGNÓSTICO (Supabase, via robô) =====
+// Traz quem começou o diagnóstico — inclusive os que NÃO terminaram,
+// que a planilha não registra. São leads pagos e nunca trabalhados.
+var SB = { rows: [], carregado: false, buscando: false, erro: '', atualizado: '' };
+function carregarSupabase() {
+  if (SB.buscando || SB.carregado) return;
+  SB.buscando = true;
+  var nome = 'sbCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  var pronto = false;
+  var fim = function(d) {
+    if (pronto) return;
+    pronto = true; SB.buscando = false;
+    try { sc.remove(); } catch (e) {}
+    try { delete window[nome]; } catch (e) {}
+    if (d && d.success) {
+      SB.rows = (d.linhas || []).map(function(r) {
+        return {
+          nome: r.nome || '', email: r.email || '', whatsapp: r.whatsapp || '',
+          insta: String(r.instagram || '').replace(/^@/, ''),
+          origem: r.origem || '', origemForm: r.origem_form || '',
+          completa: r.pesquisa_completa === true || r.pesquisa_completa === 'true',
+          invest: r.investimento || '', seg: r.seguidores || '',
+          anuncio: r.utm_content || '', campanha: r.utm_campaign || '', fonte: r.utm_source || '',
+          date: r.created_at ? new Date(r.created_at) : null,
+          tel8: ldTel8(r.whatsapp || '')
+        };
+      });
+      SB.carregado = true; SB.erro = ''; SB.atualizado = d.atualizado || '';
+    } else { SB.erro = (d && (d.detalhe || d.error)) || 'sem resposta'; }
+    renderLeads();
+  };
+  window[nome] = fim;
+  sc.onerror = function(){ fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
+    + encodeURIComponent(JSON.stringify({ action: 'supabaseDados', tabela: 'diagnostico', limite: 2000, ordenarPor: 'created_at' }));
+  document.body.appendChild(sc);
+  setTimeout(function(){ fim(null); }, 90000);
+}
+// quem parou no meio e ninguém chamou (não está na aba Vendas nem tem dono)
+function sbPendentes() {
+  if (!SB.carregado) return [];
+  return SB.rows.filter(function(r) {
+    if (r.completa) return false;                          // terminou: já está na planilha
+    if (!r.whatsapp) return false;                         // sem telefone não dá para chamar
+    if (r.tel8 && _ldIdx && _ldIdx[r.tel8]) return false;  // já teve reunião: não incomodar
+    return true;
+  });
 }
 
 // ===== 💸 META ADS: gasto por anúncio (vem do robô, que fala com o Facebook) =====
@@ -5478,6 +5566,42 @@ function renderLeads() {
       h += '</div>';
     }
   }
+  // ===== 🟠 quem começou o diagnóstico e não terminou (base do site) =====
+  carregarSupabase();
+  (function() {
+    var pend = sbPendentes();
+    if (!pend.length) {
+      if (SB.erro) h += '<div class="hint" style="margin-bottom:10px;color:#f6a350;">🟠 Base do site do diagnóstico não conectada (' + SB.erro + ')</div>';
+      return;
+    }
+    var pAberto = !!window._sbAberto;
+    var comAnuncio = pend.filter(function(x){ return x.anuncio; }).length;
+    h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(246,163,80,.09);border-color:rgba(246,163,80,.5);">'
+      + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._sbAberto=!window._sbAberto;renderLeads();">'
+      + '<span style="font-size:1.2rem;">🟠</span>'
+      + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#f6a350;">' + pend.length + ' começaram o diagnóstico e não terminaram</b>'
+      + '<span class="hint" style="margin-left:8px;">têm WhatsApp e nunca foram chamados · ' + comAnuncio + ' vieram de anúncio</span></div>'
+      + '<span style="color:#f6a350;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (pAberto ? '▲ fechar' : '▼ ver lista') + '</span></div>';
+    if (pAberto) {
+      h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
+      pend.slice(0, 200).forEach(function(x) {
+        var wa = 'https://wa.me/' + String(x.whatsapp).replace(/\D/g, '');
+        h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+          + '<b style="font-size:.76rem;flex:1;min-width:130px;">' + (x.nome || 'Sem nome') + '</b>'
+          + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;">⏱ ' + tempoDesde(x.date) + '</span>' : '')
+          + (x.origem ? '<span class="ld-tag" style="background:rgba(110,168,255,.13);color:#6ea8ff;">' + x.origem + '</span>' : '')
+          + (x.anuncio ? '<span class="ld-tag" style="background:rgba(185,138,255,.13);color:#b98aff;" title="' + x.anuncio + '">📣 ' + ldAnuncioLimpo(x.anuncio).substring(0, 22) + '</span>' : '')
+          + '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation();">💬 WhatsApp</a>'
+          + (x.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank">📷</a>' : '')
+          + '</div>';
+      });
+      if (pend.length > 200) h += '<div class="hint">… e mais ' + (pend.length - 200) + '</div>';
+      h += '</div>';
+      h += '<div class="hint">Base do site do diagnóstico' + (SB.atualizado ? ' · lida em ' + SB.atualizado : '') + ' · quem já teve reunião não aparece aqui</div>';
+    }
+    h += '</div>';
+  })();
+
   // ===== 💬 comentários no post do diagnóstico — barrinha que abre =====
   if (COMENT.carregado && COMENT.rows.length) {
     var hoje0 = ldDia(new Date()).getTime();
