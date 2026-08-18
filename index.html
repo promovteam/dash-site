@@ -4781,7 +4781,7 @@ function _valorDoTel(t8) {
 // imagens dos anúncios: busca em páginas, sem travar a tela
 var META_CRI = { porId: {}, porNome: {}, pagina: 0, buscando: false, fim: false };
 function carregarCriativos() {
-  if (META_CRI.buscando || META_CRI.fim || META_CRI.pagina >= 8) return;
+  if (META_CRI.buscando || META_CRI.fim || META_CRI.pagina >= 20) return;
   META_CRI.buscando = true;
   var pag = META_CRI.pagina + 1;
   var nome = 'criCb' + Math.random().toString(36).slice(2, 8);
@@ -4811,7 +4811,12 @@ function carregarCriativos() {
   setTimeout(function(){ fim(null); }, 90000);
 }
 function criativoDe(nomeAnuncio, adId) {
-  return (adId && META_CRI.porId[adId]) || META_CRI.porNome[_chaveAnuncio(nomeAnuncio)] || null;
+  if (adId && META_CRI.porId[adId]) return META_CRI.porId[adId];
+  var porNome = META_CRI.porNome[_chaveAnuncio(nomeAnuncio)];
+  if (porNome) return porNome;
+  // último recurso: o próprio texto traz o número do anúncio
+  var id = _idDoAnuncio(nomeAnuncio);
+  return (id && META_CRI.porId[id]) || null;
 }
 // junta as duas fontes: a base do site (ao vivo, desde 21/07) manda no período
 // que ela cobre; a planilha continua guardando todo o histórico anterior.
@@ -4829,7 +4834,7 @@ function ldFundirSupabase() {
     if (r.tel8) vistos[r.tel8] = 1;
     return {
       i: 'sb', nome: r.nome, tel: r.whatsapp, insta: r.insta, email: r.email,
-      seg: r.seg, obj: '', renda: '', invest: r.invest,
+      seg: r.seg, obj: r.obj || '', renda: r.renda || '', invest: r.invest,
       score: 0, date: r.date, dataTxt: r.date ? r.date.toLocaleString('pt-BR') : '', aprox: false,
       status: r.completa ? 'Completa' : 'Pendente',
       origem: r.origemForm || r.origem, url: '',
@@ -5054,6 +5059,8 @@ function carregarSupabase() {
           origem: r.origem || '', origemForm: r.origem_form || '',
           completa: r.pesquisa_completa === true || r.pesquisa_completa === 'true',
           invest: r.investimento || '', seg: r.seguidores || '',
+          obj: String(r.objetivos || '').replace(/[\[\]"']/g, '').trim(),
+          renda: r.fonte_renda || '',
           anuncio: r.utm_content || '', campanha: r.utm_campaign || '', fonte: r.utm_source || '',
           date: r.created_at ? new Date(r.created_at) : null,
           tel8: ldTel8(r.whatsapp || '')
@@ -5127,10 +5134,29 @@ function _chaveAnuncio(n) {
   return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/g, '').substring(0, 26);
 }
+// alguns anúncios chegam como "NOME|120249743389010771" ou só o número:
+// o número é o ID do anúncio na Meta, e casar por ele é infalível
+function _idDoAnuncio(t) {
+  var s = String(t || '');
+  var m = s.match(/(\d{15,20})/);
+  return m ? m[1] : '';
+}
 // o anúncio às vezes chega embrulhado em texto de sistema: {"co":"Ad57 - ...","url":...}
 function ldAnuncioLimpo(v) {
   var t = String(v || '').trim();
   if (!t) return '(sem anúncio)';
+  // "NOME|123456789" → NOME · só o número → tenta o nome real do criativo
+  if (t.indexOf('|') !== -1) {
+    var partes = t.split('|');
+    var soNome = partes[0].trim();
+    if (soNome && !/^\d+$/.test(soNome)) t = soNome;
+  }
+  if (/^\d{15,20}$/.test(t)) {
+    var c = META_CRI.porId[t];
+    if (c && c.nome) return c.nome.length > 52 ? c.nome.substring(0, 52) + '…' : c.nome;
+    return 'anúncio ' + t.slice(-6);
+  }
+  if (/\{\{|\}\}/.test(t)) return '⚠️ etiqueta não preenchida';
   if (t.charAt(0) === '{') {
     var m = t.match(/"co"\s*:\s*"([^"]+)"/);
     if (m) return m[1];
@@ -5359,7 +5385,11 @@ function abrirFichaLead(i) {
         if (/paid|pago|ads/i.test(l.meio || '')) return '💰 Tráfego pago (Meta)' + (l.fonte ? ' · via ' + l.fonte : '');
         return '🌱 Orgânico' + (l.fonte ? ' · via ' + l.fonte : '');
       })()],
-    ['📋', 'Status da pesquisa', l.status],
+    ['📋', 'Diagnóstico', (function(){
+        if (l.status === 'Pendente') return '<span style="color:#f6a350;font-weight:700;">⚠️ Começou e NÃO terminou</span> — ainda não respondeu as perguntas';
+        if (l.status === 'Completa') return '<span style="color:#3ddc97;font-weight:700;">✅ Respondeu tudo</span>';
+        return l.status || '';
+      })(), 'html'],
     ['🔗', 'Página de origem', l.url ? l.url.slice(0, 60) + (l.url.length > 60 ? '…' : '') : '']
   ].filter(function(c){ return String(c[2]).trim(); });
   // ---- atendimento: dono + etapa ----
