@@ -4472,6 +4472,51 @@ function ldNomePorTel8(t8) {
   }
   return _nomeTelIdx[t8] || '';
 }
+// ===== o que ACONTECEU no período (aba Vendas), independente de quando o lead chegou =====
+var _ldAcont = null;
+function ldAconteceuNoPeriodo(per) {
+  if (!V2.carregado || !V2.rows.length) return null;
+  var ini = per && per.ini ? per.ini : null, fim = per && per.fim ? per.fim : null;
+  var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
+  var ag = [], re = [], vd = [], valor = 0;
+  V2.rows.forEach(function(r) {
+    var d = r.date instanceof Date ? r.date : (r.date ? new Date(r.date) : null);
+    if (!d || isNaN(d.getTime())) return;
+    var t = d.getTime();
+    if (ini !== null && t < ini) return;
+    if (fim !== null && t > fim) return;
+    ag.push(r);
+    if (REAL.indexOf(r.sn) !== -1) re.push(r);
+    if (r.sn === 'vendido') { vd.push(r); valor += (typeof r.valor === 'number' ? r.valor : 0); }
+  });
+  _ldAcont = { ag: ag, re: re, vd: vd, valor: valor };
+  return _ldAcont;
+}
+function verAconteceu(qual) {
+  if (!_ldAcont) return;
+  var lista = _ldAcont[qual] || [];
+  var titulo = { ag: '📅 Reuniões agendadas no período', re: '✅ Reuniões realizadas no período', vd: '💰 Vendas no período' }[qual];
+  var h = '<div style="display:flex;flex-direction:column;gap:6px;">';
+  if (!lista.length) h += '<div class="hint">Nada no período.</div>';
+  lista.slice(0, 200).forEach(function(r) {
+    var d = r.date instanceof Date ? r.date : new Date(r.date);
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+      + '<b style="font-size:.78rem;flex:1;min-width:140px;">' + (r.nome || 'Sem nome') + '</b>'
+      + '<span class="hint">' + (isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR')) + '</span>'
+      + (r.status ? '<span class="ld-tag" style="background:rgba(255,255,255,.07);color:var(--text-secondary);">' + r.status + '</span>' : '')
+      + (r.closer ? '<span class="dono-chip">✋ ' + r.closer + '</span>' : '')
+      + (r.valor ? '<span class="ld-tag" style="background:rgba(61,220,151,.13);color:#3ddc97;">R$ ' + Math.round(r.valor).toLocaleString('pt-BR') + '</span>' : '')
+      + '</div>';
+  });
+  if (lista.length > 200) h += '<div class="hint">… e mais ' + (lista.length - 200) + '</div>';
+  h += '</div>';
+  document.getElementById('mb-titulo').textContent = titulo + ' — ' + lista.length;
+  document.getElementById('mb-ico').textContent = { ag: '📅', re: '✅', vd: '💰' }[qual] || '📋';
+  document.getElementById('mb-sub').textContent = 'Da aba Vendas, pela data da reunião no período escolhido';
+  document.getElementById('mb-lista').innerHTML = h;
+  var bq2 = document.getElementById('mb-busca'); if (bq2) { bq2.value = ''; bq2.style.display = 'none'; }
+  document.getElementById('modal-b').classList.add('open');
+}
 // o anúncio às vezes chega embrulhado em texto de sistema: {"co":"Ad57 - ...","url":...}
 function ldAnuncioLimpo(v) {
   var t = String(v || '').trim();
@@ -4532,7 +4577,7 @@ function ldPeriodo() {
   function filtra(ini, fim) {
     return LD.rows.filter(function(l){ return (!ini || l.date >= ini) && (!fim || l.date < fim); });
   }
-  if (LD_RANGE) return { rows: filtra(new Date(LD_RANGE.ini), new Date(LD_RANGE.fim)), aviso: '', label: LD_RANGE.label };
+  if (LD_RANGE) return { rows: filtra(new Date(LD_RANGE.ini), new Date(LD_RANGE.fim)), aviso: '', label: LD_RANGE.label, ini: LD_RANGE.ini, fim: LD_RANGE.fim };
   var hoje = ldDia(new Date());
   var ini = null, fim = null, aviso = '', label = 'Todos os leads';
   if (LD_PER === 'hoje') { ini = hoje; label = 'Hoje · ' + hoje.toLocaleDateString('pt-BR'); }
@@ -4553,7 +4598,8 @@ function ldPeriodo() {
     rows = filtra(ini, fim);
     aviso = '⚠️ Nenhum lead ' + nomes[LD_PER] + ' — mostrando o período mais recente com leads: <b>' + label + '</b>';
   }
-  return { rows: rows, aviso: aviso, label: label };
+  return { rows: rows, aviso: aviso, label: label,
+    ini: ini ? ini.getTime() : null, fim: fim ? fim.getTime() : null };
 }
 // clicar numa semana/mês do quadro filtra tudo por aquele período (clicar de novo desmarca)
 function escolherBucketLeads(iniTs, fimTs, label) {
@@ -5269,7 +5315,27 @@ function renderLeads() {
       + (tx ? '<span class="fs-tx">' + tx + '</span>' : '')
       + '</div>';
   });
-  h += '<div class="hint" style="margin-top:8px;">Clique numa etapa para ver os leads · agendou/realizou/vendido = telefone do lead casado com a aba Vendas</div></div>';
+  h += '<div class="hint" style="margin-top:8px;">Clique numa etapa para ver os leads · agendou/realizou/vendido = telefone do lead casado com a aba Vendas</div>';
+  // ⚠️ O funil acima segue os leads QUE CHEGARAM no período. As reuniões e vendas
+  // do mês costumam ser de leads mais antigos — por isso mostramos também o que
+  // ACONTECEU no período, direto da aba Vendas.
+  (function() {
+    var ac = ldAconteceuNoPeriodo(per);
+    if (!ac) return;
+    h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.09);">'
+      + '<b style="font-size:.74rem;color:#3ddc97;">📆 O que ACONTECEU em ' + per.label + ' (inclusive com leads que chegaram antes)</b>'
+      + '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:9px;">'
+      + '<div class="click" style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.32);" onclick="verAconteceu(\'ag\')">'
+      +   '<b style="font-size:1.15rem;color:#ffd166;display:block;">' + ac.ag.length + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">📅 REUNIÕES AGENDADAS</span></div>'
+      + '<div class="click" style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(185,138,255,.1);border:1px solid rgba(185,138,255,.32);" onclick="verAconteceu(\'re\')">'
+      +   '<b style="font-size:1.15rem;color:#b98aff;display:block;">' + ac.re.length + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">✅ REUNIÕES REALIZADAS</span></div>'
+      + '<div class="click" style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.32);" onclick="verAconteceu(\'vd\')">'
+      +   '<b style="font-size:1.15rem;color:#3ddc97;display:block;">' + ac.vd.length + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">💰 VENDAS' + (ac.valor ? ' · R$ ' + Math.round(ac.valor).toLocaleString('pt-BR') : '') + '</span></div>'
+      + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.28);">'
+      +   '<b style="font-size:1.15rem;color:#ff6b6b;display:block;">' + (ac.re.length ? Math.round(ac.vd.length / ac.re.length * 100) + '%' : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">🎯 FECHAMENTO</span></div>'
+      + '</div><div class="hint" style="margin-top:7px;">Conta pela data da reunião na aba Vendas · clique para ver os clientes</div></div>';
+  })();
+  h += '</div>';
 
   // ===== ⚡ velocidade de resposta — agora vem PRONTA do robô (centenas de conversas) =====
   var prPainel = (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.primeiraResposta && CLINT_PAINEL.primeiraResposta.length)
