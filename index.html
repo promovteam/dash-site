@@ -4525,6 +4525,85 @@ function verAconteceu(qual) {
   var bq2 = document.getElementById('mb-busca'); if (bq2) { bq2.value = ''; bq2.style.display = 'none'; }
   document.getElementById('modal-b').classList.add('open');
 }
+// quadro do investimento: gasto do Facebook × leads × reuniões × vendas
+function blocoMetaAds(listaAn, per) {
+  carregarMetaAds(per);
+  if (META.buscando && !META.dados) return '<div class="hint" style="margin-top:10px;">⏳ Buscando o investimento no Facebook…</div>';
+  if (!META.dados) {
+    return '<div class="hint" style="margin-top:10px;color:#f6a350;">💸 Investimento do Facebook ainda não conectado'
+      + (META.erro ? ' <span style="opacity:.75;">(' + META.erro + ')</span>' : '')
+      + ' — falta a chave META_TOKEN no robô.</div>';
+  }
+  var porAn = {};
+  listaAn.forEach(function(o){ porAn[_chaveAnuncio(o.nome)] = o.d; });
+  var linhas = [], gasto = 0, leads = 0, reun = 0, vend = 0;
+  META.dados.anuncios.forEach(function(a) {
+    var d = porAn[_chaveAnuncio(a.anuncio)] || { n: 0, ag: 0, vd: 0 };
+    gasto += a.gasto; leads += d.n; reun += d.ag; vend += d.vd;
+    linhas.push({ nome: a.anuncio, gasto: a.gasto, n: d.n, ag: d.ag, vd: d.vd });
+  });
+  linhas.sort(function(x, y){ return y.gasto - x.gasto; });
+  function rs(v){ return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
+  var h = '<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.09);">'
+    + '<b style="font-size:.72rem;color:#3ddc97;text-transform:uppercase;letter-spacing:.5px;">💸 Investimento no Facebook · ' + META.dados.desde.split('-').reverse().join('/') + ' a ' + META.dados.ate.split('-').reverse().join('/') + '</b>'
+    + '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:9px;">'
+    + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(255,107,107,.09);border:1px solid rgba(255,107,107,.28);">'
+    +   '<b style="font-size:1.1rem;color:#ff6b6b;display:block;">' + rs(gasto) + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">INVESTIDO</span></div>'
+    + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(110,168,255,.09);border:1px solid rgba(110,168,255,.28);">'
+    +   '<b style="font-size:1.1rem;color:#6ea8ff;display:block;">' + (leads ? rs(gasto / leads) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR LEAD</span></div>'
+    + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.28);">'
+    +   '<b style="font-size:1.1rem;color:#ffd166;display:block;">' + (reun ? rs(gasto / reun) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR REUNIÃO</span></div>'
+    + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(61,220,151,.09);border:1px solid rgba(61,220,151,.28);">'
+    +   '<b style="font-size:1.1rem;color:#3ddc97;display:block;">' + (vend ? rs(gasto / vend) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR VENDA</span></div>'
+    + '</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:4px;margin-top:10px;max-height:260px;overflow-y:auto;">';
+  linhas.slice(0, 20).forEach(function(x) {
+    h += '<div style="display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:9px;background:rgba(255,255,255,.04);flex-wrap:wrap;">'
+      + '<b style="font-size:.72rem;flex:1;min-width:150px;">' + x.nome + '</b>'
+      + '<span class="ld-tag" style="background:rgba(255,107,107,.13);color:#ff6b6b;">' + rs(x.gasto) + '</span>'
+      + '<span class="ld-tag" style="background:rgba(110,168,255,.13);color:#6ea8ff;">' + x.n + ' leads</span>'
+      + (x.n ? '<span class="ld-tag" style="background:rgba(255,255,255,.06);color:var(--text-secondary);">' + rs(x.gasto / x.n) + '/lead</span>' : '')
+      + (x.ag ? '<span class="ld-tag" style="background:rgba(255,209,102,.13);color:#ffd166;">📅 ' + x.ag + '</span>' : '')
+      + (x.vd ? '<span class="ld-tag" style="background:rgba(61,220,151,.13);color:#3ddc97;">💰 ' + x.vd + '</span>' : '')
+      + '</div>';
+  });
+  h += '</div><div class="hint" style="margin-top:7px;">Gasto direto do Facebook, casado com os leads pelo nome do anúncio · atualizado ' + META.dados.atualizado + '</div></div>';
+  return h;
+}
+// ===== 💸 META ADS: gasto por anúncio (vem do robô, que fala com o Facebook) =====
+var META = { dados: null, buscando: false, erro: '' };
+function carregarMetaAds(per) {
+  if (META.buscando) return;
+  var ini = per && per.ini ? new Date(per.ini) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  var fim = per && per.fim ? new Date(per.fim - 1) : new Date();
+  function fmt(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
+  var chave = fmt(ini) + '_' + fmt(fim);
+  if (META.dados && META.dados._chave === chave) return;
+  META.buscando = true;
+  var nome = 'metaCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  var pronto = false;
+  var fim2 = function(d) {
+    if (pronto) return;
+    pronto = true; META.buscando = false;
+    try { sc.remove(); } catch (e) {}
+    try { delete window[nome]; } catch (e) {}
+    if (d && d.success) { d._chave = chave; META.dados = d; META.erro = ''; }
+    else { META.erro = (d && (d.detalhe || d.error)) || 'sem resposta'; META.dados = null; }
+    renderLeads();
+  };
+  window[nome] = fim2;
+  sc.onerror = function(){ fim2(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
+    + encodeURIComponent(JSON.stringify({ action: 'metaAnuncios', desde: fmt(ini), ate: fmt(fim) }));
+  document.body.appendChild(sc);
+  setTimeout(function(){ fim2(null); }, 60000);
+}
+// junta o nome do anúncio do Facebook com o utm_content da planilha
+function _chaveAnuncio(n) {
+  return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '').substring(0, 26);
+}
 // o anúncio às vezes chega embrulhado em texto de sistema: {"co":"Ad57 - ...","url":...}
 function ldAnuncioLimpo(v) {
   var t = String(v || '').trim();
@@ -5515,6 +5594,7 @@ function renderLeads() {
       };
       h += tabela('Anúncio (o criativo que a pessoa viu)', listaAn, '#b98aff');
       h += tabela('Campanha', listaCp, '#6ea8ff');
+      h += blocoMetaAds(listaAn, per);
       if (listaOv.length) {
         h += '<div style="margin-top:10px;"><b style="font-size:.7rem;color:#3ddc97;text-transform:uppercase;letter-spacing:.5px;">Origem lançada na planilha de vendas (quando diferente)</b>'
           + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">'

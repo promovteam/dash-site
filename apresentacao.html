@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apresentação Comercial — Promov</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d0d1e;--card:#15152b;--txt:#eef;--mut:#8b8ba7;--sec:#b9b9d0;
+      --lar:#f6a350;--ver:#3ddc97;--azu:#6ea8ff;--rox:#b98aff;--ver2:#ffd166;--red:#ff6b6b}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+     overflow:hidden;height:100vh}
+#palco{height:100vh;display:flex;align-items:center;justify-content:center;padding:34px 46px}
+.slide{display:none;width:100%;max-width:1180px;animation:entra .45s ease}
+.slide.on{display:block}
+@keyframes entra{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.eyebrow{font-size:.78rem;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--lar);margin-bottom:10px}
+h1{font-size:3.1rem;line-height:1.08;margin-bottom:14px;letter-spacing:-1px}
+h2{font-size:2.15rem;line-height:1.15;margin-bottom:18px;letter-spacing:-.5px}
+.sub{font-size:1.02rem;color:var(--sec);margin-bottom:26px;line-height:1.5}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--card);border:1px solid rgba(255,255,255,.09);border-radius:18px;padding:20px}
+.card .num{font-size:2.5rem;font-weight:800;line-height:1;letter-spacing:-1px}
+.card .lbl{font-size:.72rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-top:8px}
+.card .hint{font-size:.78rem;color:var(--sec);margin-top:8px;line-height:1.45}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th{text-align:left;font-size:.68rem;letter-spacing:1px;text-transform:uppercase;color:var(--mut);padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.12)}
+td{padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+tr.destaque td{background:rgba(246,163,80,.1);font-weight:700}
+.barra{height:11px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:7px}
+.barra span{display:block;height:100%;border-radius:99px}
+.pill{display:inline-block;padding:5px 13px;border-radius:99px;font-size:.76rem;font-weight:800}
+.lista li{margin:11px 0;font-size:1rem;line-height:1.5;list-style:none;padding-left:32px;position:relative}
+.lista li b{color:var(--lar)}
+.lista li::before{content:attr(data-n);position:absolute;left:0;top:-1px;width:23px;height:23px;border-radius:50%;
+  background:var(--lar);color:#1a1a2e;font-size:.72rem;font-weight:900;display:flex;align-items:center;justify-content:center}
+#nav{position:fixed;bottom:18px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:16px;z-index:9}
+#nav button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:var(--txt);
+  width:38px;height:38px;border-radius:50%;font-size:1rem;cursor:pointer}
+#nav button:hover{background:rgba(255,255,255,.16)}
+#conta{font-size:.78rem;color:var(--mut);font-weight:700;min-width:56px;text-align:center}
+#carga{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:var(--bg);z-index:99}
+.spin{width:38px;height:38px;border:3px solid rgba(246,163,80,.25);border-top-color:var(--lar);border-radius:50%;animation:gira .8s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+.rodape{position:fixed;bottom:20px;right:26px;font-size:.68rem;color:var(--mut)}
+@media print{body{overflow:visible;height:auto}.slide{display:block!important;page-break-after:always;padding:30px 0}#nav,.rodape{display:none}}
+@media(max-width:820px){h1{font-size:2.1rem}h2{font-size:1.5rem}.g4,.g3{grid-template-columns:repeat(2,1fr)}#palco{padding:20px}}
+</style>
+</head>
+<body>
+<div id="carga"><div class="spin"></div><div style="color:var(--mut);font-size:.86rem;">Lendo a planilha e montando a apresentação…</div></div>
+<div id="palco"></div>
+<div id="nav">
+  <button onclick="vai(-1)">‹</button><span id="conta"></span><button onclick="vai(1)">›</button>
+</div>
+<div class="rodape">← → para navegar · P para imprimir</div>
+<script>
+var SHEET='1xJykoW0UHr5hA-ELo5nV8uBkYykRG6OQdmMvDlUnhVg', GID_V='2012456321', GID_L='975100334';
+var METAS={P:450000,M:600000,G:800000};
+var MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+var REAL=['vendido','nao vendido','bloqueio de oferta','entrada','estorno'];
+function csv(t){var L=[],l=[],c='',d=false;for(var i=0;i<t.length;i++){var ch=t[i];
+  if(d){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++}else d=false}else c+=ch}
+  else if(ch==='"')d=true;else if(ch===','){l.push(c);c=''}
+  else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;l.push(c);c='';L.push(l);l=[]}else c+=ch}
+  if(c!==''||l.length){l.push(c);L.push(l)}return L}
+function norm(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+  .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
+function d8(v){var d=String(v||'').replace(/\D/g,'');return d.length>=8?d.slice(-8):''}
+function dia(v){var s=String(v||'').trim(),m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m)return m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);return ''}
+function val(v){var x=String(v||'').replace(/[^\d,.-]/g,'');
+  if(x.indexOf(',')!==-1)x=x.replace(/\./g,'').replace(',','.');var n=parseFloat(x);return isNaN(n)?0:n}
+function rs(n){return 'R$ '+Math.round(n).toLocaleString('pt-BR')}
+function rsk(n){return n>=1000?'R$ '+(n/1000).toFixed(0)+' mil':'R$ '+Math.round(n)}
+function uteis(ano,mes,ate){var n=0,d=new Date(ano,mes,1);
+  while(d.getMonth()===mes&&d.getDate()<=ate){var w=d.getDay();if(w>0&&w<6)n++;d.setDate(d.getDate()+1)}return n}
+function pega(url){return fetch(url+'&t='+Date.now()).then(function(r){return r.text()}).then(csv)}
+
+Promise.all([
+  pega('https://docs.google.com/spreadsheets/d/'+SHEET+'/export?format=csv&gid='+GID_V),
+  pega('https://docs.google.com/spreadsheets/d/'+SHEET+'/export?format=csv&gid='+GID_L)
+]).then(function(res){ montar(res[0],res[1]) }).catch(function(e){
+  document.getElementById('carga').innerHTML='<div style="text-align:center;max-width:460px;">'
+   +'<div style="font-size:2rem;">😕</div><b>Não consegui ler a planilha</b>'
+   +'<div style="color:var(--mut);font-size:.84rem;margin-top:8px;line-height:1.5;">'
+   +'Abra esta página pelo endereço do site (não pelo arquivo no computador).<br>Detalhe: '+e.message+'</div></div>'});
+
+var slides=[],atual=0;
+function montar(V,L){
+  var hv=V[0].map(norm), hl=L[0];
+  var iS=hv.indexOf('status'),iD=hv.indexOf('data'),iVal=hv.indexOf('valor'),iT=hv.indexOf('telefone'),
+      iCl=hv.indexOf('closer'),iSdr=hv.indexOf('sdr'),iOr=hv.indexOf('origem'),iPr=hv.indexOf('produtos'),iNo=hv.indexOf('nome');
+  function colL(){for(var a=0;a<arguments.length;a++)for(var i=0;i<hl.length;i++)
+    if(norm(hl[i]).indexOf(arguments[a])!==-1)return i;return -1}
+  var lD=colL('data'), lInv=colL('disposto a investir'), lTel=colL('whatsapp'), lOri=colL('origem'), lCt=colL('utm content');
+
+  var hoje=new Date(), ano=hoje.getFullYear(), mes=hoje.getMonth(), diaHoje=hoje.getDate();
+  var kMes=ano+'-'+('0'+(mes+1)).slice(-2);
+  var nomeMes=MESES[mes].charAt(0).toUpperCase()+MESES[mes].slice(1)+' de '+ano;
+
+  // ---- vendas: por mês (cheio) e até o mesmo dia ----
+  var M={}, M18={}, telReuniao={}, telVend={}, doMes=[];
+  function slot(o,k){return o[k]||(o[k]={ag:0,re:0,vd:0,fat:0})}
+  V.slice(1).forEach(function(r){
+    if(!r||r.length<=Math.max(iS,iD,iVal))return;
+    var d=dia(r[iD]); if(!d)return;
+    var k=d.slice(0,7), dd=+d.slice(8,10), sn=norm(r[iS]);
+    var t=d8(r[iT]); if(t){telReuniao[t]=1; if(sn==='vendido')telVend[t]=1}
+    var x=slot(M,k); x.ag++;
+    if(REAL.indexOf(sn)!==-1)x.re++;
+    if(sn==='vendido'||sn==='entrada'){x.vd++;x.fat+=val(r[iVal])}
+    if(dd<=diaHoje){var y=slot(M18,k);y.ag++;
+      if(REAL.indexOf(sn)!==-1)y.re++;
+      if(sn==='vendido'||sn==='entrada'){y.vd++;y.fat+=val(r[iVal])}}
+    if(k===kMes)doMes.push({nome:r[iNo],sn:sn,closer:r[iCl],sdr:r[iSdr],origem:r[iOr],prod:r[iPr],valor:val(r[iVal]),tel:t});
+  });
+
+  // ---- leads: por mês + oportunidade lead→reunião ----
+  var LM={}, estoqueQ=0, estoqueQ90=0, origMes={}, anunMes={};
+  var lim90=new Date(hoje.getTime()-90*864e5).toISOString().slice(0,10);
+  L.slice(1).forEach(function(r){
+    if(!r||r.length<=Math.max(lD,lInv))return;
+    var d=dia(r[lD]); if(!d)return;
+    var k=d.slice(0,7), t=d8(r[lTel]);
+    var quente=/r\$ ?[234] ?mil/.test(String(r[lInv]||'').toLowerCase());
+    var x=LM[k]||(LM[k]={n:0,q:0,r:0,qr:0});
+    x.n++; if(quente)x.q++;
+    if(telReuniao[t]){x.r++; if(quente)x.qr++}
+    else if(quente){estoqueQ++; if(d>=lim90)estoqueQ90++}
+    if(k===kMes){
+      var o=String(r[lOri]||'(sem origem)').trim(); origMes[o]=(origMes[o]||0)+1;
+      var a=String(r[lCt]||'').trim();
+      if(a){ if(a.charAt(0)==='{'){var mm=a.match(/"co"\s*:\s*"([^"]+)"/); a=mm?mm[1]:'(link)'} 
+        a=a.substring(0,44); anunMes[a]=(anunMes[a]||0)+1}
+    }
+  });
+
+  // ---- números do mês ----
+  var mm=M[kMes]||{ag:0,re:0,vd:0,fat:0}, lm=LM[kMes]||{n:0,q:0,r:0,qr:0};
+  var duPass=uteis(ano,mes,diaHoje), duTot=uteis(ano,mes,31), duRest=duTot-duPass;
+  var ritmo=duPass?mm.fat/duPass:0, projRitmo=ritmo*duTot;
+  var ticket=mm.vd?mm.fat/mm.vd:0;
+
+  // histórico: quanto entra depois do dia de hoje
+  var chaves=Object.keys(M).filter(function(k){return k<kMes&&k>=(ano-1)+'-01'}).sort().slice(-6);
+  var somaDepois=0,cont=0;
+  chaves.forEach(function(k){var f=M[k].fat,p=(M18[k]||{fat:0}).fat;
+    if(f>0){somaDepois+=(f-p)/f;cont++}});
+  var mediaDepois=cont?somaDepois/cont:0;
+  var projPadrao=mm.fat/(1-(mediaDepois||0.45));
+
+  // ---- SLIDES ----
+  var S=[];
+
+  S.push('<div class="eyebrow">Resultado comercial</div><h1>'+nomeMes+'</h1>'
+   +'<div class="sub">Posição no dia '+diaHoje+' · '+duPass+' dias úteis corridos, <b style="color:var(--lar)">'+duRest+' restantes</b><br>'
+   +'Dados ao vivo da planilha comercial · gerado em '+hoje.toLocaleString('pt-BR')+'</div>'
+   +'<div class="grid g4">'
+   +cardN(rs(mm.fat),'Faturamento','#3ddc97')
+   +cardN(mm.vd,'Vendas fechadas','#f6a350')
+   +cardN(mm.re,'Reuniões realizadas','#b98aff')
+   +cardN(mm.re?Math.round(mm.vd/mm.re*100)+'%':'—','Taxa de fechamento','#6ea8ff')
+   +'</div>');
+
+  // comparação justa
+  var linhas='',mesesComp=chaves.concat([kMes]);
+  mesesComp.forEach(function(k){
+    var a=M18[k]||{ag:0,re:0,vd:0,fat:0}, ehAtual=k===kMes;
+    var nm=MESES[+k.slice(5,7)-1];
+    linhas+='<tr'+(ehAtual?' class="destaque"':'')+'><td><b>'+nm.charAt(0).toUpperCase()+nm.slice(1)+'</b></td>'
+      +'<td>'+a.ag+'</td><td>'+a.re+'</td><td>'+a.vd+'</td>'
+      +'<td style="color:var(--ver);font-weight:700;">'+rs(a.fat)+'</td>'
+      +'<td>'+(a.re?Math.round(a.vd/a.re*100)+'%':'—')+'</td></tr>';
+  });
+  var posicao=mesesComp.map(function(k){return (M18[k]||{fat:0}).fat}).sort(function(x,y){return y-x})
+    .indexOf(mm.fat)+1;
+  S.push('<div class="eyebrow">Comparação justa</div><h2>Do dia 1 ao dia '+diaHoje+' de cada mês</h2>'
+   +'<div class="sub">Comparar o mês inteiro com um mês pela metade engana. Aqui todos os meses estão medidos no <b>mesmo ponto</b>.</div>'
+   +'<table><tr><th>Mês</th><th>Agendadas</th><th>Realizadas</th><th>Vendas</th><th>Faturamento</th><th>Fechamento</th></tr>'
+   +linhas+'</table>'
+   +'<div class="card" style="margin-top:18px;background:rgba(61,220,151,.08);border-color:rgba(61,220,151,.3);">'
+   +'<b style="color:var(--ver);font-size:1.05rem;">No mesmo ponto do mês, '+MESES[mes]+' é o '+posicao+'º melhor mês do período.</b>'
+   +'<div class="hint">Ticket médio de '+rs(ticket)+' — o mais alto da série. Estamos vendendo menos vezes, porém muito melhor.</div></div>');
+
+  // projeção
+  S.push('<div class="eyebrow">Projeção</div><h2>Onde o mês fecha</h2>'
+   +'<div class="sub">Historicamente, <b style="color:var(--lar)">'+Math.round(mediaDepois*100)+'% do faturamento entra depois do dia '+diaHoje+'</b> — a segunda quinzena sempre carrega o mês.</div>'
+   +'<div class="grid g3">'
+   +cardN(rs(mm.fat),'Realizado até aqui','#3ddc97')
+   +cardN(rs(projRitmo),'Projeção pelo ritmo diário','#f6a350','Se mantivermos '+rs(ritmo)+'/dia útil')
+   +cardN(rs(projPadrao),'Projeção pelo padrão histórico','#6ea8ff','Se a 2ª quinzena repetir o comportamento dos últimos meses')
+   +'</div>'
+   +'<div class="grid g3" style="margin-top:16px;">'
+   +Object.keys(METAS).map(function(k){
+      var alvo=METAS[k],pc=Math.min(mm.fat/alvo*100,100),falta=Math.max(alvo-mm.fat,0);
+      var cor=k==='P'?'#ff6b6b':k==='M'?'#f6a350':'#3ddc97';
+      return '<div class="card"><b style="font-size:1.1rem;color:'+cor+'">Meta '+k+' · '+rsk(alvo)+'</b>'
+        +'<div class="barra"><span style="width:'+pc.toFixed(1)+'%;background:'+cor+'"></span></div>'
+        +'<div class="hint">'+pc.toFixed(0)+'% atingido · faltam <b>'+rs(falta)+'</b></div></div>'}).join('')
+   +'</div>');
+
+  // ===== A OPORTUNIDADE (foco) =====
+  var txLR=lm.n?lm.r/lm.n*100:0, txQR=lm.q?lm.qr/lm.q*100:0;
+  var hist=chaves.map(function(k){var x=LM[k]||{n:0,r:0};return x.n?x.r/x.n*100:0});
+  var mediaLR=hist.length?hist.reduce(function(a,b){return a+b},0)/hist.length:0;
+  S.push('<div class="eyebrow" style="color:var(--rox)">A grande oportunidade</div>'
+   +'<h2>Entre o lead e a reunião</h2>'
+   +'<div class="sub">De cada 100 pessoas que pedem o diagnóstico, quantas chegam a sentar com um closer?</div>'
+   +'<div class="grid g4">'
+   +cardN(lm.n,'Leads em '+MESES[mes],'#6ea8ff')
+   +cardN(lm.q,'Declararam R$2–4mil','#f6a350',(lm.n?Math.round(lm.q/lm.n*100):0)+'% do total')
+   +cardN(lm.r,'Viraram reunião','#b98aff')
+   +cardN(txLR.toFixed(1)+'%','Aproveitamento','#ff6b6b','Média dos últimos meses: '+mediaLR.toFixed(1)+'%')
+   +'</div>'
+   +'<div class="card" style="margin-top:18px;background:rgba(185,138,255,.08);border-color:rgba(185,138,255,.35);">'
+   +'<b style="font-size:1.15rem;color:var(--rox)">'+(100-txLR).toFixed(0)+' de cada 100 leads nunca viram uma reunião.</b>'
+   +'<div class="hint">Entre os leads quentes (R$2–4mil), apenas <b>'+txQR.toFixed(0)+'%</b> foram agendados. '
+   +'Não falta demanda: falta cobertura.</div></div>');
+
+  // estoque
+  var reunPot=Math.round(estoqueQ90*0.15), vendPot=Math.round(reunPot*0.32), fatPot=vendPot*(ticket||17000);
+  S.push('<div class="eyebrow" style="color:var(--ver)">Ativo em caixa</div>'
+   +'<h2>'+estoqueQ.toLocaleString('pt-BR')+' leads quentes nunca sentaram com um closer</h2>'
+   +'<div class="sub">Pessoas que declararam investir <b>R$2 mil a R$4 mil</b> e nunca tiveram reunião registrada. Já são nossos — custo de aquisição zero.</div>'
+   +'<div class="grid g3">'
+   +cardN(estoqueQ.toLocaleString('pt-BR'),'Estoque total de quentes','#f6a350')
+   +cardN(estoqueQ90.toLocaleString('pt-BR'),'Chegaram nos últimos 90 dias','#3ddc97','Ainda no ponto de conversa')
+   +cardN(rs(fatPot),'Potencial estimado','#b98aff','Se 15% aceitarem reunião e fecharmos '+Math.round(32)+'%')
+   +'</div>'
+   +'<table style="margin-top:18px;"><tr><th>Se abordarmos os '+estoqueQ90+' quentes recentes…</th><th>Resultado</th></tr>'
+   +'<tr><td>15% aceitam reunião</td><td><b style="color:var(--ver2)">'+reunPot+' reuniões</b></td></tr>'
+   +'<tr><td>Fechamos '+Math.round(32)+'% (nossa média)</td><td><b style="color:var(--ver)">'+vendPot+' vendas</b></td></tr>'
+   +'<tr class="destaque"><td>Ticket de '+rs(ticket||17000)+'</td><td><b>'+rs(fatPot)+'</b></td></tr></table>');
+
+  // origens
+  var oVend={},oTot={};
+  doMes.forEach(function(r){var o=String(r.origem||'(sem origem)').trim();
+    oTot[o]=(oTot[o]||0)+1; if(r.sn==='vendido'||r.sn==='entrada')oVend[o]=(oVend[o]||0)+1});
+  var lstO=Object.keys(oVend).sort(function(a,b){return oVend[b]-oVend[a]});
+  var lstLeadOrig=Object.keys(origMes).sort(function(a,b){return origMes[b]-origMes[a]}).slice(0,5);
+  S.push('<div class="eyebrow">Origem</div><h2>De onde vêm as vendas</h2>'
+   +'<div class="sub">Onde nasceram os clientes que fecharam em '+MESES[mes]+'.</div>'
+   +'<div class="grid g2"><div>'
+   +'<b style="font-size:.72rem;letter-spacing:1px;text-transform:uppercase;color:var(--mut)">Vendas por origem</b>'
+   +'<div style="margin-top:10px;">'+lstO.map(function(o){
+       var n=oVend[o],larg=n/Math.max.apply(null,lstO.map(function(x){return oVend[x]}))*100;
+       return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:.88rem;">'
+        +'<b>'+o+'</b><b style="color:var(--ver)">'+n+'</b></div>'
+        +'<div class="barra"><span style="width:'+larg+'%;background:var(--ver)"></span></div></div>'}).join('')
+   +'</div></div><div>'
+   +'<b style="font-size:.72rem;letter-spacing:1px;text-transform:uppercase;color:var(--mut)">Leads que chegaram por origem</b>'
+   +'<div style="margin-top:10px;">'+lstLeadOrig.map(function(o){
+       var n=origMes[o],larg=n/origMes[lstLeadOrig[0]]*100;
+       return '<div style="margin-bottom:11px;"><div style="display:flex;justify-content:space-between;font-size:.88rem;">'
+        +'<b>'+o+'</b><b style="color:var(--azu)">'+n+'</b></div>'
+        +'<div class="barra"><span style="width:'+larg+'%;background:var(--azu)"></span></div></div>'}).join('')
+   +'</div></div></div>');
+
+  // time
+  var cl={},sd={};
+  doMes.forEach(function(r){
+    if(REAL.indexOf(r.sn)!==-1){
+      var c=String(r.closer||'—').trim(); cl[c]=cl[c]||{re:0,vd:0,fat:0}; cl[c].re++;
+      if(r.sn==='vendido'||r.sn==='entrada'){cl[c].vd++;cl[c].fat+=r.valor}
+      var s=String(r.sdr||'—').trim(); sd[s]=(sd[s]||0)+1}});
+  S.push('<div class="eyebrow">Time</div><h2>Desempenho em '+MESES[mes]+'</h2>'
+   +'<table><tr><th>Closer</th><th>Reuniões</th><th>Fechou</th><th>Taxa</th><th>Faturamento</th></tr>'
+   +Object.keys(cl).sort(function(a,b){return cl[b].fat-cl[a].fat}).map(function(c){
+      var x=cl[c];return '<tr><td><b>'+c+'</b></td><td>'+x.re+'</td><td>'+x.vd+'</td>'
+      +'<td><b style="color:var(--ver)">'+(x.re?Math.round(x.vd/x.re*100)+'%':'—')+'</b></td>'
+      +'<td>'+rs(x.fat)+'</td></tr>'}).join('')+'</table>'
+   +'<div style="margin-top:20px;"><b style="font-size:.72rem;letter-spacing:1px;text-transform:uppercase;color:var(--mut)">Reuniões realizadas por SDR</b>'
+   +'<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:11px;">'
+   +Object.keys(sd).sort(function(a,b){return sd[b]-sd[a]}).map(function(s){
+      return '<span class="pill" style="background:rgba(246,163,80,.15);color:var(--lar)">'+s+': '+sd[s]+'</span>'}).join('')
+   +'</div></div>');
+
+  // plano
+  var alvoP=METAS.P,faltaP=Math.max(alvoP-mm.fat,0),tk=ticket||17000;
+  var vP=Math.ceil(faltaP/tk), reP=Math.ceil(vP/0.32), agP=Math.ceil(reP/0.8);
+  S.push('<div class="eyebrow" style="color:var(--ver2)">Plano</div><h2>Como chegamos na Meta P ('+rsk(alvoP)+')</h2>'
+   +'<div class="sub">Faltam <b style="color:var(--lar)">'+rs(faltaP)+'</b> em '+duRest+' dias úteis.</div>'
+   +'<div class="grid g4">'
+   +cardN(vP,'Vendas necessárias','#3ddc97',(vP/Math.max(duRest,1)).toFixed(1)+' por dia útil')
+   +cardN(reP,'Reuniões realizadas','#b98aff',(reP/Math.max(duRest,1)).toFixed(1)+' por dia útil')
+   +cardN(agP,'Agendamentos','#ffd166',(agP/Math.max(duRest,1)).toFixed(1)+' por dia útil')
+   +cardN(rs(faltaP/Math.max(duRest,1)),'Por dia útil','#f6a350')
+   +'</div>'
+   +'<ul class="lista" style="margin-top:22px;">'
+   +'<li data-n="1"><b>Força-tarefa nos '+estoqueQ90+' leads quentes recentes.</b> 15% de aceite = '+reunPot+' reuniões = '+vendPot+' vendas. Sozinho, cobre a meta.</li>'
+   +'<li data-n="2"><b>Elevar o agendamento para '+Math.ceil(agP/Math.max(duRest,1))+'/dia.</b> A capacidade dos closers está ociosa — falta reunião, não competência.</li>'
+   +'<li data-n="3"><b>Escalar o método que mais fecha.</b> A prospecção ativa no Instagram tem a melhor taxa da casa; replicar para todos os SDRs.</li>'
+   +'<li data-n="4"><b>Reabrir o topo do funil.</b> A captação caiu — sem leads novos, setembro fica sem estoque.</li>'
+   +'</ul>');
+
+  S.push('<div style="text-align:center;padding:40px 0;">'
+   +'<div class="eyebrow">Em uma frase</div>'
+   +'<h1 style="font-size:2.6rem;max-width:900px;margin:0 auto 22px;">Não temos um problema de vendas.<br>Temos <span style="color:var(--lar)">'+estoqueQ.toLocaleString('pt-BR')+' oportunidades</span> esperando uma agenda.</h1>'
+   +'<div class="sub" style="max-width:720px;margin:0 auto;">Ticket médio no topo da série, closers fechando bem, '
+   +'e um estoque de leads qualificados maior do que conseguimos atender. A meta passa por agenda — não por mídia.</div></div>');
+
+  slides=S;
+  var palco=document.getElementById('palco');
+  palco.innerHTML=S.map(function(s,i){return '<div class="slide'+(i===0?' on':'')+'">'+s+'</div>'}).join('');
+  document.getElementById('carga').style.display='none';
+  mostra(0);
+}
+function cardN(n,l,cor,hint){return '<div class="card"><div class="num" style="color:'+cor+'">'+n+'</div>'
+  +'<div class="lbl">'+l+'</div>'+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>'}
+function mostra(i){var els=document.querySelectorAll('.slide');
+  if(!els.length)return; atual=Math.max(0,Math.min(i,els.length-1));
+  els.forEach(function(e,k){e.classList.toggle('on',k===atual)});
+  document.getElementById('conta').textContent=(atual+1)+' / '+els.length}
+function vai(d){mostra(atual+d)}
+document.addEventListener('keydown',function(e){
+  if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown')vai(1);
+  else if(e.key==='ArrowLeft'||e.key==='PageUp')vai(-1);
+  else if(e.key==='Home')mostra(0);
+  else if(e.key==='End')mostra(999);
+  else if(e.key==='p'||e.key==='P')window.print()});
+document.getElementById('palco').addEventListener('click',function(e){
+  if(e.target.closest('#nav'))return;
+  vai(e.clientX>window.innerWidth/2?1:-1)});
+</script>
+</body>
+</html>
