@@ -4472,6 +4472,19 @@ function ldNomePorTel8(t8) {
   }
   return _nomeTelIdx[t8] || '';
 }
+// o anúncio às vezes chega embrulhado em texto de sistema: {"co":"Ad57 - ...","url":...}
+function ldAnuncioLimpo(v) {
+  var t = String(v || '').trim();
+  if (!t) return '(sem anúncio)';
+  if (t.charAt(0) === '{') {
+    var m = t.match(/"co"\s*:\s*"([^"]+)"/);
+    if (m) return m[1];
+    m = t.match(/"url"\s*:\s*"([^"]+)"/);
+    if (m) return m[1].replace(/^https?:\/\//, '').substring(0, 46);
+    return '(link)';
+  }
+  return t.length > 52 ? t.substring(0, 52) + '…' : t;
+}
 // filtro de período da lista de comentários (Hoje / Ontem / 7 dias / 30 dias / Tudo / datas à escolha)
 window._comFiltro = window._comFiltro || { t: 'tudo', de: '', ate: '' };
 function comentFiltrados() {
@@ -4568,6 +4581,7 @@ function _ldMontarIdx() {
     if (REAL.indexOf(r.sn) !== -1) o.re = true;
     if (r.sn === 'vendido') o.vd = true;
     if (r.sn) o.sns[r.sn] = 1;   // todos os status deste telefone na aba Vendas
+    if (r.origem && !o.origemVenda) o.origemVenda = r.origem;   // origem lançada na venda
   });
 }
 function ldSituacao(l) {
@@ -5285,6 +5299,99 @@ function renderLeads() {
       + '</div>'
       + '<div class="hint">Medição do robô nas conversas recentes da Clint · do primeiro "oi" do lead até a primeira resposta de vocês · clique no vermelho para abrir as listas</div></div>';
   }
+
+  // ===== 🧲 DE ONDE VIERAM OS LEADS: origem, anúncio e o que virou venda =====
+  // Origem/UTM vêm da planilha de leads; reunião/venda vêm da aba Vendas (casadas
+  // pelo telefone). A aba Vendas também tem a coluna ORIGEM, mostrada como
+  // "origem lançada na venda" quando for diferente da origem do lead.
+  (function() {
+    if (!rows.length) return;
+    var porOrigem = {}, porAnuncio = {}, porCampanha = {};
+    function poe(mapa, chave, l) {
+      if (!chave) return;
+      var o = mapa[chave] || (mapa[chave] = { n: 0, ag: 0, re: 0, vd: 0, quentes: 0 });
+      o.n++;
+      if (l.faixa === 'alta') o.quentes++;
+      var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+      if (st) { o.ag++; if (st.re) o.re++; if (st.vd) o.vd++; }
+    }
+    rows.forEach(function(l) {
+      poe(porOrigem, (l.origem || '(sem origem)').trim(), l);
+      poe(porAnuncio, ldAnuncioLimpo(l.anuncio), l);
+      poe(porCampanha, (l.campanha || '').trim(), l);
+    });
+    function ordena(mapa) {
+      return Object.keys(mapa).map(function(k){ return { nome: k, d: mapa[k] }; })
+        .sort(function(a, b){ return b.d.n - a.d.n; });
+    }
+    // origem que o time lançou na aba Vendas (quando diferente da origem do lead)
+    var porOrigemVenda = {};
+    rows.forEach(function(l) {
+      var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+      if (!st || !st.origemVenda) return;
+      var ov = String(st.origemVenda).trim();
+      if (!ov || ov === String(l.origem || '').trim()) return;
+      porOrigemVenda[ov] = (porOrigemVenda[ov] || 0) + 1;
+    });
+    var listaOv = Object.keys(porOrigemVenda).map(function(k){ return { nome: k, n: porOrigemVenda[k] }; })
+      .sort(function(a, b){ return b.n - a.n; }).slice(0, 8);
+    var listaOr = ordena(porOrigem), listaAn = ordena(porAnuncio).slice(0, 15), listaCp = ordena(porCampanha).slice(0, 10);
+    var verAn = !!window._origAnuncios;
+
+    h += '<div class="panel" style="margin-bottom:18px;border-color:rgba(246,163,80,.35);">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<h3 style="margin:0;">🧲 De onde vieram os leads — ' + per.label + '</h3><span style="flex:1;"></span>'
+      + '<span class="hint">' + rows.length.toLocaleString('pt-BR') + ' leads no período</span></div>';
+
+    // --- cartões por ORIGEM (clicáveis: filtram a lista) ---
+    h += '<div style="display:flex;gap:9px;flex-wrap:wrap;margin:12px 0 4px;">';
+    listaOr.forEach(function(o) {
+      var sel = LD_F.origem.indexOf(o.nome) !== -1;
+      var taxa = o.d.ag ? Math.round(o.d.vd / o.d.ag * 100) : 0;
+      h += '<div class="click" style="flex:1;min-width:150px;padding:12px;border-radius:14px;cursor:pointer;background:rgba(246,163,80,' + (sel ? '.28' : '.09') + ');border:1px solid rgba(246,163,80,' + (sel ? '.9' : '.3') + ');" onclick="ldSetF(\'origem\',' + JSON.stringify(o.nome).replace(/"/g, '&quot;') + ')">'
+        + '<b style="font-size:1.15rem;color:#f6a350;display:block;">' + o.d.n.toLocaleString('pt-BR') + '</b>'
+        + '<span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">' + o.nome + '</span>'
+        + '<div class="hint" style="margin-top:3px;">🔥 ' + o.d.quentes + ' quentes · 📅 ' + o.d.ag + ' reuniões · 💰 ' + o.d.vd + ' vendas' + (taxa ? ' (' + taxa + '%)' : '') + '</div></div>';
+    });
+    h += '</div>';
+
+    // --- anúncios / campanhas (abre e fecha) ---
+    h += '<div class="click" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:10px;" onclick="window._origAnuncios=!window._origAnuncios;renderLeads();">'
+      + '<b style="font-size:.74rem;color:#b98aff;">📣 Anúncios e campanhas que trouxeram esses leads</b>'
+      + '<span style="flex:1;height:1px;background:rgba(185,138,255,.25);"></span>'
+      + '<span style="color:#b98aff;font-weight:800;font-size:.7rem;white-space:nowrap;">' + (verAn ? '▲ fechar' : '▼ ver') + '</span></div>';
+    if (verAn) {
+      var tabela = function(titulo, lista, cor) {
+        if (!lista.length) return '';
+        var t = '<div style="margin-top:10px;"><b style="font-size:.7rem;color:' + cor + ';text-transform:uppercase;letter-spacing:.5px;">' + titulo + '</b>'
+          + '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">';
+        var topo = lista[0].d.n || 1;
+        lista.forEach(function(o) {
+          var larg = Math.max(o.d.n / topo * 100, 3);
+          t += '<div style="position:relative;padding:7px 10px;border-radius:9px;background:rgba(255,255,255,.04);overflow:hidden;">'
+            + '<span style="position:absolute;left:0;top:0;bottom:0;width:' + larg.toFixed(1) + '%;background:' + cor + '22;"></span>'
+            + '<div style="position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+            + '<b style="font-size:.73rem;flex:1;min-width:150px;">' + (o.nome || '(sem)') + '</b>'
+            + '<span class="ld-tag" style="background:rgba(255,255,255,.07);color:' + cor + ';">' + o.d.n + ' leads</span>'
+            + (o.d.quentes ? '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">🔥 ' + o.d.quentes + '</span>' : '')
+            + (o.d.ag ? '<span class="ld-tag" style="background:rgba(110,168,255,.15);color:#6ea8ff;">📅 ' + o.d.ag + '</span>' : '')
+            + (o.d.vd ? '<span class="ld-tag" style="background:rgba(61,220,151,.15);color:#3ddc97;">💰 ' + o.d.vd + '</span>' : '')
+            + '</div></div>';
+        });
+        return t + '</div></div>';
+      };
+      h += tabela('Anúncio (o criativo que a pessoa viu)', listaAn, '#b98aff');
+      h += tabela('Campanha', listaCp, '#6ea8ff');
+      if (listaOv.length) {
+        h += '<div style="margin-top:10px;"><b style="font-size:.7rem;color:#3ddc97;text-transform:uppercase;letter-spacing:.5px;">Origem lançada na planilha de vendas (quando diferente)</b>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">'
+          + listaOv.map(function(o){ return '<span class="ld-tag" style="background:rgba(61,220,151,.13);color:#3ddc97;">' + o.nome + ': ' + o.n + '</span>'; }).join('')
+          + '</div></div>';
+      }
+      h += '<div class="hint" style="margin-top:8px;">📅 = virou reunião · 💰 = virou venda (casando o telefone com a aba Vendas)</div>';
+    }
+    h += '<div class="hint" style="margin-top:8px;">Clique numa origem para filtrar a lista de leads abaixo</div></div>';
+  })();
 
   // ===== 🟣 FUNIL DA CLINT: as etapas de negócio, como estão lá =====
   if (CLINT_PAINEL && CLINT_PAINEL.success) {
