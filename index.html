@@ -4479,7 +4479,15 @@ function ldAconteceuNoPeriodo(per) {
   var ini = per && per.ini ? per.ini : null, fim = per && per.fim ? per.fim : null;
   var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
   var ag = [], re = [], vd = [], valor = 0;
+  // se o filtro de faixa estiver ligado (ex.: 🔥 R$2-4mil), só entram os clientes
+  // cujo lead na pesquisa declarou aquela faixa
+  var faixaDe = null;
+  if (LD_F.faixa.length && LD.rows && LD.rows.length) {
+    faixaDe = {};
+    LD.rows.forEach(function(l){ if (l.tel8 && !faixaDe[l.tel8]) faixaDe[l.tel8] = l.faixa; });
+  }
   V2.rows.forEach(function(r) {
+    if (faixaDe && LD_F.faixa.indexOf(faixaDe[ldTel8(r.telefone)]) === -1) return;
     var d = r.date instanceof Date ? r.date : (r.date ? new Date(r.date) : null);
     if (!d || isNaN(d.getTime())) return;
     var t = d.getTime();
@@ -5301,14 +5309,30 @@ function renderLeads() {
     }
     h += '</div>';
   }
+  var modoAc = window._funilModo === 'aconteceu';
+  var acFun = ldAconteceuNoPeriodo(per);
+  if (modoAc && acFun) {
+    // funil de TUDO que aconteceu no período (leads de qualquer época)
+    ET = [
+      { k:'acAg', nome:'Reuniões agendadas', ico:'📅', cor:'#ffd166', sub:'todas as reuniões marcadas para o período', q: acFun.ag.length, base: 0 },
+      { k:'acRe', nome:'Reuniões realizadas', ico:'✅', cor:'#b98aff', sub:'vendido + não vendido + bloqueio + entrada + estorno', q: acFun.re.length, base: acFun.ag.length },
+      { k:'acVd', nome:'Vendas', ico:'💰', cor:'#3ddc97', sub:'fechou de verdade' + (acFun.valor ? ' · R$ ' + Math.round(acFun.valor).toLocaleString('pt-BR') : ''), q: acFun.vd.length, base: acFun.re.length }
+    ];
+    topo = Math.max(acFun.ag.length, 1);
+  }
   h += '<div class="panel" style="margin-bottom:18px;">'
-    + '<h3>📥 Funil de Leads — ' + per.label + (LD_RANGE ? ' <span class="ld-selo morno" style="cursor:pointer;" onclick="escolherBucketLeads(' + LD_RANGE.ini + ')">✕ limpar</span>' : '')
+    + '<h3>' + (modoAc ? '📆 Funil do período' : '📥 Funil de Leads') + ' — ' + per.label + (LD_RANGE ? ' <span class="ld-selo morno" style="cursor:pointer;" onclick="escolherBucketLeads(' + LD_RANGE.ini + ')">✕ limpar</span>' : '')
     + (ldContaF() ? ' <span class="ld-selo morno">🔎 ' + ldContaF() + ' filtro' + (ldContaF() === 1 ? '' : 's') + ' ativo' + (ldContaF() === 1 ? '' : 's') + '</span>' : '') + '</h3>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 4px;">'
+    +   '<span class="ld-selo' + (modoAc ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._funilModo=\'chegaram\';renderLeads();" title="Segue só os leads que preencheram a pesquisa neste período">📥 Leads que chegaram no período</span>'
+    +   '<span class="ld-selo' + (modoAc ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._funilModo=\'aconteceu\';renderLeads();" title="Tudo que aconteceu no período, inclusive com leads que chegaram antes">📆 Tudo que aconteceu no período (leads de qualquer época)</span>'
+    +   '<span class="ld-selo' + (LD_F.faixa.indexOf('alta') !== -1 ? '' : ' morno') + '" style="cursor:pointer;" onclick="ldSetF(\'faixa\',\'alta\')" title="Mostra só quem declarou investir de R$2mil a R$4mil">🔥 Só leads R$2–4mil</span>'
+    + '</div>'
     + (per.aviso ? '<div class="hint" style="margin:8px 0;color:#f6a350;">' + per.aviso + '</div>' : '');
   ET.forEach(function(e) {
     var larg = Math.max(e.q / topo * 100, 4);
     var tx = e.base ? Math.round(e.q / e.base * 100) + '% da etapa anterior' : '';
-    h += '<div class="fs-et" onclick="abrirEtapaLeads(\'' + e.k + '\')">'
+    h += '<div class="fs-et" onclick="' + (e.k.indexOf('ac') === 0 ? 'verAconteceu(\'' + e.k.slice(2).toLowerCase() + '\')' : 'abrirEtapaLeads(\'' + e.k + '\')') + '">'
       + '<span class="fs-fill" style="width:' + larg.toFixed(1) + '%;background:' + e.cor + ';"></span>'
       + '<b class="fs-num" style="color:' + e.cor + ';">' + e.q + '</b>'
       + '<div class="fs-info"><b>' + e.ico + ' ' + e.nome + '</b><span>' + e.sub + '</span></div>'
@@ -5372,6 +5396,49 @@ function renderLeads() {
   // "origem lançada na venda" quando for diferente da origem do lead.
   (function() {
     if (!rows.length) return;
+    // no modo "tudo que aconteceu", as origens são as dos clientes que tiveram
+    // reunião/venda no período (mesmo tendo chegado meses antes)
+    if (window._funilModo === 'aconteceu' && _ldAcont) {
+      var porTelLead = {};
+      LD.rows.forEach(function(l){ if (l.tel8 && !porTelLead[l.tel8]) porTelLead[l.tel8] = l; });
+      var oAg = {}, oVd = {}, anAg = {};
+      _ldAcont.ag.forEach(function(r) {
+        var lead = porTelLead[ldTel8(r.telefone)];
+        if (LD_F.faixa.length && (!lead || LD_F.faixa.indexOf(lead.faixa) === -1)) return;
+        var org = (lead && lead.origem) ? lead.origem : (r.origem || '(sem origem)');
+        var o = oAg[org] || (oAg[org] = { n: 0, vd: 0 });
+        o.n++;
+        if (r.sn === 'vendido') o.vd++;
+        if (lead && lead.anuncio) {
+          var an = ldAnuncioLimpo(lead.anuncio);
+          var a2 = anAg[an] || (anAg[an] = { n: 0, vd: 0 });
+          a2.n++;
+          if (r.sn === 'vendido') a2.vd++;
+        }
+      });
+      var lst = Object.keys(oAg).map(function(k){ return { nome: k, d: oAg[k] }; }).sort(function(x, y){ return y.d.n - x.d.n; });
+      var lstAn = Object.keys(anAg).map(function(k){ return { nome: k, d: anAg[k] }; }).sort(function(x, y){ return y.d.n - x.d.n; }).slice(0, 12);
+      h += '<div class="panel" style="margin-bottom:18px;border-color:rgba(246,163,80,.35);">'
+        + '<h3>🧲 De onde vieram as reuniões e vendas de ' + per.label + '</h3>'
+        + '<div class="hint" style="margin:6px 0 10px;">Origem de cada cliente que teve reunião no período — mesmo tendo chegado meses antes</div>'
+        + '<div style="display:flex;gap:9px;flex-wrap:wrap;">';
+      lst.forEach(function(o) {
+        var tx = o.d.n ? Math.round(o.d.vd / o.d.n * 100) : 0;
+        h += '<div style="flex:1;min-width:150px;padding:12px;border-radius:14px;background:rgba(246,163,80,.09);border:1px solid rgba(246,163,80,.3);">'
+          + '<b style="font-size:1.15rem;color:#f6a350;display:block;">' + o.d.n + '</b>'
+          + '<span style="font-size:.64rem;color:var(--text-secondary);font-weight:700;">' + o.nome + '</span>'
+          + '<div class="hint" style="margin-top:3px;">💰 ' + o.d.vd + ' vendas' + (tx ? ' · ' + tx + '% de fechamento' : '') + '</div></div>';
+      });
+      h += '</div>';
+      if (lstAn.length) {
+        h += '<div style="margin-top:12px;"><b style="font-size:.7rem;color:#b98aff;text-transform:uppercase;letter-spacing:.5px;">Anúncio que trouxe esses clientes</b>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">'
+          + lstAn.map(function(o){ return '<span class="ld-tag" style="background:rgba(185,138,255,.13);color:#b98aff;">' + o.nome + ': ' + o.d.n + (o.d.vd ? ' · 💰' + o.d.vd : '') + '</span>'; }).join('')
+          + '</div></div>';
+      }
+      h += '</div>';
+      return;
+    }
     var porOrigem = {}, porAnuncio = {}, porCampanha = {};
     function poe(mapa, chave, l) {
       if (!chave) return;
