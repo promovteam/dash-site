@@ -4406,6 +4406,25 @@ function montarFiltrosLeads() {
 // ===== 💬 COMENTÁRIOS NO POST DO DIAGNÓSTICO (aba alimentada pelo ManyChat) =====
 var COMENT_GID = '1841020613';
 var COMENT = { rows: [], carregado: false };
+// o que a Sarah marcou agora (vale até a planilha ser relida, a cada 3 min)
+var COMENT_MARCA = {};
+var COMENT_TAGS = ['Qualificado', 'Perfil legado', 'Perfil HT'];
+var COMENT_TIPOS = ['QUALIFICADO', 'DESQUALIFICADO'];
+// marca TAG ou TIPO do comentarista e guarda na aba dos comentários (todo mundo vê)
+function comentMarcar(insta, campo, valor) {
+  if (soOlhar()) return;
+  if (!insta) { alert('Este comentário está sem o @ do Instagram — não dá para marcar.'); return; }
+  var k = String(insta).toLowerCase();
+  COMENT_MARCA[k] = COMENT_MARCA[k] || {};
+  COMENT_MARCA[k][campo] = valor;
+  for (var i = 0; i < COMENT.rows.length; i++) {
+    if (String(COMENT.rows[i].insta || '').toLowerCase() === k) COMENT.rows[i][campo] = valor;
+  }
+  var pedido = { action: 'comentMarcar', insta: insta, quem: ldEu() || '' };
+  pedido[campo] = valor;
+  sendToGAS(pedido);
+  renderLeads();
+}
 var _comAvisados = {};
 function carregarComentarios() {
   var url = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/export?format=csv&gid=' + COMENT_GID + '&_t=' + Date.now();
@@ -4417,7 +4436,10 @@ function carregarComentarios() {
       var insta = (linhas[i][1] || '').trim().replace(/^@/, '');
       if (!nome && !insta) continue;
       // 4ª coluna (opcional): seguidores — basta o ManyChat escrever que aparece
-      rows.push({ nome: nome, insta: insta, date: ldData(linhas[i][2] || ''), seguidores: (linhas[i][3] || '').trim() });
+      var _mk = COMENT_MARCA[insta.toLowerCase()] || {};   // marcação feita agora, antes da planilha ser relida
+      rows.push({ nome: nome, insta: insta, date: ldData(linhas[i][2] || ''), seguidores: (linhas[i][3] || '').trim(),
+        tag: _mk.tag !== undefined ? _mk.tag : (linhas[i][4] || '').trim(),
+        tipo: _mk.tipo !== undefined ? _mk.tipo : (linhas[i][5] || '').trim() });
     }
     rows.sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
     var jaTinha = COMENT.carregado;
@@ -5202,6 +5224,27 @@ function comentFiltrados() {
     return (ini === null || t >= ini) && (fim === null || t < fim);
   });
 }
+// em qual bloco o comentarista entra: falta marcar (por dia) ou já marcado
+function comSecaoDe(x) {
+  var marcado = (x.tag || '').trim() || (x.tipo || '').trim();
+  return marcado ? '✅ já marcados' : '⏳ falta marcar · ' + comGrupoDe(x.date);
+}
+// as duas caixinhas (TAG e TIPO) que a Sarah escolhe
+function comSeletores(x) {
+  var esc = function(v){ return String(v || '').replace(/'/g, "\\'"); };
+  var tag = (x.tag || '').trim(), tipo = (x.tipo || '').trim();
+  var corT = tipo.toUpperCase() === 'QUALIFICADO' ? '#3ddc97' : tipo ? '#ff6b6b' : 'rgba(255,255,255,.35)';
+  var corG = tag ? '#f6a350' : 'rgba(255,255,255,.35)';
+  var caixa = function(rotulo, valorAtual, opcoes, campo, cor) {
+    return '<select title="' + rotulo + '" onchange="event.stopPropagation();comentMarcar(\'' + esc(x.insta) + '\',\'' + campo + '\',this.value);" '
+      + 'style="background:rgba(255,255,255,.06);border:1px solid ' + cor + ';border-radius:8px;color:' + (valorAtual ? cor : 'var(--text)') + ';'
+      + 'padding:4px 6px;font-size:.68rem;font-weight:700;cursor:pointer;max-width:130px;">'
+      + '<option value="">' + rotulo + '</option>'
+      + opcoes.map(function(o){ return '<option value="' + o + '"' + (v2norm(o) === v2norm(valorAtual) ? ' selected' : '') + '>' + o + '</option>'; }).join('')
+      + '</select>';
+  };
+  return caixa('TAG', tag, COMENT_TAGS, 'tag', corG) + caixa('TIPO', tipo, COMENT_TIPOS, 'tipo', corT);
+}
 // cruza o comentarista com a base da pesquisa (pelo @ do Instagram)
 function comentCruza(c) {
   if (!c.insta) return null;
@@ -5944,20 +5987,30 @@ function renderLeads() {
               + '<input type="date" value="' + (CF.ate || '') + '" onchange="window._comFiltro.ate=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
             : '')
         + '</div>';
+      // quem ainda não foi marcado (sem TAG e sem TIPO) vem primeiro — pedido do Bruno
+      var comFalta = comLista.filter(function(x){ return !(x.tag || '').trim() && !(x.tipo || '').trim(); });
+      var comFeito = comLista.filter(function(x){ return (x.tag || '').trim() || (x.tipo || '').trim(); });
+      // mostra até 150 dos que faltam + os 50 já marcados mais recentes
+      // (sem isso, quem a Sarah marcasse sumia da tela por causa do corte)
+      var comOrdem = comFalta.slice(0, 150).concat(comFeito.slice(0, 50));
+      if (comFalta.length) {
+        h += '<div class="hint" style="margin:2px;"><b style="color:#f6a350;">' + comFalta.length + '</b> ainda sem TAG/TIPO — aparecem primeiro</div>';
+      }
       h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
       if (!comLista.length) h += '<div class="hint" style="padding:8px;">Nenhum comentário no período escolhido.</div>';
-      // contagem de cada divisão de chegada (Hoje / Ontem / …)
+      // divisões: primeiro "falta marcar" (por dia de chegada), depois "já marcados"
       var comGrupos = {};
-      comLista.slice(0, 150).forEach(function(x){ var g = comGrupoDe(x.date); comGrupos[g] = (comGrupos[g] || 0) + 1; });
+      comOrdem.forEach(function(x){ var g = comSecaoDe(x); comGrupos[g] = (comGrupos[g] || 0) + 1; });
       var comGrupoAtual = null;
-      comLista.slice(0, 150).forEach(function(x) {
+      comOrdem.forEach(function(x) {
         var lead = comentCruza(x);
-        var grupo = comGrupoDe(x.date);
+        var grupo = comSecaoDe(x);
         if (grupo !== comGrupoAtual) {
           comGrupoAtual = grupo;
+          var corG = grupo.indexOf('marcados') !== -1 ? '#3ddc97' : '#6ea8ff';
           h += '<div style="display:flex;align-items:center;gap:8px;margin:6px 2px 0;">'
-            + '<b style="font-size:.7rem;color:#6ea8ff;text-transform:uppercase;letter-spacing:.5px;">' + grupo + '</b>'
-            + '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:#6ea8ff;">' + comGrupos[grupo] + '</span>'
+            + '<b style="font-size:.7rem;color:' + corG + ';text-transform:uppercase;letter-spacing:.5px;">' + grupo + '</b>'
+            + '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:' + corG + ';">' + comGrupos[grupo] + '</span>'
             + '<span style="flex:1;height:1px;background:rgba(110,168,255,.25);"></span></div>';
         }
         var quando = x.date ? x.date.toLocaleDateString('pt-BR').slice(0,5) + ' ' + ('0'+x.date.getHours()).slice(-2) + ':' + ('0'+x.date.getMinutes()).slice(-2) : '';
@@ -5974,9 +6027,10 @@ function renderLeads() {
               : '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">⏳ só comentou</span>'
                 + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);" title="Cria na Clint (nome + @), com a Sarah de dona">➕ Clint (Sarah)</button>')
           + (x.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;padding:6px 10px;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank">📷 @' + x.insta + '</a>' : '')
+          + comSeletores(x)
           + '</div>';
       });
-      if (COMENT.rows.length > 150) h += '<div class="hint">… e mais ' + (COMENT.rows.length - 150) + '</div>';
+      if (comLista.length > comOrdem.length) h += '<div class="hint">… e mais ' + (comLista.length - comOrdem.length) + '</div>';
       h += '</div>';
     }
     h += '</div>';
