@@ -907,6 +907,7 @@ img { max-width:100%; height:auto; }
   <div class="nav-item active" data-s="visao"><span class="nav-icon">📊</span><span class="nav-label">Visão Geral</span></div>
   <div class="nav-item" data-s="agenda"><span class="nav-icon">📅</span><span class="nav-label">Agenda</span></div>
   <div class="nav-item" data-s="leads"><span class="nav-icon">📥</span><span class="nav-label">Leads</span></div>
+  <div class="nav-item" data-s="anuncios"><span class="nav-icon">📣</span><span class="nav-label">Anúncios</span></div>
   <div class="nav-item" data-s="pesquisa"><span class="nav-icon">🔍</span><span class="nav-label">Pesquisa</span></div>
   <div class="nav-item" data-s="pagamentos"><span class="nav-icon">💳</span><span class="nav-label">Pagamentos</span></div>
   <div class="nav-item" data-s="regras"><span class="nav-icon">📋</span><span class="nav-label">Regras</span></div>
@@ -1003,6 +1004,12 @@ img { max-width:100%; height:auto; }
       Carregando leads da planilha…
     </div>
     <div id="ld-corpo"></div>
+  </section>
+
+  <!-- ============ ANÚNCIOS / FONTES ============ -->
+  <section class="screen" id="s-anuncios">
+    <div id="an-chips" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:14px;"></div>
+    <div id="an-corpo"><div class="hint">Carregando…</div></div>
   </section>
 
   <!-- ============ PESQUISA ============ -->
@@ -1472,7 +1479,7 @@ Instagram: @pr.joaosilva</div>
 <script>
 var titulos = {
   visao:'Visão Geral', agenda:'Agenda', leads:'Leads', pendencias:'Pendências', pesquisa:'Pesquisa',
-  pagamentos:'Pagamentos', registro:'Registro', regras:'Regras'
+  pagamentos:'Pagamentos', registro:'Registro', regras:'Regras', anuncios:'Anúncios e Origens'
 };
 // ===== Gráfico com abas: métrica x período =====
 var DIAS_MES = 31, HOJE = 16;
@@ -2018,6 +2025,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     // abriu a aba Leads = viu os novos; o aviso da tela inicial zera
     // (espera um pouco para o filtro "só os novos" ainda funcionar nesta visita)
     if (s === 'leads' && typeof marcarLeadsVistos === 'function') setTimeout(marcarLeadsVistos, 2500);
+    if (s === 'anuncios' && typeof renderAnuncios === 'function') renderAnuncios();
   });
 });
 </script>
@@ -4570,6 +4578,170 @@ function blocoMetaAds(listaAn, per) {
   h += '</div><div class="hint" style="margin-top:7px;">Gasto direto do Facebook, casado com os leads pelo nome do anúncio · atualizado ' + META.dados.atualizado + '</div></div>';
   return h;
 }
+
+// =====================================================================
+// 📣 ABA ANÚNCIOS E ORIGENS — de onde vem cada reunião e cada venda
+// =====================================================================
+var AN_PER = 'mes', AN_ORD = 'vendas';
+function anPeriodo() {
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var ini, fim = null, label;
+  if (AN_PER === 'mes') { ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(); }
+  else if (AN_PER === 'mesant') { ini = new Date(hoje.getFullYear(), hoje.getMonth()-1, 1); fim = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[(hoje.getMonth()+11)%12] + ' de ' + (hoje.getMonth()===0?hoje.getFullYear()-1:hoje.getFullYear()); }
+  else if (AN_PER === 'sem') { ini = ldIniSemana(hoje); label = 'Esta semana'; }
+  else if (AN_PER === 'tri') { ini = ldIniTri(hoje); label = 'Trimestre'; }
+  else if (AN_PER === 'ano') { ini = new Date(hoje.getFullYear(), 0, 1); label = 'Ano de ' + hoje.getFullYear(); }
+  else { ini = null; label = 'Tudo'; }
+  return { ini: ini ? ini.getTime() : null, fim: fim ? fim.getTime() : null, label: label };
+}
+function renderAnuncios() {
+  var el = document.getElementById('an-corpo');
+  if (!el) return;
+  var per = anPeriodo();
+  // chips de período
+  var chips = document.getElementById('an-chips');
+  if (chips) {
+    var ops = [['sem','Esta semana'],['mes','Este mês'],['mesant','Mês passado'],['tri','Trimestre'],['ano','Ano'],['tudo','Tudo']];
+    chips.innerHTML = ops.map(function(o){
+      return '<span class="chart-chip' + (AN_PER === o[0] ? ' on' : '') + '" style="cursor:pointer;" onclick="AN_PER=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>';
+    }).join('') + '<span style="flex:1;"></span><span class="hint">' + per.label + '</span>';
+  }
+  if (!V2.carregado || !LD.carregado) { el.innerHTML = '<div class="hint">⏳ Carregando as planilhas…</div>'; return; }
+
+  // ---- reuniões e vendas do período, por origem ----
+  var REAL = ['vendido','nao vendido','bloqueio de oferta','entrada','estorno'];
+  var FECHOU = ['vendido','entrada','bloqueio de oferta'];
+  var porTelLead = {};
+  LD.rows.forEach(function(l){ if (l.tel8 && !porTelLead[l.tel8]) porTelLead[l.tel8] = l; });
+  var org = {}, totO = { ag:0, re:0, fe:0, vd:0, fat:0 };
+  V2.rows.forEach(function(r) {
+    var d = r.date instanceof Date ? r.date : (r.date ? new Date(r.date) : null);
+    if (!d || isNaN(d.getTime())) return;
+    var t = d.getTime();
+    if (per.ini !== null && t < per.ini) return;
+    if (per.fim !== null && t >= per.fim) return;
+    var lead = porTelLead[ldTel8(r.telefone)];
+    var nome = (lead && lead.origem) ? lead.origem : (r.origem || '(sem origem)');
+    var o = org[nome] || (org[nome] = { ag:0, re:0, fe:0, vd:0, fat:0 });
+    o.ag++; totO.ag++;
+    if (REAL.indexOf(r.sn) !== -1) { o.re++; totO.re++; }
+    if (FECHOU.indexOf(r.sn) !== -1) { o.fe++; totO.fe++; }
+    if (r.sn === 'vendido') { o.vd++; totO.vd++; o.fat += (r.valor||0); totO.fat += (r.valor||0); }
+  });
+  var lista = Object.keys(org).sort(function(a,b){ return org[b].fat - org[a].fat || org[b].ag - org[a].ag; });
+  function rs(v){ return 'R$ ' + Math.round(v||0).toLocaleString('pt-BR'); }
+
+  var h = '<div class="panel" style="margin-bottom:18px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">🧲 Detalhamento por origem</h3>'
+    + '<span style="flex:1;"></span><span class="hint">' + per.label + '</span></div>'
+    + '<div style="overflow-x:auto;margin-top:12px;"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">'
+    + '<tr><th style="text-align:left;padding:8px 10px;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">Origem</th>'
+    + ['Agendadas','Realizadas','Fecharam','Vendas','Faturamento','Conversão'].map(function(c){
+        return '<th style="text-align:right;padding:8px 10px;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">' + c + '</th>'; }).join('')
+    + '</tr>';
+  lista.forEach(function(k) {
+    var o = org[k], cv = o.re ? Math.round(o.vd/o.re*100) : 0;
+    h += '<tr style="border-bottom:1px solid rgba(255,255,255,.06);">'
+      + '<td style="padding:10px;"><b>' + k + '</b></td>'
+      + '<td style="text-align:right;padding:10px;">' + o.ag + '</td>'
+      + '<td style="text-align:right;padding:10px;">' + o.re + '</td>'
+      + '<td style="text-align:right;padding:10px;">' + o.fe + '</td>'
+      + '<td style="text-align:right;padding:10px;"><b style="color:#3ddc97;">' + o.vd + '</b></td>'
+      + '<td style="text-align:right;padding:10px;color:#3ddc97;font-weight:700;">' + rs(o.fat) + '</td>'
+      + '<td style="text-align:right;padding:10px;color:' + (cv>=30?'#3ddc97':cv>=15?'#f6a350':'var(--muted)') + ';font-weight:700;">' + (o.re?cv+'%':'—') + '</td></tr>';
+  });
+  h += '<tr style="border-top:2px solid rgba(255,255,255,.18);"><td style="padding:11px 10px;"><b>TOTAL</b></td>'
+    + '<td style="text-align:right;padding:11px 10px;"><b>' + totO.ag + '</b></td>'
+    + '<td style="text-align:right;padding:11px 10px;"><b>' + totO.re + '</b></td>'
+    + '<td style="text-align:right;padding:11px 10px;"><b>' + totO.fe + '</b></td>'
+    + '<td style="text-align:right;padding:11px 10px;"><b style="color:#3ddc97;">' + totO.vd + '</b></td>'
+    + '<td style="text-align:right;padding:11px 10px;"><b style="color:#3ddc97;">' + rs(totO.fat) + '</b></td>'
+    + '<td style="text-align:right;padding:11px 10px;"><b>' + (totO.re?Math.round(totO.vd/totO.re*100)+'%':'—') + '</b></td></tr>';
+  h += '</table></div></div>';
+
+  // ---- criativos: cada anúncio com leads, reuniões, vendas ----
+  var an = {};
+  LD.rows.forEach(function(l) {
+    if (!l.date) return;
+    var t = l.date.getTime();
+    if (per.ini !== null && t < per.ini) return;
+    if (per.fim !== null && t >= per.fim) return;
+    var nome = ldAnuncioLimpo(l.anuncio);
+    if (nome === '(sem anúncio)') return;
+    var a = an[nome] || (an[nome] = { n:0, q:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '' });
+    a.n++;
+    if (l.faixa === 'alta') a.q++;
+    var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+    if (st) {
+      a.ag++;
+      if (st.re) a.re++;
+      if (st.vd) { a.vd++; a.fat += (_valorDoTel(l.tel8) || 0); }
+    }
+  });
+  // gasto/imagem do Facebook, se conectado
+  carregarMetaAds(per);
+  var metaPor = {};
+  if (META.dados) META.dados.anuncios.forEach(function(m){ metaPor[_chaveAnuncio(m.anuncio)] = m; });
+
+  var chaves = Object.keys(an);
+  var ordFn = { vendas:function(a,b){return an[b].vd-an[a].vd||an[b].ag-an[a].ag},
+                agend:function(a,b){return an[b].ag-an[a].ag},
+                reuni:function(a,b){return an[b].re-an[a].re},
+                fat:function(a,b){return an[b].fat-an[a].fat},
+                leads:function(a,b){return an[b].n-an[a].n},
+                gasto:function(a,b){return ((metaPor[_chaveAnuncio(b)]||{}).gasto||0)-((metaPor[_chaveAnuncio(a)]||{}).gasto||0)} }[AN_ORD] || null;
+  if (ordFn) chaves.sort(ordFn);
+
+  h += '<div class="panel">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Anúncios</h3>'
+    + '<span class="hint">o criativo que trouxe cada lead</span><span style="flex:1;"></span>'
+    + '<span class="hint">ordenar:</span>'
+    + [['vendas','Vendas'],['agend','Agendamentos'],['reuni','Reuniões'],['fat','Faturamento'],['leads','Leads'],['gasto','Investimento']].map(function(o){
+        return '<span class="ld-selo' + (AN_ORD===o[0]?'':' morno') + '" style="cursor:pointer;" onclick="AN_ORD=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>'; }).join('')
+    + '</div>';
+  if (!META.dados) {
+    h += '<div class="hint" style="margin-top:9px;color:#f6a350;">💸 '
+      + (META.buscando ? 'Buscando investimento e imagens no Facebook…' : 'Facebook ainda não conectado' + (META.erro ? ' (' + META.erro + ')' : '') + ' — falta a chave META_TOKEN no robô. Os números de leads/reuniões/vendas abaixo já funcionam.')
+      + '</div>';
+  }
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
+  if (!chaves.length) h += '<div class="hint">Nenhum anúncio no período.</div>';
+  chaves.slice(0, 40).forEach(function(k, i) {
+    var a = an[k], m = metaPor[_chaveAnuncio(k)] || {};
+    var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
+    h += '<div style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;">'
+      + '<div style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
+      +   (m.foto ? '<img src="' + m.foto + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\'">'
+                  : '<span style="font-size:1.7rem;opacity:.35;">📣</span>')
+      +   '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.65);color:#fff;font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:99px;">#' + (i+1) + '</span>'
+      +   (m.link ? '<a href="' + m.link + '" target="_blank" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : '')
+      + '</div>'
+      + '<div style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
+      +   '<b style="font-size:.74rem;line-height:1.3;">' + k + '</b>'
+      +   '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · ' + (a.n?Math.round(a.q/a.n*100):0) + '% quentes' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>'
+      +   '<div style="display:flex;gap:5px;margin-top:9px;">'
+      +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(255,209,102,.1);"><b style="color:#ffd166;font-size:.95rem;display:block;">' + a.ag + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">AGEND.</span></div>'
+      +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(185,138,255,.1);"><b style="color:#b98aff;font-size:.95rem;display:block;">' + a.re + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">REUNIÕES</span></div>'
+      +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(61,220,151,.1);"><b style="color:#3ddc97;font-size:.95rem;display:block;">' + a.vd + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">VENDAS</span></div>'
+      +   '</div>'
+      +   (cpl ? '<div class="hint" style="margin-top:7px;">' + rs(cpl) + ' por lead' + (a.vd ? ' · ' + rs(m.gasto/a.vd) + ' por venda' : '') + '</div>' : '')
+      + '</div></div>';
+  });
+  h += '</div></div>';
+  el.innerHTML = h;
+}
+// valor da venda pelo telefone (para somar faturamento por anúncio)
+var _valTel = null;
+function _valorDoTel(t8) {
+  if (!_valTel) {
+    _valTel = {};
+    V2.rows.forEach(function(r){
+      if (r.sn === 'vendido') { var t = ldTel8(r.telefone); if (t) _valTel[t] = (_valTel[t]||0) + (r.valor||0); }
+    });
+  }
+  return _valTel[t8] || 0;
+}
+
 // ===== 💸 META ADS: gasto por anúncio (vem do robô, que fala com o Facebook) =====
 var META = { dados: null, buscando: false, erro: '' };
 function carregarMetaAds(per) {
@@ -4811,7 +4983,14 @@ function abrirFichaLead(i) {
     ['🎯', 'Objetivos', l.obj],
     ['⭐', 'Score', l.score ? String(l.score) : ''],
     ['🧲', 'Origem', l.origem],
-    ['📣', 'Anúncio que trouxe', l.anuncio],
+    ['📣', 'Anúncio que trouxe', (function(){
+        var nm = ldAnuncioLimpo(l.anuncio);
+        if (!l.anuncio) return '';
+        var m = (META.dados || { anuncios: [] }).anuncios.filter(function(x){ return _chaveAnuncio(x.anuncio) === _chaveAnuncio(nm); })[0];
+        if (m && m.link) return nm + ' <a href="' + m.link + '" target="_blank" style="color:#6ea8ff;font-weight:700;">ver anúncio ↗</a>'
+          + (m.gasto ? ' <span style="color:var(--muted);">· R$ ' + Math.round(m.gasto).toLocaleString('pt-BR') + ' investidos</span>' : '');
+        return nm;
+      })(), 'html'],
     ['🗂️', 'Conjunto de anúncios', l.conjunto],
     ['📊', 'Campanha', l.campanha || l.utm],
     ['🧭', 'Veio por', (function(){
@@ -4906,7 +5085,9 @@ function abrirFichaLead(i) {
     + '<span class="ld-selo morno">' + sit + '</span>'
     + '<span class="et-chip" style="background:' + ei.cor + '22;color:' + ei.cor + ';border-color:' + ei.cor + '66;">' + ei.ico + ' ' + ei.nome + '</span></div>';
   campos.forEach(function(c) {
-    h += '<div class="fs-calc-linha"><span>' + c[0] + ' ' + c[1] + '</span><b style="text-align:right;max-width:62%;">' + String(c[2]).replace(/</g, '&lt;') + '</b></div>';
+    // c[3] === 'html' = o campo já vem pronto (usado no link do anúncio)
+    var valorC = c[3] === 'html' ? String(c[2]) : String(c[2]).replace(/</g, '&lt;');
+    h += '<div class="fs-calc-linha"><span>' + c[0] + ' ' + c[1] + '</span><b style="text-align:right;max-width:62%;">' + valorC + '</b></div>';
   });
   h += '</div>';
   var wa = ldWa(l);
