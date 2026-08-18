@@ -4159,6 +4159,9 @@ function ldGuardar(rows, modoSimples) {
   LD.modoSimples = !!modoSimples;
   var jaTinha = LD.carregado;
   LD.carregado = true;
+  // a releitura da planilha apaga a mistura com a base do site: refaz agora
+  LD._fundido = null;
+  if (typeof ldFundirSupabase === 'function') ldFundirSupabase();
   renderLeads();
   renderAvisoNovos();
   if (jaTinha) toastLeadNovo(ldNovos());
@@ -4852,7 +4855,14 @@ function ldFundirSupabase() {
 var _anAtual = null;
 function abrirCriativo(nome) {
   var d = _anDados[nome];
-  if (!d) return;
+  if (!d) {
+    // veio da ficha de um lead, sem ter aberto a aba Anúncios: monta na hora
+    var m = (META.dados || { anuncios: [] }).anuncios.filter(function(x){ return _chaveAnuncio(x.anuncio) === _chaveAnuncio(nome); })[0] || {};
+    var cri = criativoDe(nome, m.adId);
+    if (cri) m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post };
+    if (!m.foto && !m.link && !m.post) return;
+    d = _anDados[nome] = { n: 0, q: 0, mql: 0, ag: 0, re: 0, vd: 0, fat: 0, camp: '', tipo: 'pago', meta: m };
+  }
   _anAtual = nome;
   var m = d.meta || {};
   var cx = document.getElementById('modal-criativo');
@@ -5068,7 +5078,18 @@ function sbPendentes() {
     if (r.completa) return false;                          // terminou: já está na planilha
     if (!r.whatsapp) return false;                         // sem telefone não dá para chamar
     if (r.tel8 && _ldIdx && _ldIdx[r.tel8]) return false;  // já teve reunião: não incomodar
+    // já está na Clint (alguém cuida dele lá): sai da fila
+    if (r.tel8 && CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[r.tel8]) return false;
     return true;
+  });
+}
+// os que estão na Clint continuam visíveis num contador à parte
+function sbJaNaClint() {
+  if (!SB.carregado || !CLINT_PAINEL || !CLINT_PAINEL.success || !CLINT_PAINEL.mapa) return [];
+  return SB.rows.filter(function(r) {
+    if (r.completa || !r.whatsapp) return false;
+    if (r.tel8 && _ldIdx && _ldIdx[r.tel8]) return false;
+    return !!(r.tel8 && CLINT_PAINEL.mapa[r.tel8]);
   });
 }
 
@@ -5317,9 +5338,19 @@ function abrirFichaLead(i) {
         var nm = ldAnuncioLimpo(l.anuncio);
         if (!l.anuncio) return '';
         var m = (META.dados || { anuncios: [] }).anuncios.filter(function(x){ return _chaveAnuncio(x.anuncio) === _chaveAnuncio(nm); })[0];
-        if (m && m.link) return nm + ' <a href="' + m.link + '" target="_blank" style="color:#6ea8ff;font-weight:700;">ver anúncio ↗</a>'
-          + (m.gasto ? ' <span style="color:var(--muted);">· R$ ' + Math.round(m.gasto).toLocaleString('pt-BR') + ' investidos</span>' : '');
-        return nm;
+        var cri = criativoDe(nm, m && m.adId);
+        var foto = cri && cri.foto ? cri.foto : '';
+        var link = (cri && cri.link) || (m && m.link) || '';
+        var txt = '<div style="display:flex;align-items:center;gap:9px;justify-content:flex-end;flex-wrap:wrap;">'
+          + (foto ? '<img src="' + foto + '" style="width:74px;height:74px;object-fit:cover;border-radius:9px;border:1px solid rgba(255,255,255,.14);cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')" title="Clique para ver o anúncio inteiro">' : '')
+          + '<div style="text-align:right;"><b>' + nm + '</b>'
+          + (!foto && LD.modoSimples ? '<div style="font-size:.66rem;color:#f6a350;">abra pelo site para ver a imagem</div>' : '')
+          + (m && m.gasto ? '<div style="font-size:.68rem;color:var(--muted);font-weight:600;">R$ ' + Math.round(m.gasto).toLocaleString('pt-BR') + ' investidos neste anúncio</div>' : '')
+          + '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:3px;">'
+          + (foto || cri ? '<span class="ld-tag" style="cursor:pointer;background:rgba(185,138,255,.14);color:#b98aff;" onclick="abrirCriativo(' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')">▶ ver criativo</span>' : '')
+          + (link ? '<a class="ld-tag" style="background:rgba(110,168,255,.14);color:#6ea8ff;text-decoration:none;" href="' + link + '" target="_blank">Facebook ↗</a>' : '')
+          + '</div></div></div>';
+        return txt;
       })(), 'html'],
     ['🗂️', 'Conjunto de anúncios', l.conjunto],
     ['📊', 'Campanha', l.campanha || l.utm],
@@ -5793,6 +5824,7 @@ function renderLeads() {
   }
   // ===== 🟠 quem começou o diagnóstico e não terminou (base do site) =====
   carregarSupabase();
+  if (META.dados && !META_CRI.pagina) carregarCriativos();   // imagens para a ficha do lead
   (function() {
     var pend = sbPendentes();
     if (!pend.length) {
@@ -5801,30 +5833,23 @@ function renderLeads() {
     }
     var pAberto = !!window._sbAberto;
     var comAnuncio = pend.filter(function(x){ return x.anuncio; }).length;
-    var naClint = 0, foraClint = 0, semDonoClint = 0;
-    if (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa) {
-      pend.forEach(function(x) {
-        var m = CLINT_PAINEL.mapa[x.tel8];
-        if (m) { naClint++; if (!(m[0] >= 0)) semDonoClint++; } else foraClint++;
-      });
-    }
+    var jaForam = sbJaNaClint();
+    var foraClint = pend.length;   // a lista agora só tem quem NÃO está na Clint
     h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(246,163,80,.09);border-color:rgba(246,163,80,.5);">'
       + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._sbAberto=!window._sbAberto;renderLeads();">'
       + '<span style="font-size:1.2rem;">🟠</span>'
-      + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#f6a350;">' + pend.length + ' começaram o diagnóstico e não terminaram</b>'
-      + '<span class="hint" style="margin-left:8px;">têm WhatsApp e nunca foram chamados · ' + comAnuncio + ' vieram de anúncio'
-      + (naClint || foraClint ? ' · <b style="color:#8f6bff;">' + naClint + ' já na Clint</b>' + (semDonoClint ? ' (' + semDonoClint + ' sem responsável)' : '') + ' · <b style="color:#f6a350;">' + foraClint + ' fora dela</b>' : '')
+      + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#f6a350;">' + pend.length + ' para levar para a Clint</b>'
+      + '<span class="hint" style="margin-left:8px;">começaram o diagnóstico, não terminaram, têm WhatsApp e ainda não estão na Clint · ' + comAnuncio + ' vieram de anúncio'
+      + (jaForam.length ? ' · <b style="color:#8f6bff;">' + jaForam.length + ' já foram</b>' : '')
       + '</span></div>'
-      + (foraClint ? '<button class="btn-assumir" style="white-space:nowrap;" onclick="event.stopPropagation();criarPendentesNaClint(this);">➕ criar os ' + foraClint + ' na Clint</button>' : '')
+      + '<button class="btn-assumir" style="white-space:nowrap;" onclick="event.stopPropagation();criarPendentesNaClint(this);">➕ criar ' + Math.min(pend.length, 25) + ' na Clint</button>'
       + '<span style="color:#f6a350;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (pAberto ? '▲ fechar' : '▼ ver lista') + '</span></div>';
     if (pAberto) {
       h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
       pend.slice(0, 200).forEach(function(x) {
         var wa = 'https://wa.me/' + String(x.whatsapp).replace(/\D/g, '');
-        // está na Clint? o painel traz dono e etapa de todos os negócios
-        var mc = (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa) ? CLINT_PAINEL.mapa[x.tel8] : null;
-        var donoC = (mc && mc[0] >= 0) ? CLINT_PAINEL.donos[mc[0]] : '';
-        var etapaC = (mc && mc[1] >= 0) ? CLINT_PAINEL.nomesEtapas[mc[1]] : '';
+        var mc = null;   // aqui só entra quem ainda NÃO está na Clint
+        var donoC = '', etapaC = '';
         h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
           + '<b style="font-size:.76rem;flex:1;min-width:130px;">' + (x.nome || 'Sem nome') + '</b>'
           + (mc
