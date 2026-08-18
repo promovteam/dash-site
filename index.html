@@ -4924,6 +4924,103 @@ function fecharCriativo() {
 document.addEventListener('keydown', function(e){ if (e.key === 'Escape') fecharCriativo(); });
 var _anDados = {};
 
+// ➕ pendente do diagnóstico → Clint (um a um)
+function criarPendenteNaClint(tel8, btn) {
+  if (soOlhar()) return;
+  var x = null;
+  SB.rows.forEach(function(r){ if (!x && r.tel8 === tel8) x = r; });
+  if (!x) { alert('Não achei esta pessoa na base do site.'); return; }
+  var eu = ldEu();
+  if (!confirm('Criar "' + (x.nome || 'este lead') + '" na Clint?\n\n'
+    + 'Ele entra no funil, na etapa Base IA' + (eu ? ', com você (' + eu + ') de dono' : '') + '.\n'
+    + 'Origem: começou o diagnóstico e não terminou.')) return;
+  var txt = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ criando…'; btn.disabled = true; }
+  var nome = 'pcCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  var pronto = false;
+  var fim = function(d) {
+    if (pronto) return;
+    pronto = true;
+    try { sc.remove(); } catch (e) {}
+    try { delete window[nome]; } catch (e) {}
+    if (btn) { btn.textContent = txt; btn.disabled = false; }
+    if (d && d.success) {
+      // marca no painel para o selo mudar na hora
+      if (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa && d.contatoId) {
+        var iE = d.etapa ? CLINT_PAINEL.nomesEtapas.indexOf(d.etapa) : -1;
+        if (d.etapa && iE === -1) { CLINT_PAINEL.nomesEtapas.push(d.etapa); iE = CLINT_PAINEL.nomesEtapas.length - 1; }
+        var iD = eu ? CLINT_PAINEL.donos.indexOf(eu) : -1;
+        CLINT_PAINEL.mapa[tel8] = [iD, iE, d.contatoId];
+      }
+      alert(d.jaExistia ? 'Este telefone já estava na Clint — nada duplicado.'
+        : '✅ Criado na Clint' + (d.etapa ? ' na etapa ' + d.etapa : '') + '!');
+      renderLeads();
+    } else alert('Não consegui criar (' + ((d && d.error) || 'sem resposta') + '). Tente de novo.');
+  };
+  window[nome] = fim;
+  sc.onerror = function(){ fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
+    + encodeURIComponent(JSON.stringify({ action: 'clintCriarContato', nome: x.nome || '',
+        telefone: x.whatsapp || '', email: x.email || '', insta: x.insta || '',
+        donoNome: eu || '', origem: 'diagnostico incompleto' }));
+  document.body.appendChild(sc);
+  setTimeout(function(){ fim(null); }, 60000);
+}
+// ➕ criar TODOS os pendentes que estão fora da Clint (de 25 em 25)
+function criarPendentesNaClint(btn) {
+  if (soOlhar()) return;
+  var fora = sbPendentes().filter(function(x) {
+    return !(CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[x.tel8]);
+  });
+  if (!fora.length) { alert('Todos os pendentes já estão na Clint.'); return; }
+  var lote = fora.slice(0, 25);
+  var eu = ldEu();
+  if (!confirm('Criar na Clint ' + lote.length + ' de ' + fora.length + ' pessoas que começaram o diagnóstico e não terminaram?\n\n'
+    + 'Cada uma entra no funil, etapa Base IA' + (eu ? ', com você de dono' : '') + '.\n'
+    + 'Faço de 25 em 25 para não pesar. Clique de novo para o próximo lote.')) return;
+  var txt = btn ? btn.textContent : '';
+  var feitos = 0, erros = 0, i = 0;
+  function proximo() {
+    if (i >= lote.length) {
+      if (btn) { btn.textContent = txt; btn.disabled = false; }
+      alert('✅ Prontinho!\n\n· Criados: ' + feitos + (erros ? '\n· Falharam: ' + erros : '')
+        + (fora.length > lote.length ? '\n· Faltam: ' + (fora.length - lote.length) + ' (clique de novo)' : ''));
+      carregarClintPainel();
+      renderLeads();
+      return;
+    }
+    var x = lote[i++];
+    if (btn) { btn.textContent = '⏳ criando ' + i + '/' + lote.length + '…'; btn.disabled = true; }
+    var nome = 'plCb' + Math.random().toString(36).slice(2, 8);
+    var sc = document.createElement('script');
+    var pronto = false;
+    var fim = function(d) {
+      if (pronto) return;
+      pronto = true;
+      try { sc.remove(); } catch (e) {}
+      try { delete window[nome]; } catch (e) {}
+      if (d && d.success) {
+        feitos++;
+        if (CLINT_PAINEL && CLINT_PAINEL.mapa && d.contatoId) {
+          var iD = eu ? CLINT_PAINEL.donos.indexOf(eu) : -1;
+          CLINT_PAINEL.mapa[x.tel8] = [iD, -1, d.contatoId];
+        }
+      } else erros++;
+      setTimeout(proximo, 400);
+    };
+    window[nome] = fim;
+    sc.onerror = function(){ fim(null); };
+    sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
+      + encodeURIComponent(JSON.stringify({ action: 'clintCriarContato', nome: x.nome || '',
+          telefone: x.whatsapp || '', email: x.email || '', insta: x.insta || '',
+          donoNome: eu || '', origem: 'diagnostico incompleto' }));
+    document.body.appendChild(sc);
+    setTimeout(function(){ fim(null); }, 45000);
+  }
+  proximo();
+}
+
 // ===== 🟠 BASE DO SITE DO DIAGNÓSTICO (Supabase, via robô) =====
 // Traz quem começou o diagnóstico — inclusive os que NÃO terminaram,
 // que a planilha não registra. São leads pagos e nunca trabalhados.
@@ -5704,18 +5801,38 @@ function renderLeads() {
     }
     var pAberto = !!window._sbAberto;
     var comAnuncio = pend.filter(function(x){ return x.anuncio; }).length;
+    var naClint = 0, foraClint = 0, semDonoClint = 0;
+    if (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa) {
+      pend.forEach(function(x) {
+        var m = CLINT_PAINEL.mapa[x.tel8];
+        if (m) { naClint++; if (!(m[0] >= 0)) semDonoClint++; } else foraClint++;
+      });
+    }
     h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(246,163,80,.09);border-color:rgba(246,163,80,.5);">'
       + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._sbAberto=!window._sbAberto;renderLeads();">'
       + '<span style="font-size:1.2rem;">🟠</span>'
       + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#f6a350;">' + pend.length + ' começaram o diagnóstico e não terminaram</b>'
-      + '<span class="hint" style="margin-left:8px;">têm WhatsApp e nunca foram chamados · ' + comAnuncio + ' vieram de anúncio</span></div>'
+      + '<span class="hint" style="margin-left:8px;">têm WhatsApp e nunca foram chamados · ' + comAnuncio + ' vieram de anúncio'
+      + (naClint || foraClint ? ' · <b style="color:#8f6bff;">' + naClint + ' já na Clint</b>' + (semDonoClint ? ' (' + semDonoClint + ' sem responsável)' : '') + ' · <b style="color:#f6a350;">' + foraClint + ' fora dela</b>' : '')
+      + '</span></div>'
+      + (foraClint ? '<button class="btn-assumir" style="white-space:nowrap;" onclick="event.stopPropagation();criarPendentesNaClint(this);">➕ criar os ' + foraClint + ' na Clint</button>' : '')
       + '<span style="color:#f6a350;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (pAberto ? '▲ fechar' : '▼ ver lista') + '</span></div>';
     if (pAberto) {
       h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
       pend.slice(0, 200).forEach(function(x) {
         var wa = 'https://wa.me/' + String(x.whatsapp).replace(/\D/g, '');
+        // está na Clint? o painel traz dono e etapa de todos os negócios
+        var mc = (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa) ? CLINT_PAINEL.mapa[x.tel8] : null;
+        var donoC = (mc && mc[0] >= 0) ? CLINT_PAINEL.donos[mc[0]] : '';
+        var etapaC = (mc && mc[1] >= 0) ? CLINT_PAINEL.nomesEtapas[mc[1]] : '';
         h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
           + '<b style="font-size:.76rem;flex:1;min-width:130px;">' + (x.nome || 'Sem nome') + '</b>'
+          + (mc
+              ? '<span class="ld-tag" style="background:rgba(108,71,255,.16);color:#8f6bff;" title="Já está na Clint">🟣 ' + (etapaC || 'na Clint') + '</span>'
+                + (donoC ? '<span class="dono-chip">✋ ' + donoC + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.14);color:#ff6b6b;">sem responsável</span>')
+                + (mc[2] ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="https://app.clint.digital/contacts/' + mc[2] + '" target="_blank" onclick="event.stopPropagation();">🟣 abrir</a>' : '')
+              : '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;" title="Não existe na Clint">⚠️ fora da Clint</span>'
+                + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarPendenteNaClint(' + JSON.stringify(x.tel8).replace(/"/g, '&quot;') + ', this);" title="Cria o contato na Clint, no funil (etapa Base IA)">➕ criar na Clint</button>')
           + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;">⏱ ' + tempoDesde(x.date) + '</span>' : '')
           + (x.origem ? '<span class="ld-tag" style="background:rgba(110,168,255,.13);color:#6ea8ff;">' + x.origem + '</span>' : '')
           + (x.anuncio ? '<span class="ld-tag" style="background:rgba(185,138,255,.13);color:#b98aff;" title="' + x.anuncio + '">📣 ' + ldAnuncioLimpo(x.anuncio).substring(0, 22) + '</span>' : '')
