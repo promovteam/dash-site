@@ -936,6 +936,7 @@ img { max-width:100%; height:auto; }
     </div>
     <div id="v2-novos"></div>
     <div id="v2-clint"></div>
+    <div id="v2-semorigem"></div>
     <div id="v2-visao"></div>
   </section>
 
@@ -1969,6 +1970,13 @@ function abrirAgendar(dur){
   agEuNoSdr();      // quem entrou no dash já vem como SDR / social seller
   document.getElementById('modal-agendar').classList.add('open');
   closerMudou();
+}
+// quem trabalha social selling pode marcar reunião sem origem
+var SEM_ORIGEM_OK = ['Sarah Promov', 'SS Sarah', 'Sarah'];
+function podeSemOrigem() {
+  var eu = localStorage.getItem('v2Login') || '';
+  if (eu === 'Bruno Pardim' || eu === 'Adm') return true;     // quem administra sempre pode
+  return SEM_ORIGEM_OK.some(function(n){ return v2norm(n) === v2norm(eu); });
 }
 // zera os campos do lead ao abrir o formulário
 function agLimparFicha() {
@@ -3565,6 +3573,7 @@ function carregarClintPainel() {
       avisarEsperando(primeira);
       renderLeads();
       renderAlertaClintHome();
+      renderSemOrigem();
     } else if (!CLINT_PAINEL) {
       CLINT_PAINEL = d || { success: false };
       renderLeads();
@@ -3914,6 +3923,78 @@ function renderAlertaClintHome() {
     + '<div style="flex:1;"><b style="font-size:.86rem;color:#ff6b6b;">' + e.rec.length + ' conversa' + (e.rec.length === 1 ? '' : 's') + ' esperando resposta na Clint</b>'
     + '<div class="hint" style="margin-top:3px;">' + espPorDono(e.rec) + ' · clique para ver quem é</div></div>'
     + '<span style="color:#ff6b6b;font-weight:800;font-size:.72rem;white-space:nowrap;">Ver agora →</span></div>';
+}
+// ===== 🧲 REUNIÕES SEM ORIGEM — aviso para os SDRs (pedido do Bruno 18/08/2026) =====
+// Toda reunião tem que dizer de onde o lead veio. Aqui listamos as que ficaram sem,
+// já sugerindo a origem quando dá para descobrir pela base (anúncio, ManyChat, bio…).
+function reunioesSemOrigem() {
+  var lim = new Date(); lim.setDate(lim.getDate() - 60); lim.setHours(0,0,0,0);
+  return (V2.rows || []).filter(function(r) {
+    if (!r.date || r.date < lim) return false;
+    if ((r.origem || '').trim()) return false;
+    return !!(r.nome || '').trim();
+  }).sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
+}
+// o que a base sabe sobre este lead (para sugerir a origem que falta)
+function origemSugerida(r) {
+  var t8 = ldTel8(r.telefone);
+  if (!t8) return null;
+  var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0];
+  if (!l) return null;
+  var bruta = (l.origem || '') + ' ' + (l.fonte || '') + ' ' + (l.utm || '');
+  var sug = /manychat|mchat/i.test(bruta) ? '[Org][Diag][Mchat]'
+    : (l.anuncio || l.meio === 'paid') ? '[Ads][Diag]'
+    : /diag/i.test(bruta) ? '[Org][Diag]' : (l.origem || '');
+  // o nome do anúncio vem cru da planilha (às vezes como link ou etiqueta) — limpa antes de mostrar
+  var txt = l.anuncio ? ldAnuncioLimpo(l.anuncio) : '';
+  if (txt === '(sem anúncio)' || txt === '(link)' || txt.indexOf('⚠️') === 0) txt = '';
+  return { sug: sug, anuncio: l.anuncio || '', anuncioTxt: txt, lead: l };
+}
+function renderSemOrigem() {
+  var el = document.getElementById('v2-semorigem');
+  if (!el) return;
+  var lista = reunioesSemOrigem();
+  if (!lista.length) { el.innerHTML = ''; return; }
+  var aberto = !!window._soAberto;
+  var comSugestao = lista.filter(function(r){ var o = origemSugerida(r); return o && o.sug; }).length;
+  var h = '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(246,163,80,.09);border-color:rgba(246,163,80,.5);">'
+    + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._soAberto=!window._soAberto;renderSemOrigem();">'
+    + '<span style="font-size:1.3rem;">🧲</span>'
+    + '<div style="flex:1;min-width:0;"><b style="font-size:.84rem;color:#f6a350;">' + lista.length + ' reuni' + (lista.length === 1 ? 'ão está' : 'ões estão') + ' sem dizer de onde o lead veio</b>'
+    + '<div class="hint" style="margin-top:3px;">Sem isso não dá para saber qual post/anúncio gerou a reunião'
+    +   (comSugestao ? ' · <b style="color:#3ddc97;">' + comSugestao + '</b> dá para descobrir pela base' : '') + '</div></div>'
+    + '<span style="color:#f6a350;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (aberto ? '▲ fechar' : '▼ ver quais') + '</span></div>';
+  if (aberto) {
+    h += '<div style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
+    lista.slice(0, 80).forEach(function(r) {
+      var o = origemSugerida(r);
+      var i = V2.rows.indexOf(r);
+      h += '<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+        + '<b style="font-size:.76rem;flex:1;min-width:120px;">' + (r.nome || '—') + '</b>'
+        + '<span class="hint">' + (r.date ? r.date.toLocaleDateString('pt-BR') : '') + '</span>'
+        + (r.sdr ? '<span class="ld-tag" style="background:rgba(110,168,255,.14);color:#6ea8ff;">' + r.sdr + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.14);color:#ff6b6b;">sem SDR</span>')
+        + (o && o.anuncioTxt ? '<span class="ld-tag" style="background:rgba(185,138,255,.14);color:#b98aff;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(o.anuncioTxt).replace(/"/g, '&quot;') + ')">📣 ' + o.anuncioTxt.slice(0, 26) + '</span>' : '')
+        + (o && o.sug
+            ? '<button class="btn-assumir" style="padding:4px 9px;font-size:.67rem;" onclick="marcarOrigem(' + i + ',' + JSON.stringify(o.sug).replace(/"/g, '&quot;') + ',this)">✓ marcar como ' + o.sug + '</button>'
+            : '<span class="hint">a base não sabe de onde veio</span>')
+        + '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="abrirLead(' + i + ')">abrir</span>'
+        + '</div>';
+    });
+    if (lista.length > 80) h += '<div class="hint">… e mais ' + (lista.length - 80) + '</div>';
+    h += '</div>';
+  }
+  el.innerHTML = h + '</div>';
+}
+// grava a origem na planilha, a partir do aviso
+function marcarOrigem(i, valor, btn) {
+  if (soOlhar()) return;
+  var r = V2.rows[i];
+  if (!r) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'salvando…'; }
+  r.origem = valor;
+  // mesmo caminho que a ficha da reunião usa para salvar (nome + data de referência)
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'origem', valor: valor, dataRef: v2dataRef(r), gid: V2_GID });
+  setTimeout(function(){ renderSemOrigem(); }, 400);
 }
 function verEsperando() {
   var item = document.querySelector('.nav-item[data-s="leads"]');
@@ -8081,10 +8162,24 @@ function agendarReuniao(btn) {
   if (email) extras.push('E-mail: ' + email);
   if (insta) extras.push('Instagram: ' + insta);
   if (clint) extras.push('Clint: ' + clint);
+  // guarda o post/anúncio que trouxe o lead, para saber depois o que gerou a reunião
+  if (_agLead && _agLead.anuncio) extras.push('Anúncio: ' + _agLead.anuncio);
   var obs = [document.getElementById('ag-obs').value.trim()].concat(extras).filter(Boolean).join(' | ');
   var prod = document.getElementById('ag-prod').value;
   var sdr = document.getElementById('ag-sdr').value; if (sdr === '—') sdr = '';
   var origem = document.getElementById('ag-origem').value;
+  if (origem === '—') origem = '';
+  // A reunião precisa dizer de onde o lead veio. Quem trabalha social selling
+  // (Sarah) pode marcar sem origem, porque nem sempre há post/anúncio por trás.
+  if (!origem && !podeSemOrigem()) {
+    alert('Falta dizer DE ONDE este lead veio.\n\n'
+      + 'Use "🔎 Procurar o lead na base" que a origem entra sozinha, '
+      + 'ou escolha na mão no campo Origem.\n\n'
+      + 'Só quem trabalha social selling pode marcar sem origem.');
+    var so = document.getElementById('ag-origem');
+    if (so) { so.focus(); so.style.borderColor = '#ff6b6b'; }
+    return;
+  }
   var hora = document.getElementById('ag-hora').value;
   var dur = parseInt(document.getElementById('ag-duracao').value, 10) || 100;
   var valor = (document.getElementById('ag-valor') || {value:''}).value.trim();
