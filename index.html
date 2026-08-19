@@ -5511,6 +5511,15 @@ function renderAnuncios() {
   var metaPor = {};
   if (META.dados) META.dados.anuncios.forEach(function(m){ metaPor[_chaveAnuncio(m.anuncio)] = m; });
 
+  // as postagens que a equipe cadastrou entram na lista junto com os anúncios,
+  // mesmo as que ainda não trouxeram lead (Bruno 19/08/2026)
+  if (typeof postsOrganicos === 'function' && (AN_TIPO === 'organico' || AN_TIPO === 'todos')) {
+    postsOrganicos().forEach(function(pst) {
+      if (an[pst.bruto]) return;
+      an[pst.bruto] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp:'', tipo:'organico', _tipoFixo:true,
+                        quem:{ n:[], q:[], mql:[], ag:[], re:[], vd:[] } };
+    });
+  }
   var chaves = Object.keys(an);
   var ordFn = { vendas:function(a,b){return an[b].vd-an[a].vd||an[b].ag-an[a].ag},
                 agend:function(a,b){return an[b].ag-an[a].ag},
@@ -5536,76 +5545,54 @@ function renderAnuncios() {
       + (META.buscando ? 'Buscando investimento e imagens no Facebook…' : 'Facebook ainda não conectado' + (META.erro ? ' (' + META.erro + ')' : '') + ' — falta a chave META_TOKEN no robô. Os números de leads/reuniões/vendas abaixo já funcionam.')
       + '</div>';
   }
-  // ===== 📱 postagens orgânicas cadastradas (Bruno 19/08/2026) =====
-  // Na aba Orgânico, além das origens, mostramos os POSTS que a equipe cadastrou —
-  // e dá para acrescentar um novo aqui mesmo, sem passar por um lead.
+  // ===== 📱 cadastrar postagem orgânica (Bruno 19/08/2026) =====
+  // Os posts cadastrados aparecem na MESMA lista dos anúncios, com os números
+  // de leads, reuniões e vendas — aqui fica só o campo de acrescentar um novo.
   if (AN_TIPO === 'organico' || AN_TIPO === 'todos') {
-    var posts = (typeof postsOrganicos === 'function') ? postsOrganicos() : [];
-    h += '<div class="panel" style="margin-top:14px;background:rgba(61,220,151,.06);border:1px solid rgba(61,220,151,.25);">'
-      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
-      +   '<b style="font-size:.8rem;color:#3ddc97;">📱 Suas postagens orgânicas</b>'
-      +   '<span class="hint" style="flex:1;">posts e reels que trouxeram lead — cole o link para acrescentar</span>'
-      + '</div>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
-      +   '<input id="po-apelido" placeholder="nome do post (ex: Reels dos 3 erros)" style="flex:2;min-width:160px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:8px 11px;font-size:.76rem;">'
-      +   '<input id="po-link" placeholder="cole o link do post/reels do Instagram" style="flex:3;min-width:200px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:8px 11px;font-size:.76rem;" onkeydown="if(event.key===\'Enter\')cadastrarPostNaAba();">'
-      +   '<button class="btn-assumir" style="padding:7px 14px;font-size:.74rem;" onclick="cadastrarPostNaAba()">➕ acrescentar</button>'
+    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:9px 11px;'
+      + 'border-radius:12px;background:rgba(61,220,151,.07);border:1px dashed rgba(61,220,151,.35);">'
+      + '<b style="font-size:.72rem;color:#3ddc97;white-space:nowrap;">📱 acrescentar postagem</b>'
+      + '<input id="po-apelido" placeholder="nome do post (ex: Reels dos 3 erros)" style="flex:2;min-width:150px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:7px 10px;font-size:.74rem;">'
+      + '<input id="po-link" placeholder="cole o link do post ou reels" style="flex:3;min-width:180px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:7px 10px;font-size:.74rem;" onkeydown="if(event.key===\'Enter\')cadastrarPostNaAba();">'
+      + '<button class="btn-assumir" style="padding:6px 13px;font-size:.72rem;" onclick="cadastrarPostNaAba()">➕ acrescentar</button>'
       + '</div>';
-    if (!posts.length) {
-      h += '<div class="hint" style="padding:6px 2px;">Nenhuma postagem cadastrada ainda. Cadastre aqui e depois marque nos leads que vieram dela — o painel passa a contar quantos leads, reuniões e vendas cada post trouxe.</div>';
-    } else {
-      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:9px;">';
-      posts.forEach(function(pst) {
-        var d = _anDados[pst.bruto] || null;
-        var quantos = 0, ags = 0, res = 0, vds = 0;
-        (LD.rows || []).forEach(function(l){
-          if (String(l.anuncio || '') !== pst.bruto) return;
-          quantos++;
-          var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
-          if (st) { ags++; if (st.re) res++; if (st.vd) vds++; }
-        });
-        h += '<div style="border:1px solid rgba(61,220,151,.25);border-radius:13px;padding:11px;background:rgba(255,255,255,.04);">'
-          + '<div style="display:flex;align-items:center;gap:8px;">'
-          +   '<span style="width:34px;height:34px;border-radius:9px;background:rgba(61,220,151,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">📱</span>'
-          +   '<b style="flex:1;font-size:.76rem;min-width:0;">' + pst.apelido + '</b>'
-          + '</div>'
-          + '<a href="' + pst.link + '" target="_blank" class="hint" style="display:block;margin-top:6px;color:#3ddc97;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + pst.link + ' ↗</a>'
-          + '<div class="hint" style="margin-top:6px;">' + quantos + ' lead' + (quantos === 1 ? '' : 's') + '</div>'
-          + '<div style="display:flex;gap:5px;margin-top:7px;">'
-          +   '<div style="flex:1;text-align:center;padding:5px 3px;border-radius:8px;background:rgba(255,209,102,.1);"><b style="color:#ffd166;font-size:.85rem;display:block;">' + ags + '</b><span style="font-size:.52rem;color:var(--text-secondary);font-weight:700;">AGEND.</span></div>'
-          +   '<div style="flex:1;text-align:center;padding:5px 3px;border-radius:8px;background:rgba(185,138,255,.1);"><b style="color:#b98aff;font-size:.85rem;display:block;">' + res + '</b><span style="font-size:.52rem;color:var(--text-secondary);font-weight:700;">REUNIÕES</span></div>'
-          +   '<div style="flex:1;text-align:center;padding:5px 3px;border-radius:8px;background:rgba(61,220,151,.1);"><b style="color:#3ddc97;font-size:.85rem;display:block;">' + vds + '</b><span style="font-size:.52rem;color:var(--text-secondary);font-weight:700;">VENDAS</span></div>'
-          + '</div></div>';
-      });
-      h += '</div>';
-    }
-    h += '</div>';
   }
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
   if (!chaves.length) h += '<div class="hint">Nenhum anúncio no período.</div>';
   carregarCriativos();
   chaves.slice(0, 40).forEach(function(k, i) {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {};
-    var cri = criativoDe(k, m.adId);
+    var ehPost = String(k).indexOf('POST:') === 0;
+    var cri = ehPost ? null : criativoDe(k, m.adId);
     if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post }; }
     _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m, quem: a.quem };
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
     h += '<div class="click" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
-      + '<div class="an-capa" data-post="' + (m.post || '') + '"'
+      + '<div class="an-capa" data-post="' + (m.post || '') + '" data-insta="' + (ehPost ? _lerPost(k).link : '') + '"'
       +   ' onmouseenter="tocarNoCard(this)" onmouseleave="pararNoCard(this)"'
       +   ' style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
-      +   (m.foto ? '<img src="' + m.foto + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : '')
-      +   '<span class="semfoto" style="position:absolute;inset:0;display:' + (m.foto ? 'none' : 'flex') + ';align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>'
+      +   (ehPost
+            ? (function(){
+                var lk = _lerPost(k).link;
+                var mm = String(lk).match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
+                return mm
+                  ? '<iframe src="https://www.instagram.com/' + mm[1] + '/' + mm[2] + '/embed/captioned/" loading="lazy" scrolling="no" frameborder="0" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:#000;"></iframe>'
+                  : '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.7rem;opacity:.4;">📱</span>';
+              })()
+            : (m.foto ? '<img src="' + m.foto + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : ''))
+      +   (ehPost ? '' : '<span class="semfoto" style="position:absolute;inset:0;display:' + (m.foto ? 'none' : 'flex') + ';align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>')
       +   (m.post
             ? '<span class="an-play" title="passe o mouse para tocar"'
               + ' style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">'
               + '<span style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.92);color:#111;display:flex;align-items:center;justify-content:center;font-size:1.15rem;box-shadow:0 3px 14px rgba(0,0,0,.5);">▶</span></span>'
             : '')
       +   '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.65);color:#fff;font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:99px;">#' + (i+1) + '</span>'
-      +   (m.link ? '<a href="' + m.link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : '')
+      +   (ehPost
+            ? '<a href="' + _lerPost(k).link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#3ddc97;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver post ↗</a>'
+            : (m.link ? '<a href="' + m.link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : ''))
       + '</div>'
       + '<div style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
-      +   '<b style="font-size:.74rem;line-height:1.3;">' + k + '</b>'
+      +   '<b style="font-size:.74rem;line-height:1.3;">' + (ehPost ? '📱 ' + ldAnuncioLimpo(k) : k) + '</b>'
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:' + (a.tipo === 'pago' ? 'rgba(255,107,107,.13);color:#ff6b6b' : 'rgba(61,220,151,.13);color:#3ddc97') + ';">' + (a.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
       +   '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · <b style="color:#f6a350;">' + a.mql + ' MQL</b> · <b style="color:#ff6b6b;">' + a.q + ' HT</b>' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>'
       +   '<div style="display:flex;gap:5px;margin-top:9px;">'
@@ -6347,6 +6334,11 @@ function _idDoAnuncio(t) {
 function ldAnuncioLimpo(v) {
   var t = String(v || '').trim();
   if (!t) return '(sem anúncio)';
+  // postagem orgânica cadastrada: mostra o apelido que a equipe deu
+  if (t.indexOf('POST:') === 0) {
+    var r = t.slice(5), b = r.lastIndexOf('|');
+    return b > 0 ? r.slice(0, b) : r;
+  }
   // "NOME|123456789" → NOME · só o número → tenta o nome real do criativo
   if (t.indexOf('|') !== -1) {
     var partes = t.split('|');
