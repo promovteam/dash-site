@@ -3048,10 +3048,17 @@ function v2row(r) {
     + (r.valor > 0 ? '<span class="valor" style="margin-left:0;">' + v2moeda0(r.valor) + '</span>' : '')
     + v2pill(r) + '</span>';
   var det = [r.leadId, r.produto, r.date ? r.date.toLocaleDateString('pt-BR') : '', r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).join(' · ');
+  // link para a Clint direto na lista (Bruno 19/08/2026)
+  var lkC = (function(){
+    try { return clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (e) { return ''; }
+  })();
   return '<div class="cliente-row" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b><span>' + det + '</span></div>'
-    + seloAnuncio(r, true) + dir + '</div>';
+    + seloAnuncio(r, true)
+    + (lkC ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;padding:5px 9px;" href="' + lkC + '" target="_blank" onclick="event.stopPropagation();" title="abrir na Clint">🟣</a>' : '')
+    + (r.telefone ? '<a class="ld-wa" style="padding:5px 9px;" href="https://wa.me/55' + String(r.telefone).replace(/\D/g, '').slice(-11) + '" target="_blank" onclick="event.stopPropagation();" title="chamar no WhatsApp">💬</a>' : '')
+    + dir + '</div>';
 }
 
 // ---------- render principal ----------
@@ -8062,14 +8069,83 @@ function abrirLead(i) {
 // ===== 📋 O QUE A PESSOA RESPONDEU NO FORMULÁRIO — dentro da ficha da reunião =====
 // A reunião mora na aba de vendas e o formulário na aba do diagnóstico;
 // juntamos os dois pelo telefone (últimos 8 números).
+// ===== 🔎 ACHAR O LEAD POR QUALQUER CAMINHO (Bruno 19/08/2026) =====
+// O telefone é a primeira tentativa, mas nem sempre bate: a pessoa dá um número
+// no formulário e outro no contrato. Então tentamos, em ordem: telefone, e-mail,
+// Instagram e nome — usando também o que o contrato e a Clint sabem dela.
+function acharLeadDeTodoJeito(r, pagDele) {
+  var t8 = ldTel8(r.telefone || r.tel || '');
+  var achou = null, como = '';
+  if (t8) {
+    achou = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] || null;
+    if (achou) como = 'telefone';
+  }
+  // e-mail: o do contrato, ou o que estiver na observação da reunião
+  if (!achou) {
+    var emails = [];
+    if (pagDele && pagDele.email) emails.push(pagDele.email);
+    var mObs = String(r.obs || '').match(/[\w.+-]+@[\w.-]+\.\w+/g);
+    if (mObs) emails = emails.concat(mObs);
+    for (var i = 0; i < emails.length && !achou; i++) {
+      var em = v2norm(emails[i]);
+      achou = (LD.rows || []).filter(function(x){ return x.email && v2norm(x.email) === em; })[0] || null;
+      if (achou) como = 'e-mail';
+    }
+  }
+  // Instagram: o do contrato, ou o que estiver na observação
+  if (!achou) {
+    var igs = [];
+    if (pagDele && pagDele.insta) igs.push(pagDele.insta);
+    var mIg = String(r.obs || '').match(/@[A-Za-z0-9._]{3,}/g);
+    if (mIg) igs = igs.concat(mIg);
+    for (var j = 0; j < igs.length && !achou; j++) {
+      var ig = v2norm(String(igs[j]).replace(/^@/, ''));
+      achou = (LD.rows || []).filter(function(x){ return x.insta && v2norm(String(x.insta).replace(/^@/, '')) === ig; })[0] || null;
+      if (achou) como = 'Instagram';
+    }
+  }
+  // nome inteiro igual (último recurso, só quando é exato)
+  if (!achou && r.nome && v2norm(r.nome).length >= 8) {
+    var nn = v2norm(r.nome);
+    var iguais = (LD.rows || []).filter(function(x){ return x.nome && v2norm(x.nome) === nn; });
+    if (iguais.length === 1) { achou = iguais[0]; como = 'nome'; }
+  }
+  return achou ? { lead: achou, como: como } : null;
+}
 function mostrarFormularioDoLead(r) {
   var cx = document.getElementById('fl-formulario');
   if (!cx) return;
   var t8 = ldTel8(r.telefone);
-  var l = t8 ? (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] : null;
+  var pagDele = (PAG.rows || []).filter(function(x) {
+    var t = ldTel8(x.celular);
+    return (t && t === t8) || (r.nome && v2norm(x.nome) === v2norm(r.nome));
+  })[0] || null;
+  var achado = acharLeadDeTodoJeito(r, pagDele);
+  var l = achado ? achado.lead : null;
+  var comoAchou = achado ? achado.como : '';
   if (!l) {
-    cx.innerHTML = '<div class="dtl-card"><div class="g-label">📋 Formulário do diagnóstico</div>'
-      + '<div class="hint" style="padding:4px 0;">Esta pessoa não preencheu o formulário (ou o telefone da reunião está diferente do que ela usou lá).</div></div>';
+    // sem formulário: mostra o que a Clint e o contrato sabem sobre a pessoa
+    var cc = t8 ? CLINT[t8] : null;
+    var linhaS = function(ico, rot, val) {
+      return val ? '<div class="dtl-line"><span>' + ico + ' ' + rot + '</span><b style="text-align:right;max-width:62%;">' + val + '</b></div>' : '';
+    };
+    var temAlgo = !!(pagDele || (cc && cc.achou));
+    cx.innerHTML = '<div class="dtl-card">'
+      + '<div class="g-label">📋 Esta pessoa não preencheu o diagnóstico</div>'
+      + '<div class="hint" style="padding:2px 0 8px;">Veio por prospecção ou indicação — abaixo, o que a Clint e o contrato sabem dela.</div>'
+      + (pagDele ? linhaS('✉️', 'E-mail', pagDele.email)
+                 + linhaS('📷', 'Instagram', pagDele.insta)
+                 + linhaS('📱', 'WhatsApp', pagDele.celular)
+                 + linhaS('👥', 'Seguidores', (pagDele.extras || {})['21. Número de seguidores'] || '')
+                 + linhaS('🎯', 'Nicho', (pagDele.extras || {})['22. Nicho de atuação'] || '') : '')
+      + (cc && cc.achou ? linhaS('🟣', 'Etapa na Clint', cc.etapaClint)
+                        + linhaS('🧲', 'Entrou na Clint por', cc.origemClint)
+                        + linhaS('✋', 'Responsável', cc.dono) : '')
+      + (!temAlgo ? '<div class="hint">Também não achei ela na Clint nem em contratos.</div>' : '')
+      + (t8 && clintLink({ tel: r.telefone, tel8: t8 })
+          ? '<div style="margin-top:9px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink({ tel: r.telefone, tel8: t8 }) + '" target="_blank">🟣 abrir na Clint</a></div>'
+          : '')
+      + '</div>';
     return;
   }
   var linha = function(ico, rot, val) {
@@ -8079,7 +8155,8 @@ function mostrarFormularioDoLead(r) {
   var a = anuncioDe(l);
   cx.innerHTML = '<div class="dtl-card">'
     + '<div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;">'
-    +   '<div class="g-label" style="margin-bottom:0;flex:1;">📋 O que respondeu no formulário</div>'
+    +   '<div class="g-label" style="margin-bottom:0;flex:1;">📋 O que respondeu no formulário'
+    +     (comoAchou && comoAchou !== 'telefone' ? '<span class="hint" style="font-weight:600;margin-left:6px;">(achei pelo ' + comoAchou + ' — o telefone estava diferente)</span>' : '') + '</div>'
     +   (l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
         : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '')
     +   seloChance(l)
@@ -8728,7 +8805,7 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbwskRY8GgEqF58YHq_qRhfI4zVz1g5JO-LvTZbP-gUBsinVkjjUiL11MOEYrkc537wC/exec (11ª implantação, v17)
 // https://script.google.com/macros/s/AKfycbyombG0HTvuGkbwQA7OGJCB2Ah43-i7i8luGA8VRsW8qjgJwFlbPDlziZySR_EjxdwB/exec (12ª implantação, v19)
 // https://script.google.com/macros/s/AKfycbxL2Vvmtga3_pp2VwmspYv5WxRDFbuDiEr0ai9oSs_k8IKRjYQal_Tli8Xekgh-DazX/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx46LiquOrsTSccUAEhFT6_so-yDtva_uwWz_q6l60n_Q_kCTt_OaPpO1ASD6g9uNXS/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzCLua8SMGLt07bY4B0XJu3UYtqLgq36IWGGVxHywmqXN2WTLOtqG945RdPa28UCXoH/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
