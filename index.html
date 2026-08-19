@@ -5042,9 +5042,27 @@ var COMENT_MARCA = {};
 var COMENT_TAGS = ['Qualificado', 'Perfil legado', 'Perfil HT'];
 var COMENT_TIPOS = ['QUALIFICADO', 'DESQUALIFICADO'];
 // marca TAG ou TIPO do comentarista e guarda na aba dos comentários (todo mundo vê)
+// ===== 🗂️ CRM DOS COMENTARISTAS — funil de contato (Bruno 19/08/2026) =====
+// As caixinhas de TAG/TIPO viram um quadro com colunas: a pessoa é arrastada de
+// "a chamar" até "agendou". Quem trabalha social selling enxerga a fila do dia.
+var CRM_ETAPAS = [
+  { k: 'chamar',   nome: 'A chamar',      ico: '📞', cor: '#f6a350' },
+  { k: 'chamei',   nome: 'Chamei',        ico: '💬', cor: '#6ea8ff' },
+  { k: 'respondeu',nome: 'Respondeu',     ico: '✅', cor: '#3ddc97' },
+  { k: 'agendou',  nome: 'Agendou',       ico: '📅', cor: '#b98aff' },
+  { k: 'semint',   nome: 'Sem interesse', ico: '❌', cor: '#8b8fa3' }
+];
+function crmEtapaDe(x) {
+  var e = v2norm(x.etapa || '');
+  if (!e) return 'chamar';
+  for (var i = 0; i < CRM_ETAPAS.length; i++) {
+    if (v2norm(CRM_ETAPAS[i].nome) === e || CRM_ETAPAS[i].k === e) return CRM_ETAPAS[i].k;
+  }
+  return 'chamar';
+}
 function comentMarcar(insta, campo, valor) {
   if (soOlhar()) return;
-  if (!insta) { alert('Este comentário está sem o @ do Instagram — não dá para marcar.'); return; }
+  if (!insta) { alert('Esta pessoa está sem o @ do Instagram — não dá para marcar.'); return; }
   var k = String(insta).toLowerCase();
   COMENT_MARCA[k] = COMENT_MARCA[k] || {};
   COMENT_MARCA[k][campo] = valor;
@@ -5070,7 +5088,9 @@ function carregarComentarios() {
       var _mk = COMENT_MARCA[insta.toLowerCase()] || {};   // marcação feita agora, antes da planilha ser relida
       rows.push({ nome: nome, insta: insta, date: ldData(linhas[i][2] || ''), seguidores: (linhas[i][3] || '').trim(),
         tag: _mk.tag !== undefined ? _mk.tag : (linhas[i][4] || '').trim(),
-        tipo: _mk.tipo !== undefined ? _mk.tipo : (linhas[i][5] || '').trim() });
+        tipo: _mk.tipo !== undefined ? _mk.tipo : (linhas[i][5] || '').trim(),
+        etapa: _mk.etapa !== undefined ? _mk.etapa : (linhas[i][7] || '').trim(),
+        nota: _mk.nota !== undefined ? _mk.nota : (linhas[i][8] || '').trim() });
     }
     rows.sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
     var jaTinha = COMENT.carregado;
@@ -6088,6 +6108,75 @@ function comentFiltrados() {
   });
 }
 // em qual bloco o comentarista entra: falta marcar (por dia) ou já marcado
+// desenha o quadro (colunas + cartões que se arrastam)
+function crmQuadro(lista) {
+  var porEtapa = {};
+  CRM_ETAPAS.forEach(function(e){ porEtapa[e.k] = []; });
+  lista.forEach(function(x){ porEtapa[crmEtapaDe(x)].push(x); });
+  var h = '<div style="display:flex;gap:9px;overflow-x:auto;padding:4px 2px 10px;align-items:flex-start;">';
+  CRM_ETAPAS.forEach(function(e) {
+    var itens = porEtapa[e.k];
+    h += '<div class="crm-col" data-etapa="' + e.k + '" ondragover="crmSobre(event)" ondragleave="crmSai(event)" ondrop="crmSoltar(event)"'
+      + ' style="flex:0 0 250px;max-width:250px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:9px;">'
+      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:0 2px;">'
+      +   '<span style="font-size:.95rem;">' + e.ico + '</span>'
+      +   '<b style="flex:1;font-size:.72rem;color:' + e.cor + ';text-transform:uppercase;letter-spacing:.4px;">' + e.nome + '</b>'
+      +   '<span class="ld-tag" style="background:' + e.cor + '22;color:' + e.cor + ';">' + itens.length + '</span>'
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:6px;max-height:430px;overflow-y:auto;min-height:60px;">';
+    if (!itens.length) h += '<div class="hint" style="padding:12px 6px;text-align:center;opacity:.5;">arraste alguém para cá</div>';
+    itens.slice(0, 60).forEach(function(x) {
+      var lead = comentCruza(x);
+      h += '<div class="crm-card" draggable="true" ondragstart="crmPegar(event)" data-insta="' + (x.insta || '') + '"'
+        + ' style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-left:3px solid ' + e.cor + ';border-radius:11px;padding:8px 9px;cursor:grab;">'
+        + '<div style="display:flex;align-items:center;gap:7px;">'
+        +   '<div class="avatar" style="width:26px;height:26px;font-size:.6rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
+        +     (x.insta ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(x.insta) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+        +   '</div>'
+        +   '<b style="flex:1;font-size:.72rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (x.nome || '@' + x.insta) + '</b>'
+        + '</div>'
+        + '<div class="hint" style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;">'
+        +   (x.date ? '<span>' + tempoDesde(x.date) + '</span>' : '')
+        +   (x.seguidores ? '<span>👥 ' + x.seguidores + '</span>' : '')
+        + '</div>'
+        + '<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">'
+        +   (lead
+              ? '<span class="ld-tag" style="background:rgba(61,220,151,.15);color:#3ddc97;">✅ preencheu' + (lead.faixa === 'alta' ? ' · 🔥' : '') + '</span>'
+              : '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">só comentou</span>')
+        +   (x.tag ? '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;">' + x.tag + '</span>' : '')
+        + '</div>'
+        + '<div style="margin-top:6px;display:flex;gap:5px;">'
+        +   (x.insta ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:4px;font-size:.64rem;background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.3);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank" onclick="event.stopPropagation();">📷 abrir</a>' : '')
+        +   (!lead ? '<button class="btn-assumir" style="flex:1;padding:4px;font-size:.64rem;" onclick="event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);">➕ Clint</button>' : '')
+        + '</div></div>';
+    });
+    if (itens.length > 60) h += '<div class="hint" style="padding:6px;">… e mais ' + (itens.length - 60) + '</div>';
+    h += '</div></div>';
+  });
+  return h + '</div>';
+}
+var _crmArrastando = null;
+function crmPegar(e) {
+  _crmArrastando = e.currentTarget.getAttribute('data-insta');
+  e.currentTarget.style.opacity = '.45';
+  try { e.dataTransfer.setData('text/plain', _crmArrastando); e.dataTransfer.effectAllowed = 'move'; } catch (x) {}
+}
+function crmSobre(e) {
+  e.preventDefault();
+  e.currentTarget.style.background = 'rgba(110,168,255,.12)';
+}
+function crmSai(e) { e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }
+function crmSoltar(e) {
+  e.preventDefault();
+  e.currentTarget.style.background = 'rgba(255,255,255,.04)';
+  var insta = _crmArrastando || (function(){ try { return e.dataTransfer.getData('text/plain'); } catch (x) { return ''; } })();
+  _crmArrastando = null;
+  var destino = e.currentTarget.getAttribute('data-etapa');
+  if (!insta || !destino) return;
+  var etapa = CRM_ETAPAS.filter(function(x){ return x.k === destino; })[0];
+  if (!etapa) return;
+  comentMarcar(insta, 'etapa', etapa.nome);
+}
 function comSecaoDe(x) {
   var marcado = (x.tag || '').trim() || (x.tipo || '').trim();
   return marcado ? '✅ já marcados' : '⏳ falta marcar · ' + comGrupoDe(x.date);
@@ -6903,12 +6992,19 @@ function renderLeads() {
       };
       h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
         + chipCF('hoje', 'Hoje') + chipCF('ontem', 'Ontem') + chipCF('7d', '7 dias') + chipCF('30d', '30 dias') + chipCF('tudo', 'Tudo') + chipCF('esc', '📅 escolher período')
+        + '<span style="flex:1;"></span>'
+        + '<span class="ld-selo' + (window._comQuadro ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._comQuadro=true;renderLeads();">🗂️ quadro</span>'
+        + '<span class="ld-selo' + (window._comQuadro ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._comQuadro=false;renderLeads();">☰ lista</span>'
         + (CF.t === 'esc'
             ? '<input type="date" value="' + (CF.de || '') + '" onchange="window._comFiltro.de=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
               + '<span class="hint">até</span>'
               + '<input type="date" value="' + (CF.ate || '') + '" onchange="window._comFiltro.ate=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
             : '')
         + '</div>';
+      if (window._comQuadro) {
+        h += '<div class="hint" style="margin:2px;">Arraste a pessoa de uma coluna para outra — grava sozinho na planilha</div>';
+        h += crmQuadro(comLista);
+      } else {
       // quem ainda não foi marcado (sem TAG e sem TIPO) vem primeiro — pedido do Bruno
       var comFalta = comLista.filter(function(x){ return !(x.tag || '').trim() && !(x.tipo || '').trim(); });
       var comFeito = comLista.filter(function(x){ return (x.tag || '').trim() || (x.tipo || '').trim(); });
@@ -6954,6 +7050,7 @@ function renderLeads() {
       });
       if (comLista.length > comOrdem.length) h += '<div class="hint">… e mais ' + (comLista.length - comOrdem.length) + '</div>';
       h += '</div>';
+      }
     }
     h += '</div>';
   }
