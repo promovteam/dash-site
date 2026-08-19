@@ -3803,7 +3803,7 @@ var LD = { rows: [], semData: [], carregado: false };
 var LD_PER = 'hoje', LD_BUSCA = '';
 var LD_VIS = 'dia';   // quadro "por período": dia | sem | mes | tri | ano
 // filtros da aba (listas vazias = todos)
-var LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: '', etClint: [] };
+var LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: '', etClint: [], classe: [] };
 
 // ===== ATENDIMENTO: dono + etapa do lead (grava na planilha via robô) =====
 // As etapas ficam na coluna "Situacao" e o responsável na coluna "Dono",
@@ -5054,6 +5054,11 @@ function ldFiltrar(rows) {
     if (f.dono === 'sem' && (l.dono || '').trim()) return false;
     if (f.origem.length && f.origem.indexOf(l.origem) === -1) return false;
     if (f.faixa.length && f.faixa.indexOf(l.faixa) === -1) return false;
+    // filtro pela nota de qualificação A/B/C/D (Bruno 19/08/2026)
+    if (f.classe.length) {
+      var cl = classeDoLead(l);
+      if (!cl || f.classe.indexOf(cl.classe) === -1) return false;
+    }
     if (f.seg.length && f.seg.indexOf(l.seg) === -1) return false;
     if (f.renda.length && f.renda.indexOf(l.renda) === -1) return false;
     if (f.score && l.score < f.score) return false;
@@ -5068,7 +5073,11 @@ function ldFiltrar(rows) {
   });
 }
 function ldSetF(grupo, valor) {
-  if (grupo === 'sit') LD_F.sit = (LD_F.sit === valor) ? '' : valor;
+  if (grupo === 'classe') {
+    var iC = LD_F.classe.indexOf(valor);
+    if (iC === -1) LD_F.classe.push(valor); else LD_F.classe.splice(iC, 1);
+  }
+  else if (grupo === 'sit') LD_F.sit = (LD_F.sit === valor) ? '' : valor;
   else if (grupo === 'score') LD_F.score = (LD_F.score === valor) ? 0 : valor;
   else if (grupo === 'novos') LD_F.novos = !LD_F.novos;
   else if (grupo === 'dono') LD_F.dono = (LD_F.dono === valor) ? '' : valor;
@@ -5091,7 +5100,7 @@ function ldLimparF() {
   renderLeads();
 }
 function ldContaF() {
-  return LD_F.origem.length + LD_F.faixa.length + LD_F.seg.length + LD_F.renda.length + LD_F.etapa.length + LD_F.etClint.length
+  return LD_F.origem.length + LD_F.faixa.length + LD_F.seg.length + LD_F.renda.length + LD_F.etapa.length + LD_F.etClint.length + LD_F.classe.length
     + (LD_F.sit ? 1 : 0) + (LD_F.score ? 1 : 0) + (LD_F.novos ? 1 : 0) + (LD_F.dono ? 1 : 0);
 }
 // a barra de filtros fica escondida até o usuário pedir
@@ -7716,6 +7725,17 @@ function renderLeads() {
     +   '<span class="ld-selo' + (modoAc ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._funilModo=\'chegaram\';renderLeads();" title="Segue só os leads que preencheram a pesquisa neste período">📥 Leads que chegaram no período</span>'
     +   '<span class="ld-selo' + (modoAc ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._funilModo=\'aconteceu\';renderLeads();" title="Tudo que aconteceu no período, inclusive com leads que chegaram antes">📆 Tudo que aconteceu no período (leads de qualquer época)</span>'
     +   '<span class="ld-selo' + (LD_F.faixa.indexOf('alta') !== -1 ? '' : ' morno') + '" style="cursor:pointer;" onclick="ldSetF(\'faixa\',\'alta\')" title="Perfil HT: declarou investir de R$2mil a R$4mil">🔥 Só perfil HT (R$2–4mil)</span>'
+    +   (function(){
+          // atalho por nota de qualificação: comece pelos A
+          var contagem = { A:0, B:0, C:0, D:0 };
+          (LD.rows || []).forEach(function(x){ var c = classeDoLead(x); if (c) contagem[c.classe]++; });
+          return ['A','B','C','D'].map(function(k) {
+            var i = CLASSES_LEAD[k], on = LD_F.classe.indexOf(k) !== -1;
+            return '<span class="ld-selo' + (on ? '' : ' morno') + '" style="cursor:pointer;'
+              + (on ? 'background:' + i.cor + '2e;color:' + i.cor + ';border:1px solid ' + i.cor + ';' : '')
+              + '" onclick="ldSetF(\'classe\',\'' + k + '\')" title="' + i.txt + ' · ' + contagem[k] + ' leads">🏅 ' + k + '</span>';
+          }).join('');
+        })()
     + '</div>'
     + (per.aviso ? '<div class="hint" style="margin:8px 0;color:#f6a350;">' + per.aviso + '</div>' : '');
   ET.forEach(function(e) {
@@ -8859,7 +8879,7 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbwskRY8GgEqF58YHq_qRhfI4zVz1g5JO-LvTZbP-gUBsinVkjjUiL11MOEYrkc537wC/exec (11ª implantação, v17)
 // https://script.google.com/macros/s/AKfycbyombG0HTvuGkbwQA7OGJCB2Ah43-i7i8luGA8VRsW8qjgJwFlbPDlziZySR_EjxdwB/exec (12ª implantação, v19)
 // https://script.google.com/macros/s/AKfycbxL2Vvmtga3_pp2VwmspYv5WxRDFbuDiEr0ai9oSs_k8IKRjYQal_Tli8Xekgh-DazX/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzCLua8SMGLt07bY4B0XJu3UYtqLgq36IWGGVxHywmqXN2WTLOtqG945RdPa28UCXoH/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlGTVFqCPmTOZZAp8AKvYLZ0Ga5LuGVsmKXgLWYAbEdvdDfhVK0aEUAh_Jo8vnuRF6/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
