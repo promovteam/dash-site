@@ -2775,13 +2775,15 @@ function seloAnuncio(x, mini) {
     return '<a class="ld-tag" href="' + (a.post.link || '#') + '" target="_blank" onclick="event.stopPropagation();"'
       + ' style="background:rgba(61,220,151,.15);color:#3ddc97;text-decoration:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;display:inline-block;"'
       + ' title="postagem orgânica que trouxe este lead · ' + String(a.post.link || '').replace(/"/g, '') + '">'
-      + '📱 ' + rotulo + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>';
+      + '📱 ' + rotulo + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>'
+      + (t8 ? '<span class="ld-tag" style="background:rgba(255,255,255,.07);color:var(--muted);cursor:pointer;" title="trocar a postagem deste lead" onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')">✏️</span>' : '');
   }
   if (a.tem) {
     var corte = mini ? 18 : 30;
     return '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;cursor:pointer;max-width:230px;overflow:hidden;text-overflow:ellipsis;"'
       + ' onclick="event.stopPropagation();abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')" title="criativo que trouxe este lead: ' + String(a.txt).replace(/"/g, '') + ' — clique para ver">'
-      + '📣 ' + rotulo + (a.txt.length > corte ? a.txt.slice(0, corte) + '…' : a.txt) + '</span>';
+      + '📣 ' + rotulo + (a.txt.length > corte ? a.txt.slice(0, corte) + '…' : a.txt) + '</span>'
+      + (t8 ? '<span class="ld-tag" style="background:rgba(255,255,255,.07);color:var(--muted);cursor:pointer;" title="trocar o criativo deste lead" onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')">✏️</span>' : '');
   }
   if (!t8) return '';
   // lead orgânico nunca vai ter anúncio: em vez de cobrar, convida a dizer qual post
@@ -2801,6 +2803,7 @@ function seloAnuncio(x, mini) {
 function escolherAnuncio(t8) {
   if (soOlhar()) return;
   window._anEscolhaTel = t8;
+  window._eaMostrarPagos = false;
   var cx = document.getElementById('modal-escolhe-anuncio');
   if (!cx) {
     cx = document.createElement('div');
@@ -2914,6 +2917,13 @@ function listarAnunciosEscolha(txt) {
 
   var posts = postsOrganicos();
   if (q) posts = posts.filter(function(p){ return v2norm(p.apelido + ' ' + p.link).indexOf(q) !== -1; });
+  // lead que veio do orgânico não deve receber anúncio pago por engano:
+  // a lista dos pagos fica escondida atrás de um pedido explícito (Bruno 19/08/2026)
+  var _l = (LD.rows || []).filter(function(y){ return y.tel8 === window._anEscolhaTel; })[0] || {};
+  var _br = String(_l.origem || '') + ' ' + String(_l.fonte || '') + ' ' + String(_l.utm || '');
+  var ehLeadOrganico = !(/\[ads\]|\bads\b|paid/i.test(_br) || _l.meio === 'paid')
+                       && /\[org\]|organic|\bbio\b|mchat|manychat|indica|prospec|diagnostico-org/i.test(_br);
+  var mostrarPagos = !ehLeadOrganico || window._eaMostrarPagos === true;
 
   var h = '<div class="click" style="padding:10px 12px;border-radius:11px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);cursor:pointer;"'
     + ' onclick="salvarAnuncioEscolhido(\'__organico__\')"><b style="font-size:.8rem;color:#3ddc97;">🌱 Não veio de anúncio</b>'
@@ -2940,6 +2950,14 @@ function listarAnunciosEscolha(txt) {
   }).join('');
 
   // ---- anúncios pagos ----
+  if (!mostrarPagos) {
+    h += '<div style="margin-top:10px;padding:9px 11px;border-radius:11px;background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.15);">'
+      + '<div class="hint">Este lead veio do <b style="color:#3ddc97;">orgânico</b>' + (_l.origem ? ' (' + _l.origem + ')' : '') + ' — por isso os anúncios pagos não aparecem aqui.</div>'
+      + '<span class="ld-selo morno" style="cursor:pointer;margin-top:7px;display:inline-block;" onclick="window._eaMostrarPagos=true;listarAnunciosEscolha(document.getElementById(\'ea-q\')?document.getElementById(\'ea-q\').value:\'\');">'
+      + 'foi anúncio pago sim — mostrar a lista</span></div>';
+    cx.innerHTML = h;
+    return;
+  }
   h += '<div style="margin-top:8px;"><b style="font-size:.7rem;color:#b98aff;text-transform:uppercase;letter-spacing:.5px;">📣 Anúncios</b></div>';
   if (!lista.length) h += '<div class="hint" style="padding:8px 10px;">Nenhum anúncio com esse nome.</div>';
   h += lista.map(function(x) {
@@ -5775,57 +5793,93 @@ function listaPreenchimentos(l) {
   });
   return h + '</div>';
 }
-// ===== 🏅 CLASSE DO LEAD: A · B · C · D (Bruno 19/08/2026) =====
-// Os pesos NÃO foram chutados: saíram das 369 reuniões realizadas da própria
-// Promov, medindo quanto cada resposta do formulário fecha de verdade.
-// Depois de pronto, testei as classes contra as vendas reais:
-//   A → 45% fecham (114 reuniões) · B → 35% (80) · C → 25% (155) · D → 17% (18)
-//   A média da casa é 33%. Ou seja: um lead A vale ~2,6 leads D.
-// D fica reservado a quem tem DOIS ou mais sinais ruins — com um sinal só, o lead
-// é C (média). Antes, um único ponto negativo derrubava para D e isso pintava de
-// "fraco" gente que estava na média da casa (Bruno reparou no caso da Pra. Luzia).
+// ===== 🏅 NOTA DE QUALIFICAÇÃO: A · B · C · D (Bruno 19/08/2026) =====
+// A nota mede QUÃO QUALIFICADO o lead é — verba declarada, tamanho da audiência,
+// se já tem negócio rodando, clareza do objetivo e quanto ele respondeu.
+// É o perfil dele, não um palpite de fechamento. A chance de fechar aparece
+// à parte, como informação histórica, para não confundir as duas coisas.
 var CLASSES_LEAD = {
-  A: { cor: '#ffd166', rot: 'A', txt: 'melhor perfil — 45% fecham' },
-  B: { cor: '#3ddc97', rot: 'B', txt: 'bom perfil — 35% fecham' },
-  C: { cor: '#6ea8ff', rot: 'C', txt: 'perfil médio — 25% fecham' },
-  D: { cor: '#ff6b6b', rot: 'D', txt: 'atenção — 17% fecham' }
+  A: { cor: '#ffd166', rot: 'A', txt: 'muito qualificado' },
+  B: { cor: '#3ddc97', rot: 'B', txt: 'qualificado' },
+  C: { cor: '#6ea8ff', rot: 'C', txt: 'qualificação média' },
+  D: { cor: '#ff6b6b', rot: 'D', txt: 'pouco qualificado' }
 };
 function classeDoLead(l) {
   if (!l) return null;
   var inv = String(l.invest || ''), ren = String(l.renda || ''), seg = String(l.seg || '');
-  if (!inv && !ren && !seg) return null;      // não preencheu: não dá para classificar
-  var p = 0, porque = [];
-  // 1) a verba que declarou — valor cravado vale mais que faixa
-  if (/^r?\$?\s*2 ?mil por m/i.test(inv)) { p += 2; porque.push('declarou R$2mil (40% fecham)'); }
-  else if (/^r?\$?\s*1 ?mil por m/i.test(inv)) { p += 2; porque.push('declarou R$1mil (37%)'); }
-  else if (/^r?\$?\s*500 por m/i.test(inv)) { p += 1; porque.push('declarou R$500 (33%)'); }
-  else if (/de r?\$?\s*500 a/i.test(inv)) { p += 1; }
-  else if (/^r?\$?\s*3 ?mil por m/i.test(inv)) { p += 1; }
-  else if (/de r?\$?\s*3 ?mil a/i.test(inv)) { p -= 1; porque.push('marcou faixa R$3–4mil (só 17% fecham)'); }
-  // 2) de que vive hoje
-  if (/f[íi]sico.*,|,.*f[íi]sico/i.test(ren)) { p += 2; porque.push('tem produto físico + outra fonte (57%)'); }
-  else if (/f[íi]sico/i.test(ren)) { p += 1; porque.push('vive de produto/serviço físico (36%)'); }
-  else if (/clt/i.test(ren)) { p += 1; }
-  else if (/digital/i.test(ren)) { p -= 1; porque.push('só produto digital (24%)'); }
-  if (/n[ãa]o tenho nenhuma renda/i.test(ren)) { p -= 2; porque.push('sem renda hoje (14% fecham)'); }
-  else if (/evento|mentoria|consultoria/i.test(ren)) porque.push('vive de eventos/mentoria (33%, na média)');
-  // 3) tamanho da audiência
-  if (/6\.000 a 10/i.test(seg)) { p += 2; porque.push('6 a 10 mil seguidores (45%)'); }
-  else if (/30\.000 a 50|mais de 100/i.test(seg)) { p += 1; porque.push('audiência grande (36%)'); }
-  else if (/15\.000 a 30/i.test(seg)) { p -= 1; porque.push('15 a 30 mil seguidores (28%, a faixa que menos fecha)'); }
-  else if (/menos de 1\.000/i.test(seg)) { p -= 1; porque.push('menos de mil seguidores (28%)'); }
-  if (/de r?\$?\s*2 ?mil a/i.test(inv)) porque.push('marcou faixa R$2–3mil (26%) — quem crava R$2mil fecha 40%');
-  var k = p >= 3 ? 'A' : p >= 2 ? 'B' : p >= -1 ? 'C' : 'D';
-  return { classe: k, pontos: p, porque: porque, info: CLASSES_LEAD[k] };
+  if (!inv && !ren && !seg) return null;      // não preencheu: não dá para qualificar
+  var nota = 0, itens = [];
+
+  // 1) QUANTO PODE INVESTIR — o que mais pesa (até 45), a pedido do Bruno
+  var pv = 0;
+  var _inv = inv.replace(/r\$\s*/gi, '');    // tira o R$ do meio ("De R$2mil a R$3 mil")
+  if (/sem disponibilidade|n[ãa]o receber|n[ãa]o tenho/i.test(_inv)) pv = 0;
+  else if (/3 ?mil a 4|4 ?mil/i.test(_inv)) pv = 45;
+  else if (/^\s*3 ?mil|^\s*de 3/i.test(_inv)) pv = 42;
+  else if (/2 ?mil a 3/i.test(_inv)) pv = 38;
+  else if (/^\s*2 ?mil|^\s*de 2/i.test(_inv)) pv = 36;
+  else if (/1 ?mil a 2/i.test(_inv)) pv = 28;
+  else if (/^\s*1 ?mil|^\s*de 1/i.test(_inv)) pv = 26;
+  else if (/500 a 1/i.test(_inv)) pv = 18;
+  else if (/500/i.test(_inv)) pv = 15;
+  if (inv) itens.push({ o: 'investimento', v: pv, max: 45, t: inv.slice(0, 44) });
+  nota += pv;
+
+  // 2) SE TEM PRODUTO — segundo mais importante (até 35)
+  var pn = 0, txtN = ren;
+  if (/n[ãa]o tenho nenhuma renda/i.test(ren)) { pn = 0; txtN = 'não tem produto nem renda'; }
+  else if (/,/.test(ren)) { pn = 35; txtN = 'mais de uma fonte'; }
+  else if (/f[íi]sico/i.test(ren)) pn = 32;
+  else if (/evento|mentoria|consultoria/i.test(ren)) pn = 30;
+  else if (/digital/i.test(ren)) pn = 30;
+  else if (/clt/i.test(ren)) { pn = 14; txtN = 'só CLT, sem produto'; }
+  if (ren) itens.push({ o: 'tem produto', v: pn, max: 35, t: txtN.slice(0, 40) });
+  nota += pn;
+
+  // 3) TAMANHO DA AUDIÊNCIA — o corte que importa é passar de mil (até 20)
+  var pa = 0, txtA = seg;
+  if (/menos de 1\.000/i.test(seg)) { pa = 4; txtA = 'menos de mil seguidores'; }
+  else if (/1\.000 a 5/i.test(seg)) pa = 14;
+  else if (/6\.000 a 10/i.test(seg)) pa = 17;
+  else if (/10\.000 a 15/i.test(seg)) pa = 18;
+  else if (/15\.000 a 30/i.test(seg)) pa = 19;
+  else if (/30\.000 a 50|50\.000 a 100|mais de 100/i.test(seg)) pa = 20;
+  if (seg) itens.push({ o: 'audiência', v: pa, max: 20, t: txtA });
+  nota += pa;
+
+  var k = nota >= 75 ? 'A' : nota >= 58 ? 'B' : nota >= 40 ? 'C' : 'D';
+  return { classe: k, nota: nota, itens: itens, info: CLASSES_LEAD[k] };
+}
+// a taxa de fechamento de cada nota, medida na PRÓPRIA base a cada leitura —
+// assim o número nunca fica desatualizado nem é chutado
+var _fechPorClasse = null, _fechQuando = 0;
+function fechamentoHistorico(l) {
+  var c = classeDoLead(l);
+  if (!c) return null;
+  if (!_fechPorClasse || Date.now() - _fechQuando > 300000) {
+    var m = {};
+    (LD.rows || []).forEach(function(x) {
+      if (!x.tel8 || !_ldIdx || !_ldIdx[x.tel8] || !_ldIdx[x.tel8].re) return;
+      var cc = classeDoLead(x);
+      if (!cc) return;
+      m[cc.classe] = m[cc.classe] || { n: 0, vd: 0 };
+      m[cc.classe].n++;
+      if (_ldIdx[x.tel8].vd) m[cc.classe].vd++;
+    });
+    _fechPorClasse = {};
+    Object.keys(m).forEach(function(k){ if (m[k].n >= 15) _fechPorClasse[k] = Math.round(m[k].vd / m[k].n * 100); });
+    _fechQuando = Date.now();
+  }
+  return _fechPorClasse[c.classe] || null;
 }
 function seloChance(l, mini) {
   var c = classeDoLead(l);
   if (!c) return '';
   var i = c.info;
-  var titulo = i.txt + (c.porque.length ? ' · ' + c.porque.join(' · ') : '')
-    + ' — medido em 369 reuniões da Promov (a média é 33%)';
+  var titulo = 'Qualificação ' + i.rot + ' (' + c.nota + '/100) — ' + i.txt
+    + (c.itens.length ? ' · ' + c.itens.map(function(x){ return x.o + ': ' + x.v + '/' + x.max; }).join(' · ') : '');
   return ' <span class="ld-tag" style="background:' + i.cor + '26;color:' + i.cor + ';border:1px solid ' + i.cor + '55;font-weight:900;" title="' + titulo + '">'
-    + '🏅 ' + i.rot + (mini ? '' : ' · ' + i.txt) + '</span>';
+    + '🏅 ' + i.rot + (mini ? '' : ' · ' + c.nota + '/100') + '</span>';
 }
 // selo de quem voltou a preencher: quem insiste está interessado
 function seloVezes(l) {
@@ -6735,13 +6789,26 @@ function abrirFichaLead(i) {
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1) ? listaPreenchimentos(l) : '', 'html'],
-    ['🏅', 'Classe do lead', (function(){
+    ['🏅', 'Nota de qualificação', (function(){
         var c = classeDoLead(l);
         if (!c) return '';
-        return '<b style="color:' + c.info.cor + ';font-size:1.3rem;">' + c.info.rot + '</b>'
-          + '<span style="color:' + c.info.cor + ';font-weight:700;font-size:.78rem;margin-left:6px;">' + c.info.txt + '</span>'
-          + (c.porque.length ? '<div class="hint" style="margin-top:4px;">' + c.porque.join(' · ') + '</div>' : '')
-          + '<div class="hint" style="margin-top:2px;opacity:.7;">classes medidas em 369 reuniões da Promov · a média da casa é 33%</div>';
+        var h = '<b style="color:' + c.info.cor + ';font-size:1.35rem;">' + c.info.rot + '</b>'
+          + '<span style="color:' + c.info.cor + ';font-weight:800;font-size:.9rem;margin-left:6px;">' + c.nota + '/100</span>'
+          + '<div style="color:' + c.info.cor + ';font-weight:700;font-size:.76rem;margin-top:1px;">' + c.info.txt + '</div>'
+          + '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px;">';
+        c.itens.forEach(function(x) {
+          var pct = Math.round(x.v / x.max * 100);
+          h += '<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;margin-top:2px;">'
+            + '<span class="hint" style="min-width:78px;text-align:right;">' + x.o + '</span>'
+            + '<span style="width:70px;height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;display:inline-block;">'
+            +   '<span style="display:block;height:100%;width:' + pct + '%;background:' + c.info.cor + ';"></span></span>'
+            + '<b style="font-size:.68rem;min-width:44px;text-align:right;">' + x.v + '/' + x.max + '</b></div>'
+            + '<div class="hint" style="text-align:right;font-size:.6rem;opacity:.7;">' + x.t + '</div>';
+        });
+        var fh = fechamentoHistorico(l);
+        h += '</div>' + (fh ? '<div class="hint" style="margin-top:5px;opacity:.75;">na história da Promov, leads com esta nota fecharam <b>'
+          + fh + '%</b> das reuniões que aconteceram</div>' : '');
+        return h;
       })(), 'html'],
     ['📱', 'WhatsApp', l.tel
       ? '<a href="' + (ldWa(l) || ('https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11)))
