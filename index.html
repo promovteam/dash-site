@@ -5460,28 +5460,73 @@ function _valorDoTel(t8) {
 
 // imagens dos anúncios: busca em páginas, sem travar a tela
 var META_CRI = { porId: {}, porNome: {}, pagina: 0, buscando: false, fim: false };
+// ===== ⚡ CRIATIVOS NA HORA (Bruno 19/08/2026) =====
+// Antes as imagens vinham de página em página, uma de cada vez, com quase um
+// segundo de espera entre elas: a aba levava mais de um minuto para ficar pronta.
+// Agora: (1) o que já veio antes fica guardado no navegador e aparece na hora;
+// (2) as páginas seguintes são buscadas várias ao mesmo tempo, não em fila.
+var CRI_CACHE_CHAVE = 'v2Criativos';
+var CRI_VALIDADE = 6 * 3600 * 1000;   // 6 horas, igual à memória do robô
+function criativosDaMemoria() {
+  try {
+    var g = JSON.parse(localStorage.getItem(CRI_CACHE_CHAVE) || 'null');
+    if (!g || !g.quando || Date.now() - g.quando > CRI_VALIDADE) return false;
+    (g.itens || []).forEach(function(it) {
+      if (it.id) META_CRI.porId[it.id] = it;
+      if (it.nome) META_CRI.porNome[_chaveAnuncio(it.nome)] = it;
+    });
+    META_CRI.pagina = g.pagina || 0;
+    META_CRI.doCache = true;
+    return (g.itens || []).length > 0;
+  } catch (e) { return false; }
+}
+var _criSalvar = null;
+// guarda 3 segundos depois que parar de chegar página (evita escrever 25 vezes)
+function guardarCriativos() {
+  clearTimeout(_criSalvar);
+  _criSalvar = setTimeout(function() {
+    try {
+      var itens = Object.keys(META_CRI.porId).map(function(k){ return META_CRI.porId[k]; });
+      if (!itens.length) return;
+      if (itens.length > 2600) itens = itens.slice(0, 2600);   // não lotar a memória do navegador
+      localStorage.setItem(CRI_CACHE_CHAVE, JSON.stringify({ quando: Date.now(), pagina: META_CRI.pagina, itens: itens }));
+    } catch (e) { /* memória cheia: segue sem guardar */ }
+  }, 3000);
+}
+var _criEmVoo = 0;
 function carregarCriativos() {
-  if (META_CRI.buscando || META_CRI.fim || META_CRI.pagina >= 20) return;
-  META_CRI.buscando = true;
-  var pag = META_CRI.pagina + 1;
-  var nome = 'criCb' + Math.random().toString(36).slice(2, 8);
+  if (META_CRI.fim) return;
+  // primeira vez na sessão: tenta a memória do navegador antes de pedir ao robô
+  if (!META_CRI.tentouCache) {
+    META_CRI.tentouCache = true;
+    if (criativosDaMemoria()) { renderAnuncios(); }
+  }
+  if (_criEmVoo >= 4 || META_CRI.pagina >= 25) return;   // até 4 páginas ao mesmo tempo
+  var quantas = Math.min(4 - _criEmVoo, 25 - META_CRI.pagina);
+  for (var n = 0; n < quantas; n++) buscarPaginaCriativos(++META_CRI.pagina);
+}
+function buscarPaginaCriativos(pag) {
+  _criEmVoo++;
+  var nome = 'criCb' + pag + '_' + Math.random().toString(36).slice(2, 6);
   var sc = document.createElement('script');
   var pronto = false;
   var fim = function(d) {
     if (pronto) return;
-    pronto = true; META_CRI.buscando = false;
+    pronto = true; _criEmVoo--;
     try { sc.remove(); } catch (e) {}
     try { delete window[nome]; } catch (e) {}
     if (d && d.success) {
-      META_CRI.pagina = pag;
       (d.itens || []).forEach(function(it) {
         if (it.id) META_CRI.porId[it.id] = it;
         if (it.nome) META_CRI.porNome[_chaveAnuncio(it.nome)] = it;
       });
       if (!d.temMais) META_CRI.fim = true;
       renderAnuncios();
-      if (!META_CRI.fim) setTimeout(carregarCriativos, 900);   // próxima página
-    } else { META_CRI.fim = true; }
+      if (!META_CRI.fim && META_CRI.pagina < 25) carregarCriativos();   // mantém 4 em voo
+      guardarCriativos();   // guarda quando parar de chegar (a próxima abertura é na hora)
+    } else if (!Object.keys(META_CRI.porId).length) {
+      META_CRI.fim = true;
+    }
   };
   window[nome] = fim;
   sc.onerror = function(){ fim(null); };
@@ -6009,6 +6054,24 @@ function sbPendentes() {
     if (r.tel8 && CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[r.tel8]) return false;
     return true;
   });
+}
+// abre a ficha completa de quem está na fila "para levar para a Clint"
+function verFichaPendente(t8) {
+  if (!t8) return;
+  var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0];
+  if (!l) {
+    // ainda não entrou na lista principal: monta a ficha com o que a base do site tem
+    var r = (SB.rows || []).filter(function(x){ return x.tel8 === t8; })[0];
+    if (!r) return;
+    l = { nome: r.nome, tel: r.whatsapp, insta: r.insta, email: r.email, seg: r.seg,
+          obj: r.obj || '', renda: r.renda || '', invest: r.invest, date: r.date,
+          dataTxt: r.date ? r.date.toLocaleString('pt-BR') : '', origem: r.origemForm || r.origem,
+          anuncio: r.anuncio, campanha: r.campanha, fonte: r.fonte, faixa: leadFaixa(r.invest),
+          tel8: r.tel8, i: 'sb', status: r.completa ? 'Completa' : 'Pendente' };
+  }
+  var pos = _ldReg.indexOf(l);
+  if (pos === -1) { _ldReg.push(l); pos = _ldReg.length - 1; }
+  abrirFichaLead(pos);
 }
 // os que estão na Clint continuam visíveis num contador à parte
 function sbJaNaClint() {
@@ -6949,7 +7012,9 @@ function renderLeads() {
         var wa = 'https://wa.me/' + String(x.whatsapp).replace(/\D/g, '');
         var mc = null;   // aqui só entra quem ainda NÃO está na Clint
         var donoC = '', etapaC = '';
-        h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+        h += '<div class="click" onclick="verFichaPendente(\'' + (x.tel8 || '') + '\')" title="clique para ver todos os dados"'
+          + ' style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;cursor:pointer;"'
+          + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'">'
           + '<b style="font-size:.76rem;flex:1;min-width:130px;">' + (x.nome || 'Sem nome') + '</b>'
           + (mc
               ? '<span class="ld-tag" style="background:rgba(108,71,255,.16);color:#8f6bff;" title="Já está na Clint">🟣 ' + (etapaC || 'na Clint') + '</span>'
