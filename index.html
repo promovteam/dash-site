@@ -5906,24 +5906,37 @@ function classeDoLead(l) {
   nota += pv;
 
   // 2) SE TEM PRODUTO — segundo mais importante (até 35)
+  // Quem marca "não tenho renda" JUNTO com um produto tem produto: o que zera
+  // é só quem marcou nada além disso (antes, 38 pessoas com produto físico
+  // ficavam com nota zero por causa disso — Bruno reparou em 19/08/2026)
   var pn = 0, txtN = ren;
-  if (/n[ãa]o tenho nenhuma renda/i.test(ren)) { pn = 0; txtN = 'não tem produto nem renda'; }
-  else if (/,/.test(ren)) { pn = 35; txtN = 'mais de uma fonte'; }
-  else if (/f[íi]sico/i.test(ren)) pn = 32;
-  else if (/evento|mentoria|consultoria/i.test(ren)) pn = 30;
-  else if (/digital/i.test(ren)) pn = 30;
-  else if (/clt/i.test(ren)) { pn = 14; txtN = 'só CLT, sem produto'; }
-  if (ren) itens.push({ o: 'tem produto', v: pn, max: 35, t: txtN.slice(0, 40) });
+  var temFisico = /f[íi]sico/i.test(ren);
+  var temMentoria = /evento|mentoria|consultoria/i.test(ren);
+  var temDigital = /digital/i.test(ren);
+  var temClt = /clt/i.test(ren);
+  var semRenda = /n[ãa]o tenho nenhuma renda/i.test(ren);
+  var quantos = (temFisico ? 1 : 0) + (temMentoria ? 1 : 0) + (temDigital ? 1 : 0);
+  if (quantos >= 2) { pn = 35; txtN = 'mais de um produto'; }
+  else if (temFisico) pn = 32;
+  else if (temMentoria || temDigital) pn = 30;
+  else if (temClt) { pn = 14; txtN = 'só CLT, sem produto'; }
+  else if (semRenda) { pn = 0; txtN = 'não tem produto nem renda'; }
+  if (semRenda && pn > 0) txtN = txtN + ' (marcou também "sem renda")';
+  if (ren) itens.push({ o: 'tem produto', v: pn, max: 35, t: txtN.slice(0, 44) });
   nota += pn;
 
   // 3) TAMANHO DA AUDIÊNCIA — o corte que importa é passar de mil (até 20)
+  // Cobre TODAS as opções que o formulário já usou, inclusive as antigas
+  // ("Mais de 15.000", "Mais de 50.000", "Mais de 5.000")
   var pa = 0, txtA = seg;
-  if (/menos de 1\.000/i.test(seg)) { pa = 4; txtA = 'menos de mil seguidores'; }
-  else if (/1\.000 a 5/i.test(seg)) pa = 14;
-  else if (/6\.000 a 10/i.test(seg)) pa = 17;
-  else if (/10\.000 a 15/i.test(seg)) pa = 18;
-  else if (/15\.000 a 30/i.test(seg)) pa = 19;
-  else if (/30\.000 a 50|50\.000 a 100|mais de 100/i.test(seg)) pa = 20;
+  var _sg = seg.toLowerCase();
+  if (/menos de 1\.?000/.test(_sg)) { pa = 4; txtA = 'menos de mil seguidores'; }
+  else if (/mais de 100|mais de 50|50\.?000 a 100|30\.?000 a 50/.test(_sg)) pa = 20;
+  else if (/15\.?000 a 30|mais de 15/.test(_sg)) pa = 19;
+  else if (/10\.?000 a 15/.test(_sg)) pa = 18;
+  else if (/6\.?000 a 10|mais de 5/.test(_sg)) pa = 17;
+  else if (/1\.?000 a 5/.test(_sg)) pa = 14;
+  else if (_sg) { pa = 12; txtA = seg + ' (faixa nova)'; }   // opção que ainda não conheço: não zera
   if (seg) itens.push({ o: 'audiência', v: pa, max: 20, t: txtA });
   nota += pa;
 
