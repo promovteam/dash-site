@@ -424,8 +424,10 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .rk-card.top3 .avatar { border-color:#d98c4a; }
 .rk-nome { flex:1; text-transform:uppercase; letter-spacing:.8px; font-size:.98rem; font-weight:400; color:#dfe2ff; }
 .rk-nome b { font-weight:900; color:#fff; }
-.rk-pos { position:absolute; top:10px; right:14px; font-size:1.25rem; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+.rk-pos { position:absolute; top:8px; right:12px; font-size:1.15rem; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); z-index:3; }
+/* espaço à direita para a medalha não cair em cima do faturamento */
 .rk-right { text-align:right; padding-right:18px; line-height:1.6; }
+.rk-card.top1 .rk-right, .rk-card.top2 .rk-right, .rk-card.top3 .rk-right { padding-right:34px; }
 .rk-right .vd { color:#3ddc97; font-weight:800; font-size:.76rem; display:block; }
 .rk-right .ps { color:#b98aff; font-weight:700; font-size:.65rem; display:block; }
 /* tubo de atingimento (termômetro) */
@@ -1452,6 +1454,8 @@ Instagram: @pr.joaosilva</div>
     <span class="pill p" id="fl-pill" style="display:none;">MQL</span>
     <button class="close-x" onclick="fecharLead()">✕</button>
   </div>
+  <!-- Meet / gravação primeiro: é o que se usa na hora da reunião (Bruno 19/08/2026) -->
+  <div class="dtl-card" id="card-gravacao" style="display:none;"></div>
   <div class="dtl-card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
       <div class="g-label" style="margin-bottom:0;">Informações</div>
@@ -1465,29 +1469,6 @@ Instagram: @pr.joaosilva</div>
   <!-- o que a pessoa respondeu no formulário do diagnóstico (pedido do Bruno 19/08/2026) -->
   <div id="fl-formulario"></div>
   <!-- Aparece somente quando a reuniao foi REALIZADA (etapa futura: links reais) -->
-  <div class="dtl-card" id="card-gravacao" style="display:none;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div class="g-label" style="margin-bottom:0;">🎙️ Gravação da reunião</div>
-      <span class="pill v">Realizada · 15/07 · 48 min</span>
-    </div>
-    <div class="player">
-      <button class="play-btn" onclick="event.stopPropagation();abrirVideo();" title="Assistir dentro do painel">▶</button>
-      <div class="wave">
-        <i style="height:40%"></i><i style="height:70%"></i><i style="height:55%"></i><i style="height:85%"></i><i style="height:45%"></i><i style="height:90%"></i><i style="height:60%"></i><i style="height:75%"></i><i style="height:35%"></i><i style="height:65%"></i><i style="height:80%"></i><i style="height:50%"></i><i style="height:70%"></i><i style="height:40%"></i><i style="height:85%"></i><i style="height:55%"></i><i style="height:65%"></i><i style="height:45%"></i><i style="height:75%"></i><i style="height:60%"></i>
-      </div>
-      <span class="player-tempo">48:12</span>
-    </div>
-    <div class="g-label" style="margin-top:16px;">📝 Transcrição</div>
-    <div class="transcricao">
-      <p><b class="tr-closer">Bruno:</b> Carla, me conta — hoje o que mais trava o crescimento do seu consultório?</p>
-      <p><b class="tr-lead">Carla:</b> Agenda vazia em janeiro e julho. Nas outras épocas até vai, mas essas quedas me assustam.</p>
-      <p><b class="tr-closer">Bruno:</b> E se eu te mostrar um método para manter a agenda cheia o ano todo, faria sentido investir nisso agora?</p>
-      <p><b class="tr-lead">Carla:</b> Faria, mas preciso entender o valor. Consigo parcelar?</p>
-      <p><b class="tr-closer">Bruno:</b> Consegue, e vou te mostrar as condições…</p>
-    </div>
-    <div class="hint" style="margin-top:10px;">Ver transcrição completa ↓</div>
-  </div>
-
   <div class="dtl-card">
     <div class="g-label">✏️ Suas anotações</div>
     <textarea class="notas" id="fl-notas" placeholder="Escreva aqui o que quiser lembrar sobre este lead..."></textarea>
@@ -2710,14 +2691,16 @@ var ANUNCIO_MARCA = {};
 function anuncioDe(x) {
   if (!x) return { nome: '', txt: '', cri: null, tem: false };
   var t8 = x.tel8 || ldTel8(x.tel || x.telefone || '');
-  if (t8 && ANUNCIO_MARCA[t8]) {
-    var mk = ANUNCIO_MARCA[t8];
-    return { nome: mk, txt: ldAnuncioLimpo(mk), cri: criativoDe(mk, ''), tem: true, tel8: t8 };
-  }
-  var bruto = x.anuncio || '';
+  // o que foi marcado agora vale mais que o que a planilha ainda mostra
+  var bruto = (t8 && ANUNCIO_MARCA[t8]) ? ANUNCIO_MARCA[t8] : (x.anuncio || '');
   if (!bruto && t8) {                       // linha de reunião: procura o lead na base
     var l = (LD.rows || []).filter(function(y){ return y.tel8 === t8; })[0];
-    if (l) bruto = l.anuncio || '';
+    if (l) bruto = (t8 && ANUNCIO_MARCA[t8]) ? ANUNCIO_MARCA[t8] : (l.anuncio || '');
+  }
+  // postagem orgânica que alguém cadastrou (POST:apelido|link)
+  if (String(bruto).indexOf('POST:') === 0) {
+    var pp = _lerPost(bruto);
+    return { nome: bruto, txt: pp.apelido, cri: null, tem: true, tel8: t8, post: pp, organico: true };
   }
   var txt = bruto ? ldAnuncioLimpo(bruto) : '';
   var vale = txt && txt !== '(sem anúncio)' && txt !== '(link)' && txt.indexOf('⚠️') !== 0;
@@ -2727,6 +2710,13 @@ function anuncioDe(x) {
 function seloAnuncio(x, mini) {
   var a = anuncioDe(x);
   var t8 = a.tel8 || '';
+  if (a.tem && a.organico) {
+    var corteO = mini ? 18 : 30;
+    return '<a class="ld-tag" href="' + (a.post.link || '#') + '" target="_blank" onclick="event.stopPropagation();"'
+      + ' style="background:rgba(61,220,151,.15);color:#3ddc97;text-decoration:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;display:inline-block;"'
+      + ' title="' + String(a.post.link || '').replace(/"/g, '') + '">'
+      + '📱 ' + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>';
+  }
   if (a.tem) {
     var corte = mini ? 18 : 30;
     return '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;cursor:pointer;max-width:230px;overflow:hidden;text-overflow:ellipsis;"'
@@ -2734,6 +2724,15 @@ function seloAnuncio(x, mini) {
       + '📣 ' + (a.txt.length > corte ? a.txt.slice(0, corte) + '…' : a.txt) + '</span>';
   }
   if (!t8) return '';
+  // lead orgânico nunca vai ter anúncio: em vez de cobrar, convida a dizer qual post
+  var bruta = String(x.origem || '') + ' ' + String(x.fonte || '') + ' ' + String(x.utm || '');
+  var ehPago = /\[ads\]|\bads\b|paid/i.test(bruta) || x.meio === 'paid';
+  var ehOrganico = !ehPago && /\[org\]|organic|\bbio\b|mchat|manychat|indica|prospec/i.test(bruta);
+  if (ehOrganico) {
+    return '<span class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;cursor:pointer;border:1px dashed rgba(61,220,151,.5);"'
+      + ' onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')" title="veio do orgânico — diga qual post trouxe">'
+      + '📱 qual post' + (mini ? '?' : ' trouxe? · colar link') + '</span>';
+  }
   return '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;cursor:pointer;border:1px dashed rgba(246,163,80,.5);"'
     + ' onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')" title="este lead está sem anúncio — clique para dizer de onde veio">'
     + '⚠️ sem anúncio' + (mini ? '' : ' · adicionar') + '</span>';
@@ -2756,7 +2755,8 @@ function escolherAnuncio(t8) {
     +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">'
     +     '<span style="font-size:1.15rem;">📣</span>'
     +     '<div style="flex:1;min-width:0;"><b style="font-size:.9rem;">De onde este lead veio?</b>'
-    +       '<div class="hint" style="margin-top:2px;">' + (l.nome || 'lead') + (l.origem ? ' · ' + l.origem : '') + '</div></div>'
+    +       '<div class="hint" style="margin-top:2px;">' + (l.nome || 'lead') + (l.origem ? ' · ' + l.origem : '')
+    +         (/\[org\]|organic|\bbio\b|mchat|manychat/i.test(String(l.origem || '')) ? ' · <b style="color:#3ddc97;">orgânico: cole o link do post do Instagram</b>' : '') + '</div></div>'
     +     '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharEscolheAnuncio()">✕</span></div>'
     +   '<input id="ea-q" autocomplete="off" placeholder="procurar o anúncio pelo nome" oninput="listarAnunciosEscolha(this.value)"'
     +     ' style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(185,138,255,.4);border-radius:12px;color:var(--text);padding:10px 13px;font-size:.86rem;">'
@@ -2769,6 +2769,62 @@ function escolherAnuncio(t8) {
 function fecharEscolheAnuncio() {
   var cx = document.getElementById('modal-escolhe-anuncio');
   if (cx) cx.style.display = 'none';
+}
+// ===== 📱 POSTAGENS ORGÂNICAS (pedido do Bruno 19/08/2026) =====
+// Nem todo lead vem de anúncio: muitos vêm de um post, reels ou story.
+// A lista se monta sozinha com os posts que já foram usados + os que a pessoa
+// acrescentar aqui (o link fica guardado e aparece para todo mundo depois).
+function postsOrganicos() {
+  var vistos = {}, lista = [];
+  // os que alguém já marcou em algum lead
+  (LD.rows || []).forEach(function(l) {
+    var a = String(l.anuncio || '');
+    if (a.indexOf('POST:') !== 0) return;
+    var k = v2norm(a);
+    if (vistos[k]) return;
+    vistos[k] = 1;
+    lista.push(_lerPost(a));
+  });
+  // os que foram acrescentados neste navegador e ainda não foram usados
+  var meus = [];
+  try { meus = JSON.parse(localStorage.getItem('v2PostsOrganicos') || '[]'); } catch (e) {}
+  meus.forEach(function(p) {
+    var bruto = 'POST:' + p.apelido + '|' + p.link;
+    var k = v2norm(bruto);
+    if (vistos[k]) return;
+    vistos[k] = 1;
+    lista.push(_lerPost(bruto));
+  });
+  return lista;
+}
+function _lerPost(bruto) {
+  var resto = String(bruto).replace(/^POST:/, '');
+  var i = resto.lastIndexOf('|');
+  return { bruto: bruto, apelido: i > 0 ? resto.slice(0, i) : resto, link: i > 0 ? resto.slice(i + 1) : '' };
+}
+function guardarPostOrganico(apelido, link) {
+  var meus = [];
+  try { meus = JSON.parse(localStorage.getItem('v2PostsOrganicos') || '[]'); } catch (e) {}
+  if (!meus.some(function(p){ return p.link === link; })) meus.unshift({ apelido: apelido, link: link });
+  try { localStorage.setItem('v2PostsOrganicos', JSON.stringify(meus.slice(0, 60))); } catch (e) {}
+}
+// acrescenta o post e já marca no lead que está aberto
+function acrescentarPostOrganico() {
+  var li = document.getElementById('ea-link');
+  var ap = document.getElementById('ea-apelido');
+  if (!li) return;
+  var link = (li.value || '').trim();
+  var apelido = (ap && ap.value || '').trim();
+  if (!link) { alert('Cole o link da postagem.'); li.focus(); return; }
+  if (!/^https?:\/\//i.test(link)) { alert('O link precisa começar com http:// ou https://'); li.focus(); return; }
+  if (!apelido) {
+    // sem apelido, usa um nome curto tirado do próprio link
+    var m = link.match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
+    apelido = m ? 'Post ' + m[2].slice(0, 8) : link.replace(/^https?:\/\//, '').slice(0, 34);
+  }
+  apelido = apelido.replace(/\|/g, '-');
+  guardarPostOrganico(apelido, link);
+  salvarAnuncioEscolhido('POST:' + apelido + '|' + link);
 }
 function listarAnunciosEscolha(txt) {
   var cx = document.getElementById('ea-lista');
@@ -2785,7 +2841,7 @@ function listarAnunciosEscolha(txt) {
     lista.push({ nome: c.nome, foto: c.foto || '' });
   });
   (LD.rows || []).forEach(function(l) {
-    if (!l.anuncio) return;
+    if (!l.anuncio || String(l.anuncio).indexOf('POST:') === 0) return;
     var t = ldAnuncioLimpo(l.anuncio);
     if (!t || t === '(sem anúncio)' || t === '(link)' || t.indexOf('⚠️') === 0) return;
     var k = _chaveAnuncio(t);
@@ -2795,10 +2851,37 @@ function listarAnunciosEscolha(txt) {
   });
   if (q) lista = lista.filter(function(x){ return v2norm(x.nome).indexOf(q) !== -1; });
   lista = lista.slice(0, 40);
+
+  var posts = postsOrganicos();
+  if (q) posts = posts.filter(function(p){ return v2norm(p.apelido + ' ' + p.link).indexOf(q) !== -1; });
+
   var h = '<div class="click" style="padding:10px 12px;border-radius:11px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);cursor:pointer;"'
     + ' onclick="salvarAnuncioEscolhido(\'__organico__\')"><b style="font-size:.8rem;color:#3ddc97;">🌱 Não veio de anúncio</b>'
     + '<div class="hint" style="margin-top:2px;">orgânico, link na bio, indicação ou prospecção</div></div>';
-  if (!lista.length) h += '<div class="hint" style="padding:14px;text-align:center;">Nenhum anúncio com esse nome.</div>';
+
+  // ---- postagens orgânicas ----
+  h += '<div style="margin-top:6px;"><b style="font-size:.7rem;color:#3ddc97;text-transform:uppercase;letter-spacing:.5px;">📱 Postagens orgânicas</b></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px;border-radius:11px;background:rgba(61,220,151,.07);border:1px dashed rgba(61,220,151,.4);">'
+    +   '<input id="ea-apelido" placeholder="nome do post (ex: Reels dos 3 erros)" style="flex:2;min-width:150px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:7px 10px;font-size:.74rem;">'
+    +   '<input id="ea-link" placeholder="cole o link do post/reels" style="flex:3;min-width:180px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:7px 10px;font-size:.74rem;"'
+    +     ' onkeydown="if(event.key===\'Enter\')acrescentarPostOrganico();">'
+    +   '<button class="btn-assumir" style="padding:6px 13px;font-size:.72rem;" onclick="acrescentarPostOrganico()">➕ acrescentar e usar</button>'
+    + '</div>';
+  if (!posts.length) h += '<div class="hint" style="padding:4px 10px;">Nenhuma postagem cadastrada ainda — cole o link acima.</div>';
+  h += posts.map(function(p) {
+    return '<div class="click" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(61,220,151,.06);cursor:pointer;"'
+      + ' onmouseover="this.style.background=\'rgba(61,220,151,.15)\'" onmouseout="this.style.background=\'rgba(61,220,151,.06)\'"'
+      + ' onclick="salvarAnuncioEscolhido(' + JSON.stringify(p.bruto).replace(/"/g, '&quot;') + ')">'
+      + '<span style="width:38px;height:38px;border-radius:8px;background:rgba(61,220,151,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;">📱</span>'
+      + '<div style="flex:1;min-width:0;"><b style="font-size:.77rem;">' + p.apelido + '</b>'
+      +   '<div class="hint" style="margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + p.link + '</div></div>'
+      + (p.link ? '<a href="' + p.link + '" target="_blank" onclick="event.stopPropagation();" class="ld-wa" style="background:rgba(61,220,151,.14);border-color:rgba(61,220,151,.4);color:#3ddc97;">ver ↗</a>' : '')
+      + '<span style="color:#3ddc97;font-weight:800;font-size:.66rem;">usar →</span></div>';
+  }).join('');
+
+  // ---- anúncios pagos ----
+  h += '<div style="margin-top:8px;"><b style="font-size:.7rem;color:#b98aff;text-transform:uppercase;letter-spacing:.5px;">📣 Anúncios</b></div>';
+  if (!lista.length) h += '<div class="hint" style="padding:8px 10px;">Nenhum anúncio com esse nome.</div>';
   h += lista.map(function(x) {
     return '<div class="click" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);cursor:pointer;"'
       + ' onmouseover="this.style.background=\'rgba(185,138,255,.14)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'"'
@@ -6148,8 +6231,14 @@ function abrirFichaLead(i) {
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1) ? listaPreenchimentos(l) : '', 'html'],
-    ['📱', 'WhatsApp', l.tel],
-    ['📷', 'Instagram', l.insta ? '@' + l.insta : ''],
+    ['📱', 'WhatsApp', l.tel
+      ? '<a href="' + (ldWa(l) || ('https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11)))
+        + '" target="_blank" style="color:#3ddc97;text-decoration:none;font-weight:800;" title="abrir a conversa no WhatsApp">'
+        + l.tel + ' ↗</a>' : '', 'html'],
+    ['📷', 'Instagram', l.insta
+      ? '<a href="https://instagram.com/' + encodeURIComponent(String(l.insta).replace(/^@/, ''))
+        + '" target="_blank" style="color:#b98aff;text-decoration:none;font-weight:800;" title="abrir o perfil no Instagram">@'
+        + String(l.insta).replace(/^@/, '') + ' ↗</a>' : '', 'html'],
     ['✉️', 'E-mail', l.email],
     ['👥', 'Seguidores', l.seg],
     ['💰', 'Quanto pode investir', l.invest],
@@ -6160,9 +6249,16 @@ function abrirFichaLead(i) {
     ['📣', 'Anúncio que trouxe', (function(){
         var aa = anuncioDe(l);
         if (!aa.tem) {
+          var _br = String(l.origem || '') + ' ' + String(l.fonte || '') + ' ' + String(l.utm || '');
+          var org = !(/\[ads\]|\bads\b|paid/i.test(_br) || l.meio === 'paid')
+                    && /\[org\]|organic|\bbio\b|mchat|manychat|indica|prospec/i.test(_br);
           return '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
-            + '<span style="color:#f6a350;font-weight:700;font-size:.76rem;">⚠️ está incompleto — não sabemos de onde veio</span>'
-            + '<button class="btn-assumir" style="padding:5px 11px;font-size:.7rem;" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">📣 adicionar o anúncio</button></div>';
+            + (org
+                ? '<span style="color:#3ddc97;font-weight:700;font-size:.76rem;">📱 veio do orgânico — qual post trouxe?</span>'
+                  + '<button class="btn-assumir" style="padding:5px 11px;font-size:.7rem;" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">colar o link do post</button>'
+                : '<span style="color:#f6a350;font-weight:700;font-size:.76rem;">⚠️ está incompleto — não sabemos de onde veio</span>'
+                  + '<button class="btn-assumir" style="padding:5px 11px;font-size:.7rem;" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">📣 adicionar</button>')
+            + '</div>';
         }
         var nm = aa.txt;
         if (!l.anuncio) return '';
