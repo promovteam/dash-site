@@ -3004,7 +3004,42 @@ function salvarAnuncioEscolhido(nome) {
   fecharEscolheAnuncio();
   try { renderLeads(); } catch (e) {}
   try { if (typeof filtrarUltimas === 'function') filtrarUltimas(''); } catch (e) {}
-  try { if (_ldFichaAberta && _ldFichaAberta.tel8 === t8) abrirFichaLead(_ldReg.indexOf(_ldFichaAberta)); } catch (e) {}
+  // redesenha a ficha que está aberta (era isso que fazia parecer que "não mudou")
+  try {
+    var aberta = document.getElementById('modal-b');
+    if (aberta && aberta.classList.contains('open')) {
+      var alvo = _ldFichaAberta && _ldFichaAberta.tel8 === t8 ? _ldFichaAberta
+               : (LD.rows || []).filter(function(y){ return y.tel8 === t8; })[0];
+      if (alvo) {
+        var pos = _ldReg.indexOf(alvo);
+        if (pos === -1) { _ldReg.push(alvo); pos = _ldReg.length - 1; }
+        abrirFichaLead(pos);
+      }
+    }
+  } catch (e) {}
+  try { if (typeof renderAnuncios === 'function' && telaVisivel('s-anuncios')) renderAnuncios(); } catch (e) {}
+  avisoRapido('✓ marcado: ' + (valor === 'Orgânico (sem anúncio)' ? 'não veio de anúncio' : ldAnuncioLimpo(valor)));
+}
+// aviso curto no canto, para a pessoa ver que a escolha pegou
+function avisoRapido(txt) {
+  var el = document.getElementById('aviso-rapido');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'aviso-rapido';
+    el.style.cssText = 'position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:10010;'
+      + 'background:rgba(61,220,151,.95);color:#0d0d1e;font-weight:800;font-size:.8rem;'
+      + 'padding:11px 20px;border-radius:999px;box-shadow:0 8px 26px rgba(0,0,0,.5);'
+      + 'opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  el.textContent = txt;
+  el.style.opacity = '1';
+  el.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(window._avisoT);
+  window._avisoT = setTimeout(function() {
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(8px)';
+  }, 2600);
 }
 
 function v2row(r) {
@@ -6959,6 +6994,61 @@ function abrirFichaLead(i) {
     h += '<div class="fs-calc-linha"><span>' + c[0] + ' ' + c[1] + '</span><b style="text-align:right;max-width:62%;">' + valorC + '</b></div>';
   });
   h += '</div>';
+  // ===== 📅 A REUNIÃO E O PAGAMENTO DESTE LEAD (Bruno 19/08/2026) =====
+  // Se a pessoa virou reunião (e venda), tudo aparece aqui: quem atendeu, o que
+  // foi vendido, por quanto, como pagou e o que o contrato diz.
+  var _reu = null, _pag = null;
+  if (l.tel8) {
+    _reu = (V2.rows || []).filter(function(r){ return ldTel8(r.telefone) === l.tel8; })
+             .sort(function(a, b){ return (b.date || 0) - (a.date || 0); })[0] || null;
+    _pag = (PAG.rows || []).filter(function(r) {
+      var t = ldTel8(r.celular);
+      if (t && t === l.tel8) return true;
+      return l.nome && v2norm(r.nome) === v2norm(l.nome);
+    })[0] || null;
+  }
+  if (_reu) {
+    var stCor = _reu.sn === 'vendido' ? '#3ddc97' : /nao vendido|no show|estorno/.test(_reu.sn) ? '#ff6b6b' : '#ffd166';
+    var lin = function(ico, rot, val) {
+      return val ? '<div class="fs-calc-linha"><span>' + ico + ' ' + rot + '</span><b style="text-align:right;">' + val + '</b></div>' : '';
+    };
+    h += '<div class="dtl-card" style="margin-top:12px;border:1px solid ' + stCor + '44;background:' + stCor + '0d;">'
+      + '<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">'
+      +   '<div class="g-label" style="margin-bottom:0;flex:1;">📅 A reunião</div>'
+      +   '<span class="ld-tag" style="background:' + stCor + '26;color:' + stCor + ';font-weight:800;">' + (_reu.status || '—') + '</span>'
+      + '</div>'
+      + lin('🗓️', 'Quando', _reu.date ? _reu.date.toLocaleDateString('pt-BR') : '')
+      + lin('🏆', 'Closer', _reu.closer)
+      + lin('📞', 'SDR', _reu.sdr)
+      + lin('🎯', 'Produto', _reu.produto)
+      + lin('🧲', 'Origem', _reu.origem)
+      + lin('🆔', 'ID do lead', _reu.leadId)
+      + (_reu.valor ? lin('💰', 'Valor', v2moeda(_reu.valor)) : '')
+      + (_reu.obs ? '<div class="hint" style="margin-top:6px;">📝 ' + _reu.obs + '</div>' : '')
+      + '<div style="margin-top:9px;"><span class="ld-tag" style="cursor:pointer;background:rgba(110,168,255,.14);color:#6ea8ff;" onclick="fecharB();abrirLead(v2reg(V2.rows[' + V2.rows.indexOf(_reu) + ']))">abrir a ficha da reunião →</span></div>'
+      + '</div>';
+  }
+  if (_pag) {
+    var pgVal = _pag.valor || 0;
+    h += '<div class="dtl-card" style="margin-top:12px;border:1px solid rgba(61,220,151,.4);background:rgba(61,220,151,.07);">'
+      + '<div class="g-label">💵 O pagamento</div>'
+      + (pgVal ? '<div style="text-align:center;margin:6px 0 10px;"><b style="color:#3ddc97;font-size:1.5rem;">' + v2moeda(pgVal) + '</b></div>' : '')
+      + (function(){
+          var lin2 = function(ico, rot, val) {
+            return val ? '<div class="fs-calc-linha"><span>' + ico + ' ' + rot + '</span><b style="text-align:right;">' + val + '</b></div>' : '';
+          };
+          return lin2('🎯', 'Programa', _pag.programa)
+            + lin2('💳', 'Forma de pagamento', _pag.forma)
+            + lin2('🔒', 'Entrada', _pag.entrada)
+            + lin2('📄', 'Contrato', _pag.contrato)
+            + lin2('📊', 'Status do contrato', _pag.stC)
+            + lin2('🧾', 'Omie', _pag.omie)
+            + lin2('🏆', 'Vendedor', _pag.vendedor)
+            + lin2('🗓️', 'Quando', _pag.date ? _pag.date.toLocaleDateString('pt-BR') : '')
+            + (_pag.obs ? '<div class="hint" style="margin-top:6px;">📝 ' + _pag.obs + '</div>' : '');
+        })()
+      + '</div>';
+  }
   var wa = ldWa(l);
   if (wa || l.insta || clintLink(l)) {
     h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">'
