@@ -2269,14 +2269,18 @@ function rankearPor(campo, rows) {
   rows.forEach(function(r) {
     var k = (r[campo] || '').trim();
     if (!k) return;
-    if (!m[k]) m[k] = { nome: k, vd: 0, vdV: 0, ps: 0, psV: 0, re: 0, feV: 0 };
+    if (!m[k]) m[k] = { nome: k, vd: 0, vdV: 0, ps: 0, psV: 0, re: 0, ns: 0, feV: 0 };
     if (r.sn === 'vendido') { m[k].vd++; m[k].vdV += r.valor; }
     if (r.sn === 'entrada' || r.sn.indexOf('bloqueio') !== -1) { m[k].ps++; m[k].psV += r.valor; }
-    if (isReal(r.sn)) m[k].re++;
+    // "realizada" aqui é a MESMA conta do funil que abre no clique (o no-show fica
+    // de fora: o lead não apareceu). Antes o card somava o no-show e o número do
+    // card não batia com o da janela — pedido do Bruno 19/08/2026.
+    if (_fsRealizada(r.sn)) m[k].re++;
+    if (r.sn === 'no show') m[k].ns++;
     if (isFe(r.sn)) m[k].feV += r.valor;
   });
   return Object.keys(m).map(function(k){ return m[k]; })
-    .filter(function(x){ return x.vd || x.ps || x.re; })
+    .filter(function(x){ return x.vd || x.ps || x.re || x.ns; })
     .sort(function(a, b){ return b.vdV - a.vdV || b.vd - a.vd; });
 }
 
@@ -3094,6 +3098,7 @@ function renderV2() {
         projTxt = fatorProj ? '📈 projeção: ' + Math.round(p.re * fatorProj) + ' realizadas' : '';
         linhas = '<span class="vd">💰 faturamento · ' + v2mil(p.feV) + '</span>'
           + '<span class="ps">🔒 +' + p.ps + ' possíve' + (p.ps === 1 ? 'l' : 'is') + ' · ' + v2mil(p.psV) + '</span>'
+          + (p.ns ? '<span class="ps" style="color:#ff6b6b;">🤦 ' + p.ns + ' no-show</span>' : '')
           + (projTxt ? '<span class="ps" style="color:#f6a350;">' + projTxt + '</span>' : '');
       }
       var marcas = tipo === 'closer'
