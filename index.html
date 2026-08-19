@@ -4627,7 +4627,7 @@ function ldConferirGravacao(rows) {
 function ldGuardar(rows, modoSimples) {
   ldEstimarDatas(rows);
   ldConferirGravacao(rows);
-  LD.rows = rows.filter(function(l){ return l.date; }).sort(function(a, b){ return b.date - a.date || b.i - a.i; });
+  LD.rows = ldJuntarRepetidos(rows.filter(function(l){ return l.date; }).sort(function(a, b){ return b.date - a.date || b.i - a.i; }));
   LD.semData = rows.filter(function(l){ return !l.date; });
   LD.total = rows.length;
   LD.aprox = rows.filter(function(l){ return l.aprox; }).length;
@@ -5388,9 +5388,44 @@ function ldFundirSupabase() {
   var historico = LD.rows.filter(function(l) {
     return !(l.tel8 && vistos[l.tel8]);
   });
-  LD.rows = novos.concat(historico).sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
+  LD.rows = ldJuntarRepetidos(novos.concat(historico).sort(function(a, b){ return (b.date || 0) - (a.date || 0); }));
   LD._fundido = SB.rows.length;
   _ldIdx = null; _nomeTelIdx = null;
+}
+// selo de quem voltou a preencher: quem insiste está interessado
+function seloVezes(l) {
+  if (!l || !l.vezes || l.vezes < 2) return '';
+  return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="Preencheu o formulário ' + l.vezes + ' vezes — está atrás de você">🔁 ' + l.vezes + 'x preencheu</span>';
+}
+// ===== 👥 MESMA PESSOA, VÁRIOS PREENCHIMENTOS (pedido do Bruno 19/08/2026) =====
+// Quem preenche e não é chamado costuma preencher de novo. Antes cada tentativa
+// virava um "lead" e os números do painel ficavam ~13% acima do real.
+// Agora contamos PESSOAS: fica o preenchimento mais novo, completado com o que
+// os anteriores tinham, e guardamos quantas vezes ela voltou (é interesse quente).
+function ldJuntarRepetidos(lista) {
+  var porTel = {}, saida = [];
+  lista.forEach(function(l) {
+    if (!l.tel8) { saida.push(l); return; }        // sem telefone não dá para juntar
+    var antes = porTel[l.tel8];
+    if (!antes) {
+      l.vezes = l.vezes || 1;
+      l.outrasVezes = l.outrasVezes || [];
+      porTel[l.tel8] = l;
+      saida.push(l);
+      return;
+    }
+    // a lista vem do mais novo para o mais velho: o primeiro é o que vale
+    antes.vezes = (antes.vezes || 1) + (l.vezes || 1);
+    antes.outrasVezes = (antes.outrasVezes || []).concat([{ date: l.date, dataTxt: l.dataTxt, invest: l.invest,
+                             origem: l.origem, anuncio: l.anuncio }], l.outrasVezes || []);
+    // completa o que faltava no mais novo com o que a tentativa antiga tinha
+    ['email', 'insta', 'seg', 'obj', 'renda', 'invest', 'anuncio', 'campanha', 'fonte', 'origem', 'utm', 'conjunto']
+      .forEach(function(c){ if (!antes[c] && l[c]) antes[c] = l[c]; });
+    // faixa: vale a maior verba que ela já declarou
+    if (antes.faixa !== 'alta' && l.faixa === 'alta') antes.faixa = 'alta';
+    else if (!antes.faixa && l.faixa) antes.faixa = l.faixa;
+  });
+  return saida;
 }
 
 // ===== ▶ VER O CRIATIVO DENTRO DO DASH (imagem grande / vídeo tocando) =====
@@ -6006,7 +6041,7 @@ function ldRow(l, quente) {
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
     + '<div class="ld-info"><b>' + (l.nome || 'Sem nome')
     + (quente ? ' <span class="ld-selo rapido">🔥 CHAMAR RÁPIDO</span>' : '')
-    + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + '</b>'
+    + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + seloVezes(l) + '</b>'
     + '<span>' + det + '</span></div>'
     + seloAnuncio(l, true)
     + (donoNome ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
@@ -6026,6 +6061,10 @@ function abrirFichaLead(i) {
   var FX = { alta:['🔥 Prioridade máxima','#f6a350'], media:['🟡 Prioridade menor','#6ea8ff'], nda:['⚪ Sem disponibilidade','#8b8fa3'], sem:['⚪ Não respondeu','#8b8fa3'] }[l.faixa];
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
+    ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1)
+      ? '<b style="color:#ff6b6b;">' + l.vezes + ' vezes</b> — insistiu, está interessado<div class="hint" style="margin-top:3px;">'
+        + (l.outrasVezes || []).map(function(v){ return (v.dataTxt || '').slice(0, 16); }).filter(Boolean).join(' · ') + '</div>'
+      : '', 'html'],
     ['📱', 'WhatsApp', l.tel],
     ['📷', 'Instagram', l.insta ? '@' + l.insta : ''],
     ['✉️', 'E-mail', l.email],
@@ -8478,7 +8517,7 @@ function agProcurar(txt) {
       +   (l.insta && !/\s/.test(l.insta) ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
       + '</div>'
       + '<div style="flex:1;min-width:0;">'
-      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + '</div>'
+      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + seloVezes(l) + '</div>'
       +   '<div class="hint" style="margin-top:2px;">' + [l.tel, l.insta ? '@' + String(l.insta).replace(/^@/, '') : '', (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div>'
       +   '<div style="margin-top:3px;">' + seloAnuncio(l, true) + '</div>'
       + '</div>'
