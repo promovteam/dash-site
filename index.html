@@ -5473,7 +5473,10 @@ function renderAnuncios() {
     var t = l.date.getTime();
     if (per.ini !== null && t < per.ini) return;
     if (per.fim !== null && t >= per.fim) return;
-    var nome = ldAnuncioLimpo(l.anuncio);
+    // o que foi marcado à mão vale tanto quanto o que veio da planilha — sem isso,
+    // o lead marcado num post não era contado no card daquele post (Bruno 19/08/2026)
+    var bruto = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
+    var nome = (String(bruto || '').indexOf('POST:') === 0) ? bruto : ldAnuncioLimpo(bruto);
     if (nome === '(sem anúncio)') return;
     var tipo = tipoDoAnuncio(nome, ldTipoTrafego(l));
     if (AN_TIPO !== 'todos' && tipo !== AN_TIPO) return;
