@@ -1206,10 +1206,15 @@ img { max-width:100%; height:auto; }
   <div class="ag-grid2">
     <div class="dtl-card">
       <div class="g-label">👤 Lead</div>
-      <div class="ag-campo"><label>🔎 Procurar o lead (nome, telefone ou @)</label>
-        <input class="edit-in ag-in" id="ag-busca" autocomplete="off" placeholder="digite e escolha — o resto preenche sozinho"
-          oninput="agProcurar(this.value)" onblur="setTimeout(function(){var r=document.getElementById('ag-result');if(r)r.style.display='none';},200)">
-        <div id="ag-result" style="display:none;position:relative;z-index:5;max-height:210px;overflow-y:auto;margin-top:4px;border:1px solid rgba(110,168,255,.35);border-radius:10px;background:var(--card,#15152b);"></div>
+      <div class="ag-campo">
+        <button type="button" onclick="abrirBuscaLead()"
+          style="width:100%;display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:12px;cursor:pointer;
+                 background:linear-gradient(135deg,rgba(110,168,255,.16),rgba(185,138,255,.12));border:1px solid rgba(110,168,255,.45);color:var(--text);">
+          <span style="font-size:1.1rem;">🔎</span>
+          <span style="flex:1;text-align:left;"><b style="font-size:.8rem;display:block;">Procurar o lead na base</b>
+            <span class="hint">acha pelo nome, telefone ou @ e preenche tudo sozinho</span></span>
+          <span style="color:#6ea8ff;font-weight:800;font-size:.72rem;">abrir →</span>
+        </button>
       </div>
       <div id="ag-origem-box" style="display:none;"></div>
       <div class="ag-campo"><label>Nome</label><input class="edit-in ag-in" id="ag-nome" placeholder="Nome completo do lead" onblur="agAcharPor('nome')"></div>
@@ -1967,7 +1972,7 @@ function abrirAgendar(dur){
 }
 // zera os campos do lead ao abrir o formulário
 function agLimparFicha() {
-  ['ag-busca','ag-nome','ag-tel','ag-email','ag-insta','ag-clint','ag-obs'].forEach(function(id) {
+  ['ag-nome','ag-tel','ag-email','ag-insta','ag-clint','ag-obs'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -7750,33 +7755,83 @@ function abrirAgendarCom(dur, dataStr, hora) {
 // a pessoa na base (diagnóstico + site) e já preenche nome, telefone, e-mail,
 // Instagram e a origem — mostrando de qual anúncio ela veio.
 var _agLead = null;
+// janela de busca: abre por cima do formulário, com os leads em cartões
+function abrirBuscaLead() {
+  var cx = document.getElementById('modal-busca-lead');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-busca-lead';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(6,6,16,.9);display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;';
+    cx.onclick = function(e){ if (e.target === cx) fecharBuscaLead(); };
+    document.body.appendChild(cx);
+  }
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,255,255,.14);border-radius:20px;max-width:720px;width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div style="padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08);">'
+    +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+    +     '<span style="font-size:1.2rem;">🔎</span>'
+    +     '<b style="flex:1;font-size:.95rem;">Procurar o lead</b>'
+    +     '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharBuscaLead()">✕</span></div>'
+    +   '<input id="bl-q" autocomplete="off" placeholder="nome, telefone ou @ do Instagram" oninput="agProcurar(this.value)"'
+    +     ' onkeydown="if(event.key===\'Escape\')fecharBuscaLead();"'
+    +     ' style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:12px;color:var(--text);padding:11px 13px;font-size:.9rem;">'
+    + '</div>'
+    + '<div id="ag-result" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px;"></div></div>';
+  cx.style.display = 'flex';
+  agProcurar('');                       // já mostra os mais recentes
+  setTimeout(function(){ var q = document.getElementById('bl-q'); if (q) q.focus(); }, 60);
+}
+function fecharBuscaLead() {
+  var cx = document.getElementById('modal-busca-lead');
+  if (cx) cx.style.display = 'none';
+}
 function agProcurar(txt) {
   var cx = document.getElementById('ag-result');
   if (!cx) return;
   var q = v2norm(txt || '');
   var soDigitos = String(txt || '').replace(/\D/g, '');
-  if (q.length < 3 && soDigitos.length < 4) { cx.style.display = 'none'; return; }
-  var achados = (LD.rows || []).filter(function(l) {
-    if (soDigitos.length >= 4 && String(l.tel || '').replace(/\D/g, '').indexOf(soDigitos) !== -1) return true;
-    if (q.length < 3) return false;
-    return v2norm(l.nome || '').indexOf(q) !== -1 || v2norm(l.insta || '').indexOf(q) !== -1;
-  }).slice(0, 12);
+  var achados, cabecalho = '';
+  if (q.length < 3 && soDigitos.length < 4) {
+    // sem digitar nada: os que chegaram há menos tempo, quentes primeiro
+    achados = (LD.rows || []).filter(function(l){ return l.nome || l.insta; })
+      .slice(0, 400)
+      .sort(function(a, b){ return (b.faixa === 'alta' ? 1 : 0) - (a.faixa === 'alta' ? 1 : 0); })
+      .slice(0, 25);
+    cabecalho = '<div class="hint" style="padding:2px 4px 6px;">Últimos que chegaram — digite para procurar outro</div>';
+  } else {
+    achados = (LD.rows || []).filter(function(l) {
+      if (soDigitos.length >= 4 && String(l.tel || '').replace(/\D/g, '').indexOf(soDigitos) !== -1) return true;
+      if (q.length < 3) return false;
+      return v2norm(l.nome || '').indexOf(q) !== -1 || v2norm(l.insta || '').indexOf(q) !== -1
+          || v2norm(l.email || '').indexOf(q) !== -1;
+    }).slice(0, 30);
+    cabecalho = '<div class="hint" style="padding:2px 4px 6px;">' + achados.length + (achados.length === 30 ? '+ ' : ' ') + 'encontrado' + (achados.length === 1 ? '' : 's') + '</div>';
+  }
   if (!achados.length) {
-    cx.innerHTML = '<div class="hint" style="padding:9px 11px;">Ninguém com esse nome/telefone na base. Pode preencher na mão.</div>';
-    cx.style.display = 'block';
+    cx.innerHTML = '<div class="hint" style="padding:16px;text-align:center;">Ninguém com esse nome, telefone ou @ na base.<br>Feche a janela e preencha na mão.</div>';
     return;
   }
-  cx.innerHTML = achados.map(function(l) {
+  cx.innerHTML = cabecalho + achados.map(function(l) {
     var i = LD.rows.indexOf(l);
-    var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.15);color:#ff6b6b;">🔥 HT</span>'
-      : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">MQL</span>' : '';
-    return '<div class="click" style="padding:8px 11px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"'
-      + ' onmousedown="agUsarLead(' + i + ')">'
-      + '<b style="font-size:.76rem;flex:1;">' + (l.nome || '(sem nome)') + '</b>' + selo
-      + '<span class="hint">' + (l.tel || (l.insta ? '@' + l.insta : '')) + '</span>'
-      + '<span class="hint">' + (l.dataTxt || '').slice(0, 10) + '</span></div>';
+    var cri = l.anuncio ? criativoDe(l.anuncio, '') : null;
+    var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
+      : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '';
+    var jaTeve = (l.tel8 && _ldIdx && _ldIdx[l.tel8])
+      ? '<span class="ld-tag" style="background:rgba(185,138,255,.16);color:#b98aff;">já teve reunião</span>' : '';
+    return '<div class="click" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);cursor:pointer;"'
+      + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'"'
+      + ' onclick="agUsarLead(' + i + ');fecharBuscaLead();">'
+      + '<div class="avatar" style="width:38px;height:38px;font-size:.72rem;position:relative;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || l.insta || '?') + ');">' + v2ini(l.nome || l.insta || '?')
+      +   (l.insta && !/\s/.test(l.insta) ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+      + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + '</div>'
+      +   '<div class="hint" style="margin-top:2px;">' + [l.tel, l.insta ? '@' + String(l.insta).replace(/^@/, '') : '', (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div>'
+      +   (l.origem || l.anuncio ? '<div class="hint" style="margin-top:1px;color:#6ea8ff;">📍 ' + (l.anuncio || l.origem) + '</div>' : '')
+      + '</div>'
+      + (cri && cri.foto ? '<img src="' + cri.foto + '" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid rgba(255,255,255,.12);">' : '')
+      + '<span style="color:#6ea8ff;font-weight:800;font-size:.68rem;flex-shrink:0;">usar →</span>'
+      + '</div>';
   }).join('');
-  cx.style.display = 'block';
 }
 // achou pelo que já foi digitado no nome ou no telefone (sem precisar da busca)
 function agAcharPor(campo) {
@@ -7856,11 +7911,6 @@ function agUsarLead(i, silencioso) {
       }
     }
   }
-  // reunião de 50 min para Legado, 1h40 para HT — só sugere se ninguém mexeu
-  var busca = document.getElementById('ag-busca');
-  if (busca && !silencioso) busca.value = '';
-  var res = document.getElementById('ag-result');
-  if (res) res.style.display = 'none';
   agMostrarOrigem(l);
 }
 // o quadrinho "de onde este lead veio"
