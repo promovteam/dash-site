@@ -603,6 +603,21 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .crm-resp { margin-top:7px; padding:7px 8px; border-radius:9px; background:rgba(0,0,0,.22); display:flex; flex-direction:column; gap:3px; }
 .crm-resp div { font-size:.62rem; color:var(--text-secondary); line-height:1.35; display:flex; gap:5px; }
 .crm-resp span { flex-shrink:0; }
+.crm-chip.sug { background:transparent; color:var(--c); border:1px dashed color-mix(in srgb, var(--c) 60%, transparent); }
+.crm-sug { display:flex; align-items:center; gap:7px; flex-wrap:wrap; padding:7px 9px; margin-bottom:8px; border-radius:9px; cursor:pointer;
+  background:color-mix(in srgb, var(--c) 14%, transparent); border:1px dashed var(--c); transition:background .14s; }
+.crm-sug:hover { background:color-mix(in srgb, var(--c) 26%, transparent); }
+.crm-sug b { font-size:.68rem; color:var(--c); }
+.crm-sug span { font-size:.6rem; color:var(--muted); flex:1; }
+.crm-sug i { font-size:.6rem; font-weight:800; color:var(--c); font-style:normal; }
+.crm-perfil { margin-top:8px; padding:8px; border-radius:10px; background:rgba(0,0,0,.28); border:1px solid rgba(255,255,255,.09); }
+.crm-perfil-tit { font-size:.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+.crm-perfil-ops { display:flex; flex-direction:column; gap:4px; }
+.crm-perfil-op { font-size:.65rem; font-weight:800; padding:5px 9px; border-radius:8px; cursor:pointer;
+  background:rgba(255,255,255,.05); color:var(--text-secondary); border:1px solid transparent; transition:all .13s; }
+.crm-perfil-op:hover { background:color-mix(in srgb, var(--c) 20%, transparent); color:var(--c); }
+.crm-perfil-op.on { background:color-mix(in srgb, var(--c) 22%, transparent); color:var(--c); border-color:var(--c); }
+.crm-card.aberto { box-shadow:0 8px 24px rgba(0,0,0,.45); background:rgba(255,255,255,.1); }
 .crm-acoes { display:flex; gap:5px; margin-top:8px; }
 .crm-acoes a { flex:1; text-align:center; font-size:.62rem; font-weight:800; padding:5px 4px; border-radius:8px;
   text-decoration:none; background:rgba(255,255,255,.07); color:var(--text-secondary); transition:background .15s, color .15s; }
@@ -6357,7 +6372,9 @@ function crmQuadro(lista) {
       }
       var faixa = lead && lead.faixa === 'alta' ? '<span class="crm-chip quente">🔥 R$2–4mil</span>'
                 : lead && lead.faixa === 'media' ? '<span class="crm-chip morno">R$500–1mil</span>' : '';
-      h += '<div class="crm-card" draggable="true" ondragstart="crmPegar(event)" ondragend="crmLargou(event)" data-insta="' + (x.insta || '') + '">'
+      var aberto = window._crmAberto === (x.insta || '');
+      h += '<div class="crm-card' + (aberto ? ' aberto' : '') + '" draggable="true" ondragstart="crmPegar(event)" ondragend="crmLargou(event)"'
+        + ' onclick="crmAbrirPerfil(event, \'' + (x.insta || '') + '\')" data-insta="' + (x.insta || '') + '">'
         + '<div class="crm-topo">'
         +   '<div class="avatar" style="width:30px;height:30px;font-size:.62rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
         +     (x.insta ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(x.insta) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
@@ -6370,9 +6387,14 @@ function crmQuadro(lista) {
         + '<div class="crm-chips">'
         +   (lead ? '<span class="crm-chip ok">✅ preencheu</span>' : '<span class="crm-chip pend">só comentou</span>')
         +   faixa
-        +   (x.tag ? '<span class="crm-chip tag">' + x.tag + '</span>' : '')
+        +   (function(){
+              if (x.tag) return '<span class="crm-chip tag">' + x.tag + '</span>';
+              var sg = perfilSugerido(x);
+              return sg ? '<span class="crm-chip sug" style="--c:' + sg.cor + ';" title="perfil que os dados indicam · ' + sg.porque + ' — clique no cartão para confirmar">' + sg.rot + '?</span>' : '';
+            })()
         + '</div>'
         + respostas
+        + (aberto ? crmEscolhaPerfil(x) : '')
         + '<div class="crm-acoes">'
         +   (x.insta ? '<a href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank" onclick="event.stopPropagation();">📷 perfil</a>' : '')
         +   (lead ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();verFichaPendente(\'' + (lead.tel8 || '') + '\');">👤 ficha</a>'
@@ -6383,6 +6405,46 @@ function crmQuadro(lista) {
     h += '</div></div>';
   });
   return h + '</div>';
+}
+// as opções de perfil que aparecem ao clicar no cartão
+var CRM_PERFIS = [
+  { v: 'Perfil HT',     rot: '🔥 Perfil HT',     cor: '#ff6b6b' },
+  { v: 'Perfil legado', rot: '🏛️ Perfil legado', cor: '#b98aff' },
+  { v: 'Qualificado',   rot: '✅ Qualificado',   cor: '#3ddc97' },
+  { v: '',              rot: '⚪ sem perfil',    cor: '#8b8fa3' }
+];
+// o perfil que os dados do formulário indicam (a verba que a pessoa declarou)
+function perfilSugerido(x) {
+  var lead = comentCruza(x);
+  if (!lead) return null;
+  if (lead.faixa === 'alta') return { v: 'Perfil HT', rot: '🔥 Perfil HT', cor: '#ff6b6b', porque: lead.invest || 'R$2–4mil' };
+  if (lead.faixa === 'media') return { v: 'Perfil legado', rot: '🏛️ Perfil legado', cor: '#b98aff', porque: lead.invest || 'R$500–1mil' };
+  return null;
+}
+function crmEscolhaPerfil(x) {
+  var atual = String(x.tag || '').trim();
+  var sug = perfilSugerido(x);
+  return '<div class="crm-perfil">'
+    + (sug && !atual
+        ? '<div class="crm-sug" style="--c:' + sug.cor + ';" onclick="event.stopPropagation();comentMarcar(\'' + (x.insta || '') + '\',\'tag\',\'' + sug.v + '\');">'
+          + '<b>' + sug.rot + '</b><span>pelo que respondeu: ' + sug.porque + '</span>'
+          + '<i>confirmar →</i></div>'
+        : '')
+    + '<div class="crm-perfil-tit">que perfil é este lead?</div>'
+    + '<div class="crm-perfil-ops">'
+    + CRM_PERFIS.map(function(p) {
+        var on = v2norm(p.v) === v2norm(atual);
+        return '<span class="crm-perfil-op' + (on ? ' on' : '') + '" style="--c:' + p.cor + ';"'
+          + ' onclick="event.stopPropagation();comentMarcar(\'' + (x.insta || '') + '\',\'tag\',\'' + p.v + '\');">'
+          + p.rot + '</span>';
+      }).join('')
+    + '</div></div>';
+}
+// clicar no cartão abre/fecha a escolha (o arrastar continua funcionando)
+function crmAbrirPerfil(e, insta) {
+  if (e && e.target && e.target.closest && e.target.closest('.crm-acoes, .crm-perfil')) return;
+  window._crmAberto = (window._crmAberto === insta) ? null : insta;
+  renderLeads();
 }
 var _crmArrastando = null;
 function crmPegar(e) {
