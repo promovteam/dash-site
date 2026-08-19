@@ -5779,13 +5779,16 @@ function listaPreenchimentos(l) {
 // Os pesos NÃO foram chutados: saíram das 369 reuniões realizadas da própria
 // Promov, medindo quanto cada resposta do formulário fecha de verdade.
 // Depois de pronto, testei as classes contra as vendas reais:
-//   A → 45% fecham (114 reuniões) · B → 35% (80) · C → 26% (126) · D → 17% (47)
+//   A → 45% fecham (114 reuniões) · B → 35% (80) · C → 25% (155) · D → 17% (18)
 //   A média da casa é 33%. Ou seja: um lead A vale ~2,6 leads D.
+// D fica reservado a quem tem DOIS ou mais sinais ruins — com um sinal só, o lead
+// é C (média). Antes, um único ponto negativo derrubava para D e isso pintava de
+// "fraco" gente que estava na média da casa (Bruno reparou no caso da Pra. Luzia).
 var CLASSES_LEAD = {
   A: { cor: '#ffd166', rot: 'A', txt: 'melhor perfil — 45% fecham' },
   B: { cor: '#3ddc97', rot: 'B', txt: 'bom perfil — 35% fecham' },
-  C: { cor: '#6ea8ff', rot: 'C', txt: 'perfil médio — 26% fecham' },
-  D: { cor: '#ff6b6b', rot: 'D', txt: 'perfil fraco — 17% fecham' }
+  C: { cor: '#6ea8ff', rot: 'C', txt: 'perfil médio — 25% fecham' },
+  D: { cor: '#ff6b6b', rot: 'D', txt: 'atenção — 17% fecham' }
 };
 function classeDoLead(l) {
   if (!l) return null;
@@ -5805,11 +5808,14 @@ function classeDoLead(l) {
   else if (/clt/i.test(ren)) { p += 1; }
   else if (/digital/i.test(ren)) { p -= 1; porque.push('só produto digital (24%)'); }
   if (/n[ãa]o tenho nenhuma renda/i.test(ren)) { p -= 2; porque.push('sem renda hoje (14% fecham)'); }
+  else if (/evento|mentoria|consultoria/i.test(ren)) porque.push('vive de eventos/mentoria (33%, na média)');
   // 3) tamanho da audiência
   if (/6\.000 a 10/i.test(seg)) { p += 2; porque.push('6 a 10 mil seguidores (45%)'); }
-  else if (/30\.000 a 50|mais de 100/i.test(seg)) p += 1;
-  else if (/15\.000 a 30|menos de 1\.000/i.test(seg)) p -= 1;
-  var k = p >= 3 ? 'A' : p >= 2 ? 'B' : p >= 0 ? 'C' : 'D';
+  else if (/30\.000 a 50|mais de 100/i.test(seg)) { p += 1; porque.push('audiência grande (36%)'); }
+  else if (/15\.000 a 30/i.test(seg)) { p -= 1; porque.push('15 a 30 mil seguidores (28%, a faixa que menos fecha)'); }
+  else if (/menos de 1\.000/i.test(seg)) { p -= 1; porque.push('menos de mil seguidores (28%)'); }
+  if (/de r?\$?\s*2 ?mil a/i.test(inv)) porque.push('marcou faixa R$2–3mil (26%) — quem crava R$2mil fecha 40%');
+  var k = p >= 3 ? 'A' : p >= 2 ? 'B' : p >= -1 ? 'C' : 'D';
   return { classe: k, pontos: p, porque: porque, info: CLASSES_LEAD[k] };
 }
 function seloChance(l, mini) {
