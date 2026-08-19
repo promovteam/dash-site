@@ -5811,48 +5811,51 @@ function listaPreenchimentos(l) {
   });
   return h + '</div>';
 }
-// ===== 🎯 SINAL DO FORMULÁRIO — do estudo do avatar (Bruno 19/08/2026) =====
-// Baseado no "Avatar Profundo + Manual do Lead" (555 reuniões, 20.941 formulários).
-// Testei o resultado contra as vendas reais da própria base: o formulário NÃO
-// distingue os bons leads entre si (todos ficam na faixa de 30-42%), mas separa
-// muito bem quem tende a NÃO comprar. Por isso o painel só avisa do lado fraco —
-// mostrar uma "chance de fechar" para todo mundo seria um número que não prevê nada.
-//   -3 pontos → 8% fecharam   ·  -2 → 15%  ·  -1 → 17%
-//    0 pontos → 32% fecharam  ·  +1 ou mais → 29% a 42% (sem ordem: é ruído)
-function sinalFormulario(l) {
+// ===== 🏅 CLASSE DO LEAD: A · B · C · D (Bruno 19/08/2026) =====
+// Os pesos NÃO foram chutados: saíram das 369 reuniões realizadas da própria
+// Promov, medindo quanto cada resposta do formulário fecha de verdade.
+// Depois de pronto, testei as classes contra as vendas reais:
+//   A → 45% fecham (114 reuniões) · B → 35% (80) · C → 26% (126) · D → 17% (47)
+//   A média da casa é 33%. Ou seja: um lead A vale ~2,6 leads D.
+var CLASSES_LEAD = {
+  A: { cor: '#ffd166', rot: 'A', txt: 'melhor perfil — 45% fecham' },
+  B: { cor: '#3ddc97', rot: 'B', txt: 'bom perfil — 35% fecham' },
+  C: { cor: '#6ea8ff', rot: 'C', txt: 'perfil médio — 26% fecham' },
+  D: { cor: '#ff6b6b', rot: 'D', txt: 'perfil fraco — 17% fecham' }
+};
+function classeDoLead(l) {
   if (!l) return null;
-  var renda = String(l.renda || ''), inv = String(l.invest || ''),
-      obj = String(l.obj || ''), seg = String(l.seg || '');
-  var p = 0, respondeu = 0, motivos = [];
-  if (renda) {
-    respondeu++;
-    if (/n[ãa]o tenho|sem renda/i.test(renda)) { p -= 2; motivos.push('não tem renda hoje (24% fecham)'); }
-    else if (/f[íi]sico|digital/i.test(renda)) p++;
-  }
-  if (obj) {
-    respondeu++;
-    if (/multiplicar receita|multiplicar venda|atrair clientes/i.test(obj)) p++;
-  }
-  if (inv) {
-    respondeu++;
-    if (/ a /i.test(inv)) { p--; motivos.push('marcou faixa em vez de valor cravado'); }
-    else if (/1\.?000|2\.?000|1 ?mil|2 ?mil/i.test(inv)) p++;
-  }
-  if (seg) {
-    respondeu++;
-    if (/15\.?000 a 30/i.test(seg)) { p--; motivos.push('faixa de seguidores que menos fecha (33%)'); }
-    else if (/6\.?000 a 10|mais de 100/i.test(seg)) p++;
-  }
-  if (respondeu < 3) return null;      // respondeu pouco: não dá para dizer nada
-  return { pontos: p, motivos: motivos };
+  var inv = String(l.invest || ''), ren = String(l.renda || ''), seg = String(l.seg || '');
+  if (!inv && !ren && !seg) return null;      // não preencheu: não dá para classificar
+  var p = 0, porque = [];
+  // 1) a verba que declarou — valor cravado vale mais que faixa
+  if (/^r?\$?\s*2 ?mil por m/i.test(inv)) { p += 2; porque.push('declarou R$2mil (40% fecham)'); }
+  else if (/^r?\$?\s*1 ?mil por m/i.test(inv)) { p += 2; porque.push('declarou R$1mil (37%)'); }
+  else if (/^r?\$?\s*500 por m/i.test(inv)) { p += 1; porque.push('declarou R$500 (33%)'); }
+  else if (/de r?\$?\s*500 a/i.test(inv)) { p += 1; }
+  else if (/^r?\$?\s*3 ?mil por m/i.test(inv)) { p += 1; }
+  else if (/de r?\$?\s*3 ?mil a/i.test(inv)) { p -= 1; porque.push('marcou faixa R$3–4mil (só 17% fecham)'); }
+  // 2) de que vive hoje
+  if (/f[íi]sico.*,|,.*f[íi]sico/i.test(ren)) { p += 2; porque.push('tem produto físico + outra fonte (57%)'); }
+  else if (/f[íi]sico/i.test(ren)) { p += 1; porque.push('vive de produto/serviço físico (36%)'); }
+  else if (/clt/i.test(ren)) { p += 1; }
+  else if (/digital/i.test(ren)) { p -= 1; porque.push('só produto digital (24%)'); }
+  if (/n[ãa]o tenho nenhuma renda/i.test(ren)) { p -= 2; porque.push('sem renda hoje (14% fecham)'); }
+  // 3) tamanho da audiência
+  if (/6\.000 a 10/i.test(seg)) { p += 2; porque.push('6 a 10 mil seguidores (45%)'); }
+  else if (/30\.000 a 50|mais de 100/i.test(seg)) p += 1;
+  else if (/15\.000 a 30|menos de 1\.000/i.test(seg)) p -= 1;
+  var k = p >= 3 ? 'A' : p >= 2 ? 'B' : p >= 0 ? 'C' : 'D';
+  return { classe: k, pontos: p, porque: porque, info: CLASSES_LEAD[k] };
 }
 function seloChance(l, mini) {
-  var sf = sinalFormulario(l);
-  if (!sf || sf.pontos >= 0) return '';
-  var taxa = sf.pontos <= -3 ? 8 : sf.pontos === -2 ? 15 : 17;
-  var titulo = 'No estudo de 555 reuniões, quem respondeu assim fechou ' + taxa + '% das vezes'
-    + (sf.motivos.length ? ' · ' + sf.motivos.join(' · ') : '');
-  return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="' + titulo + '">⚠️ sinal fraco' + (mini ? '' : ' · ' + taxa + '% fecham') + '</span>';
+  var c = classeDoLead(l);
+  if (!c) return '';
+  var i = c.info;
+  var titulo = i.txt + (c.porque.length ? ' · ' + c.porque.join(' · ') : '')
+    + ' — medido em 369 reuniões da Promov (a média é 33%)';
+  return ' <span class="ld-tag" style="background:' + i.cor + '26;color:' + i.cor + ';border:1px solid ' + i.cor + '55;font-weight:900;" title="' + titulo + '">'
+    + '🏅 ' + i.rot + (mini ? '' : ' · ' + i.txt) + '</span>';
 }
 // selo de quem voltou a preencher: quem insiste está interessado
 function seloVezes(l) {
@@ -6050,7 +6053,7 @@ function verLeadsDoAnuncio(chave) {
           + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
           + '<div style="flex:1;min-width:130px;"><b style="font-size:.77rem;">' + (l.nome || '(sem nome)') + '</b>'
           +   '<div class="hint" style="margin-top:1px;">' + [l.tel, (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div></div>'
-          + selo + etapa + seloAnuncio(l, true)
+          + selo + etapa + seloChance(l, true) + seloAnuncio(l, true)
           + (l.tel ? '<a class="ld-wa" onclick="event.stopPropagation();" href="https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11) + '" target="_blank">💬</a>' : '')
           + (lk ? '<a class="ld-wa" onclick="event.stopPropagation();" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + lk + '" target="_blank">🟣</a>' : '')
           + '<span style="color:#6ea8ff;font-weight:800;font-size:.66rem;">ver →</span>'
@@ -6449,6 +6452,10 @@ function crmQuadro(lista) {
         +   (lead ? '<span class="crm-chip ok">✅ preencheu</span>' : '<span class="crm-chip pend">só comentou</span>')
         +   faixa
         +   (function(){
+              var cl = lead ? classeDoLead(lead) : null;
+              return cl ? '<span class="crm-chip" style="background:' + cl.info.cor + '26;color:' + cl.info.cor + ';" title="' + cl.info.txt + '">🏅 ' + cl.info.rot + '</span>' : '';
+            })()
+        +   (function(){
               if (x.tag) return '<span class="crm-chip tag">' + x.tag + '</span>';
               var sg = perfilSugerido(x);
               return sg ? '<span class="crm-chip sug" style="--c:' + sg.cor + ';" title="perfil que os dados indicam · ' + sg.porque + ' — clique no cartão para confirmar">' + sg.rot + '?</span>' : '';
@@ -6747,15 +6754,13 @@ function abrirFichaLead(i) {
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1) ? listaPreenchimentos(l) : '', 'html'],
-    ['🎯', 'Sinal do formulário', (function(){
-        var sf = sinalFormulario(l);
-        if (!sf) return '';
-        if (sf.pontos >= 0) return '<span style="color:#3ddc97;font-weight:700;">sem alerta</span>'
-          + '<div class="hint" style="margin-top:3px;">as respostas dele estão na média de quem compra</div>';
-        var taxa = sf.pontos <= -3 ? 8 : sf.pontos === -2 ? 15 : 17;
-        return '<b style="color:#ff6b6b;font-size:1.02rem;">⚠️ ' + taxa + '% fecham</b>'
-          + '<div class="hint" style="margin-top:3px;">' + (sf.motivos.join(' · ') || 'respostas de perfil que converte pouco') + '</div>'
-          + '<div class="hint" style="margin-top:2px;opacity:.7;">medido em 555 reuniões da Promov (a média geral é 38%)</div>';
+    ['🏅', 'Classe do lead', (function(){
+        var c = classeDoLead(l);
+        if (!c) return '';
+        return '<b style="color:' + c.info.cor + ';font-size:1.3rem;">' + c.info.rot + '</b>'
+          + '<span style="color:' + c.info.cor + ';font-weight:700;font-size:.78rem;margin-left:6px;">' + c.info.txt + '</span>'
+          + (c.porque.length ? '<div class="hint" style="margin-top:4px;">' + c.porque.join(' · ') + '</div>' : '')
+          + '<div class="hint" style="margin-top:2px;opacity:.7;">classes medidas em 369 reuniões da Promov · a média da casa é 33%</div>';
       })(), 'html'],
     ['📱', 'WhatsApp', l.tel
       ? '<a href="' + (ldWa(l) || ('https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11)))
@@ -7324,6 +7329,7 @@ function renderLeads() {
                 + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarPendenteNaClint(' + JSON.stringify(x.tel8).replace(/"/g, '&quot;') + ', this);" title="Cria o contato na Clint, no funil (etapa Base IA)">➕ criar na Clint</button>')
           + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;">⏱ ' + tempoDesde(x.date) + '</span>' : '')
           + (x.origem ? '<span class="ld-tag" style="background:rgba(110,168,255,.13);color:#6ea8ff;">' + x.origem + '</span>' : '')
+          + seloChance((LD.rows || []).filter(function(y){ return y.tel8 === x.tel8; })[0] || x, true)
           + seloAnuncio(x)   // criativo que trouxe (ou o convite para dizer qual foi)
           + '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation();">💬 WhatsApp</a>'
           + (x.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank">📷</a>' : '')
@@ -7922,6 +7928,7 @@ function mostrarFormularioDoLead(r) {
     +   '<div class="g-label" style="margin-bottom:0;flex:1;">📋 O que respondeu no formulário</div>'
     +   (l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
         : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '')
+    +   seloChance(l)
     + '</div>'
     + linha('📅', 'Preencheu em', (l.dataTxt || '').slice(0, 16))
     + linha('👥', 'Seguidores', l.seg)
@@ -9269,7 +9276,7 @@ function agProcurar(txt) {
       +   (l.insta && !/\s/.test(l.insta) ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
       + '</div>'
       + '<div style="flex:1;min-width:0;">'
-      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + seloVezes(l) + '</div>'
+      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + seloVezes(l) + seloChance(l, true) + '</div>'
       +   '<div class="hint" style="margin-top:2px;">' + [l.tel, l.insta ? '@' + String(l.insta).replace(/^@/, '') : '', (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div>'
       +   '<div style="margin-top:3px;">' + seloAnuncio(l, true) + '</div>'
       + '</div>'
