@@ -1694,7 +1694,12 @@ function abrirB(tipo){
   document.getElementById('modal-b').classList.add('open');
 }
 function abrirLead(){ document.getElementById('modal-lead').classList.add('open'); _modoEdicao=false; desenharInfo(); }
-function fecharLead(){ document.getElementById('modal-lead').classList.remove('open'); }
+function fecharLead(){
+  var ml = document.getElementById('modal-lead');
+  ml.classList.remove('open');
+  // veio do pop-up do closer: devolve o empilhamento normal
+  if (ml.dataset.doPopup) { ml.style.zIndex = ''; delete ml.dataset.doPopup; }
+}
 
 // ===== Informações do lead: ver / editar (no painel real salva na planilha) =====
 var _ficha = [
@@ -4169,37 +4174,76 @@ function reunioesSemResultado() {
     return v2norm(r.status || '') === v2norm('Reunião agendada') || !(r.status || '').trim();
   }).sort(function(a, b){ return b.date - a.date; });
 }
+// na Visão Geral vira só uma linha discreta; o conteúdo abre em janela (pop-up)
 function renderStatusPendente() {
   var el = document.getElementById('v2-statuspendente');
   if (!el) return;
   var lista = reunioesSemResultado();
-  if (!lista.length) { el.innerHTML = ''; return; }
-  var aberto = !!window._stpAberto;
-  var h = '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(185,138,255,.1);border-color:rgba(185,138,255,.5);">'
-    + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._stpAberto=!window._stpAberto;renderStatusPendente();">'
+  if (!lista.length) { el.innerHTML = ''; fecharStatusPendente(); return; }
+  el.innerHTML = '<div class="alerta-parado click" style="padding:10px 14px;background:rgba(185,138,255,.1);border-color:rgba(185,138,255,.5);cursor:pointer;" onclick="abrirStatusPendente()">'
     + '<span style="font-size:1.3rem;">✅</span>'
     + '<div style="flex:1;min-width:0;"><b style="font-size:.86rem;color:#b98aff;">'
     +   lista.length + ' reuni' + (lista.length === 1 ? 'ão sua já aconteceu e está sem resultado' : 'ões suas já aconteceram e estão sem resultado') + '</b>'
     + '<div class="hint" style="margin-top:3px;">Diga o que aconteceu para o número do mês ficar certo</div></div>'
-    + '<span style="color:#b98aff;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (aberto ? '▲ fechar' : '▼ atualizar agora') + '</span></div>';
-  if (aberto) {
-    h += '<div style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
-    lista.slice(0, 40).forEach(function(r) {
-      var i = v2reg(r);
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
-        + '<b style="font-size:.77rem;flex:1;min-width:110px;">' + (r.nome || 'Sem nome') + '</b>'
-        + '<span class="hint">' + r.date.toLocaleDateString('pt-BR') + '</span>'
-        + '<select onchange="porResultado(' + i + ', this)" style="background:rgba(255,255,255,.07);border:1px solid rgba(185,138,255,.45);border-radius:9px;color:var(--text);padding:5px 8px;font-size:.7rem;font-weight:700;cursor:pointer;">'
-        +   '<option value="">o que aconteceu?</option>'
-        +   ST_RAPIDOS.map(function(o){ return '<option>' + o + '</option>'; }).join('')
-        + '</select>'
-        + '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="abrirLead(' + i + ')">abrir</span>'
-        + '</div>';
-    });
-    if (lista.length > 40) h += '<div class="hint">… e mais ' + (lista.length - 40) + '</div>';
-    h += '</div>';
+    + '<span style="color:#b98aff;font-weight:800;font-size:.72rem;white-space:nowrap;">atualizar agora →</span></div>';
+  // aparece sozinho ao entrar na Visão Geral, uma vez por hora
+  var ultima = 0;
+  try { ultima = parseInt(localStorage.getItem('v2StpVisto') || '0', 10); } catch (e) {}
+  if (Date.now() - ultima > 3600000 && !window._stpJaMostrei) {
+    window._stpJaMostrei = true;
+    setTimeout(abrirStatusPendente, 900);
   }
-  el.innerHTML = h + '</div>';
+}
+function abrirStatusPendente() {
+  var lista = reunioesSemResultado();
+  if (!lista.length) { fecharStatusPendente(); return; }
+  var cx = document.getElementById('modal-status-pendente');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-status-pendente';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10003;background:rgba(6,6,16,.9);display:flex;align-items:center;justify-content:center;padding:30px 18px;';
+    cx.onclick = function(e){ if (e.target === cx) fecharStatusPendente(); };
+    document.body.appendChild(cx);
+  }
+  var eu = localStorage.getItem('v2Login') || '';
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(185,138,255,.4);border-radius:20px;max-width:620px;width:100%;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6);">'
+    + '<div style="padding:18px 20px 14px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:flex-start;gap:11px;">'
+    +   '<span style="font-size:1.5rem;">✅</span>'
+    +   '<div style="flex:1;min-width:0;"><b style="font-size:1rem;color:#b98aff;">Como foram estas reuniões?</b>'
+    +     '<div class="hint" style="margin-top:3px;">' + (eu ? eu + ', ' : '') + lista.length + ' reuni' + (lista.length === 1 ? 'ão sua já aconteceu' : 'ões suas já aconteceram') + ' e ainda estão como "agendada". Sem o resultado, o número do mês fica errado.</div></div>'
+    +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharStatusPendente()">✕</span></div>'
+    + '<div id="stp-lista" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:7px;">'
+    + lista.slice(0, 40).map(function(r) {
+        var i = v2reg(r);
+        return '<div id="stp-l' + i + '" style="display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:12px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+          + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(r.nome || '?') + ');">' + v2ini(r.nome || '?') + '</div>'
+          + '<div style="flex:1;min-width:110px;"><b style="font-size:.8rem;">' + (r.nome || 'Sem nome') + '</b>'
+          +   '<div class="hint" style="margin-top:1px;">' + r.date.toLocaleDateString('pt-BR') + (r.produto ? ' · ' + r.produto : '') + '</div></div>'
+          + '<select onchange="porResultado(' + i + ', this)" style="background:rgba(255,255,255,.07);border:1px solid rgba(185,138,255,.45);border-radius:9px;color:var(--text);padding:7px 9px;font-size:.74rem;font-weight:700;cursor:pointer;">'
+          +   '<option value="">o que aconteceu?</option>'
+          +   ST_RAPIDOS.map(function(o){ return '<option>' + o + '</option>'; }).join('')
+          + '</select>'
+          + '<span class="ld-tag" style="cursor:pointer;background:rgba(110,168,255,.16);color:#6ea8ff;font-weight:800;" onclick="verLeadDoPopup(' + i + ')">👤 ver o lead →</span>'
+          + '</div>';
+      }).join('')
+    + (lista.length > 40 ? '<div class="hint" style="padding:6px;">… e mais ' + (lista.length - 40) + '</div>' : '')
+    + '</div>'
+    + '<div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:9px;align-items:center;">'
+    +   '<span class="hint" style="flex:1;">Escolheu, já salvou na planilha.</span>'
+    +   '<button class="btn" style="padding:8px 16px;font-size:.74rem;" onclick="fecharStatusPendente(true)">deixar para depois</button></div>'
+    + '</div>';
+  cx.style.display = 'flex';
+}
+// abre a ficha do lead POR CIMA do pop-up (fechando a ficha, a lista continua lá)
+function verLeadDoPopup(i) {
+  abrirLead(i);
+  var ml = document.getElementById('modal-lead');
+  if (ml) { ml.style.zIndex = '10008'; ml.dataset.doPopup = '1'; }
+}
+function fecharStatusPendente(marcarVisto) {
+  var cx = document.getElementById('modal-status-pendente');
+  if (cx) { cx.innerHTML = ''; cx.style.display = 'none'; }
+  if (marcarVisto) { try { localStorage.setItem('v2StpVisto', String(Date.now())); } catch (e) {} }
 }
 // grava o resultado direto do aviso
 function porResultado(i, sel) {
@@ -4211,7 +4255,12 @@ function porResultado(i, sel) {
   r.status = valor; r.sn = v2norm(valor);
   sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: valor, dataRef: v2dataRef(r), gid: V2_GID });
   try { sincronizarStatusEvento(r); } catch (e) {}
-  setTimeout(function(){ renderStatusPendente(); renderV2(); }, 500);
+  var linha = document.getElementById('stp-l' + i);
+  if (linha) {
+    linha.style.opacity = '.45';
+    linha.innerHTML = '<span style="font-size:.78rem;color:#3ddc97;font-weight:700;">✓ ' + (r.nome || '') + ' — ' + valor + '</span>';
+  }
+  setTimeout(function(){ renderStatusPendente(); renderV2(); }, 600);
 }
 
 // ===== 🧲 REUNIÕES SEM ORIGEM — aviso para os SDRs (pedido do Bruno 18/08/2026) =====
