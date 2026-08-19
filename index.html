@@ -4770,15 +4770,16 @@ function renderAnuncios() {
     if (nome === '(sem anúncio)') return;
     var tipo = ldTipoTrafego(l);
     if (AN_TIPO !== 'todos' && tipo !== AN_TIPO) return;
-    var a = an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo });
-    a.n++;
-    if (l.faixa === 'alta') a.q++;
-    if (l.faixa === 'alta' || l.faixa === 'media') a.mql++;   // MQL = declarou qualquer investimento
+    var a = an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo,
+      quem: { n:[], q:[], mql:[], ag:[], re:[], vd:[] } });   // guarda quem é, para poder clicar e ver
+    a.n++; a.quem.n.push(l);
+    if (l.faixa === 'alta') { a.q++; a.quem.q.push(l); }
+    if (l.faixa === 'alta' || l.faixa === 'media') { a.mql++; a.quem.mql.push(l); }   // MQL = declarou qualquer investimento
     var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
     if (st) {
-      a.ag++;
-      if (st.re) a.re++;
-      if (st.vd) { a.vd++; a.fat += (_valorDoTel(l.tel8) || 0); }
+      a.ag++; a.quem.ag.push(l);
+      if (st.re) { a.re++; a.quem.re.push(l); }
+      if (st.vd) { a.vd++; a.fat += (_valorDoTel(l.tel8) || 0); a.quem.vd.push(l); }
     }
   });
   // gasto/imagem do Facebook, se conectado
@@ -4818,7 +4819,7 @@ function renderAnuncios() {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {};
     var cri = criativoDe(k, m.adId);
     if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post }; }
-    _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m };
+    _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m, quem: a.quem };
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
     h += '<div class="click" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
       + '<div class="an-capa" style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
@@ -4995,19 +4996,20 @@ function abrirCriativo(nome, jaTocar) {
     +   '</div>'
     +   '<div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:9px;">'
     +     '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
-    +       cardMini(d.n, 'LEADS', '#6ea8ff') + cardMini(d.mql, 'MQL', '#f6a350')
-    +       cardMini(d.q, 'PERFIL HT', '#ff6b6b')
+    +       cardMini(d.n, 'LEADS', '#6ea8ff', 'n') + cardMini(d.mql, 'MQL', '#f6a350', 'mql')
+    +       cardMini(d.q, 'PERFIL HT', '#ff6b6b', 'q')
     +     '</div>'
     +     '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
-    +       cardMini(d.ag, 'AGENDOU', '#ffd166')
-    +       cardMini(d.re, 'REUNIÕES', '#b98aff') + cardMini(d.vd, 'VENDAS', '#3ddc97')
+    +       cardMini(d.ag, 'AGENDOU', '#ffd166', 'ag')
+    +       cardMini(d.re, 'REUNIÕES', '#b98aff', 're') + cardMini(d.vd, 'VENDAS', '#3ddc97', 'vd')
     +     '</div>'
+    +     '<div class="hint">👆 clique num número para ver quem são</div>'
     +     '<div class="hint">MQL = declarou qualquer investimento · HT = R$2 a R$4mil'
-    +       + (d.n ? ' · ' + Math.round(d.mql / d.n * 100) + '% dos leads deste anúncio' : '') + '</div>'
+    +       (d.n ? ' · ' + Math.round(d.mql / d.n * 100) + '% dos leads deste anúncio' : '') + '</div>'
     +     (m.gasto ? '<div class="card" style="padding:12px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.28);border-radius:13px;">'
     +       '<b style="color:#ff6b6b;font-size:1.1rem;">' + rs(m.gasto) + '</b><div class="hint">investido'
-    +       + (d.n ? ' · ' + rs(m.gasto/d.n) + ' por lead' : '')
-    +       + (d.vd ? ' · ' + rs(m.gasto/d.vd) + ' por venda' : '') + '</div></div>' : '')
+    +       (d.n ? ' · ' + rs(m.gasto/d.n) + ' por lead' : '')
+    +       (d.vd ? ' · ' + rs(m.gasto/d.vd) + ' por venda' : '') + '</div></div>' : '')
     +     (d.fat ? '<div class="card" style="padding:12px;background:rgba(61,220,151,.08);border:1px solid rgba(61,220,151,.28);border-radius:13px;">'
     +       '<b style="color:#3ddc97;font-size:1.1rem;">' + rs(d.fat) + '</b><div class="hint">faturamento gerado'
     +       + (m.gasto ? ' · retorno de ' + (d.fat/m.gasto).toFixed(1) + 'x' : '') + '</div></div>' : '')
@@ -5022,10 +5024,75 @@ function verPostCriativo() {
   if (p) p.style.display = 'block';
   if (b) b.style.display = 'none';
 }
-function cardMini(v, l, cor) {
-  return '<div style="flex:1;min-width:70px;text-align:center;padding:9px 5px;border-radius:11px;background:rgba(255,255,255,.05);">'
+function cardMini(v, l, cor, chave) {
+  var clicavel = !!(chave && v);
+  return '<div' + (clicavel ? ' class="click" onclick="verLeadsDoAnuncio(\'' + chave + '\')" title="clique para ver quem são"' : '')
+    + ' style="flex:1;min-width:70px;text-align:center;padding:9px 5px;border-radius:11px;background:rgba(255,255,255,.05);'
+    + (clicavel ? 'cursor:pointer;border:1px solid rgba(255,255,255,.09);' : '') + '">'
     + '<b style="color:' + cor + ';font-size:1.15rem;display:block;">' + (v || 0) + '</b>'
     + '<span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">' + l + '</span></div>';
+}
+// 👥 quem são os leads por trás do número (clique em LEADS, MQL, PERFIL HT, AGENDOU…)
+var _anRotulo = { n:'leads', mql:'MQL', q:'perfil HT (R$2–4mil)', ag:'agendaram', re:'fizeram a reunião', vd:'compraram' };
+function verLeadsDoAnuncio(chave) {
+  var d = _anDados[_anAtual];
+  if (!d || !d.quem || !d.quem[chave]) return;
+  var lista = d.quem[chave];
+  var cx = document.getElementById('modal-quem');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-quem';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(6,6,16,.9);display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;';
+    cx.onclick = function(e){ if (e.target === cx) fecharQuem(); };
+    document.body.appendChild(cx);
+  }
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,255,255,.14);border-radius:20px;max-width:720px;width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div style="padding:15px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px;">'
+    +   '<div style="flex:1;min-width:0;"><b style="font-size:.92rem;">' + lista.length + ' ' + (_anRotulo[chave] || '') + '</b>'
+    +     '<div class="hint" style="margin-top:2px;">' + _anAtual + '</div></div>'
+    +   '<button class="btn" style="padding:6px 11px;font-size:.68rem;" onclick="baixarQuem(\'' + chave + '\')">📊 planilha</button>'
+    +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharQuem()">✕</span></div>'
+    + '<div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;">'
+    + lista.slice(0, 300).map(function(l) {
+        var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+        var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
+          : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '';
+        var etapa = st ? (st.vd ? '<span class="ld-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;">✅ comprou</span>'
+              : st.re ? '<span class="ld-tag" style="background:rgba(185,138,255,.16);color:#b98aff;">fez a reunião</span>'
+              : '<span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;">agendou</span>') : '';
+        var lk = clintLink(l);
+        return '<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+          + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
+          + '<div style="flex:1;min-width:130px;"><b style="font-size:.77rem;">' + (l.nome || '(sem nome)') + '</b>'
+          +   '<div class="hint" style="margin-top:1px;">' + [l.tel, (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div></div>'
+          + selo + etapa
+          + (l.tel ? '<a class="ld-wa" href="https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11) + '" target="_blank">💬</a>' : '')
+          + (lk ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + lk + '" target="_blank">🟣</a>' : '')
+          + '</div>';
+      }).join('')
+    + (lista.length > 300 ? '<div class="hint" style="padding:8px;">… e mais ' + (lista.length - 300) + '</div>' : '')
+    + '</div></div>';
+  cx.style.display = 'flex';
+}
+function fecharQuem() {
+  var cx = document.getElementById('modal-quem');
+  if (cx) { cx.innerHTML = ''; cx.style.display = 'none'; }
+}
+// leva a lista para o Excel (ponto e vírgula + BOM, do jeito que o Excel brasileiro abre)
+function baixarQuem(chave) {
+  var d = _anDados[_anAtual];
+  if (!d || !d.quem || !d.quem[chave]) return;
+  var linhas = [['Nome', 'Telefone', 'Instagram', 'E-mail', 'Chegou em', 'Investe', 'Etapa', 'Anúncio'].join(';')];
+  d.quem[chave].forEach(function(l) {
+    var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+    var etapa = st ? (st.vd ? 'Comprou' : st.re ? 'Fez a reunião' : 'Agendou') : 'Só lead';
+    linhas.push([l.nome, l.tel, l.insta, l.email, (l.dataTxt || '').slice(0, 10), l.invest, etapa, _anAtual]
+      .map(function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }).join(';'));
+  });
+  var a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(linhas.join('\n'));
+  a.download = (_anRotulo[chave] || 'leads') + ' - ' + String(_anAtual).replace(/[^\w.-]+/g, '_') + '.csv';
+  a.click();
 }
 function fecharCriativo() {
   var cx = document.getElementById('modal-criativo');
