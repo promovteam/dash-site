@@ -5520,12 +5520,18 @@ function renderAnuncios() {
   h += '</table></div></div>';
 
   // ---- criativos: cada anúncio com leads, reuniões, vendas ----
-  var an = {};
+  var an = {}, foraDoPeriodo = {};
   (LD.rows || []).forEach(function(l) {
     if (!l.date) return;
     var t = l.date.getTime();
-    if (per.ini !== null && t < per.ini) return;
-    if (per.fim !== null && t >= per.fim) return;
+    // fora do período escolhido: não entra na conta, mas fica registrado para avisar
+    // (senão o card aparece zerado e parece que a marcação não pegou — Bruno 19/08/2026)
+    if ((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)) {
+      var bf = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
+      var nf = (String(bf || '').indexOf('POST:') === 0) ? bf : ldAnuncioLimpo(bf);
+      if (nf && nf !== '(sem anúncio)') foraDoPeriodo[nf] = (foraDoPeriodo[nf] || 0) + 1;
+      return;
+    }
     // o que foi marcado à mão vale tanto quanto o que veio da planilha — sem isso,
     // o lead marcado num post não era contado no card daquele post (Bruno 19/08/2026)
     var bruto = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
@@ -5631,6 +5637,10 @@ function renderAnuncios() {
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(61,220,151,.1);"><b style="color:#3ddc97;font-size:.95rem;display:block;">' + a.vd + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">VENDAS</span></div>'
       +   '</div>'
       +   (cpl ? '<div class="hint" style="margin-top:7px;">' + rs(cpl) + ' por lead' + (a.vd ? ' · ' + rs(m.gasto/a.vd) + ' por venda' : '') + '</div>' : '')
+      +   (foraDoPeriodo[k]
+            ? '<div class="hint" style="margin-top:7px;color:#f6a350;cursor:pointer;" onclick="event.stopPropagation();AN_PER=\'tudo\';renderAnuncios();" title="clique para ver todos os períodos">'
+              + '⚠️ + ' + foraDoPeriodo[k] + ' lead' + (foraDoPeriodo[k] === 1 ? '' : 's') + ' fora de ' + per.label + ' — ver tudo</div>'
+            : '')
       + '</div></div>';
   });
   h += '</div></div>';
