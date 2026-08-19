@@ -5362,6 +5362,22 @@ function ldTipoTrafego(l) {
 // O que é anúncio pago e o que é orgânico, decidido pelo PRÓPRIO criativo.
 // Antes o tipo vinha do primeiro lead que chegava — bastava um lead ter entrado
 // pelo ManyChat para o anúncio inteiro cair na aba Orgânico (Bruno 19/08/2026).
+// cadastra a postagem direto na aba Criativos (sem precisar de um lead aberto)
+function cadastrarPostNaAba() {
+  if (soOlhar()) return;
+  var li = document.getElementById('po-link'), ap = document.getElementById('po-apelido');
+  if (!li) return;
+  var link = (li.value || '').trim(), apelido = (ap && ap.value || '').trim();
+  if (!link) { alert('Cole o link da postagem.'); li.focus(); return; }
+  if (!/^https?:\/\//i.test(link)) { alert('O link precisa começar com http:// ou https://'); li.focus(); return; }
+  if (!apelido) {
+    var m = link.match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
+    apelido = m ? 'Post ' + m[2].slice(0, 8) : link.replace(/^https?:\/\//, '').slice(0, 34);
+  }
+  guardarPostOrganico(apelido.replace(/\|/g, '-'), link);
+  li.value = ''; if (ap) ap.value = '';
+  renderAnuncios();
+}
 function tipoDoAnuncio(nome, tipoDoLead) {
   var n = String(nome || '').trim();
   if (!n) return tipoDoLead || 'organico';
@@ -5519,6 +5535,51 @@ function renderAnuncios() {
     h += '<div class="hint" style="margin-top:9px;color:#f6a350;">💸 '
       + (META.buscando ? 'Buscando investimento e imagens no Facebook…' : 'Facebook ainda não conectado' + (META.erro ? ' (' + META.erro + ')' : '') + ' — falta a chave META_TOKEN no robô. Os números de leads/reuniões/vendas abaixo já funcionam.')
       + '</div>';
+  }
+  // ===== 📱 postagens orgânicas cadastradas (Bruno 19/08/2026) =====
+  // Na aba Orgânico, além das origens, mostramos os POSTS que a equipe cadastrou —
+  // e dá para acrescentar um novo aqui mesmo, sem passar por um lead.
+  if (AN_TIPO === 'organico' || AN_TIPO === 'todos') {
+    var posts = (typeof postsOrganicos === 'function') ? postsOrganicos() : [];
+    h += '<div class="panel" style="margin-top:14px;background:rgba(61,220,151,.06);border:1px solid rgba(61,220,151,.25);">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+      +   '<b style="font-size:.8rem;color:#3ddc97;">📱 Suas postagens orgânicas</b>'
+      +   '<span class="hint" style="flex:1;">posts e reels que trouxeram lead — cole o link para acrescentar</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
+      +   '<input id="po-apelido" placeholder="nome do post (ex: Reels dos 3 erros)" style="flex:2;min-width:160px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:8px 11px;font-size:.76rem;">'
+      +   '<input id="po-link" placeholder="cole o link do post/reels do Instagram" style="flex:3;min-width:200px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:8px 11px;font-size:.76rem;" onkeydown="if(event.key===\'Enter\')cadastrarPostNaAba();">'
+      +   '<button class="btn-assumir" style="padding:7px 14px;font-size:.74rem;" onclick="cadastrarPostNaAba()">➕ acrescentar</button>'
+      + '</div>';
+    if (!posts.length) {
+      h += '<div class="hint" style="padding:6px 2px;">Nenhuma postagem cadastrada ainda. Cadastre aqui e depois marque nos leads que vieram dela — o painel passa a contar quantos leads, reuniões e vendas cada post trouxe.</div>';
+    } else {
+      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:9px;">';
+      posts.forEach(function(pst) {
+        var d = _anDados[pst.bruto] || null;
+        var quantos = 0, ags = 0, res = 0, vds = 0;
+        (LD.rows || []).forEach(function(l){
+          if (String(l.anuncio || '') !== pst.bruto) return;
+          quantos++;
+          var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+          if (st) { ags++; if (st.re) res++; if (st.vd) vds++; }
+        });
+        h += '<div style="border:1px solid rgba(61,220,151,.25);border-radius:13px;padding:11px;background:rgba(255,255,255,.04);">'
+          + '<div style="display:flex;align-items:center;gap:8px;">'
+          +   '<span style="width:34px;height:34px;border-radius:9px;background:rgba(61,220,151,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">📱</span>'
+          +   '<b style="flex:1;font-size:.76rem;min-width:0;">' + pst.apelido + '</b>'
+          + '</div>'
+          + '<a href="' + pst.link + '" target="_blank" class="hint" style="display:block;margin-top:6px;color:#3ddc97;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + pst.link + ' ↗</a>'
+          + '<div class="hint" style="margin-top:6px;">' + quantos + ' lead' + (quantos === 1 ? '' : 's') + '</div>'
+          + '<div style="display:flex;gap:5px;margin-top:7px;">'
+          +   '<div style="flex:1;text-align:center;padding:5px 3px;border-radius:8px;background:rgba(255,209,102,.1);"><b style="color:#ffd166;font-size:.85rem;display:block;">' + ags + '</b><span style="font-size:.52rem;color:var(--text-secondary);font-weight:700;">AGEND.</span></div>'
+          +   '<div style="flex:1;text-align:center;padding:5px 3px;border-radius:8px;background:rgba(185,138,255,.1);"><b style="color:#b98aff;font-size:.85rem;display:block;">' + res + '</b><span style="font-size:.52rem;color:var(--text-secondary);font-weight:700;">REUNIÕES</span></div>'
+          +   '<div style="flex:1;text-align:center;padding:5px 3px;border-radius:8px;background:rgba(61,220,151,.1);"><b style="color:#3ddc97;font-size:.85rem;display:block;">' + vds + '</b><span style="font-size:.52rem;color:var(--text-secondary);font-weight:700;">VENDAS</span></div>'
+          + '</div></div>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
   }
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
   if (!chaves.length) h += '<div class="hint">Nenhum anúncio no período.</div>';
