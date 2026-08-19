@@ -1650,7 +1650,7 @@ try { desenharGrafico(); } catch(e) {}
 // ===== Aberturas de informações (tudo no meio da tela) =====
 function abrirA(){ document.getElementById('modal-a').classList.add('open'); }
 function fecharA(){ document.getElementById('modal-a').classList.remove('open'); }
-function fecharB(){ document.getElementById('modal-b').classList.remove('open'); }
+function fecharB(){ document.getElementById('modal-b').classList.remove('open'); _fichaVoltaNormal(); }
 
 // ===== Leads de exemplo (no painel real virão da planilha) =====
 var LEADS = [
@@ -2673,7 +2673,7 @@ function _ultCard(r) {
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b>'
     + '<span>' + [r.leadId, r.date.toLocaleDateString('pt-BR'), r.closer].filter(Boolean).join(' · ') + '</span></div>'
-    + v2pill(r) + '</div>';
+    + seloAnuncio(r, true) + v2pill(r) + '</div>';
 }
 function filtrarUltimas(txt) {
   var t = v2norm(txt || '');
@@ -2687,6 +2687,129 @@ function filtrarUltimas(txt) {
   var box = document.getElementById('v2-ultimas');
   if (box) box.innerHTML = uh || '<div style="color:var(--muted);font-size:.8rem;">Nenhuma reunião encontrada.</div>';
 }
+// ===== 📣 O ANÚNCIO DE CADA LEAD, EM TODA TELA (pedido do Bruno 19/08/2026) =====
+// Uma peça só, usada na lista de leads, na ficha, nas reuniões e na busca.
+// Quem não tem anúncio aparece marcado como INCOMPLETO, com botão para preencher.
+// Marcações feitas agora (antes da planilha ser relida) ficam guardadas aqui.
+var ANUNCIO_MARCA = {};
+// descobre o anúncio de alguém, venha de onde vier (lead da base ou linha de reunião)
+function anuncioDe(x) {
+  if (!x) return { nome: '', txt: '', cri: null, tem: false };
+  var t8 = x.tel8 || ldTel8(x.tel || x.telefone || '');
+  if (t8 && ANUNCIO_MARCA[t8]) {
+    var mk = ANUNCIO_MARCA[t8];
+    return { nome: mk, txt: ldAnuncioLimpo(mk), cri: criativoDe(mk, ''), tem: true, tel8: t8 };
+  }
+  var bruto = x.anuncio || '';
+  if (!bruto && t8) {                       // linha de reunião: procura o lead na base
+    var l = (LD.rows || []).filter(function(y){ return y.tel8 === t8; })[0];
+    if (l) bruto = l.anuncio || '';
+  }
+  var txt = bruto ? ldAnuncioLimpo(bruto) : '';
+  var vale = txt && txt !== '(sem anúncio)' && txt !== '(link)' && txt.indexOf('⚠️') !== 0;
+  return { nome: bruto, txt: vale ? txt : '', cri: vale ? criativoDe(bruto, '') : null, tem: !!vale, tel8: t8 };
+}
+// o selinho: azul com o nome do anúncio, ou laranja avisando que falta
+function seloAnuncio(x, mini) {
+  var a = anuncioDe(x);
+  var t8 = a.tel8 || '';
+  if (a.tem) {
+    var corte = mini ? 18 : 30;
+    return '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;cursor:pointer;max-width:230px;overflow:hidden;text-overflow:ellipsis;"'
+      + ' onclick="event.stopPropagation();abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')" title="' + String(a.txt).replace(/"/g, '') + ' — clique para ver o criativo">'
+      + '📣 ' + (a.txt.length > corte ? a.txt.slice(0, corte) + '…' : a.txt) + '</span>';
+  }
+  if (!t8) return '';
+  return '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;cursor:pointer;border:1px dashed rgba(246,163,80,.5);"'
+    + ' onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')" title="este lead está sem anúncio — clique para dizer de onde veio">'
+    + '⚠️ sem anúncio' + (mini ? '' : ' · adicionar') + '</span>';
+}
+// janela para dizer de qual anúncio o lead veio
+function escolherAnuncio(t8) {
+  if (soOlhar()) return;
+  window._anEscolhaTel = t8;
+  var cx = document.getElementById('modal-escolhe-anuncio');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-escolhe-anuncio';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(6,6,16,.9);display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;';
+    cx.onclick = function(e){ if (e.target === cx) fecharEscolheAnuncio(); };
+    document.body.appendChild(cx);
+  }
+  var l = (LD.rows || []).filter(function(y){ return y.tel8 === t8; })[0] || {};
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,255,255,.14);border-radius:20px;max-width:680px;width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">'
+    + '<div style="padding:15px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08);">'
+    +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">'
+    +     '<span style="font-size:1.15rem;">📣</span>'
+    +     '<div style="flex:1;min-width:0;"><b style="font-size:.9rem;">De onde este lead veio?</b>'
+    +       '<div class="hint" style="margin-top:2px;">' + (l.nome || 'lead') + (l.origem ? ' · ' + l.origem : '') + '</div></div>'
+    +     '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharEscolheAnuncio()">✕</span></div>'
+    +   '<input id="ea-q" autocomplete="off" placeholder="procurar o anúncio pelo nome" oninput="listarAnunciosEscolha(this.value)"'
+    +     ' style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(185,138,255,.4);border-radius:12px;color:var(--text);padding:10px 13px;font-size:.86rem;">'
+    + '</div>'
+    + '<div id="ea-lista" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;"></div></div>';
+  cx.style.display = 'flex';
+  listarAnunciosEscolha('');
+  setTimeout(function(){ var q = document.getElementById('ea-q'); if (q) q.focus(); }, 60);
+}
+function fecharEscolheAnuncio() {
+  var cx = document.getElementById('modal-escolhe-anuncio');
+  if (cx) cx.style.display = 'none';
+}
+function listarAnunciosEscolha(txt) {
+  var cx = document.getElementById('ea-lista');
+  if (!cx) return;
+  var q = v2norm(txt || '');
+  // todos os criativos que o Facebook conhece + os que já aparecem na base
+  var vistos = {}, lista = [];
+  Object.keys(META_CRI.porId || {}).forEach(function(id) {
+    var c = META_CRI.porId[id];
+    if (!c || !c.nome) return;
+    var k = _chaveAnuncio(c.nome);
+    if (vistos[k]) return;
+    vistos[k] = 1;
+    lista.push({ nome: c.nome, foto: c.foto || '' });
+  });
+  (LD.rows || []).forEach(function(l) {
+    if (!l.anuncio) return;
+    var t = ldAnuncioLimpo(l.anuncio);
+    if (!t || t === '(sem anúncio)' || t === '(link)' || t.indexOf('⚠️') === 0) return;
+    var k = _chaveAnuncio(t);
+    if (vistos[k]) return;
+    vistos[k] = 1;
+    lista.push({ nome: t, foto: '' });
+  });
+  if (q) lista = lista.filter(function(x){ return v2norm(x.nome).indexOf(q) !== -1; });
+  lista = lista.slice(0, 40);
+  var h = '<div class="click" style="padding:10px 12px;border-radius:11px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);cursor:pointer;"'
+    + ' onclick="salvarAnuncioEscolhido(\'__organico__\')"><b style="font-size:.8rem;color:#3ddc97;">🌱 Não veio de anúncio</b>'
+    + '<div class="hint" style="margin-top:2px;">orgânico, link na bio, indicação ou prospecção</div></div>';
+  if (!lista.length) h += '<div class="hint" style="padding:14px;text-align:center;">Nenhum anúncio com esse nome.</div>';
+  h += lista.map(function(x) {
+    return '<div class="click" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);cursor:pointer;"'
+      + ' onmouseover="this.style.background=\'rgba(185,138,255,.14)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'"'
+      + ' onclick="salvarAnuncioEscolhido(' + JSON.stringify(x.nome).replace(/"/g, '&quot;') + ')">'
+      + (x.foto ? '<img src="' + x.foto + '" loading="lazy" style="width:38px;height:38px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
+                : '<span style="width:38px;height:38px;border-radius:8px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;flex-shrink:0;">📣</span>')
+      + '<b style="flex:1;font-size:.77rem;">' + x.nome + '</b>'
+      + '<span style="color:#b98aff;font-weight:800;font-size:.66rem;">usar →</span></div>';
+  }).join('');
+  cx.innerHTML = h;
+}
+function salvarAnuncioEscolhido(nome) {
+  var t8 = window._anEscolhaTel;
+  if (!t8) return;
+  var valor = (nome === '__organico__') ? 'Orgânico (sem anúncio)' : nome;
+  ANUNCIO_MARCA[t8] = valor;
+  (LD.rows || []).forEach(function(l){ if (l.tel8 === t8) l.anuncio = valor; });
+  var l = (LD.rows || []).filter(function(y){ return y.tel8 === t8; })[0];
+  sendToGAS({ action: 'marcarAnuncio', tel8: t8, telefone: (l && l.tel) || t8, anuncio: valor, quem: ldEu() || '' });
+  fecharEscolheAnuncio();
+  try { renderLeads(); } catch (e) {}
+  try { if (typeof filtrarUltimas === 'function') filtrarUltimas(''); } catch (e) {}
+  try { if (_ldFichaAberta && _ldFichaAberta.tel8 === t8) abrirFichaLead(_ldReg.indexOf(_ldFichaAberta)); } catch (e) {}
+}
+
 function v2row(r) {
   var i = v2reg(r);
   var dir = '<span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;">'
@@ -2696,7 +2819,7 @@ function v2row(r) {
   return '<div class="cliente-row" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b><span>' + det + '</span></div>'
-    + dir + '</div>';
+    + seloAnuncio(r, true) + dir + '</div>';
 }
 
 // ---------- render principal ----------
@@ -5154,7 +5277,7 @@ function verLeadsDoAnuncio(chave) {
           + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
           + '<div style="flex:1;min-width:130px;"><b style="font-size:.77rem;">' + (l.nome || '(sem nome)') + '</b>'
           +   '<div class="hint" style="margin-top:1px;">' + [l.tel, (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div></div>'
-          + selo + etapa
+          + selo + etapa + seloAnuncio(l, true)
           + (l.tel ? '<a class="ld-wa" onclick="event.stopPropagation();" href="https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11) + '" target="_blank">💬</a>' : '')
           + (lk ? '<a class="ld-wa" onclick="event.stopPropagation();" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + lk + '" target="_blank">🟣</a>' : '')
           + '<span style="color:#6ea8ff;font-weight:800;font-size:.66rem;">ver →</span>'
@@ -5172,6 +5295,14 @@ function verFichaDaLista(i) {
   var pos = _ldReg.indexOf(l);
   if (pos === -1) { _ldReg.push(l); pos = _ldReg.length - 1; }   // a ficha lê de _ldReg
   abrirFichaLead(pos);
+  // a ficha nasce com z-index 200 e a lista está em 10001: sem isto ela abriria ATRÁS
+  var mb = document.getElementById('modal-b');
+  if (mb) { mb.style.zIndex = '10005'; mb.dataset.voltaLista = '1'; }
+}
+// ao fechar a ficha aberta pela lista, devolve o empilhamento normal
+function _fichaVoltaNormal() {
+  var mb = document.getElementById('modal-b');
+  if (mb && mb.dataset.voltaLista) { mb.style.zIndex = ''; delete mb.dataset.voltaLista; }
 }
 function fecharQuem() {
   var cx = document.getElementById('modal-quem');
@@ -5617,6 +5748,7 @@ function ldRow(l, quente) {
     + (quente ? ' <span class="ld-selo rapido">🔥 CHAMAR RÁPIDO</span>' : '')
     + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + '</b>'
     + '<span>' + det + '</span></div>'
+    + seloAnuncio(l, true)
     + (donoNome ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
     + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="event.stopPropagation()" title="Abrir este lead na Clint">🟣 Clint</a>' : '')
     + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank" onclick="event.stopPropagation()">📷</a>' : '')
@@ -5644,7 +5776,13 @@ function abrirFichaLead(i) {
     ['⭐', 'Score', l.score ? String(l.score) : ''],
     ['🧲', 'Origem', l.origem],
     ['📣', 'Anúncio que trouxe', (function(){
-        var nm = ldAnuncioLimpo(l.anuncio);
+        var aa = anuncioDe(l);
+        if (!aa.tem) {
+          return '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
+            + '<span style="color:#f6a350;font-weight:700;font-size:.76rem;">⚠️ está incompleto — não sabemos de onde veio</span>'
+            + '<button class="btn-assumir" style="padding:5px 11px;font-size:.7rem;" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">📣 adicionar o anúncio</button></div>';
+        }
+        var nm = aa.txt;
         if (!l.anuncio) return '';
         var m = (META.dados || { anuncios: [] }).anuncios.filter(function(x){ return _chaveAnuncio(x.anuncio) === _chaveAnuncio(nm); })[0];
         var cri = criativoDe(nm, m && m.adId);
@@ -8027,7 +8165,7 @@ function agProcurar(txt) {
       + '<div style="flex:1;min-width:0;">'
       +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + '</div>'
       +   '<div class="hint" style="margin-top:2px;">' + [l.tel, l.insta ? '@' + String(l.insta).replace(/^@/, '') : '', (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div>'
-      +   (l.origem || l.anuncio ? '<div class="hint" style="margin-top:1px;color:#6ea8ff;">📍 ' + (l.anuncio || l.origem) + '</div>' : '')
+      +   '<div style="margin-top:3px;">' + seloAnuncio(l, true) + '</div>'
       + '</div>'
       + (cri && cri.foto ? '<img src="' + cri.foto + '" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid rgba(255,255,255,.12);">' : '')
       + '<span style="color:#6ea8ff;font-weight:800;font-size:.68rem;flex-shrink:0;">usar →</span>'
