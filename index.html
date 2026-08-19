@@ -1635,7 +1635,7 @@ try { desenharGrafico(); } catch(e) {}
 // ===== Aberturas de informações (tudo no meio da tela) =====
 function abrirA(){ document.getElementById('modal-a').classList.add('open'); }
 function fecharA(){ document.getElementById('modal-a').classList.remove('open'); }
-function fecharB(){ document.getElementById('modal-b').classList.remove('open'); _fichaVoltaNormal(); }
+function fecharB(){ document.getElementById('modal-b').classList.remove('open'); _fichaVoltaNormal(); _mbAnterior = null; }
 
 // ===== Leads de exemplo (no painel real virão da planilha) =====
 var LEADS = [
@@ -6221,9 +6221,40 @@ function ldRow(l, quente) {
 }
 // ficha do lead: tudo que a pesquisa respondeu
 var _ldFichaAberta = null;
+// a ficha do lead usa a MESMA janela da lista. Antes de escrever por cima,
+// guardamos a lista para dar um "voltar" — sem isso, fechar a ficha fazia a
+// lista sumir junto e não dava para abrir o próximo lead (Bruno 19/08/2026).
+var _mbAnterior = null;
+function guardarListaModal() {
+  var mb = document.getElementById('modal-b');
+  if (!mb || !mb.classList.contains('open')) { _mbAnterior = null; return; }
+  var lista = document.getElementById('mb-lista');
+  if (!lista || !lista.innerHTML || lista.innerHTML.indexOf('fs-calc-linha') !== -1) return;  // já é uma ficha
+  var bq = document.getElementById('mb-busca');
+  _mbAnterior = {
+    titulo: (document.getElementById('mb-titulo') || {}).textContent || '',
+    ico: (document.getElementById('mb-ico') || {}).textContent || '',
+    sub: (document.getElementById('mb-sub') || {}).textContent || '',
+    html: lista.innerHTML,
+    busca: bq ? bq.style.display : 'none',
+    buscaValor: bq ? bq.value : ''
+  };
+}
+function voltarParaLista() {
+  if (!_mbAnterior) { fecharB(); return; }
+  document.getElementById('mb-titulo').textContent = _mbAnterior.titulo;
+  document.getElementById('mb-ico').textContent = _mbAnterior.ico;
+  document.getElementById('mb-sub').textContent = _mbAnterior.sub;
+  document.getElementById('mb-lista').innerHTML = _mbAnterior.html;
+  var bq = document.getElementById('mb-busca');
+  if (bq) { bq.style.display = _mbAnterior.busca; bq.value = _mbAnterior.buscaValor; }
+  _mbAnterior = null;
+  _ldFichaAberta = null;
+}
 function abrirFichaLead(i) {
   var l = _ldReg[i];
   if (!l) return;
+  guardarListaModal();
   _ldFichaAberta = l;
   var st = ldSituacao(l);
   var sit = st ? (st.vd ? '💰 Virou VENDA' : st.re ? '✅ Fez a reunião' : '📅 Reunião agendada') : '⏳ Ainda não agendou reunião';
@@ -6393,6 +6424,13 @@ function abrirFichaLead(i) {
   document.getElementById('mb-sub').textContent = 'Lead da pesquisa/diagnóstico';
   document.getElementById('mb-lista').innerHTML = h;
   var bq = document.getElementById('mb-busca'); if (bq) bq.style.display = 'none';
+  if (_mbAnterior) {
+    var volta = '<div class="click" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:6px 12px;border-radius:9px;'
+      + 'background:rgba(110,168,255,.14);color:#6ea8ff;font-weight:800;font-size:.72rem;cursor:pointer;" onclick="voltarParaLista()">'
+      + '← voltar para a lista</div>';
+    var el = document.getElementById('mb-lista');
+    el.innerHTML = volta + el.innerHTML;
+  }
   document.getElementById('modal-b').classList.add('open');
 }
 // tira lead repetido (mesmo telefone) mantendo o mais recente
