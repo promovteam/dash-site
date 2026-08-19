@@ -911,7 +911,7 @@ img { max-width:100%; height:auto; }
   <div class="nav-item active" data-s="visao"><span class="nav-icon">📊</span><span class="nav-label">Visão Geral</span></div>
   <div class="nav-item" data-s="agenda"><span class="nav-icon">📅</span><span class="nav-label">Agenda</span></div>
   <div class="nav-item" data-s="leads"><span class="nav-icon">📥</span><span class="nav-label">Leads</span></div>
-  <div class="nav-item" data-s="anuncios"><span class="nav-icon">📣</span><span class="nav-label">Anúncios</span></div>
+  <div class="nav-item" data-s="anuncios"><span class="nav-icon">📣</span><span class="nav-label">Criativos</span></div>
   <div class="nav-item" data-s="pesquisa"><span class="nav-icon">🔍</span><span class="nav-label">Pesquisa</span></div>
   <div class="nav-item" data-s="pagamentos"><span class="nav-icon">💳</span><span class="nav-label">Pagamentos</span></div>
   <div class="nav-item" data-s="regras"><span class="nav-icon">📋</span><span class="nav-label">Regras</span></div>
@@ -1495,7 +1495,7 @@ Instagram: @pr.joaosilva</div>
 <script>
 var titulos = {
   visao:'Visão Geral', agenda:'Agenda', leads:'Leads', pendencias:'Pendências', pesquisa:'Pesquisa',
-  pagamentos:'Pagamentos', registro:'Registro', regras:'Regras', anuncios:'Anúncios e Origens'
+  pagamentos:'Pagamentos', registro:'Registro', regras:'Regras', anuncios:'Criativos e Origens'
 };
 // ===== Gráfico com abas: métrica x período =====
 var DIAS_MES = 31, HOJE = 16;
@@ -3900,6 +3900,7 @@ function espPorDono(lista) {
 function avisarEsperando(primeiraCarga) {
   var e = espRecentes();
   var novos = e.rec.filter(function(x){
+    if (/insta/i.test(x.canal || '')) return false;   // a sirene é só do WhatsApp
     if (x.horas > 24) return false;
     if (_espAvisados[x.contatoId]) return false;
     _espAvisados[x.contatoId] = 1;
@@ -3917,11 +3918,14 @@ function renderAlertaClintHome() {
   var el = document.getElementById('v2-clint');
   if (!el) return;
   var e = espRecentes();
-  if (!e.rec.length) { el.innerHTML = ''; return; }
+  // a faixa da tela inicial conta só o WhatsApp (pedido do Bruno 19/08/2026):
+  // o Instagram tem outro ritmo de resposta e continua na lista lá dentro
+  var wa = e.rec.filter(function(x){ return !/insta/i.test(x.canal || ''); });
+  if (!wa.length) { el.innerHTML = ''; return; }
   el.innerHTML = '<div class="alerta-parado" style="cursor:pointer;animation:ldPisca 1.5s ease-in-out infinite;" onclick="verEsperando()">'
     + '<span style="font-size:1.4rem;">🔴</span>'
-    + '<div style="flex:1;"><b style="font-size:.86rem;color:#ff6b6b;">' + e.rec.length + ' conversa' + (e.rec.length === 1 ? '' : 's') + ' esperando resposta na Clint</b>'
-    + '<div class="hint" style="margin-top:3px;">' + espPorDono(e.rec) + ' · clique para ver quem é</div></div>'
+    + '<div style="flex:1;"><b style="font-size:.86rem;color:#ff6b6b;">' + wa.length + ' conversa' + (wa.length === 1 ? '' : 's') + ' esperando resposta no WhatsApp</b>'
+    + '<div class="hint" style="margin-top:3px;">' + espPorDono(wa) + ' · clique para ver quem é</div></div>'
     + '<span style="color:#ff6b6b;font-weight:800;font-size:.72rem;white-space:nowrap;">Ver agora →</span></div>';
 }
 // ===== 🧲 REUNIÕES SEM ORIGEM — aviso para os SDRs (pedido do Bruno 18/08/2026) =====
@@ -4878,7 +4882,7 @@ function renderAnuncios() {
   if (ordFn) chaves.sort(ordFn);
 
   h += '<div class="panel">'
-    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Anúncios</h3>'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Criativos</h3>'
     + '<span class="hint">o criativo que trouxe cada lead</span><span style="flex:1;"></span>'
     + '<span class="hint">ordenar:</span>'
     + [['vendas','Vendas'],['agend','Agendamentos'],['reuni','Reuniões'],['fat','Faturamento'],['leads','Leads'],['gasto','Investimento']].map(function(o){
