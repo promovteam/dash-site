@@ -2502,22 +2502,27 @@ function atualizarHorarios() {
         var bi = agMin(ev.startTime), bf = agMin(ev.endTime);
         return ini < bf && fim > bi;
       });
-      op.disabled = ocupado;
-      op.textContent = hv + (op.dataset.lock ? ' 🔒' : '') + (ocupado ? ' — ocupado' : '');
+      // o horário ocupado NÃO trava mais (pedido do Bruno 19/08/2026): só avisa
+      op.disabled = false;
+      op.dataset.ocupado = ocupado ? '1' : '';
+      op.textContent = hv + (op.dataset.lock ? ' 🔒' : '') + (ocupado ? ' — ⚠️ já tem reunião' : '');
     });
-    // NUNCA troca o horário sozinho: se o escolhido está ocupado, avisa em vermelho
-    // (o botão Agendar também barra, então não tem como marcar em cima de outra reunião)
+    // NUNCA troca o horário sozinho: se o escolhido já tem reunião, avisa em laranja
     var opSel = sel.selectedOptions[0];
     var aviso = document.getElementById('ag-hora-aviso');
     if (!aviso && sel.parentElement) {
       aviso = document.createElement('div');
       aviso.id = 'ag-hora-aviso';
-      aviso.style.cssText = 'font-size:.68rem;color:#ff6b6b;font-weight:700;margin-top:6px;';
+      aviso.style.cssText = 'font-size:.68rem;font-weight:700;margin-top:6px;';
       sel.parentElement.appendChild(aviso);
     }
-    if (aviso) aviso.textContent = (opSel && opSel.disabled)
-      ? '⚠️ Esse horário já está ocupado na agenda do closer da vez — escolha outro.'
-      : '';
+    if (aviso) {
+      var chocou = !!(opSel && opSel.dataset.ocupado);
+      aviso.style.color = '#f6a350';
+      aviso.textContent = chocou
+        ? '⚠️ Já tem reunião nesse horário na agenda do closer — dá para marcar assim mesmo.'
+        : '';
+    }
   }
   if (AG.cache[wk]) { aplicar(AG.cache[wk]); return; }
   fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + wk, { redirect: 'follow' })
@@ -8410,6 +8415,7 @@ function agendarReuniao(btn) {
   var obs = [document.getElementById('ag-obs').value.trim()].concat(extras).filter(Boolean).join(' | ');
   var prod = document.getElementById('ag-prod').value;
   var sdr = document.getElementById('ag-sdr').value; if (sdr === '—') sdr = '';
+  var obsChoque = '';
   var origem = document.getElementById('ag-origem').value;
   if (origem === '—') origem = '';
   // A reunião precisa dizer de onde o lead veio. Quem trabalha social selling
@@ -8431,9 +8437,11 @@ function agendarReuniao(btn) {
   // o SDR escolheu o closer no formulário
   var closerNome = closerEscolhido();
   var agenda = closerNome === 'Tony Londe' ? 'tony' : 'bruno';
-  // horário ocupado não passa
+  // horário ocupado apenas avisa — quem decide é quem está agendando
   var opHora = document.getElementById('ag-hora').selectedOptions[0];
-  if (opHora && opHora.disabled) { alert('Esse horário já está ocupado. Escolha outro horário.'); return; }
+  if (opHora && opHora.dataset && opHora.dataset.ocupado) {
+    obsChoque = 'Marcado em cima de outra reunião';
+  }
 
   // horário 🔒 (18h do Tony ou sábado): precisa do OK do closer e fica registrado
   // (a regra só vale para datas a partir de 03/08/2026 — antes disso era outra grade)
@@ -8452,6 +8460,7 @@ function agendarReuniao(btn) {
   if (ehExtra) {
     obs = obs ? obs + ' | Horário extra aprovado pelo closer' : 'Horário extra aprovado pelo closer';
   }
+  if (obsChoque) obs = obs ? obs + ' | ' + obsChoque : obsChoque;
 
   var fields = [{ campo:'nome', valor: nome }];
   fields.push({ campo:'carimbo', valor: filaStampAgora() });
