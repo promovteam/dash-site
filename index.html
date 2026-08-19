@@ -5399,6 +5399,7 @@ function criarPendenteNaClint(tel8, btn) {
         var iD = eu ? CLINT_PAINEL.donos.indexOf(eu) : -1;
         CLINT_PAINEL.mapa[tel8] = [iD, iE, d.contatoId];
       }
+      sbMarcarCriado(tel8);   // some da fila e não volta na próxima leitura
       alert(d.jaExistia ? 'Este telefone já estava na Clint — nada duplicado.'
         : '✅ Criado na Clint' + (d.etapa ? ' na etapa ' + d.etapa : '') + '!');
       renderLeads();
@@ -5417,6 +5418,7 @@ function criarPendenteNaClint(tel8, btn) {
 function criarPendentesNaClint(btn) {
   if (soOlhar()) return;
   var fora = sbPendentes().filter(function(x) {
+    if (SB_CRIADOS[x.tel8]) return false;
     return !(CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[x.tel8]);
   });
   if (!fora.length) { alert('Todos os pendentes já estão na Clint.'); return; }
@@ -5452,6 +5454,7 @@ function criarPendentesNaClint(btn) {
           var iD = eu ? CLINT_PAINEL.donos.indexOf(eu) : -1;
           CLINT_PAINEL.mapa[x.tel8] = [iD, -1, d.contatoId];
         }
+        sbMarcarCriado(x.tel8);   // some da fila e não volta na próxima leitura
       } else erros++;
       setTimeout(proximo, 400);
     };
@@ -5509,6 +5512,17 @@ function carregarSupabase() {
   document.body.appendChild(sc);
   setTimeout(function(){ fim(null); }, 90000);
 }
+// ===== quem JÁ mandamos para a Clint (fica guardado no navegador) =====
+// O painel da Clint é relido de 3 em 3 minutos e demora a mostrar o contato
+// recém-criado — sem esta lista, o lead voltava para a fila logo depois.
+var SB_CRIADOS = (function() {
+  try { return JSON.parse(localStorage.getItem('v2CriadosClint') || '{}'); } catch (e) { return {}; }
+})();
+function sbMarcarCriado(tel8) {
+  if (!tel8) return;
+  SB_CRIADOS[tel8] = Date.now();
+  try { localStorage.setItem('v2CriadosClint', JSON.stringify(SB_CRIADOS)); } catch (e) {}
+}
 // quem parou no meio e ninguém chamou (não está na aba Vendas nem tem dono)
 function sbPendentes() {
   if (!SB.carregado) return [];
@@ -5516,6 +5530,7 @@ function sbPendentes() {
     if (r.completa) return false;                          // terminou: já está na planilha
     if (!r.whatsapp) return false;                         // sem telefone não dá para chamar
     if (r.tel8 && _ldIdx && _ldIdx[r.tel8]) return false;  // já teve reunião: não incomodar
+    if (r.tel8 && SB_CRIADOS[r.tel8]) return false;        // já mandamos para a Clint daqui
     // já está na Clint (alguém cuida dele lá): sai da fila
     if (r.tel8 && CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[r.tel8]) return false;
     return true;
@@ -5527,7 +5542,7 @@ function sbJaNaClint() {
   return SB.rows.filter(function(r) {
     if (r.completa || !r.whatsapp) return false;
     if (r.tel8 && _ldIdx && _ldIdx[r.tel8]) return false;
-    return !!(r.tel8 && CLINT_PAINEL.mapa[r.tel8]);
+    return !!(r.tel8 && (CLINT_PAINEL.mapa[r.tel8] || SB_CRIADOS[r.tel8]));
   });
 }
 
