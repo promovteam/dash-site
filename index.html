@@ -5294,7 +5294,7 @@ function comGrupoDe(d) {
   return 'Mais antigos';
 }
 // completa o nome que a Clint não deu, usando a planilha de leads (pelo fim do telefone)
-var _nomeTelIdx = null;
+var _nomeTelIdx = null, _ldIdxAlt = null;
 function ldNomePorTel8(t8) {
   if (!t8 || !LD.rows || !LD.rows.length) return '';
   if (!_nomeTelIdx || _nomeTelIdx._n !== LD.rows.length) {
@@ -5539,7 +5539,12 @@ function renderAnuncios() {
     if ((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)) {
       var bf = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
       var nf = (String(bf || '').indexOf('POST:') === 0) ? bf : ldAnuncioLimpo(bf);
-      if (nf && nf !== '(sem anúncio)') foraDoPeriodo[nf] = (foraDoPeriodo[nf] || 0) + 1;
+      if (nf && nf !== '(sem anúncio)') {
+        var ff = foraDoPeriodo[nf] || (foraDoPeriodo[nf] = { n: 0, re: 0, vd: 0 });
+        ff.n++;
+        var sf = ldSituacao(l);
+        if (sf) { if (sf.re) ff.re++; if (sf.vd) ff.vd++; }
+      }
       return;
     }
     // o que foi marcado à mão vale tanto quanto o que veio da planilha — sem isso,
@@ -5555,7 +5560,7 @@ function renderAnuncios() {
     a.n++; a.quem.n.push(l);
     if (l.faixa === 'alta') { a.q++; a.quem.q.push(l); }
     if (l.faixa === 'alta' || l.faixa === 'media') { a.mql++; a.quem.mql.push(l); }   // MQL = declarou qualquer investimento
-    var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+    var st = ldSituacao(l);
     if (st) {
       a.ag++; a.quem.ag.push(l);
       if (st.re) { a.re++; a.quem.re.push(l); }
@@ -5626,7 +5631,15 @@ function renderAnuncios() {
                   : '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.7rem;opacity:.4;">📱</span>';
               })()
             : (m.foto ? '<img src="' + m.foto + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : ''))
-      +   (ehPost ? '' : '<span class="semfoto" style="position:absolute;inset:0;display:' + (m.foto ? 'none' : 'flex') + ';align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>')
+      +   (ehPost ? '' : (function(){
+              if (m.foto) return '<span class="semfoto" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>';
+              // sem imagem: em vez do megafone, mostra o que aquela origem é
+              var ico = /bio/i.test(k) ? '🔗' : /manychat|mchat/i.test(k) ? '💬' : /org[âa]nico/i.test(k) ? '🌱' : '📣';
+              var rot = /bio/i.test(k) ? 'link na bio' : /manychat|mchat/i.test(k) ? 'ManyChat' : /org[âa]nico/i.test(k) ? 'sem anúncio' : 'sem imagem';
+              return '<span class="semfoto" style="position:absolute;inset:0;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;">'
+                + '<span style="font-size:1.9rem;opacity:.55;">' + ico + '</span>'
+                + '<span style="font-size:.62rem;color:var(--muted);font-weight:700;">' + rot + '</span></span>';
+            })())
       +   (m.post
             ? '<span class="an-play" title="passe o mouse para tocar"'
               + ' style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">'
@@ -5649,7 +5662,10 @@ function renderAnuncios() {
       +   (cpl ? '<div class="hint" style="margin-top:7px;">' + rs(cpl) + ' por lead' + (a.vd ? ' · ' + rs(m.gasto/a.vd) + ' por venda' : '') + '</div>' : '')
       +   (foraDoPeriodo[k]
             ? '<div class="hint" style="margin-top:7px;color:#f6a350;cursor:pointer;" onclick="event.stopPropagation();AN_PER=\'tudo\';renderAnuncios();" title="clique para ver todos os períodos">'
-              + '⚠️ + ' + foraDoPeriodo[k] + ' lead' + (foraDoPeriodo[k] === 1 ? '' : 's') + ' fora de ' + per.label + ' — ver tudo</div>'
+              + '⚠️ fora de ' + per.label + ': ' + foraDoPeriodo[k].n + ' lead' + (foraDoPeriodo[k].n === 1 ? '' : 's')
+              + (foraDoPeriodo[k].re ? ' · ' + foraDoPeriodo[k].re + ' reuni' + (foraDoPeriodo[k].re === 1 ? 'ão' : 'ões') : '')
+              + (foraDoPeriodo[k].vd ? ' · <b style="color:#3ddc97;">' + foraDoPeriodo[k].vd + ' venda' + (foraDoPeriodo[k].vd === 1 ? '' : 's') + '</b>' : '')
+              + ' — ver tudo</div>'
             : '')
       + '</div></div>';
   });
@@ -5914,12 +5930,13 @@ function fechamentoHistorico(l) {
   if (!_fechPorClasse || Date.now() - _fechQuando > 300000) {
     var m = {};
     (LD.rows || []).forEach(function(x) {
-      if (!x.tel8 || !_ldIdx || !_ldIdx[x.tel8] || !_ldIdx[x.tel8].re) return;
+      var _st = ldSituacao(x);
+      if (!_st || !_st.re) return;
       var cc = classeDoLead(x);
       if (!cc) return;
       m[cc.classe] = m[cc.classe] || { n: 0, vd: 0 };
       m[cc.classe].n++;
-      if (_ldIdx[x.tel8].vd) m[cc.classe].vd++;
+      if (_st.vd) m[cc.classe].vd++;
     });
     _fechPorClasse = {};
     Object.keys(m).forEach(function(k){ if (m[k].n >= 15) _fechPorClasse[k] = Math.round(m[k].vd / m[k].n * 100); });
@@ -6124,7 +6141,7 @@ function verLeadsDoAnuncio(chave) {
     +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharQuem()">✕</span></div>'
     + '<div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;">'
     + lista.slice(0, 300).map(function(l, i) {
-        var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+        var st = ldSituacao(l);
         var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
           : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '';
         var etapa = st ? (st.vd ? '<span class="ld-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;">✅ comprou</span>'
@@ -6175,7 +6192,7 @@ function baixarQuem(chave) {
   if (!d || !d.quem || !d.quem[chave]) return;
   var linhas = [['Nome', 'Telefone', 'Instagram', 'E-mail', 'Chegou em', 'Investe', 'Etapa', 'Anúncio'].join(';')];
   d.quem[chave].forEach(function(l) {
-    var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+    var st = ldSituacao(l);
     var etapa = st ? (st.vd ? 'Comprou' : st.re ? 'Fez a reunião' : 'Agendou') : 'Só lead';
     linhas.push([l.nome, l.tel, l.insta, l.email, (l.dataTxt || '').slice(0, 10), l.invest, etapa, _anAtual]
       .map(function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }).join(';'));
@@ -6396,6 +6413,16 @@ function carregarMetaAds(per) {
   function fmt(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
   var chave = fmt(ini) + '_' + fmt(fim);
   if (META.dados && META.dados._chave === chave) return;
+  // o gasto de cada anúncio também fica guardado no navegador por 3 horas:
+  // a aba abre com os números na hora e só depois confere com o Facebook
+  try {
+    var g = JSON.parse(localStorage.getItem('v2MetaGasto_' + chave) || 'null');
+    if (g && g.quando && Date.now() - g.quando < 3 * 3600 * 1000 && g.dados) {
+      META.dados = g.dados;
+      META.dados._chave = chave;
+      renderAnuncios();
+    }
+  } catch (e) {}
   META.buscando = true;
   var nome = 'metaCb' + Math.random().toString(36).slice(2, 8);
   var sc = document.createElement('script');
@@ -6405,9 +6432,13 @@ function carregarMetaAds(per) {
     pronto = true; META.buscando = false;
     try { sc.remove(); } catch (e) {}
     try { delete window[nome]; } catch (e) {}
-    if (d && d.success) { d._chave = chave; META.dados = d; META.erro = ''; }
-    else { META.erro = (d && (d.detalhe || d.error)) || 'sem resposta'; META.dados = null; }
+    if (d && d.success) {
+      d._chave = chave; META.dados = d; META.erro = '';
+      try { localStorage.setItem('v2MetaGasto_' + chave, JSON.stringify({ quando: Date.now(), dados: d })); } catch (e) {}
+    }
+    else if (!META.dados) { META.erro = (d && (d.detalhe || d.error)) || 'sem resposta'; META.dados = null; }
     renderLeads();
+    try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e) {}
   };
   window[nome] = fim2;
   sc.onerror = function(){ fim2(null); };
@@ -6713,21 +6744,47 @@ function escolherBucketLeads(iniTs, fimTs, label) {
 var _ldIdx = null;
 function _ldMontarIdx() {
   _ldIdx = {};
+  _ldIdxAlt = { email: {}, insta: {}, nome: {} };
   if (!V2.carregado) return;
   var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
   V2.rows.forEach(function(r) {
     var t = ldTel8(r.telefone);
-    if (!t) return;
-    var o = _ldIdx[t] || (_ldIdx[t] = { ag: true, re: false, vd: false, sns: {} });
+    var o = t ? (_ldIdx[t] || (_ldIdx[t] = { ag: true, re: false, vd: false, sns: {} }))
+              : { ag: true, re: false, vd: false, sns: {} };
     if (!o.sns) o.sns = {};
     if (REAL.indexOf(r.sn) !== -1) o.re = true;
     if (r.sn === 'vendido') o.vd = true;
     if (r.sn) o.sns[r.sn] = 1;   // todos os status deste telefone na aba Vendas
     if (r.origem && !o.origemVenda) o.origemVenda = r.origem;   // origem lançada na venda
+    // ===== 🔎 casar também por e-mail, @ e nome (Bruno 19/08/2026) =====
+    // A pessoa dá um número no formulário e outro na reunião — só o telefone
+    // deixava reunião e venda de fora da conta do criativo.
+    var pg = (PAG.rows || []).filter(function(x) {
+      var tt = ldTel8(x.celular);
+      return (tt && t && tt === t) || (r.nome && v2norm(x.nome) === v2norm(r.nome));
+    })[0];
+    var mails = [];
+    if (pg && pg.email) mails.push(pg.email);
+    var mo = String(r.obs || '').match(/[\w.+-]+@[\w.-]+\.\w+/g);
+    if (mo) mails = mails.concat(mo);
+    mails.forEach(function(e){ var k = v2norm(e); if (k) _ldIdxAlt.email[k] = o; });
+    var igs = [];
+    if (pg && pg.insta) igs.push(pg.insta);
+    var mi = String(r.obs || '').match(/@[A-Za-z0-9._]{3,}/g);
+    if (mi) igs = igs.concat(mi);
+    igs.forEach(function(g){ var k = v2norm(String(g).replace(/^@/, '')); if (k) _ldIdxAlt.insta[k] = o; });
+    // NÃO casamos por nome: "Patrícia" e "Juliana Souza" se repetem na base
+    // (558 nomes repetidos) e isso juntava gente diferente. E-mail e @ são únicos.
   });
 }
+// a situação do lead: tenta telefone, depois e-mail, @ e nome inteiro
 function ldSituacao(l) {
-  return (l.tel8 && _ldIdx && _ldIdx[l.tel8]) || null;
+  if (!l) return null;
+  if (l.tel8 && _ldIdx && _ldIdx[l.tel8]) return _ldIdx[l.tel8];
+  if (!_ldIdxAlt) return null;
+  if (l.email) { var e = _ldIdxAlt.email[v2norm(l.email)]; if (e) return e; }
+  if (l.insta) { var g = _ldIdxAlt.insta[v2norm(String(l.insta).replace(/^@/, ''))]; if (g) return g; }
+  return null;
 }
 function ldWa(l) {
   var d = String(l.tel || '').replace(/\D/g, '');
@@ -7777,7 +7834,7 @@ function renderLeads() {
       var o = mapa[chave] || (mapa[chave] = { n: 0, ag: 0, re: 0, vd: 0, quentes: 0 });
       o.n++;
       if (l.faixa === 'alta') o.quentes++;
-      var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+      var st = ldSituacao(l);
       if (st) { o.ag++; if (st.re) o.re++; if (st.vd) o.vd++; }
     }
     rows.forEach(function(l) {
@@ -7792,7 +7849,7 @@ function renderLeads() {
     // origem que o time lançou na aba Vendas (quando diferente da origem do lead)
     var porOrigemVenda = {};
     rows.forEach(function(l) {
-      var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
+      var st = ldSituacao(l);
       if (!st || !st.origemVenda) return;
       var ov = String(st.origemVenda).trim();
       if (!ov || ov === String(l.origem || '').trim()) return;
@@ -8104,12 +8161,9 @@ function acharLeadDeTodoJeito(r, pagDele) {
       if (achou) como = 'Instagram';
     }
   }
-  // nome inteiro igual (último recurso, só quando é exato)
-  if (!achou && r.nome && v2norm(r.nome).length >= 8) {
-    var nn = v2norm(r.nome);
-    var iguais = (LD.rows || []).filter(function(x){ return x.nome && v2norm(x.nome) === nn; });
-    if (iguais.length === 1) { achou = iguais[0]; como = 'nome'; }
-  }
+  // Nome fica de fora de propósito (decisão do Bruno 19/08/2026): "Patrícia",
+  // "Juliana Souza" e outros se repetem na base e juntavam pessoas diferentes.
+  // Telefone, e-mail e @ são únicos — é neles que dá para confiar.
   return achou ? { lead: achou, como: como } : null;
 }
 function mostrarFormularioDoLead(r) {
@@ -9497,7 +9551,7 @@ function agProcurar(txt) {
     var cri = l.anuncio ? criativoDe(l.anuncio, '') : null;
     var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
       : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '';
-    var jaTeve = (l.tel8 && _ldIdx && _ldIdx[l.tel8])
+    var jaTeve = ldSituacao(l)
       ? '<span class="ld-tag" style="background:rgba(185,138,255,.16);color:#b98aff;">já teve reunião</span>' : '';
     if (l.soClint) jaTeve += '<span class="ld-tag" style="background:rgba(108,71,255,.18);color:#8f6bff;">🟣 só na Clint</span>';
     return '<div class="click" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);cursor:pointer;"'
