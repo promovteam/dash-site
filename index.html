@@ -4228,11 +4228,14 @@ function abrirStatusPendente() {
       }).join('')
     + (lista.length > 40 ? '<div class="hint" style="padding:6px;">… e mais ' + (lista.length - 40) + '</div>' : '')
     + '</div>'
-    + '<div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:9px;align-items:center;">'
-    +   '<span class="hint" style="flex:1;">Escolheu, já salvou na planilha.</span>'
-    +   '<button class="btn" style="padding:8px 16px;font-size:.74rem;" onclick="fecharStatusPendente(true)">deixar para depois</button></div>'
+    + '<div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:9px;align-items:center;flex-wrap:wrap;">'
+    +   '<span class="hint" style="flex:1;min-width:130px;">Escolha o resultado e clique em salvar.</span>'
+    +   '<button class="btn" style="padding:8px 16px;font-size:.74rem;" onclick="fecharStatusPendente(true)">deixar para depois</button>'
+    +   '<button class="btn primary" id="stp-salvar" disabled style="padding:8px 18px;font-size:.74rem;opacity:.45;" onclick="salvarResultadosStp(this)">💾 salvar na planilha</button></div>'
     + '</div>';
   cx.style.display = 'flex';
+  STP_ESCOLHAS = {};
+  atualizarBotaoSalvarStp();
 }
 // abre a ficha do lead POR CIMA do pop-up (fechando a ficha, a lista continua lá)
 function verLeadDoPopup(i) {
@@ -4246,21 +4249,48 @@ function fecharStatusPendente(marcarVisto) {
   if (marcarVisto) { try { localStorage.setItem('v2StpVisto', String(Date.now())); } catch (e) {} }
 }
 // grava o resultado direto do aviso
+// o seletor apenas MARCA; quem grava é o botão "salvar na planilha"
+var STP_ESCOLHAS = {};
 function porResultado(i, sel) {
   if (soOlhar()) return;
-  var r = V2.rows[i];
   var valor = sel.value;
-  if (!r || !valor) return;
-  sel.disabled = true;
-  r.status = valor; r.sn = v2norm(valor);
-  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: valor, dataRef: v2dataRef(r), gid: V2_GID });
-  try { sincronizarStatusEvento(r); } catch (e) {}
-  var linha = document.getElementById('stp-l' + i);
-  if (linha) {
-    linha.style.opacity = '.45';
-    linha.innerHTML = '<span style="font-size:.78rem;color:#3ddc97;font-weight:700;">✓ ' + (r.nome || '') + ' — ' + valor + '</span>';
-  }
-  setTimeout(function(){ renderStatusPendente(); renderV2(); }, 600);
+  if (!valor) delete STP_ESCOLHAS[i];
+  else STP_ESCOLHAS[i] = valor;
+  sel.style.borderColor = valor ? '#3ddc97' : 'rgba(185,138,255,.45)';
+  sel.style.color = valor ? '#3ddc97' : 'var(--text)';
+  atualizarBotaoSalvarStp();
+}
+function atualizarBotaoSalvarStp() {
+  var b = document.getElementById('stp-salvar');
+  if (!b) return;
+  var n = Object.keys(STP_ESCOLHAS).length;
+  b.disabled = !n;
+  b.style.opacity = n ? '1' : '.45';
+  b.textContent = n ? '💾 salvar ' + n + ' na planilha' : '💾 salvar na planilha';
+}
+// grava de uma vez tudo o que foi escolhido
+function salvarResultadosStp(btn) {
+  if (soOlhar()) return;
+  var ids = Object.keys(STP_ESCOLHAS);
+  if (!ids.length) return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ salvando…'; }
+  var feitos = 0;
+  ids.forEach(function(i) {
+    var r = _v2reg[i], valor = STP_ESCOLHAS[i];
+    if (!r || !valor) return;
+    r.status = valor; r.sn = v2norm(valor);
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: valor, dataRef: v2dataRef(r), gid: V2_GID });
+    try { sincronizarStatusEvento(r); } catch (e) {}
+    feitos++;
+    var linha = document.getElementById('stp-l' + i);
+    if (linha) {
+      linha.style.opacity = '.5';
+      linha.innerHTML = '<span style="font-size:.78rem;color:#3ddc97;font-weight:700;">✓ ' + (r.nome || '') + ' — ' + valor + ' · salvo na planilha</span>';
+    }
+  });
+  STP_ESCOLHAS = {};
+  if (btn) btn.textContent = '✓ ' + feitos + ' salvo' + (feitos === 1 ? '' : 's') + ' na planilha';
+  setTimeout(function(){ renderStatusPendente(); renderV2(); if (btn) atualizarBotaoSalvarStp(); }, 1200);
 }
 
 // ===== 🧲 REUNIÕES SEM ORIGEM — aviso para os SDRs (pedido do Bruno 18/08/2026) =====
@@ -5392,6 +5422,31 @@ function ldFundirSupabase() {
   LD._fundido = SB.rows.length;
   _ldIdx = null; _nomeTelIdx = null;
 }
+// cada vez que a pessoa preencheu, uma linha — dá para ver o que mudou entre elas
+function listaPreenchimentos(l) {
+  var todas = [l._esteAqui || { date: l.date, dataTxt: l.dataTxt, invest: l.invest, origem: l.origem,
+                                anuncio: l.anuncio, seg: l.seg, obj: l.obj, de: (l.i === 'sb' ? 'site' : 'planilha') }]
+    .concat(l.outrasVezes || [])
+    .sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
+  var h = '<b style="color:#ff6b6b;">' + l.vezes + ' vezes</b> — insistiu, está interessado'
+    + '<div style="margin-top:7px;display:flex;flex-direction:column;gap:5px;text-align:left;">';
+  todas.forEach(function(v, i) {
+    var quando = (v.dataTxt || (v.date ? v.date.toLocaleString('pt-BR') : '')).slice(0, 16);
+    h += '<div style="padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.05);border-left:3px solid ' + (i === 0 ? '#3ddc97' : 'rgba(255,255,255,.2)') + ';">'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+      +   '<b style="font-size:.72rem;">' + (i === 0 ? '✅ mais recente' : (i + 1) + 'ª mais nova') + '</b>'
+      +   '<span class="hint">' + quando + '</span>'
+      +   (v.de ? '<span class="ld-tag" style="background:rgba(110,168,255,.14);color:#6ea8ff;">' + v.de + '</span>' : '')
+      + '</div>'
+      + '<div class="hint" style="margin-top:3px;line-height:1.5;">'
+      +   [v.invest ? '💰 ' + v.invest : '', v.seg ? '👥 ' + v.seg : '', v.origem ? '🧲 ' + v.origem : '',
+           v.anuncio ? '📣 ' + ldAnuncioLimpo(v.anuncio) : ''].filter(Boolean).join(' · ')
+      + '</div>'
+      + (v.obj ? '<div class="hint" style="margin-top:2px;">🎯 ' + String(v.obj).slice(0, 110) + '</div>' : '')
+      + '</div>';
+  });
+  return h + '</div>';
+}
 // selo de quem voltou a preencher: quem insiste está interessado
 function seloVezes(l) {
   if (!l || !l.vezes || l.vezes < 2) return '';
@@ -5402,22 +5457,53 @@ function seloVezes(l) {
 // virava um "lead" e os números do painel ficavam ~13% acima do real.
 // Agora contamos PESSOAS: fica o preenchimento mais novo, completado com o que
 // os anteriores tinham, e guardamos quantas vezes ela voltou (é interesse quente).
+// telefone "de verdade": sem o 55 do Brasil e sem o 9 que uns põem e outros não,
+// para 11 91234-5678 e 11 1234-5678 contarem como o mesmo número
+function _telCheio(v) {
+  var d = String(v || '').replace(/\D/g, '');
+  // tira o 55 do Brasil (o resto tem que sobrar com 10 ou 11 dígitos)
+  while (d.length > 11 && d.indexOf('55') === 0) d = d.slice(2);
+  if (d.length > 11) d = d.slice(-11);
+  if (d.length === 11 && d.charAt(2) === '9') d = d.slice(0, 2) + d.slice(3);   // tira o 9
+  return d;
+}
+// só o primeiro nome, sem acento — é o que a pessoa nunca troca
+function _primeiroNome(v) {
+  return v2norm(v || '').split(' ')[0] || '';
+}
 function ldJuntarRepetidos(lista) {
   var porTel = {}, saida = [];
   lista.forEach(function(l) {
     if (!l.tel8) { saida.push(l); return; }        // sem telefone não dá para juntar
-    var antes = porTel[l.tel8];
+    // A chave é o número INTEIRO (com DDD). Os 8 últimos dígitos sozinhos juntavam
+    // gente diferente de DDDs diferentes — por isso, quando só eles batem,
+    // exigimos também que o primeiro nome seja o mesmo.
+    var cheio = _telCheio(l.tel);
+    var chave = cheio.length >= 10 ? 'T' + cheio : 'C' + l.tel8 + '|' + _primeiroNome(l.nome);
+    var antes = porTel[chave];
     if (!antes) {
       l.vezes = l.vezes || 1;
       l.outrasVezes = l.outrasVezes || [];
-      porTel[l.tel8] = l;
+      l._esteAqui = { date: l.date, dataTxt: l.dataTxt, invest: l.invest, origem: l.origem,
+                      anuncio: l.anuncio, nome: l.nome, seg: l.seg, obj: l.obj, renda: l.renda,
+                      email: l.email, insta: l.insta, campanha: l.campanha, faixa: l.faixa,
+                      fonte: l.fonte, de: (l.i === 'sb' ? 'site' : 'planilha') };
+      porTel[chave] = l;
+      saida.push(l);
+      return;
+    }
+    // o número bate, mas o primeiro nome é outro? são pessoas diferentes
+    var n1 = _primeiroNome(antes.nome), n2 = _primeiroNome(l.nome);
+    if (n1 && n2 && n1 !== n2 && n1.indexOf(n2) === -1 && n2.indexOf(n1) === -1) {
       saida.push(l);
       return;
     }
     // a lista vem do mais novo para o mais velho: o primeiro é o que vale
     antes.vezes = (antes.vezes || 1) + (l.vezes || 1);
     antes.outrasVezes = (antes.outrasVezes || []).concat([{ date: l.date, dataTxt: l.dataTxt, invest: l.invest,
-                             origem: l.origem, anuncio: l.anuncio }], l.outrasVezes || []);
+                             origem: l.origem, anuncio: l.anuncio, nome: l.nome, seg: l.seg, obj: l.obj,
+                             renda: l.renda, email: l.email, insta: l.insta, campanha: l.campanha,
+                             faixa: l.faixa, fonte: l.fonte, de: (l.i === 'sb' ? 'site' : 'planilha') }], l.outrasVezes || []);
     // completa o que faltava no mais novo com o que a tentativa antiga tinha
     ['email', 'insta', 'seg', 'obj', 'renda', 'invest', 'anuncio', 'campanha', 'fonte', 'origem', 'utm', 'conjunto']
       .forEach(function(c){ if (!antes[c] && l[c]) antes[c] = l[c]; });
@@ -6061,10 +6147,7 @@ function abrirFichaLead(i) {
   var FX = { alta:['🔥 Prioridade máxima','#f6a350'], media:['🟡 Prioridade menor','#6ea8ff'], nda:['⚪ Sem disponibilidade','#8b8fa3'], sem:['⚪ Não respondeu','#8b8fa3'] }[l.faixa];
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
-    ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1)
-      ? '<b style="color:#ff6b6b;">' + l.vezes + ' vezes</b> — insistiu, está interessado<div class="hint" style="margin-top:3px;">'
-        + (l.outrasVezes || []).map(function(v){ return (v.dataTxt || '').slice(0, 16); }).filter(Boolean).join(' · ') + '</div>'
-      : '', 'html'],
+    ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1) ? listaPreenchimentos(l) : '', 'html'],
     ['📱', 'WhatsApp', l.tel],
     ['📷', 'Instagram', l.insta ? '@' + l.insta : ''],
     ['✉️', 'E-mail', l.email],
