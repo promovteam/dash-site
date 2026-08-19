@@ -572,6 +572,41 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .ld-info { flex:1; min-width:0; }
 .ld-info b { font-size:.84rem; display:block; }
 .ld-info span { font-size:.68rem; color:var(--muted); font-weight:600; }
+/* ===== 🗂️ QUADRO CRM DOS COMENTARISTAS (Bruno 19/08/2026) ===== */
+.crm-board { display:flex; gap:10px; overflow-x:auto; padding:4px 2px 12px; align-items:flex-start; }
+.crm-col { flex:0 0 246px; max-width:246px; background:linear-gradient(180deg, color-mix(in srgb, var(--cor) 9%, transparent), rgba(255,255,255,.03));
+  border:1px solid color-mix(in srgb, var(--cor) 26%, transparent); border-radius:16px; padding:10px;
+  transition:background .18s, border-color .18s, transform .18s; }
+.crm-col.alvo { background:color-mix(in srgb, var(--cor) 20%, transparent); border-color:var(--cor); transform:translateY(-2px); }
+.crm-cab { display:flex; align-items:center; gap:7px; margin-bottom:9px; padding:0 2px; }
+.crm-cab b { flex:1; font-size:.7rem; color:var(--cor); text-transform:uppercase; letter-spacing:.5px; }
+.crm-conta { background:color-mix(in srgb, var(--cor) 22%, transparent); color:var(--cor);
+  font-size:.66rem; font-weight:800; padding:2px 8px; border-radius:999px; }
+.crm-fila { display:flex; flex-direction:column; gap:7px; max-height:460px; overflow-y:auto; min-height:70px; padding-right:2px; }
+.crm-vazio { padding:16px 6px; text-align:center; font-size:.66rem; color:var(--muted); opacity:.55; }
+.crm-card { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09);
+  border-left:3px solid var(--cor); border-radius:12px; padding:9px 10px; cursor:grab;
+  transition:transform .14s, box-shadow .14s, opacity .14s; }
+.crm-card:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,.35); background:rgba(255,255,255,.09); }
+.crm-card:active { cursor:grabbing; }
+.crm-card.arrastando { opacity:.4; transform:rotate(-1.5deg) scale(.97); }
+.crm-topo { display:flex; align-items:center; gap:8px; }
+.crm-nome { font-size:.74rem; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.crm-quando { font-size:.62rem; color:var(--muted); margin-top:1px; }
+.crm-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+.crm-chip { font-size:.58rem; font-weight:800; padding:2px 7px; border-radius:999px; white-space:nowrap; }
+.crm-chip.ok { background:rgba(61,220,151,.16); color:#3ddc97; }
+.crm-chip.pend { background:rgba(246,163,80,.15); color:#f6a350; }
+.crm-chip.quente { background:rgba(255,107,107,.16); color:#ff6b6b; }
+.crm-chip.morno { background:rgba(246,163,80,.14); color:#f6a350; }
+.crm-chip.tag { background:rgba(185,138,255,.15); color:#b98aff; }
+.crm-resp { margin-top:7px; padding:7px 8px; border-radius:9px; background:rgba(0,0,0,.22); display:flex; flex-direction:column; gap:3px; }
+.crm-resp div { font-size:.62rem; color:var(--text-secondary); line-height:1.35; display:flex; gap:5px; }
+.crm-resp span { flex-shrink:0; }
+.crm-acoes { display:flex; gap:5px; margin-top:8px; }
+.crm-acoes a { flex:1; text-align:center; font-size:.62rem; font-weight:800; padding:5px 4px; border-radius:8px;
+  text-decoration:none; background:rgba(255,255,255,.07); color:var(--text-secondary); transition:background .15s, color .15s; }
+.crm-acoes a:hover { background:color-mix(in srgb, var(--cor) 24%, transparent); color:var(--cor); }
 /* capa do anúncio: passando o mouse aparece o ▶ para tocar */
 .an-capa .an-play { opacity:0; transform:scale(.9); transition:opacity .15s, transform .15s; pointer-events:none; }
 .an-capa:hover .an-play { opacity:1; transform:scale(1); pointer-events:auto; }
@@ -5038,7 +5073,14 @@ function montarFiltrosLeads() {
 var COMENT_GID = '1841020613';
 var COMENT = { rows: [], carregado: false };
 // o que a Sarah marcou agora (vale até a planilha ser relida, a cada 3 min)
-var COMENT_MARCA = {};
+var COMENT_MARCA = (function() {
+  // o que foi marcado fica guardado aqui até a planilha ser relida — e sobrevive
+  // a recarregar a página (pedido do Bruno 19/08/2026)
+  try { return JSON.parse(localStorage.getItem('v2ComentMarca') || '{}'); } catch (e) { return {}; }
+})();
+function guardarComentMarca() {
+  try { localStorage.setItem('v2ComentMarca', JSON.stringify(COMENT_MARCA)); } catch (e) {}
+}
 var COMENT_TAGS = ['Qualificado', 'Perfil legado', 'Perfil HT'];
 var COMENT_TIPOS = ['QUALIFICADO', 'DESQUALIFICADO'];
 // marca TAG ou TIPO do comentarista e guarda na aba dos comentários (todo mundo vê)
@@ -5050,7 +5092,8 @@ var CRM_ETAPAS = [
   { k: 'chamei',   nome: 'Chamei',        ico: '💬', cor: '#6ea8ff' },
   { k: 'respondeu',nome: 'Respondeu',     ico: '✅', cor: '#3ddc97' },
   { k: 'agendou',  nome: 'Agendou',       ico: '📅', cor: '#b98aff' },
-  { k: 'semint',   nome: 'Sem interesse', ico: '❌', cor: '#8b8fa3' }
+  { k: 'semint',   nome: 'Sem interesse', ico: '🚪', cor: '#8b8fa3' },
+  { k: 'desq',     nome: 'Desqualificado',ico: '👎', cor: '#ff6b6b' }
 ];
 function crmEtapaDe(x) {
   var e = v2norm(x.etapa || '');
@@ -5066,6 +5109,7 @@ function comentMarcar(insta, campo, valor) {
   var k = String(insta).toLowerCase();
   COMENT_MARCA[k] = COMENT_MARCA[k] || {};
   COMENT_MARCA[k][campo] = valor;
+  guardarComentMarca();
   for (var i = 0; i < COMENT.rows.length; i++) {
     if (String(COMENT.rows[i].insta || '').toLowerCase() === k) COMENT.rows[i][campo] = valor;
   }
@@ -5638,6 +5682,49 @@ function listaPreenchimentos(l) {
   });
   return h + '</div>';
 }
+// ===== 🎯 SINAL DO FORMULÁRIO — do estudo do avatar (Bruno 19/08/2026) =====
+// Baseado no "Avatar Profundo + Manual do Lead" (555 reuniões, 20.941 formulários).
+// Testei o resultado contra as vendas reais da própria base: o formulário NÃO
+// distingue os bons leads entre si (todos ficam na faixa de 30-42%), mas separa
+// muito bem quem tende a NÃO comprar. Por isso o painel só avisa do lado fraco —
+// mostrar uma "chance de fechar" para todo mundo seria um número que não prevê nada.
+//   -3 pontos → 8% fecharam   ·  -2 → 15%  ·  -1 → 17%
+//    0 pontos → 32% fecharam  ·  +1 ou mais → 29% a 42% (sem ordem: é ruído)
+function sinalFormulario(l) {
+  if (!l) return null;
+  var renda = String(l.renda || ''), inv = String(l.invest || ''),
+      obj = String(l.obj || ''), seg = String(l.seg || '');
+  var p = 0, respondeu = 0, motivos = [];
+  if (renda) {
+    respondeu++;
+    if (/n[ãa]o tenho|sem renda/i.test(renda)) { p -= 2; motivos.push('não tem renda hoje (24% fecham)'); }
+    else if (/f[íi]sico|digital/i.test(renda)) p++;
+  }
+  if (obj) {
+    respondeu++;
+    if (/multiplicar receita|multiplicar venda|atrair clientes/i.test(obj)) p++;
+  }
+  if (inv) {
+    respondeu++;
+    if (/ a /i.test(inv)) { p--; motivos.push('marcou faixa em vez de valor cravado'); }
+    else if (/1\.?000|2\.?000|1 ?mil|2 ?mil/i.test(inv)) p++;
+  }
+  if (seg) {
+    respondeu++;
+    if (/15\.?000 a 30/i.test(seg)) { p--; motivos.push('faixa de seguidores que menos fecha (33%)'); }
+    else if (/6\.?000 a 10|mais de 100/i.test(seg)) p++;
+  }
+  if (respondeu < 3) return null;      // respondeu pouco: não dá para dizer nada
+  return { pontos: p, motivos: motivos };
+}
+function seloChance(l, mini) {
+  var sf = sinalFormulario(l);
+  if (!sf || sf.pontos >= 0) return '';
+  var taxa = sf.pontos <= -3 ? 8 : sf.pontos === -2 ? 15 : 17;
+  var titulo = 'No estudo de 555 reuniões, quem respondeu assim fechou ' + taxa + '% das vezes'
+    + (sf.motivos.length ? ' · ' + sf.motivos.join(' · ') : '');
+  return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="' + titulo + '">⚠️ sinal fraco' + (mini ? '' : ' · ' + taxa + '% fecham') + '</span>';
+}
 // selo de quem voltou a preencher: quem insiste está interessado
 function seloVezes(l) {
   if (!l || !l.vezes || l.vezes < 2) return '';
@@ -6171,49 +6258,75 @@ function comentFiltrados() {
   });
 }
 // em qual bloco o comentarista entra: falta marcar (por dia) ou já marcado
+// na lista, mostra em que etapa do CRM a pessoa está (e deixa trocar por ali)
+function seloEtapaCrm(x) {
+  var k = crmEtapaDe(x);
+  var e = CRM_ETAPAS.filter(function(y){ return y.k === k; })[0] || CRM_ETAPAS[0];
+  return '<select title="etapa do atendimento" onchange="event.stopPropagation();comentMarcar(\'' + (x.insta || '') + '\',\'etapa\',this.value);"'
+    + ' style="background:' + e.cor + '1f;border:1px solid ' + e.cor + '66;border-radius:8px;color:' + e.cor + ';'
+    + 'padding:4px 6px;font-size:.66rem;font-weight:800;cursor:pointer;">'
+    + CRM_ETAPAS.map(function(o){ return '<option value="' + o.nome + '"' + (o.k === k ? ' selected' : '') + '>' + o.ico + ' ' + o.nome + '</option>'; }).join('')
+    + '</select>';
+}
 // desenha o quadro (colunas + cartões que se arrastam)
 function crmQuadro(lista) {
   var porEtapa = {};
   CRM_ETAPAS.forEach(function(e){ porEtapa[e.k] = []; });
   lista.forEach(function(x){ porEtapa[crmEtapaDe(x)].push(x); });
-  var h = '<div style="display:flex;gap:9px;overflow-x:auto;padding:4px 2px 10px;align-items:flex-start;">';
+  var h = '<div class="crm-board">';
   CRM_ETAPAS.forEach(function(e) {
     var itens = porEtapa[e.k];
     h += '<div class="crm-col" data-etapa="' + e.k + '" ondragover="crmSobre(event)" ondragleave="crmSai(event)" ondrop="crmSoltar(event)"'
-      + ' style="flex:0 0 250px;max-width:250px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:9px;">'
-      + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:0 2px;">'
-      +   '<span style="font-size:.95rem;">' + e.ico + '</span>'
-      +   '<b style="flex:1;font-size:.72rem;color:' + e.cor + ';text-transform:uppercase;letter-spacing:.4px;">' + e.nome + '</b>'
-      +   '<span class="ld-tag" style="background:' + e.cor + '22;color:' + e.cor + ';">' + itens.length + '</span>'
+      + ' style="--cor:' + e.cor + ';">'
+      + '<div class="crm-cab">'
+      +   '<span style="font-size:1rem;">' + e.ico + '</span>'
+      +   '<b>' + e.nome + '</b>'
+      +   '<span class="crm-conta">' + itens.length + '</span>'
       + '</div>'
-      + '<div style="display:flex;flex-direction:column;gap:6px;max-height:430px;overflow-y:auto;min-height:60px;">';
-    if (!itens.length) h += '<div class="hint" style="padding:12px 6px;text-align:center;opacity:.5;">arraste alguém para cá</div>';
+      + '<div class="crm-fila">';
+    if (!itens.length) h += '<div class="crm-vazio">solte alguém aqui</div>';
     itens.slice(0, 60).forEach(function(x) {
       var lead = comentCruza(x);
-      h += '<div class="crm-card" draggable="true" ondragstart="crmPegar(event)" data-insta="' + (x.insta || '') + '"'
-        + ' style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-left:3px solid ' + e.cor + ';border-radius:11px;padding:8px 9px;cursor:grab;">'
-        + '<div style="display:flex;align-items:center;gap:7px;">'
-        +   '<div class="avatar" style="width:26px;height:26px;font-size:.6rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
+      // o que a pessoa respondeu no formulário, quando respondeu
+      var respostas = '';
+      if (lead) {
+        var linhas = [
+          lead.invest ? ['💰', lead.invest] : null,
+          lead.seg ? ['👥', lead.seg + ' seguidores'] : null,
+          lead.renda ? ['💼', lead.renda] : null,
+          lead.obj ? ['🎯', String(lead.obj).slice(0, 70)] : null
+        ].filter(Boolean);
+        if (linhas.length) {
+          respostas = '<div class="crm-resp">'
+            + linhas.map(function(l){ return '<div><span>' + l[0] + '</span>' + l[1] + '</div>'; }).join('')
+            + '</div>';
+        }
+      }
+      var faixa = lead && lead.faixa === 'alta' ? '<span class="crm-chip quente">🔥 R$2–4mil</span>'
+                : lead && lead.faixa === 'media' ? '<span class="crm-chip morno">R$500–1mil</span>' : '';
+      h += '<div class="crm-card" draggable="true" ondragstart="crmPegar(event)" ondragend="crmLargou(event)" data-insta="' + (x.insta || '') + '">'
+        + '<div class="crm-topo">'
+        +   '<div class="avatar" style="width:30px;height:30px;font-size:.62rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
         +     (x.insta ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(x.insta) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
         +   '</div>'
-        +   '<b style="flex:1;font-size:.72rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (x.nome || '@' + x.insta) + '</b>'
+        +   '<div style="flex:1;min-width:0;">'
+        +     '<b class="crm-nome">' + (x.nome || '@' + x.insta) + '</b>'
+        +     '<div class="crm-quando">' + (x.date ? tempoDesde(x.date) : '') + (x.seguidores ? ' · 👥 ' + x.seguidores : '') + '</div>'
+        +   '</div>'
         + '</div>'
-        + '<div class="hint" style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;">'
-        +   (x.date ? '<span>' + tempoDesde(x.date) + '</span>' : '')
-        +   (x.seguidores ? '<span>👥 ' + x.seguidores + '</span>' : '')
+        + '<div class="crm-chips">'
+        +   (lead ? '<span class="crm-chip ok">✅ preencheu</span>' : '<span class="crm-chip pend">só comentou</span>')
+        +   faixa
+        +   (x.tag ? '<span class="crm-chip tag">' + x.tag + '</span>' : '')
         + '</div>'
-        + '<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">'
-        +   (lead
-              ? '<span class="ld-tag" style="background:rgba(61,220,151,.15);color:#3ddc97;">✅ preencheu' + (lead.faixa === 'alta' ? ' · 🔥' : '') + '</span>'
-              : '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">só comentou</span>')
-        +   (x.tag ? '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;">' + x.tag + '</span>' : '')
-        + '</div>'
-        + '<div style="margin-top:6px;display:flex;gap:5px;">'
-        +   (x.insta ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:4px;font-size:.64rem;background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.3);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank" onclick="event.stopPropagation();">📷 abrir</a>' : '')
-        +   (!lead ? '<button class="btn-assumir" style="flex:1;padding:4px;font-size:.64rem;" onclick="event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);">➕ Clint</button>' : '')
+        + respostas
+        + '<div class="crm-acoes">'
+        +   (x.insta ? '<a href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank" onclick="event.stopPropagation();">📷 perfil</a>' : '')
+        +   (lead ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();verFichaPendente(\'' + (lead.tel8 || '') + '\');">👤 ficha</a>'
+                  : '<a href="#" onclick="event.preventDefault();event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);">➕ Clint</a>')
         + '</div></div>';
     });
-    if (itens.length > 60) h += '<div class="hint" style="padding:6px;">… e mais ' + (itens.length - 60) + '</div>';
+    if (itens.length > 60) h += '<div class="crm-vazio">… e mais ' + (itens.length - 60) + '</div>';
     h += '</div></div>';
   });
   return h + '</div>';
@@ -6221,17 +6334,18 @@ function crmQuadro(lista) {
 var _crmArrastando = null;
 function crmPegar(e) {
   _crmArrastando = e.currentTarget.getAttribute('data-insta');
-  e.currentTarget.style.opacity = '.45';
+  e.currentTarget.classList.add('arrastando');
   try { e.dataTransfer.setData('text/plain', _crmArrastando); e.dataTransfer.effectAllowed = 'move'; } catch (x) {}
 }
 function crmSobre(e) {
   e.preventDefault();
-  e.currentTarget.style.background = 'rgba(110,168,255,.12)';
+  e.currentTarget.classList.add('alvo');
 }
-function crmSai(e) { e.currentTarget.style.background = 'rgba(255,255,255,.04)'; }
+function crmLargou(e) { e.currentTarget.classList.remove('arrastando'); }
+function crmSai(e) { e.currentTarget.classList.remove('alvo'); }
 function crmSoltar(e) {
   e.preventDefault();
-  e.currentTarget.style.background = 'rgba(255,255,255,.04)';
+  e.currentTarget.classList.remove('alvo');
   var insta = _crmArrastando || (function(){ try { return e.dataTransfer.getData('text/plain'); } catch (x) { return ''; } })();
   _crmArrastando = null;
   var destino = e.currentTarget.getAttribute('data-etapa');
@@ -6405,7 +6519,7 @@ function ldRow(l, quente) {
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
     + '<div class="ld-info"><b>' + (l.nome || 'Sem nome')
     + (quente ? ' <span class="ld-selo rapido">🔥 CHAMAR RÁPIDO</span>' : '')
-    + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + seloVezes(l) + '</b>'
+    + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + seloVezes(l) + seloChance(l, true) + '</b>'
     + '<span>' + det + '</span></div>'
     + seloAnuncio(l, true)
     + (donoNome ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
@@ -6457,6 +6571,16 @@ function abrirFichaLead(i) {
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1) ? listaPreenchimentos(l) : '', 'html'],
+    ['🎯', 'Sinal do formulário', (function(){
+        var sf = sinalFormulario(l);
+        if (!sf) return '';
+        if (sf.pontos >= 0) return '<span style="color:#3ddc97;font-weight:700;">sem alerta</span>'
+          + '<div class="hint" style="margin-top:3px;">as respostas dele estão na média de quem compra</div>';
+        var taxa = sf.pontos <= -3 ? 8 : sf.pontos === -2 ? 15 : 17;
+        return '<b style="color:#ff6b6b;font-size:1.02rem;">⚠️ ' + taxa + '% fecham</b>'
+          + '<div class="hint" style="margin-top:3px;">' + (sf.motivos.join(' · ') || 'respostas de perfil que converte pouco') + '</div>'
+          + '<div class="hint" style="margin-top:2px;opacity:.7;">medido em 555 reuniões da Promov (a média geral é 38%)</div>';
+      })(), 'html'],
     ['📱', 'WhatsApp', l.tel
       ? '<a href="' + (ldWa(l) || ('https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11)))
         + '" target="_blank" style="color:#3ddc97;text-decoration:none;font-weight:800;" title="abrir a conversa no WhatsApp">'
@@ -7058,14 +7182,19 @@ function renderLeads() {
       h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
         + chipCF('hoje', 'Hoje') + chipCF('ontem', 'Ontem') + chipCF('7d', '7 dias') + chipCF('30d', '30 dias') + chipCF('tudo', 'Tudo') + chipCF('esc', '📅 escolher período')
         + '<span style="flex:1;"></span>'
-        + '<span class="ld-selo' + (window._comQuadro ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._comQuadro=true;renderLeads();">🗂️ quadro</span>'
-        + '<span class="ld-selo' + (window._comQuadro ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._comQuadro=false;renderLeads();">☰ lista</span>'
+        + '<span class="ld-selo' + (window._comQuadro ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._comQuadro=true;try{localStorage.setItem(\'v2ComVista\',\'quadro\');}catch(e){};renderLeads();">🗂️ quadro</span>'
+        + '<span class="ld-selo' + (window._comQuadro ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._comQuadro=false;try{localStorage.setItem(\'v2ComVista\',\'lista\');}catch(e){};renderLeads();">☰ lista</span>'
         + (CF.t === 'esc'
             ? '<input type="date" value="' + (CF.de || '') + '" onchange="window._comFiltro.de=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
               + '<span class="hint">até</span>'
               + '<input type="date" value="' + (CF.ate || '') + '" onchange="window._comFiltro.ate=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
             : '')
         + '</div>';
+      if (window._comQuadro === undefined) {
+        // padrão é o quadro; se a pessoa escolher a lista, o painel lembra
+        try { window._comQuadro = localStorage.getItem('v2ComVista') !== 'lista'; }
+        catch (e) { window._comQuadro = true; }
+      }
       if (window._comQuadro) {
         h += '<div class="hint" style="margin:2px;">Arraste a pessoa de uma coluna para outra — grava sozinho na planilha</div>';
         h += crmQuadro(comLista);
@@ -7110,6 +7239,7 @@ function renderLeads() {
               : '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">⏳ só comentou</span>'
                 + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);" title="Cria na Clint (nome + @), com a Sarah de dona">➕ Clint (Sarah)</button>')
           + (x.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;padding:6px 10px;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank">📷 @' + x.insta + '</a>' : '')
+          + seloEtapaCrm(x)
           + comSeletores(x)
           + '</div>';
       });
