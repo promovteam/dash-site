@@ -1867,6 +1867,7 @@ function fecharTipo(){ document.getElementById('tipo-popup').classList.remove('o
 function vistaPesq(v){
   document.getElementById('pesq-cards').style.display = v === 'cards' ? '' : 'none';
   document.getElementById('pesq-lista').style.display = v === 'lista' ? '' : 'none';
+  if (typeof montarPesquisa === 'function') montarPesquisa(true);   // desenha a visão escolhida
   document.getElementById('vp-cards').classList.toggle('on', v === 'cards');
   document.getElementById('vp-lista').classList.toggle('on', v === 'lista');
 }
@@ -2067,6 +2068,8 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     // (espera um pouco para o filtro "só os novos" ainda funcionar nesta visita)
     if (s === 'leads' && typeof marcarLeadsVistos === 'function') setTimeout(marcarLeadsVistos, 2500);
     if (s === 'anuncios' && typeof renderAnuncios === 'function') renderAnuncios();
+    if (typeof montarTelaSePreciso === 'function') montarTelaSePreciso(s);
+    if (typeof fecharTodasJanelas === 'function') fecharTodasJanelas();
   });
 });
 </script>
@@ -4257,6 +4260,37 @@ function reunioesSemResultado() {
     return v2norm(r.status || '') === v2norm('Reunião agendada') || !(r.status || '').trim();
   }).sort(function(a, b){ return b.date - a.date; });
 }
+// ===== 🚪 CONTROLE DAS JANELAS (Bruno 19/08/2026) =====
+// Uma janela esquecida aberta cobre a tela inteira e engole todos os cliques —
+// era por isso que, depois de abrir e fechar algo, as barras do funil não abriam.
+var _JANELAS = ['modal-status-pendente', 'modal-quem', 'modal-busca-lead',
+                'modal-escolhe-anuncio', 'modal-criativo'];
+function _temJanelaAberta() {
+  if (document.getElementById('modal-b') && document.getElementById('modal-b').classList.contains('open')) return true;
+  if (document.getElementById('modal-lead') && document.getElementById('modal-lead').classList.contains('open')) return true;
+  return _JANELAS.some(function(id) {
+    var m = document.getElementById(id);
+    return m && getComputedStyle(m).display !== 'none';
+  });
+}
+function fecharTodasJanelas() {
+  _JANELAS.forEach(function(id) {
+    var m = document.getElementById(id);
+    if (m) { m.innerHTML = ''; m.style.display = 'none'; }
+  });
+}
+// Esc fecha a janela de cima; e nenhuma janela sobra escondida ao trocar de tela
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  for (var i = 0; i < _JANELAS.length; i++) {
+    var m = document.getElementById(_JANELAS[i]);
+    if (m && getComputedStyle(m).display !== 'none') { m.innerHTML = ''; m.style.display = 'none'; return; }
+  }
+  var mb = document.getElementById('modal-b');
+  if (mb && mb.classList.contains('open')) { fecharB(); return; }
+  var ml = document.getElementById('modal-lead');
+  if (ml && ml.classList.contains('open')) fecharLead();
+});
 // na Visão Geral vira só uma linha discreta; o conteúdo abre em janela (pop-up)
 function renderStatusPendente() {
   var el = document.getElementById('v2-statuspendente');
@@ -4274,7 +4308,11 @@ function renderStatusPendente() {
   try { ultima = parseInt(localStorage.getItem('v2StpVisto') || '0', 10); } catch (e) {}
   if (Date.now() - ultima > 3600000 && !window._stpJaMostrei) {
     window._stpJaMostrei = true;
-    setTimeout(abrirStatusPendente, 900);
+    setTimeout(function() {
+      // não pula na frente de outra janela aberta — ficaria por cima e travaria os cliques
+      if (_temJanelaAberta()) return;
+      abrirStatusPendente();
+    }, 900);
   }
 }
 function abrirStatusPendente() {
@@ -7577,8 +7615,29 @@ function v2stKey(sn) {
   if (sn === 'no show' || sn === 'nao vendido' || sn === 'estorno') return 'r';
   return 'a';
 }
-function montarPesquisa() {
+// ===== ⚡ TELAS PESADAS SÓ SE MONTAM QUANDO ABERTAS (Bruno 19/08/2026) =====
+// Pesquisa e Registro desenhavam TODAS as reuniões (duas vezes cada, em cartão e
+// em lista) já no carregamento — 18 mil pedaços de tela invisíveis. Em computador
+// mais fraco isso travava o painel. Agora só desenham quando alguém abre a aba.
+var TELA_PENDENTE = {};
+function telaVisivel(id) {
+  var el = document.getElementById(id);
+  return !!(el && el.classList.contains('active'));
+}
+function montarTelaSePreciso(s) {
+  if (s === 'pesquisa' && TELA_PENDENTE.pesquisa) { TELA_PENDENTE.pesquisa = false; montarPesquisa(true); }
+  if (s === 'registro' && TELA_PENDENTE.registro) { TELA_PENDENTE.registro = false; montarRegistro(true); }
+  if (s === 'pagamentos' && TELA_PENDENTE.pagamentos) { TELA_PENDENTE.pagamentos = false; montarPagamentos(true); }
+}
+function montarPesquisa(forcar) {
+  if (!forcar && !telaVisivel('s-pesquisa')) { TELA_PENDENTE.pesquisa = true; return; }
   var rows = V2.rows.slice().sort(function(a,b){ return (b.date || 0) - (a.date || 0); });
+  var LIMITE_PESQ = 300;
+  var cortou = rows.length > LIMITE_PESQ;
+  if (cortou) rows = rows.slice(0, LIMITE_PESQ);
+  // desenha só a visão que está aparecendo — a outra fica para quando alguém trocar
+  var plEl = document.getElementById('pesq-lista');
+  var vendoLista = plEl && plEl.style.display !== 'none';
   var cards = '', lista = '';
   rows.forEach(function(r) {
     var i = v2reg(r);
@@ -7586,11 +7645,11 @@ function montarPesquisa() {
     var mkey = r.date ? r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') : '';
     var attrs = ' data-st="' + cls + '" data-prod="' + v2prodKey(r.produto) + '" data-mes="' + mkey + '"';
     var det = [r.leadId, r.produto, r.date ? r.date.toLocaleDateString('pt-BR') : 'sem data'].filter(Boolean).join(' · ');
-    cards += '<div class="glass click pcard"' + attrs + ' style="--halo:rgba(246,163,80,.12);" onclick="abrirLead(' + i + ')">'
+    if (!vendoLista) cards += '<div class="glass click pcard"' + attrs + ' style="--halo:rgba(246,163,80,.12);" onclick="abrirLead(' + i + ')">'
       + '<div class="avatar pgrande" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
       + '<b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b>'
       + '<span>' + det + '</span>' + v2pill(r) + '</div>';
-    lista += '<div class="glass lead-card click"' + attrs + ' style="--halo:rgba(246,163,80,.12);margin-bottom:10px;" onclick="abrirLead(' + i + ')">'
+    if (vendoLista) lista += '<div class="glass lead-card click"' + attrs + ' style="--halo:rgba(246,163,80,.12);margin-bottom:10px;" onclick="abrirLead(' + i + ')">'
       + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
       + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b>'
       + '<span>' + [det, r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).join(' · ') + '</span></div>'
@@ -7598,8 +7657,9 @@ function montarPesquisa() {
   });
   var pc = document.getElementById('pesq-cards');
   var pl = document.getElementById('pesq-lista');
-  if (pc) pc.innerHTML = cards;
-  if (pl) pl.innerHTML = lista;
+  var aviso = cortou ? '<div class="hint" style="padding:10px;grid-column:1/-1;">Mostrando as ' + LIMITE_PESQ + ' reuniões mais recentes — use a busca para achar as outras.</div>' : '';
+  if (pc) pc.innerHTML = vendoLista ? '' : (cards + aviso);
+  if (pl) pl.innerHTML = vendoLista ? (lista + aviso) : '';
 
   // chips de mês gerados dos dados (últimos 4 + Todos)
   var meses = {};
@@ -7637,7 +7697,8 @@ function aplicarFiltroPesq() {
 }
 
 // ---------- registro real ----------
-function montarRegistro() {
+function montarRegistro(forcar) {
+  if (!forcar && !telaVisivel('s-registro')) { TELA_PENDENTE.registro = true; return; }
   var corpo = document.getElementById('reg-corpo');
   if (!corpo) return;
   var rows = V2.rows.slice().sort(function(a,b){ return (b.date || 0) - (a.date || 0); });
@@ -7756,7 +7817,8 @@ function carregarPag() {
   document.body.appendChild(s);
 }
 
-function montarPagamentos() {
+function montarPagamentos(forcar) {
+  if (!forcar && !telaVisivel('s-pagamentos')) { TELA_PENDENTE.pagamentos = true; return; }
   var corpo = document.getElementById('pag-corpo');
   if (!corpo) return;
   var rows = PAG.rows.slice().sort(function(a,b){ return (b.date || 0) - (a.date || 0); });
@@ -9202,20 +9264,36 @@ carregarV2();
 carregarLeads();
 carregarClintPainel();
 carregarComentarios();
-setInterval(carregarComentarios, 180000);
+// ===== ⚡ SÓ ATUALIZA COM O PAINEL À VISTA (Bruno 19/08/2026) =====
+// Com o dash aberto atrás de outra janela o dia todo, cada releitura gastava
+// internet e memória à toa. Agora, escondido, o painel descansa; ao voltar,
+// atualiza na hora o que ficou para trás.
+var _pendenteAoVoltar = false;
+function _cadaTanto(fn, ms) {
+  setInterval(function() {
+    if (document.hidden) { _pendenteAoVoltar = true; return; }
+    try { fn(); } catch (e) {}
+  }, ms);
+}
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden || !_pendenteAoVoltar) return;
+  _pendenteAoVoltar = false;
+  try { carregarV2(); carregarLeads(); carregarClintPainel(); } catch (e) {}
+});
+_cadaTanto(carregarComentarios, 180000);
 // avisos do closer (reunião nova na agenda dele): confere a cada 2 minutos
 carregarAvisosCloser();
-setInterval(carregarAvisosCloser, 120000);
-// base do site do diagnóstico: relê a cada 2 minutos (leads ao vivo)
-setInterval(function(){ SB.carregado = false; LD._fundido = null; carregarSupabase(); }, 180000);
+_cadaTanto(carregarAvisosCloser, 120000);
+// base do site do diagnóstico: relê a cada 3 minutos (leads ao vivo)
+_cadaTanto(function(){ SB.carregado = false; LD._fundido = null; carregarSupabase(); }, 180000);
 // fica de olho: a cada 3 minutos relê a planilha de leads e avisa se chegou alguém;
 // a cada 5 minutos atualiza o painel da Clint (etapas, donos e esperando resposta)
-setInterval(carregarLeads, 180000);
-setInterval(carregarClintPainel, 300000);
+_cadaTanto(carregarLeads, 180000);
+_cadaTanto(carregarClintPainel, 300000);
 carregarPag();
 setTimeout(carregarAgenda, 800);
-setInterval(carregarV2, 120000);
-setInterval(carregarPag, 300000);
+_cadaTanto(carregarV2, 120000);
+_cadaTanto(carregarPag, 300000);
 </script>
 
 </body>
