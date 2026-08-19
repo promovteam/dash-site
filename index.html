@@ -570,6 +570,10 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .ld-info { flex:1; min-width:0; }
 .ld-info b { font-size:.84rem; display:block; }
 .ld-info span { font-size:.68rem; color:var(--muted); font-weight:600; }
+/* capa do anúncio: passando o mouse aparece o ▶ para tocar */
+.an-capa .an-play { opacity:0; transform:scale(.9); transition:opacity .15s, transform .15s; pointer-events:none; }
+.an-capa:hover .an-play { opacity:1; transform:scale(1); pointer-events:auto; }
+.an-capa:hover img { filter:brightness(.6); transition:filter .15s; }
 .ld-selo { font-size:.6rem; font-weight:800; letter-spacing:.4px; padding:4px 10px; border-radius:999px; white-space:nowrap; }
 .ld-selo.rapido { background:rgba(246,163,80,.18); color:#f6a350; border:1px solid rgba(246,163,80,.5); animation:ldPulsa 1.4s ease-in-out infinite; }
 .ld-selo.morno { background:rgba(110,168,255,.14); color:#6ea8ff; border:1px solid rgba(110,168,255,.35); }
@@ -4766,10 +4770,14 @@ function renderAnuncios() {
     _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m };
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
     h += '<div class="click" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
-      + '<div style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
+      + '<div class="an-capa" style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
       +   (m.foto ? '<img src="' + m.foto + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : '')
       +   '<span class="semfoto" style="position:absolute;inset:0;display:' + (m.foto ? 'none' : 'flex') + ';align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>'
-      +   (m.post ? '<a href="https://www.facebook.com/' + m.post.replace('_', '/posts/') + '" target="_blank" style="position:absolute;inset:0;" title="ver a publicação"></a>' : '')
+      +   (m.post
+            ? '<span class="an-play" onclick="event.stopPropagation();abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ',true);" title="tocar aqui dentro"'
+              + ' style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:pointer;">'
+              + '<span style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.92);color:#111;display:flex;align-items:center;justify-content:center;font-size:1.15rem;box-shadow:0 3px 14px rgba(0,0,0,.5);">▶</span></span>'
+            : '')
       +   '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.65);color:#fff;font-size:.62rem;font-weight:800;padding:3px 8px;border-radius:99px;">#' + (i+1) + '</span>'
       +   (m.link ? '<a href="' + m.link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : '')
       + '</div>'
@@ -4880,7 +4888,7 @@ function ldFundirSupabase() {
 
 // ===== ▶ VER O CRIATIVO DENTRO DO DASH (imagem grande / vídeo tocando) =====
 var _anAtual = null;
-function abrirCriativo(nome) {
+function abrirCriativo(nome, jaTocar) {
   var d = _anDados[nome];
   if (!d) {
     // veio da ficha de um lead, sem ter aberto a aba Anúncios: monta na hora
@@ -4926,12 +4934,12 @@ function abrirCriativo(nome) {
     +     (m.foto ? '<img src="' + m.foto + '" style="width:100%;border-radius:12px;display:block;">' : '')
     +     (player
           ? '<div id="cri-post" style="margin-top:10px;">'
-            + (ehCatalogo || m.foto
+            + ((ehCatalogo || m.foto) && !jaTocar
                 ? '<span class="ld-selo morno" style="cursor:pointer;" onclick="verPostCriativo()">▶ ver a publicação no Facebook (aqui dentro)</span>'
                   + (ehCatalogo ? '<div class="hint" style="margin-top:6px;">Anúncio de catálogo: a prévia do Facebook mostra etiquetas como {{product.name}} porque o texto é montado na hora da entrega.</div>' : '')
-                : player)
+                : '')
             + '</div>'
-            + '<div id="cri-player" style="display:none;margin-top:10px;">' + player + '</div>'
+            + '<div id="cri-player" style="display:' + ((ehCatalogo || m.foto) && !jaTocar ? 'none' : 'block') + ';margin-top:10px;">' + player + '</div>'
           : (m.foto ? '' : '<div class="hint">Sem prévia disponível</div>'))
     +   '</div>'
     +   '<div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:9px;">'
