@@ -1206,8 +1206,14 @@ img { max-width:100%; height:auto; }
   <div class="ag-grid2">
     <div class="dtl-card">
       <div class="g-label">👤 Lead</div>
-      <div class="ag-campo"><label>Nome</label><input class="edit-in ag-in" id="ag-nome" placeholder="Nome completo do lead"></div>
-      <div class="ag-campo"><label>📱 Telefone</label><input class="edit-in ag-in" id="ag-tel" placeholder="(21) 9 9999-9999"></div>
+      <div class="ag-campo"><label>🔎 Procurar o lead (nome, telefone ou @)</label>
+        <input class="edit-in ag-in" id="ag-busca" autocomplete="off" placeholder="digite e escolha — o resto preenche sozinho"
+          oninput="agProcurar(this.value)" onblur="setTimeout(function(){var r=document.getElementById('ag-result');if(r)r.style.display='none';},200)">
+        <div id="ag-result" style="display:none;position:relative;z-index:5;max-height:210px;overflow-y:auto;margin-top:4px;border:1px solid rgba(110,168,255,.35);border-radius:10px;background:var(--card,#15152b);"></div>
+      </div>
+      <div id="ag-origem-box" style="display:none;"></div>
+      <div class="ag-campo"><label>Nome</label><input class="edit-in ag-in" id="ag-nome" placeholder="Nome completo do lead" onblur="agAcharPor('nome')"></div>
+      <div class="ag-campo"><label>📱 Telefone</label><input class="edit-in ag-in" id="ag-tel" placeholder="(21) 9 9999-9999" onblur="agAcharPor('tel')"></div>
       <div class="ag-campo"><label>✉️ E-mail</label><input class="edit-in ag-in" id="ag-email" placeholder="email@exemplo.com"></div>
       <div class="ag-campo"><label>📷 Instagram</label><input class="edit-in ag-in" id="ag-insta" placeholder="@usuario"></div>
       <div class="ag-campo"><label>🔗 Link Clint</label><input class="edit-in ag-in" id="ag-clint" placeholder="https://app.clint.digital/..."></div>
@@ -1953,8 +1959,36 @@ function abrirAgendar(dur){
   if (cs && (AG.closer === 'bruno' || AG.closer === 'tony')) {
     cs.value = AG.closer === 'tony' ? 'Tony Londe' : 'Bruno Pardim';
   }
+  agLimparFicha();  // sem isso, os dados do lead anterior ficavam no formulário
+  agLimparLead();
+  agEuNoSdr();      // quem entrou no dash já vem como SDR / social seller
   document.getElementById('modal-agendar').classList.add('open');
   closerMudou();
+}
+// zera os campos do lead ao abrir o formulário
+function agLimparFicha() {
+  ['ag-busca','ag-nome','ag-tel','ag-email','ag-insta','ag-clint','ag-obs'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var so = document.getElementById('ag-origem');
+  if (so) { for (var i = 0; i < so.options.length; i++) if (so.options[i].text === '—') { so.selectedIndex = i; break; } }
+  var res = document.getElementById('ag-result');
+  if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+}
+// põe quem está logado no campo SDR (o login é "Sarah Promov", a planilha diz "SS Sarah":
+// casamos pelo primeiro nome, que é como as duas listas se encontram)
+function agEuNoSdr() {
+  var sel = document.getElementById('ag-sdr');
+  if (!sel) return;
+  var eu = localStorage.getItem('v2Login') || ldEu() || '';
+  if (!eu || eu === 'Visitante' || eu === 'Adm') return;
+  var primeiro = v2norm(eu).split(' ')[0];
+  if (!primeiro) return;
+  for (var i = 0; i < sel.options.length; i++) {
+    var op = v2norm(sel.options[i].text);
+    if (op === v2norm(eu) || op.split(' ').indexOf(primeiro) !== -1) { sel.selectedIndex = i; return; }
+  }
 }
 function fecharAgendar(){ document.getElementById('modal-agendar').classList.remove('open'); window._agAprovado = false; }
 function mudarVista(v){
@@ -2488,6 +2522,16 @@ function v2usados(campo, minimo) {
   V2.rows.forEach(function(r){ var v = (r[campo] || '').trim(); if (v) m[v] = (m[v] || 0) + 1; });
   return Object.keys(m).filter(function(k){ return m[k] >= (minimo || 5); }).sort(function(a, b){ return m[b] - m[a]; });
 }
+// junta a lista base com o que veio da planilha, sem repetir nome trocando maiúscula/acento
+function v2mais(base, daPlanilha) {
+  var fora = [], vistos = {};
+  (base || []).forEach(function(v){ vistos[v2norm(v)] = 1; });
+  (daPlanilha || []).forEach(function(v){
+    var k = v2norm(v);
+    if (k && !vistos[k]) { vistos[k] = 1; fora.push(v); }
+  });
+  return (base || []).concat(fora);
+}
 function montarOpcoesAgenda() {
   function fill(id, vals, comVazio) {
     var el = document.getElementById(id); if (!el || !vals.length) return;
@@ -2496,8 +2540,10 @@ function montarOpcoesAgenda() {
     if (atual && vals.indexOf(atual) !== -1) el.value = atual;
   }
   fill('ag-prod', v2usados('produto'));
-  fill('ag-sdr', OPCOES_PLANILHA.sdr, true);
-  fill('ag-origem', OPCOES_PLANILHA.origem);
+  // a lista deixa de ser fixa: quem aparece na planilha entra sozinho
+  // (era por isso que o Ismael não aparecia — ele estava na planilha, não no código)
+  fill('ag-sdr', v2mais(OPCOES_PLANILHA.sdr, v2usados('sdr', 1)), true);
+  fill('ag-origem', v2mais(OPCOES_PLANILHA.origem, v2usados('origem', 2)), true);
   var mesesL = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   var hj = new Date(), m1 = hj.getMonth(), m2 = (m1 + 1) % 12;
   fill('ag-mes', [(m1 + 1) + '.' + mesesL[m1], (m2 + 1) + '.' + mesesL[m2]]);
@@ -3920,7 +3966,7 @@ function montarSeletorEu() {
     return;
   }
   sel.disabled = false;
-  var nomes = (OPCOES_PLANILHA.sdr || []).slice();
+  var nomes = v2mais(OPCOES_PLANILHA.sdr || [], v2usados('sdr', 1));
   ['Bruno Pardim', 'Tony Londe'].forEach(function(n){ if (nomes.indexOf(n) === -1) nomes.push(n); });
   var eu = ldEu();
   if (eu && nomes.indexOf(eu) === -1) nomes.push(eu);
@@ -7699,6 +7745,156 @@ function abrirAgendarCom(dur, dataStr, hora) {
   if (typeof atualizarHorarios === 'function') atualizarHorarios();
 }
 
+// ===== 🔎 PUXAR OS DADOS DO LEAD NA HORA DE MARCAR A REUNIÃO =====
+// Pedido do Bruno 18/08/2026: em vez de digitar tudo de novo, o formulário acha
+// a pessoa na base (diagnóstico + site) e já preenche nome, telefone, e-mail,
+// Instagram e a origem — mostrando de qual anúncio ela veio.
+var _agLead = null;
+function agProcurar(txt) {
+  var cx = document.getElementById('ag-result');
+  if (!cx) return;
+  var q = v2norm(txt || '');
+  var soDigitos = String(txt || '').replace(/\D/g, '');
+  if (q.length < 3 && soDigitos.length < 4) { cx.style.display = 'none'; return; }
+  var achados = (LD.rows || []).filter(function(l) {
+    if (soDigitos.length >= 4 && String(l.tel || '').replace(/\D/g, '').indexOf(soDigitos) !== -1) return true;
+    if (q.length < 3) return false;
+    return v2norm(l.nome || '').indexOf(q) !== -1 || v2norm(l.insta || '').indexOf(q) !== -1;
+  }).slice(0, 12);
+  if (!achados.length) {
+    cx.innerHTML = '<div class="hint" style="padding:9px 11px;">Ninguém com esse nome/telefone na base. Pode preencher na mão.</div>';
+    cx.style.display = 'block';
+    return;
+  }
+  cx.innerHTML = achados.map(function(l) {
+    var i = LD.rows.indexOf(l);
+    var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.15);color:#ff6b6b;">🔥 HT</span>'
+      : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">MQL</span>' : '';
+    return '<div class="click" style="padding:8px 11px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"'
+      + ' onmousedown="agUsarLead(' + i + ')">'
+      + '<b style="font-size:.76rem;flex:1;">' + (l.nome || '(sem nome)') + '</b>' + selo
+      + '<span class="hint">' + (l.tel || (l.insta ? '@' + l.insta : '')) + '</span>'
+      + '<span class="hint">' + (l.dataTxt || '').slice(0, 10) + '</span></div>';
+  }).join('');
+  cx.style.display = 'block';
+}
+// achou pelo que já foi digitado no nome ou no telefone (sem precisar da busca)
+function agAcharPor(campo) {
+  if (_agLead) return;                 // já preenchido por escolha
+  var v = (document.getElementById(campo === 'tel' ? 'ag-tel' : 'ag-nome') || {value:''}).value.trim();
+  if (!v) return;
+  var l = null;
+  if (campo === 'tel') {
+    var d8 = v.replace(/\D/g, '').slice(-8);
+    if (d8.length === 8) l = (LD.rows || []).filter(function(x){ return x.tel8 === d8; })[0];
+  } else {
+    var q = v2norm(v);
+    if (q.length >= 4) {
+      var iguais = (LD.rows || []).filter(function(x){ return v2norm(x.nome || '') === q; });
+      if (iguais.length === 1) l = iguais[0];
+    }
+  }
+  if (l) agUsarLead(LD.rows.indexOf(l), true);
+}
+// preenche o formulário com os dados do lead escolhido
+function agUsarLead(i, silencioso) {
+  var l = (LD.rows || [])[i];
+  if (!l) return;
+  _agLead = l;
+  var por = function(id, valor) {
+    var el = document.getElementById(id);
+    if (el && valor && !el.value.trim()) el.value = valor;
+  };
+  por('ag-nome', l.nome);
+  // telefone só com números e sem o 55 do Brasil (é assim que a planilha guarda)
+  var tel = String(l.tel || '').replace(/\D/g, '');
+  if (tel.length > 11 && tel.indexOf('55') === 0) tel = tel.slice(-11);
+  por('ag-tel', tel);
+  por('ag-email', l.email);
+  // em parte da base o campo do Instagram veio com o nome da pessoa; só usa se for mesmo um @
+  // parte da base traz nome ou e-mail nesse campo; só usa se parecer mesmo um @ do Instagram
+  var ig = String(l.insta || '').trim().replace(/^@/, '');
+  var igVale = ig && ig.length <= 32 && /^[A-Za-z0-9._]+$/.test(ig) && !/\.(com|br|net|org)$/i.test(ig);
+  por('ag-insta', igVale ? '@' + ig : '');
+  // quem já vinha atendendo (dono na base ou na Clint) entra como SDR / social seller
+  var quem = (l.dono || '').trim();
+  if (!quem) {
+    try {
+      var m = CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[l.tel8];
+      if (m && m[0] >= 0) quem = (CLINT_PAINEL.donos[m[0]] || '').trim();
+    } catch (e) {}
+  }
+  var selS = document.getElementById('ag-sdr');
+  if (selS && quem && (selS.value === '—' || !selS.value)) {
+    for (var j = 0; j < selS.options.length; j++) {
+      if (v2norm(selS.options[j].text) === v2norm(quem)) { selS.selectedIndex = j; break; }
+    }
+  }
+  // origem: usa a regra da casa — quem veio do diagnóstico é [Ads][Diag] se teve
+  // anúncio, [Org][Diag] se foi orgânico, e [Org][Diag][Mchat] se veio do ManyChat
+  var sel = document.getElementById('ag-origem');
+  if (sel && (!sel.value || sel.value === '—')) {
+    var bruta = (l.origem || '') + ' ' + (l.fonte || '') + ' ' + (l.utm || '');
+    var ehDiag = /diagnostic|\[diag\]|\bdiag\b/i.test(bruta) || l.i === 'sb';
+    var ehMchat = /manychat|mchat/i.test(bruta);
+    var ehBio = /\bbio\b|organic/i.test(bruta);
+    var ehPago = !ehBio && (l.meio === 'paid' || !!l.anuncio || /(^|[^a-z])(ads|fb|facebook|instagram_ads|paid)([^a-z]|$)/i.test(bruta));
+    var querido = ehDiag
+      ? (ehMchat ? '[Org][Diag][Mchat]' : ehPago ? '[Ads][Diag]' : '[Org][Diag]')
+      : (l.origem || l.fonte || '');
+    var alvo = v2norm(querido);
+    for (var k = 0; k < sel.options.length && alvo; k++) {
+      var op = v2norm(sel.options[k].text);
+      if (op && op === alvo) { sel.selectedIndex = k; break; }
+    }
+    // não achou exato: tenta pelo texto, exigindo pedaço grande para não errar
+    if (sel.value === '—' || !sel.value) {
+      var cru = v2norm(l.origem || l.fonte || '');
+      for (var k2 = 0; k2 < sel.options.length && cru.length >= 5; k2++) {
+        var op2 = v2norm(sel.options[k2].text);
+        if (op2.length >= 5 && (cru.indexOf(op2) !== -1 || op2.indexOf(cru) !== -1)) { sel.selectedIndex = k2; break; }
+      }
+    }
+  }
+  // reunião de 50 min para Legado, 1h40 para HT — só sugere se ninguém mexeu
+  var busca = document.getElementById('ag-busca');
+  if (busca && !silencioso) busca.value = '';
+  var res = document.getElementById('ag-result');
+  if (res) res.style.display = 'none';
+  agMostrarOrigem(l);
+}
+// o quadrinho "de onde este lead veio"
+function agMostrarOrigem(l) {
+  var cx = document.getElementById('ag-origem-box');
+  if (!cx) return;
+  var cri = l.anuncio ? criativoDe(l.anuncio, '') : null;
+  var linha = function(rot, val) {
+    return val ? '<div style="display:flex;gap:6px;font-size:.7rem;margin-top:3px;"><span class="hint" style="min-width:74px;">' + rot + '</span><b style="flex:1;">' + val + '</b></div>' : '';
+  };
+  cx.innerHTML = '<div class="dtl-card" style="background:rgba(110,168,255,.07);border:1px solid rgba(110,168,255,.3);padding:10px 12px;margin-bottom:8px;">'
+    + '<div style="display:flex;align-items:center;gap:8px;">'
+    +   (cri && cri.foto ? '<img src="' + cri.foto + '" onclick="abrirCriativo(' + JSON.stringify(l.anuncio || '').replace(/"/g, '&quot;') + ')" title="ver o anúncio" style="width:52px;height:52px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid rgba(255,255,255,.15);">' : '')
+    +   '<div style="flex:1;min-width:0;"><b style="font-size:.74rem;color:#6ea8ff;">📍 de onde veio</b>'
+    +     '<div class="hint" style="margin-top:2px;">preenchido da base — confira antes de agendar</div></div>'
+    +   '<span style="cursor:pointer;opacity:.6;font-size:.9rem;" onclick="agLimparLead()" title="não é este lead">✕</span>'
+    + '</div>'
+    + linha('origem', l.origem || l.fonte)
+    + linha('anúncio', l.anuncio)
+    + linha('campanha', l.campanha)
+    + linha('investe', l.invest)
+    + linha('seguidores', l.seg)
+    + linha('objetivo', l.obj)
+    + linha('chegou em', (l.dataTxt || '').slice(0, 16))
+    + linha('atendendo', l.dono)
+    + '</div>';
+  cx.style.display = 'block';
+}
+function agLimparLead() {
+  _agLead = null;
+  var cx = document.getElementById('ag-origem-box');
+  if (cx) { cx.style.display = 'none'; cx.innerHTML = ''; }
+}
+
 // AGENDAR DE VERDADE: planilha + Calendar + Meet (mesmo canal do antigo)
 function agendarReuniao(btn) {
   if (soOlhar()) return;
@@ -7938,6 +8134,7 @@ var ACESSOS = [
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
+  { nome: 'Ismael',        pin: '6180' },
   { nome: 'Adm',           pin: '8520', adm: true },     // acesso geral; não vira "Você" sozinho
   { nome: 'Visitante',     pin: '0000', soOlha: true }   // vê tudo, não mexe em nada
 ];
