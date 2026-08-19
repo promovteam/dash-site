@@ -1460,6 +1460,8 @@ Instagram: @pr.joaosilva</div>
     </div>
     <div id="lead-info"></div>
   </div>
+  <!-- o que a pessoa respondeu no formulário do diagnóstico (pedido do Bruno 19/08/2026) -->
+  <div id="fl-formulario"></div>
   <!-- Aparece somente quando a reuniao foi REALIZADA (etapa futura: links reais) -->
   <div class="dtl-card" id="card-gravacao" style="display:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -6899,8 +6901,62 @@ function abrirLead(i) {
   if (nt) nt.value = r.obs || '';
   _modoEdicao = false;
   desenharInfo();
+  mostrarFormularioDoLead(r);
   document.getElementById('modal-lead').classList.add('open');
   preencherGravacao(r);
+}
+// ===== 📋 O QUE A PESSOA RESPONDEU NO FORMULÁRIO — dentro da ficha da reunião =====
+// A reunião mora na aba de vendas e o formulário na aba do diagnóstico;
+// juntamos os dois pelo telefone (últimos 8 números).
+function mostrarFormularioDoLead(r) {
+  var cx = document.getElementById('fl-formulario');
+  if (!cx) return;
+  var t8 = ldTel8(r.telefone);
+  var l = t8 ? (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] : null;
+  if (!l) {
+    cx.innerHTML = '<div class="dtl-card"><div class="g-label">📋 Formulário do diagnóstico</div>'
+      + '<div class="hint" style="padding:4px 0;">Esta pessoa não preencheu o formulário (ou o telefone da reunião está diferente do que ela usou lá).</div></div>';
+    return;
+  }
+  var linha = function(ico, rot, val) {
+    if (!val) return '';
+    return '<div class="dtl-line"><span>' + ico + ' ' + rot + '</span><b style="text-align:right;max-width:62%;">' + val + '</b></div>';
+  };
+  var a = anuncioDe(l);
+  cx.innerHTML = '<div class="dtl-card">'
+    + '<div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;">'
+    +   '<div class="g-label" style="margin-bottom:0;flex:1;">📋 O que respondeu no formulário</div>'
+    +   (l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
+        : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '')
+    + '</div>'
+    + linha('📅', 'Preencheu em', (l.dataTxt || '').slice(0, 16))
+    + linha('👥', 'Seguidores', l.seg)
+    + linha('💰', 'Quanto pode investir', l.invest)
+    + linha('💼', 'Fonte de renda hoje', l.renda)
+    + linha('🎯', 'Objetivos', l.obj)
+    + linha('📷', 'Instagram', l.insta ? '@' + String(l.insta).replace(/^@/, '') : '')
+    + linha('✉️', 'E-mail', l.email)
+    + linha('🧲', 'Origem', l.origem || l.fonte)
+    + linha('📊', 'Campanha', l.campanha)
+    + '<div class="dtl-line"><span>📣 Anúncio que trouxe</span>'
+    +   '<span style="text-align:right;">' + (seloAnuncio(l) || '<span class="hint">—</span>') + '</span></div>'
+    + (a.cri && a.cri.foto
+        ? '<div style="margin-top:10px;text-align:center;"><img src="' + a.cri.foto + '" onclick="abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')"'
+          + ' style="max-width:100%;max-height:200px;border-radius:12px;cursor:pointer;border:1px solid rgba(255,255,255,.12);" title="clique para ver o anúncio inteiro"></div>'
+        : '')
+    + '<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap;">'
+    +   (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank">🟣 abrir na Clint</a>' : '')
+    +   '<span class="ld-tag" style="cursor:pointer;background:rgba(110,168,255,.14);color:#6ea8ff;" onclick="verFormularioCompleto(\'' + t8 + '\')">ver a ficha completa do lead →</span>'
+    + '</div></div>';
+}
+function verFormularioCompleto(t8) {
+  var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0];
+  if (!l) return;
+  var pos = _ldReg.indexOf(l);
+  if (pos === -1) { _ldReg.push(l); pos = _ldReg.length - 1; }
+  abrirFichaLead(pos);
+  var mb = document.getElementById('modal-b');
+  if (mb) { mb.style.zIndex = '10005'; mb.dataset.voltaLista = '1'; }
 }
 
 // copia texto com método reserva (para navegadores que bloqueiam a cópia moderna)
@@ -7493,7 +7549,7 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbwskRY8GgEqF58YHq_qRhfI4zVz1g5JO-LvTZbP-gUBsinVkjjUiL11MOEYrkc537wC/exec (11ª implantação, v17)
 // https://script.google.com/macros/s/AKfycbyombG0HTvuGkbwQA7OGJCB2Ah43-i7i8luGA8VRsW8qjgJwFlbPDlziZySR_EjxdwB/exec (12ª implantação, v19)
 // https://script.google.com/macros/s/AKfycbxL2Vvmtga3_pp2VwmspYv5WxRDFbuDiEr0ai9oSs_k8IKRjYQal_Tli8Xekgh-DazX/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzw9iYS-wkK1Hi9rkbTnKZFDV1C4p4VnEIcTnXu5Ns_roXvAGcK2JaQ1X0KrCy3GqGN/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzHswp2uHTHhPGAGz_ej1fwshn6zj940flNaeRpTEv2ZCLOyCzFy3K2vl41rAHXQ6DS/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
