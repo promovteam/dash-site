@@ -937,6 +937,8 @@ img { max-width:100%; height:auto; }
     <div id="v2-novos"></div>
     <div id="v2-clint"></div>
     <div id="v2-semorigem"></div>
+    <div id="v2-avisocloser"></div>
+    <div id="v2-statuspendente"></div>
     <div id="v2-visao"></div>
   </section>
 
@@ -3704,6 +3706,8 @@ function carregarClintPainel() {
       renderLeads();
       renderAlertaClintHome();
       renderSemOrigem();
+      renderAvisoCloser();
+      renderStatusPendente();
     } else if (!CLINT_PAINEL) {
       CLINT_PAINEL = d || { success: false };
       renderLeads();
@@ -4058,6 +4062,158 @@ function renderAlertaClintHome() {
     + '<div class="hint" style="margin-top:3px;">' + espPorDono(wa) + ' · clique para ver quem é</div></div>'
     + '<span style="color:#ff6b6b;font-weight:800;font-size:.72rem;white-space:nowrap;">Ver agora →</span></div>';
 }
+// ===== 🔔 AVISO DO CLOSER: marcaram reunião na sua agenda (Bruno 19/08/2026) =====
+// Além do e-mail que o robô manda, o closer vê aqui ao abrir o dash — com som
+// e notificação do computador quando chega uma nova com o dash aberto.
+var AV_CLOSER = { lista: [], carregado: false };
+function _euSouCloser() {
+  var eu = localStorage.getItem('v2Login') || '';
+  if (v2norm(eu).indexOf('bruno') !== -1) return 'bruno';
+  if (v2norm(eu).indexOf('tony') !== -1) return 'tony';
+  return '';
+}
+function carregarAvisosCloser() {
+  var quem = _euSouCloser();
+  if (!quem) return;                       // só o closer vê os avisos dele
+  var nome = 'avCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  var pronto = false;
+  var fim = function(d) {
+    if (pronto) return;
+    pronto = true;
+    try { sc.remove(); } catch (e) {}
+    try { delete window[nome]; } catch (e) {}
+    if (d && d.success) {
+      var antes = AV_CLOSER.lista.length;
+      AV_CLOSER.lista = d.avisos || [];
+      AV_CLOSER.carregado = true;
+      // chegou reunião nova com o dash aberto: toca e avisa
+      var vistos = {};
+      try { vistos = JSON.parse(localStorage.getItem('v2AvisosVistos') || '{}'); } catch (e) {}
+      var novas = AV_CLOSER.lista.filter(function(a){ return !vistos[a.criadoEm]; });
+      if (antes && novas.length) {
+        try { tocarSirene(false); } catch (e) {}
+        notificarLead('🔔 Reunião nova na sua agenda!',
+          (novas[0].lead || 'Lead') + ' · ' + (novas[0].quando || '')
+          + (novas.length > 1 ? ' (+' + (novas.length - 1) + ')' : ''));
+      }
+      renderAvisoCloser();
+    }
+  };
+  window[nome] = fim;
+  sc.onerror = function(){ fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
+    + encodeURIComponent(JSON.stringify({ action: 'avisosCloser', quem: quem }));
+  document.body.appendChild(sc);
+  setTimeout(function(){ fim(null); }, 30000);
+}
+function renderAvisoCloser() {
+  var el = document.getElementById('v2-avisocloser');
+  if (!el) return;
+  var quem = _euSouCloser();
+  if (!quem || !AV_CLOSER.lista.length) { if (el) el.innerHTML = ''; return; }
+  var vistos = {};
+  try { vistos = JSON.parse(localStorage.getItem('v2AvisosVistos') || '{}'); } catch (e) {}
+  var novas = AV_CLOSER.lista.filter(function(a){ return !vistos[a.criadoEm]; });
+  if (!novas.length) { el.innerHTML = ''; return; }
+  var aberto = !!window._avAberto;
+  var h = '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(61,220,151,.1);border-color:rgba(61,220,151,.5);">'
+    + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._avAberto=!window._avAberto;renderAvisoCloser();">'
+    + '<span style="font-size:1.3rem;">🔔</span>'
+    + '<div style="flex:1;min-width:0;"><b style="font-size:.86rem;color:#3ddc97;">'
+    +   novas.length + ' reuni' + (novas.length === 1 ? 'ão nova na sua agenda' : 'ões novas na sua agenda') + '</b>'
+    + '<div class="hint" style="margin-top:3px;">' + novas.slice(0, 3).map(function(a){ return (a.lead || 'Lead') + ' · ' + (a.quando || ''); }).join(' · ') + '</div></div>'
+    + '<span style="color:#3ddc97;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (aberto ? '▲ fechar' : '▼ ver') + '</span></div>';
+  if (aberto) {
+    h += '<div style="display:flex;flex-direction:column;gap:6px;">';
+    novas.forEach(function(a) {
+      var choque = /em cima de outra/i.test(a.obs || '');
+      h += '<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+        + '<b style="font-size:.78rem;flex:1;min-width:120px;">' + (a.lead || 'Lead') + '</b>'
+        + '<span class="ld-tag" style="background:rgba(255,209,102,.15);color:#ffd166;">📅 ' + (a.quando || '') + '</span>'
+        + (a.sdr ? '<span class="ld-tag" style="background:rgba(110,168,255,.14);color:#6ea8ff;">' + a.sdr + '</span>' : '')
+        + (choque ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;" title="Já tinha outra reunião nesse horário">⚠️ em cima de outra</span>' : '')
+        + (a.meet ? '<a class="ld-wa" style="background:rgba(61,220,151,.14);border-color:rgba(61,220,151,.45);color:#3ddc97;" href="' + a.meet + '" target="_blank">▶ Meet</a>' : '')
+        + '</div>';
+    });
+    h += '<button class="btn" style="align-self:flex-start;padding:6px 13px;font-size:.7rem;margin-top:2px;" onclick="jaViAvisos()">✓ já vi todas</button>';
+    h += '</div>';
+  }
+  el.innerHTML = h + '</div>';
+}
+function jaViAvisos() {
+  var vistos = {};
+  try { vistos = JSON.parse(localStorage.getItem('v2AvisosVistos') || '{}'); } catch (e) {}
+  AV_CLOSER.lista.forEach(function(a){ vistos[a.criadoEm] = 1; });
+  try { localStorage.setItem('v2AvisosVistos', JSON.stringify(vistos)); } catch (e) {}
+  window._avAberto = false;
+  renderAvisoCloser();
+}
+
+// ===== ✅ REUNIÃO ACABOU: LEMBRA O CLOSER DE PÔR O RESULTADO (Bruno 19/08/2026) =====
+// Cada closer vê só as dele. Aparece quando o horário já passou e a reunião
+// continua marcada como "agendada".
+var ST_RAPIDOS = ['Vendido', 'Não vendido', 'No-Show', 'Bloqueio de oferta', 'Entrada', 'Remarcada 2 reunião'];
+function reunioesSemResultado() {
+  var quem = _euSouCloser();
+  if (!quem) return [];
+  var nomeCloser = quem === 'tony' ? 'tony londe' : 'bruno pardim';
+  var agora = Date.now();
+  var limite = agora - 30 * 86400000;   // não cobra reunião de mais de um mês atrás
+  return (V2.rows || []).filter(function(r) {
+    if (!r.date) return false;
+    if (v2norm(r.closer || '').indexOf(quem === 'tony' ? 'tony' : 'bruno') === -1) return false;
+    var t = r.date.getTime();
+    if (t > agora - 3600000) return false;      // ainda não acabou (dá 1h de folga)
+    if (t < limite) return false;
+    return v2norm(r.status || '') === v2norm('Reunião agendada') || !(r.status || '').trim();
+  }).sort(function(a, b){ return b.date - a.date; });
+}
+function renderStatusPendente() {
+  var el = document.getElementById('v2-statuspendente');
+  if (!el) return;
+  var lista = reunioesSemResultado();
+  if (!lista.length) { el.innerHTML = ''; return; }
+  var aberto = !!window._stpAberto;
+  var h = '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(185,138,255,.1);border-color:rgba(185,138,255,.5);">'
+    + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._stpAberto=!window._stpAberto;renderStatusPendente();">'
+    + '<span style="font-size:1.3rem;">✅</span>'
+    + '<div style="flex:1;min-width:0;"><b style="font-size:.86rem;color:#b98aff;">'
+    +   lista.length + ' reuni' + (lista.length === 1 ? 'ão sua já aconteceu e está sem resultado' : 'ões suas já aconteceram e estão sem resultado') + '</b>'
+    + '<div class="hint" style="margin-top:3px;">Diga o que aconteceu para o número do mês ficar certo</div></div>'
+    + '<span style="color:#b98aff;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (aberto ? '▲ fechar' : '▼ atualizar agora') + '</span></div>';
+  if (aberto) {
+    h += '<div style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
+    lista.slice(0, 40).forEach(function(r) {
+      var i = v2reg(r);
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+        + '<b style="font-size:.77rem;flex:1;min-width:110px;">' + (r.nome || 'Sem nome') + '</b>'
+        + '<span class="hint">' + r.date.toLocaleDateString('pt-BR') + '</span>'
+        + '<select onchange="porResultado(' + i + ', this)" style="background:rgba(255,255,255,.07);border:1px solid rgba(185,138,255,.45);border-radius:9px;color:var(--text);padding:5px 8px;font-size:.7rem;font-weight:700;cursor:pointer;">'
+        +   '<option value="">o que aconteceu?</option>'
+        +   ST_RAPIDOS.map(function(o){ return '<option>' + o + '</option>'; }).join('')
+        + '</select>'
+        + '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="abrirLead(' + i + ')">abrir</span>'
+        + '</div>';
+    });
+    if (lista.length > 40) h += '<div class="hint">… e mais ' + (lista.length - 40) + '</div>';
+    h += '</div>';
+  }
+  el.innerHTML = h + '</div>';
+}
+// grava o resultado direto do aviso
+function porResultado(i, sel) {
+  if (soOlhar()) return;
+  var r = V2.rows[i];
+  var valor = sel.value;
+  if (!r || !valor) return;
+  sel.disabled = true;
+  r.status = valor; r.sn = v2norm(valor);
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: valor, dataRef: v2dataRef(r), gid: V2_GID });
+  try { sincronizarStatusEvento(r); } catch (e) {}
+  setTimeout(function(){ renderStatusPendente(); renderV2(); }, 500);
+}
+
 // ===== 🧲 REUNIÕES SEM ORIGEM — aviso para os SDRs (pedido do Bruno 18/08/2026) =====
 // Toda reunião tem que dizer de onde o lead veio. Aqui listamos as que ficaram sem,
 // já sugerindo a origem quando dá para descobrir pela base (anúncio, ManyChat, bio…).
@@ -8740,6 +8896,9 @@ carregarLeads();
 carregarClintPainel();
 carregarComentarios();
 setInterval(carregarComentarios, 180000);
+// avisos do closer (reunião nova na agenda dele): confere a cada 2 minutos
+carregarAvisosCloser();
+setInterval(carregarAvisosCloser, 120000);
 // base do site do diagnóstico: relê a cada 2 minutos (leads ao vivo)
 setInterval(function(){ SB.carregado = false; LD._fundido = null; carregarSupabase(); }, 180000);
 // fica de olho: a cada 3 minutos relê a planilha de leads e avisa se chegou alguém;
