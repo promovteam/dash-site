@@ -2728,7 +2728,9 @@ function filtrarUltimas(txt) {
 // Uma peça só, usada na lista de leads, na ficha, nas reuniões e na busca.
 // Quem não tem anúncio aparece marcado como INCOMPLETO, com botão para preencher.
 // Marcações feitas agora (antes da planilha ser relida) ficam guardadas aqui.
-var ANUNCIO_MARCA = {};
+var ANUNCIO_MARCA = (function() {
+  try { return JSON.parse(localStorage.getItem('v2AnuncioMarca') || '{}'); } catch (e) { return {}; }
+})();
 // descobre o anúncio de alguém, venha de onde vier (lead da base ou linha de reunião)
 function anuncioDe(x) {
   if (!x) return { nome: '', txt: '', cri: null, tem: false };
@@ -2752,18 +2754,19 @@ function anuncioDe(x) {
 function seloAnuncio(x, mini) {
   var a = anuncioDe(x);
   var t8 = a.tel8 || '';
+  var rotulo = mini ? '' : 'criativo que trouxe: ';
   if (a.tem && a.organico) {
     var corteO = mini ? 18 : 30;
     return '<a class="ld-tag" href="' + (a.post.link || '#') + '" target="_blank" onclick="event.stopPropagation();"'
       + ' style="background:rgba(61,220,151,.15);color:#3ddc97;text-decoration:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;display:inline-block;"'
-      + ' title="' + String(a.post.link || '').replace(/"/g, '') + '">'
-      + '📱 ' + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>';
+      + ' title="postagem orgânica que trouxe este lead · ' + String(a.post.link || '').replace(/"/g, '') + '">'
+      + '📱 ' + rotulo + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>';
   }
   if (a.tem) {
     var corte = mini ? 18 : 30;
     return '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;cursor:pointer;max-width:230px;overflow:hidden;text-overflow:ellipsis;"'
-      + ' onclick="event.stopPropagation();abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')" title="' + String(a.txt).replace(/"/g, '') + ' — clique para ver o criativo">'
-      + '📣 ' + (a.txt.length > corte ? a.txt.slice(0, corte) + '…' : a.txt) + '</span>';
+      + ' onclick="event.stopPropagation();abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')" title="criativo que trouxe este lead: ' + String(a.txt).replace(/"/g, '') + ' — clique para ver">'
+      + '📣 ' + rotulo + (a.txt.length > corte ? a.txt.slice(0, corte) + '…' : a.txt) + '</span>';
   }
   if (!t8) return '';
   // lead orgânico nunca vai ter anúncio: em vez de cobrar, convida a dizer qual post
@@ -2940,9 +2943,31 @@ function salvarAnuncioEscolhido(nome) {
   if (!t8) return;
   var valor = (nome === '__organico__') ? 'Orgânico (sem anúncio)' : nome;
   ANUNCIO_MARCA[t8] = valor;
+  try { localStorage.setItem('v2AnuncioMarca', JSON.stringify(ANUNCIO_MARCA)); } catch (e) {}
   (LD.rows || []).forEach(function(l){ if (l.tel8 === t8) l.anuncio = valor; });
   var l = (LD.rows || []).filter(function(y){ return y.tel8 === t8; })[0];
-  sendToGAS({ action: 'marcarAnuncio', tel8: t8, telefone: (l && l.tel) || t8, anuncio: valor, quem: ldEu() || '' });
+  // pede com resposta (JSONP): assim sabemos se a planilha aceitou
+  var cb = 'maCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  var pronto = false;
+  window[cb] = function(d) {
+    if (pronto) return;
+    pronto = true;
+    try { sc.remove(); } catch (e) {}
+    try { delete window[cb]; } catch (e) {}
+    if (d && !d.success) {
+      // o lead ainda não está na aba da pesquisa (veio da base do site): fica só no painel
+      alert('Marquei aqui no painel, mas a planilha ainda não tem esta pessoa '
+        + '(ela veio da base do site e a planilha só recebe quando o formulário é concluído).\n\n'
+        + 'A marcação vale na sua tela e nas próximas aberturas deste computador.');
+    }
+  };
+  sc.onerror = function(){ if (!pronto) { pronto = true; try { delete window[cb]; } catch (e) {} } };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({
+    action: 'marcarAnuncio', tel8: t8, telefone: (l && l.tel) || t8, anuncio: valor, quem: ldEu() || ''
+  }));
+  document.body.appendChild(sc);
+  setTimeout(function(){ if (!pronto) { pronto = true; try { sc.remove(); delete window[cb]; } catch (e) {} } }, 30000);
   fecharEscolheAnuncio();
   try { renderLeads(); } catch (e) {}
   try { if (typeof filtrarUltimas === 'function') filtrarUltimas(''); } catch (e) {}
@@ -5304,9 +5329,36 @@ function ldTipoTrafego(l) {
   var meio = String((l && l.meio) || '').toLowerCase();
   var fonte = String((l && l.fonte) || '').toLowerCase();
   var org = String((l && l.origem) || '').toLowerCase();
+  var anun = String((l && l.anuncio) || '');
+  // Quem clicou num ANÚNCIO é tráfego pago, mesmo que tenha entrado pelo ManyChat
+  // ou pela bio: o ManyChat é o caminho, o anúncio é a origem. Antes, esses leads
+  // caíam em "orgânico" e o anúncio inteiro aparecia na aba errada (Bruno 19/08/2026).
+  if (anun) {
+    if (anun.indexOf('POST:') === 0 || /org[âa]nico/i.test(anun)) return 'organico';
+    // é um criativo que o Facebook conhece, ou tem cara de anúncio (Ad12, ADV-01, Diag.Julho…)
+    var ehCriativo = false;
+    try { ehCriativo = !!criativoDe(anun, ''); } catch (e) {}
+    if (ehCriativo || /^\s*(ad|adv|advsl)[\s\-_.0-9]/i.test(anun) || /^\s*diag[\s\-_.]/i.test(anun)) return 'pago';
+  }
   if (/paid|ads|cpc|pago/.test(meio) || /\[ads\]/.test(org) || /^fb$|^ig$/.test(fonte)) return 'pago';
   if (/bio|manychat|organic|org/.test(fonte) || /\[org\]|\[bio\]/.test(org) || meio) return 'organico';
   return 'organico';
+}
+// O que é anúncio pago e o que é orgânico, decidido pelo PRÓPRIO criativo.
+// Antes o tipo vinha do primeiro lead que chegava — bastava um lead ter entrado
+// pelo ManyChat para o anúncio inteiro cair na aba Orgânico (Bruno 19/08/2026).
+function tipoDoAnuncio(nome, tipoDoLead) {
+  var n = String(nome || '').trim();
+  if (!n) return tipoDoLead || 'organico';
+  if (n.indexOf('POST:') === 0) return 'organico';                       // postagem que cadastramos
+  if (/^org[âa]nico( |$|\s*\()/i.test(n)) return 'organico';             // "Orgânico (sem anúncio)"
+  if (/^link[_ ]?in[_ ]?bio$/i.test(n)) return 'organico';               // link da bio
+  // é um criativo que o Facebook conhece? então é anúncio pago, ponto final
+  try { if (criativoDe(n, '')) return 'pago'; } catch (e) {}
+  if (/^\s*(ad|adv|advsl)[\s\-_.0-9]/i.test(n)) return 'pago';           // Ad10, ADV-01, ADVSL-…
+  if (/^\s*diag[\s\-_.]/i.test(n)) return 'pago';                       // Diag.Julho_VIDEO_10
+  if (/^https?:|\.com|\.br|manychat|bio\b/i.test(n)) return 'organico';  // link, página, manychat
+  return tipoDoLead || 'organico';
 }
 // =====================================================================
 // 📣 ABA ANÚNCIOS E ORIGENS — de onde vem cada reunião e cada venda
@@ -5408,9 +5460,10 @@ function renderAnuncios() {
     if (per.fim !== null && t >= per.fim) return;
     var nome = ldAnuncioLimpo(l.anuncio);
     if (nome === '(sem anúncio)') return;
-    var tipo = ldTipoTrafego(l);
+    var tipo = tipoDoAnuncio(nome, ldTipoTrafego(l));
     if (AN_TIPO !== 'todos' && tipo !== AN_TIPO) return;
     var a = an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo,
+      _tipoFixo: true,
       quem: { n:[], q:[], mql:[], ag:[], re:[], vd:[] } });   // guarda quem é, para poder clicar e ver
     a.n++; a.quem.n.push(l);
     if (l.faixa === 'alta') { a.q++; a.quem.q.push(l); }
@@ -7148,7 +7201,7 @@ function renderLeads() {
                 + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarPendenteNaClint(' + JSON.stringify(x.tel8).replace(/"/g, '&quot;') + ', this);" title="Cria o contato na Clint, no funil (etapa Base IA)">➕ criar na Clint</button>')
           + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;">⏱ ' + tempoDesde(x.date) + '</span>' : '')
           + (x.origem ? '<span class="ld-tag" style="background:rgba(110,168,255,.13);color:#6ea8ff;">' + x.origem + '</span>' : '')
-          + (x.anuncio ? '<span class="ld-tag" style="background:rgba(185,138,255,.13);color:#b98aff;" title="' + x.anuncio + '">📣 ' + ldAnuncioLimpo(x.anuncio).substring(0, 22) + '</span>' : '')
+          + seloAnuncio(x)   // criativo que trouxe (ou o convite para dizer qual foi)
           + '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation();">💬 WhatsApp</a>'
           + (x.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank">📷</a>' : '')
           + '</div>';
