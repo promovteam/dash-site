@@ -5362,22 +5362,6 @@ function ldTipoTrafego(l) {
 // O que é anúncio pago e o que é orgânico, decidido pelo PRÓPRIO criativo.
 // Antes o tipo vinha do primeiro lead que chegava — bastava um lead ter entrado
 // pelo ManyChat para o anúncio inteiro cair na aba Orgânico (Bruno 19/08/2026).
-// cadastra a postagem direto na aba Criativos (sem precisar de um lead aberto)
-function cadastrarPostNaAba() {
-  if (soOlhar()) return;
-  var li = document.getElementById('po-link'), ap = document.getElementById('po-apelido');
-  if (!li) return;
-  var link = (li.value || '').trim(), apelido = (ap && ap.value || '').trim();
-  if (!link) { alert('Cole o link da postagem.'); li.focus(); return; }
-  if (!/^https?:\/\//i.test(link)) { alert('O link precisa começar com http:// ou https://'); li.focus(); return; }
-  if (!apelido) {
-    var m = link.match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
-    apelido = m ? 'Post ' + m[2].slice(0, 8) : link.replace(/^https?:\/\//, '').slice(0, 34);
-  }
-  guardarPostOrganico(apelido.replace(/\|/g, '-'), link);
-  li.value = ''; if (ap) ap.value = '';
-  renderAnuncios();
-}
 function tipoDoAnuncio(nome, tipoDoLead) {
   var n = String(nome || '').trim();
   if (!n) return tipoDoLead || 'organico';
@@ -5545,18 +5529,8 @@ function renderAnuncios() {
       + (META.buscando ? 'Buscando investimento e imagens no Facebook…' : 'Facebook ainda não conectado' + (META.erro ? ' (' + META.erro + ')' : '') + ' — falta a chave META_TOKEN no robô. Os números de leads/reuniões/vendas abaixo já funcionam.')
       + '</div>';
   }
-  // ===== 📱 cadastrar postagem orgânica (Bruno 19/08/2026) =====
-  // Os posts cadastrados aparecem na MESMA lista dos anúncios, com os números
-  // de leads, reuniões e vendas — aqui fica só o campo de acrescentar um novo.
-  if (AN_TIPO === 'organico' || AN_TIPO === 'todos') {
-    h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:9px 11px;'
-      + 'border-radius:12px;background:rgba(61,220,151,.07);border:1px dashed rgba(61,220,151,.35);">'
-      + '<b style="font-size:.72rem;color:#3ddc97;white-space:nowrap;">📱 acrescentar postagem</b>'
-      + '<input id="po-apelido" placeholder="nome do post (ex: Reels dos 3 erros)" style="flex:2;min-width:150px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:7px 10px;font-size:.74rem;">'
-      + '<input id="po-link" placeholder="cole o link do post ou reels" style="flex:3;min-width:180px;background:rgba(255,255,255,.07);border:1px solid rgba(61,220,151,.3);border-radius:9px;color:var(--text);padding:7px 10px;font-size:.74rem;" onkeydown="if(event.key===\'Enter\')cadastrarPostNaAba();">'
-      + '<button class="btn-assumir" style="padding:6px 13px;font-size:.72rem;" onclick="cadastrarPostNaAba()">➕ acrescentar</button>'
-      + '</div>';
-  }
+  // O cadastro de postagem fica só na ficha do lead (pedido do Bruno 19/08/2026):
+  // aqui a aba só MOSTRA os posts junto com os anúncios, com os números de cada um.
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
   if (!chaves.length) h += '<div class="hint">Nenhum anúncio no período.</div>';
   carregarCriativos();
@@ -5920,11 +5894,12 @@ function abrirCriativo(nome, jaTocar) {
     var m = (META.dados || { anuncios: [] }).anuncios.filter(function(x){ return _chaveAnuncio(x.anuncio) === _chaveAnuncio(nome); })[0] || {};
     var cri = criativoDe(nome, m.adId);
     if (cri) m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post };
-    if (!m.foto && !m.link && !m.post) return;
+    if (!m.foto && !m.link && !m.post && String(nome).indexOf('POST:') !== 0) return;
     d = _anDados[nome] = { n: 0, q: 0, mql: 0, ag: 0, re: 0, vd: 0, fat: 0, camp: '', tipo: 'pago', meta: m };
   }
   _anAtual = nome;
   var m = d.meta || {};
+  var ehPostOrg = String(nome).indexOf('POST:') === 0;
   var cx = document.getElementById('modal-criativo');
   if (!cx) {
     cx = document.createElement('div');
@@ -5935,7 +5910,12 @@ function abrirCriativo(nome, jaTocar) {
   }
   // o vídeo/post do Facebook tocando aqui dentro
   var player = '';
-  if (m.post) {
+  if (ehPostOrg) {
+    // postagem do Instagram: mostra o post inteiro dentro da janela
+    var pp = _lerPost(nome);
+    var mi = String(pp.link).match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
+    if (mi) player = '<iframe src="https://www.instagram.com/' + mi[1] + '/' + mi[2] + '/embed/captioned/" width="400" height="560" scrolling="no" frameborder="0" style="border:none;border-radius:12px;background:#000;max-width:100%;"></iframe>';
+  } else if (m.post) {
     var partes = String(m.post).split('_');
     if (partes.length === 2) {
       var urlPost = 'https://www.facebook.com/' + partes[0] + '/posts/' + partes[1];
@@ -5949,14 +5929,14 @@ function abrirCriativo(nome, jaTocar) {
   var ehCatalogo = /^adv[-_]/i.test(nome) || /catalog|dpa|dinamic/i.test(nome);
   cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,255,255,.14);border-radius:20px;max-width:960px;width:100%;max-height:92vh;overflow-y:auto;padding:20px;">'
     + '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;">'
-    +   '<div style="flex:1;"><b style="font-size:1.02rem;">' + nome + '</b>'
-    +     '<div class="hint" style="margin-top:3px;">' + (d.camp || '') + '</div></div>'
-    +   '<span class="ld-tag" style="background:' + (d.tipo === 'pago' ? 'rgba(255,107,107,.14);color:#ff6b6b' : 'rgba(61,220,151,.14);color:#3ddc97') + ';">' + (d.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
+    +   '<div style="flex:1;"><b style="font-size:1.02rem;">' + (ehPostOrg ? '📱 ' + ldAnuncioLimpo(nome) : nome) + '</b>'
+    +     '<div class="hint" style="margin-top:3px;">' + (ehPostOrg ? '<a href="' + _lerPost(nome).link + '" target="_blank" style="color:#3ddc97;text-decoration:none;">' + _lerPost(nome).link + ' ↗</a>' : (d.camp || '')) + '</div></div>'
+    +   '<span class="ld-tag" style="background:' + (d.tipo === 'pago' ? 'rgba(255,107,107,.14);color:#ff6b6b' : 'rgba(61,220,151,.14);color:#3ddc97') + ';">' + (d.tipo === 'pago' ? '💰 pago' : ehPostOrg ? '📱 postagem' : '🌱 orgânico') + '</span>'
     +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;padding:0 4px;" onclick="fecharCriativo()">✕</span>'
     + '</div>'
     + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
     +   '<div style="flex:1;min-width:300px;">'
-    +     (m.foto ? '<img src="' + m.foto + '" style="width:100%;border-radius:12px;display:block;">' : '')
+    +     (!ehPostOrg && m.foto ? '<img src="' + m.foto + '" style="width:100%;border-radius:12px;display:block;">' : '')
     +     (player
           ? '<div id="cri-post" style="margin-top:8px;">'
             + (ehCatalogo ? '<div class="hint">Anúncio de catálogo: a prévia do Facebook mostra etiquetas como {{product.name}} porque o texto é montado na hora da entrega.</div>' : '')
