@@ -5119,6 +5119,7 @@ function verLeadsDoAnuncio(chave) {
   var d = _anDados[_anAtual];
   if (!d || !d.quem || !d.quem[chave]) return;
   var lista = d.quem[chave];
+  _quemLista = lista;
   var cx = document.getElementById('modal-quem');
   if (!cx) {
     cx = document.createElement('div');
@@ -5134,7 +5135,7 @@ function verLeadsDoAnuncio(chave) {
     +   '<button class="btn" style="padding:6px 11px;font-size:.68rem;" onclick="baixarQuem(\'' + chave + '\')">📊 planilha</button>'
     +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharQuem()">✕</span></div>'
     + '<div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;">'
-    + lista.slice(0, 300).map(function(l) {
+    + lista.slice(0, 300).map(function(l, i) {
         var st = l.tel8 && _ldIdx ? _ldIdx[l.tel8] : null;
         var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
           : l.faixa === 'media' ? '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;">R$500–1mil</span>' : '';
@@ -5142,18 +5143,31 @@ function verLeadsDoAnuncio(chave) {
               : st.re ? '<span class="ld-tag" style="background:rgba(185,138,255,.16);color:#b98aff;">fez a reunião</span>'
               : '<span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;">agendou</span>') : '';
         var lk = clintLink(l);
-        return '<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+        var pos = _ldReg.indexOf(l);
+        return '<div class="click" onclick="verFichaDaLista(' + i + ')" title="clique para ver todos os dados"'
+          + ' style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;cursor:pointer;"'
+          + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'">'
           + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
           + '<div style="flex:1;min-width:130px;"><b style="font-size:.77rem;">' + (l.nome || '(sem nome)') + '</b>'
           +   '<div class="hint" style="margin-top:1px;">' + [l.tel, (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div></div>'
           + selo + etapa
-          + (l.tel ? '<a class="ld-wa" href="https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11) + '" target="_blank">💬</a>' : '')
-          + (lk ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + lk + '" target="_blank">🟣</a>' : '')
+          + (l.tel ? '<a class="ld-wa" onclick="event.stopPropagation();" href="https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11) + '" target="_blank">💬</a>' : '')
+          + (lk ? '<a class="ld-wa" onclick="event.stopPropagation();" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + lk + '" target="_blank">🟣</a>' : '')
+          + '<span style="color:#6ea8ff;font-weight:800;font-size:.66rem;">ver →</span>'
           + '</div>';
       }).join('')
     + (lista.length > 300 ? '<div class="hint" style="padding:8px;">… e mais ' + (lista.length - 300) + '</div>' : '')
     + '</div></div>';
   cx.style.display = 'flex';
+}
+// abre a ficha completa (todos os dados do diagnóstico) de quem foi clicado na lista
+var _quemLista = [];
+function verFichaDaLista(i) {
+  var l = _quemLista[i];
+  if (!l) return;
+  var pos = _ldReg.indexOf(l);
+  if (pos === -1) { _ldReg.push(l); pos = _ldReg.length - 1; }   // a ficha lê de _ldReg
+  abrirFichaLead(pos);
 }
 function fecharQuem() {
   var cx = document.getElementById('modal-quem');
