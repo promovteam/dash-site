@@ -567,7 +567,9 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .fs-calc-total b { font-size:1.25rem; color:var(--green); }
 
 /* ===== ABA LEADS ===== */
-.ld-row { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:14px; margin-bottom:8px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
+.ld-row { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:14px; margin-bottom:8px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); user-select:none; -webkit-user-select:none; }
+.ld-row .ld-info { min-width:140px; }
+.ld-row .btn-assumir, .ld-row .ld-wa { flex-shrink:0; white-space:nowrap; }
 .ld-row.quente { border-color:rgba(246,163,80,.45); background:linear-gradient(90deg, rgba(246,163,80,.10), rgba(255,255,255,.03)); }
 .ld-info { flex:1; min-width:0; }
 .ld-info b { font-size:.84rem; display:block; }
@@ -2159,7 +2161,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-20-1859';
+var VERSAO_DASH = '2026-08-20-1909';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -7113,7 +7115,7 @@ function ldRow(l, quente) {
   var ek = ldEtapaDe(l), ei = ldEtapaInfo(ek);
   var hs = ldHorasParado(l);
   // leads em atendimento consultam a conversa na Clint (o resto usaria muita chamada)
-  if (ek === 'qualif' || (l.dono || '').trim()) clintPerguntar(l, function(){ renderLeads(); });
+  if (ek === 'qualif' || (l.dono || '').trim()) clintPerguntar(l, renderLeadsLogo);
   var cl = clintTexto(l);
   var cInfo = CLINT[ldTel8(l.tel)];
   // lead que falou por último e está esperando resposta nossa = pisca
@@ -7128,6 +7130,9 @@ function ldRow(l, quente) {
   var etapa = (infoC && infoC.etapa)
     ? '<span class="et-chip" style="background:rgba(108,71,255,.18);color:#8f6bff;border-color:rgba(108,71,255,.5);" title="Etapa que está na Clint">' + infoC.etapa + '</span>'
     : (ek === 'novo' ? '' : '<span class="et-chip" style="background:' + ei.cor + '22;color:' + ei.cor + ';border-color:' + ei.cor + '66;">' + ei.ico + ' ' + ei.nome + '</span>');
+  // "Agendado" aparecia DUAS vezes (o da planilha e o da Clint dizendo a mesma
+  // coisa) — quando as duas etiquetas falam de agendamento, fica só a da Clint
+  if (tags && infoC && infoC.etapa && v2norm(infoC.etapa).indexOf('agendad') !== -1 && tags.indexOf('Agendado') !== -1) tags = '';
   var donoNome = (infoC && infoC.dono) || l.dono || '';
   var dono = donoNome ? '<span class="dono-chip" title="' + ((infoC && infoC.dono) ? 'Dono na Clint' : 'Assumido no dash') + '">✋ ' + donoNome + '</span>' : '';
   // aviso: lead da pesquisa que NÃO está na Clint (não virou negócio)
@@ -7670,8 +7675,25 @@ function ldSetDonoUnico(v) {
   renderLeads();
 }
 
+// ===== REDESENHO SEM MATAR O CLIQUE (Bruno 20/08/2026) =====
+// Cada resposta da Clint redesenhava a lista inteira NA HORA. Com vários leads
+// consultando, a tela era reconstruída várias vezes seguidas — e o clique que
+// caísse no meio de uma reconstrução morria. Agora as respostas são juntadas
+// e a lista redesenha UMA vez; e se o mouse acabou de ser pressionado, o
+// redesenho espera o clique terminar.
+var _rlTimer = null, _rlUltimo = 0;
+function renderLeadsLogo() {
+  if (_rlTimer) return;   // já tem um redesenho marcado: as próximas respostas pegam carona
+  var espera = Math.max(900, 5000 - (Date.now() - _rlUltimo));   // no máximo 1 redesenho a cada 5s
+  _rlTimer = setTimeout(function(){ _rlTimer = null; renderLeads(); }, espera);
+}
+var _ultimoClique = 0;
+document.addEventListener('mousedown', function(){ _ultimoClique = Date.now(); }, true);
 function renderLeads() {
   if (!LD.carregado) return;
+  // alguém está no meio de um clique/seleção: espera um instante e tenta de novo
+  if (Date.now() - _ultimoClique < 900) { renderLeadsLogo(); return; }
+  _rlUltimo = Date.now();
   var lo = document.getElementById('ld-loading');
   if (lo) lo.style.display = 'none';
   _ldMontarIdx();
