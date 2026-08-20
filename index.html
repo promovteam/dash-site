@@ -976,7 +976,7 @@ img { max-width:100%; height:auto; }
     <h1 id="screen-title">Visão Geral<small>Dashboard Comercial — Julho 2026</small></h1>
     <div class="topbar-right">
       <button class="btn" id="btn-filtros" onclick="abrirFiltros()">⚙ Filtros</button>
-      <button class="btn">↻</button>
+      <button class="btn" title="Buscar a versão mais nova do dash" onclick="atualizarDash()">↻</button>
     </div>
   </div>
 
@@ -2125,6 +2125,64 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 </script>
 
 <script>
+// =====================================================================
+// VERSÃO DO DASH — para o navegador de cada pessoa não ficar com a tela velha
+// =====================================================================
+// O navegador guarda a página para abrir mais rápido. Quando publicamos uma
+// melhoria, quem já estava com o dash aberto (ou abriu há pouco) continuava
+// vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
+// com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
+// e avisa na tela, com um botão para pegar a nova na hora.
+var VERSAO_DASH = '2026-08-20-1103';
+var _versaoNova = null;
+
+// recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
+function atualizarDash(versao) {
+  var v = versao || _versaoNova || String(Date.now());
+  try { location.replace(location.pathname + '?v=' + encodeURIComponent(v)); }
+  catch (e) { location.reload(true); }
+}
+function _dashNaInternet() {
+  var hn = location.hostname;
+  return !!hn && hn !== 'localhost' && hn !== '127.0.0.1';
+}
+// pergunta ao site qual é a versão publicada agora
+function conferirVersaoDash() {
+  if (!_dashNaInternet() || _versaoNova) return;
+  fetch('versao.txt?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.text() : null; })
+    .then(function(t) {
+      if (!t) return;
+      var v = String(t).trim().split(/\s/)[0];
+      if (!v || v === VERSAO_DASH) return;
+      _versaoNova = v;
+      avisarVersaoNova();
+    })
+    .catch(function(){});   // sem internet ou arquivo ausente: segue a vida
+}
+function avisarVersaoNova() {
+  if (document.getElementById('aviso-versao')) return;
+  var d = document.createElement('div');
+  d.id = 'aviso-versao';
+  d.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:100000;'
+    + 'display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;'
+    + 'background:#16213a;border:1px solid #3ddc97;box-shadow:0 10px 30px rgba(0,0,0,.5);'
+    + 'font-size:.8rem;color:#fff;max-width:92vw;';
+  d.innerHTML = '<span style="font-size:1.1rem;">✨</span>'
+    + '<span>Saiu uma versão nova do dash com as últimas melhorias.</span>'
+    + '<button class="btn primary" style="padding:7px 14px;white-space:nowrap;" onclick="atualizarDash()">🔄 Atualizar agora</button>'
+    + '<span style="cursor:pointer;color:#8b8ba7;" title="Fechar o aviso" onclick="this.parentNode.remove()">✕</span>';
+  document.body.appendChild(d);
+  // se a pessoa estiver com o dash em outra aba, atualiza sozinho — ninguém perde nada
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden && _versaoNova) atualizarDash();
+  });
+}
+if (_dashNaInternet()) {
+  setTimeout(conferirVersaoDash, 15000);          // pouco depois de abrir
+  setInterval(conferirVersaoDash, 5 * 60 * 1000); // e de 5 em 5 minutos
+}
+
 // =====================================================================
 // MOTOR DE DADOS V2 — planilha real dentro da proposta visual
 // =====================================================================
