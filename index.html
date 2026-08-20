@@ -3803,7 +3803,7 @@ var LD = { rows: [], semData: [], carregado: false };
 var LD_PER = 'hoje', LD_BUSCA = '';
 var LD_VIS = 'dia';   // quadro "por período": dia | sem | mes | tri | ano
 // filtros da aba (listas vazias = todos)
-var LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: '', etClint: [], classe: [] };
+var LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: [], etClint: [], classe: [] };
 
 // ===== ATENDIMENTO: dono + etapa do lead (grava na planilha via robô) =====
 // As etapas ficam na coluna "Situacao" e o responsável na coluna "Dono",
@@ -5036,6 +5036,36 @@ function carregarLeads() {
     carregarLeadsPlanoB(); // navegador bloqueou a leitura direta → caminho alternativo
   });
 }
+// ===== RESPONSÁVEL DO LEAD =====
+// Quem é o dono: a Clint manda (é lá que o time trabalha); se não estiver lá,
+// vale quem assumiu no dash. Mesma regra que o card do lead já usava.
+function ldDonoDe(l) {
+  if (!l) return '';
+  var c = clintInfoDe(l);
+  if (c && c.dono) return String(c.dono).trim();
+  return String(l.dono || '').trim();
+}
+// "Selina" (assumido no dash) e "Selina Promov" (nome na Clint) são a mesma pessoa:
+// contam junto quando um nome é o começo do outro.
+function ldMesmoDono(a, b) {
+  var x = v2norm(a || ''), y = v2norm(b || '');
+  if (!x || !y) return false;
+  if (x === y) return true;
+  return (x + ' ').indexOf(y + ' ') === 0 || (y + ' ').indexOf(x + ' ') === 0;
+}
+// lista de responsáveis que REALMENTE aparecem nos leads, do que mais tem para o que menos tem
+function ldDonosExistentes() {
+  var c = {};
+  (LD.rows || []).forEach(function(l){ var d = ldDonoDe(l); if (d) c[d] = (c[d] || 0) + 1; });
+  var nomes = Object.keys(c), junto = {};
+  nomes.forEach(function(n) {
+    var melhor = n;   // fica com o nome mais completo do grupo
+    nomes.forEach(function(o){ if (o.length > melhor.length && ldMesmoDono(o, n)) melhor = o; });
+    junto[melhor] = (junto[melhor] || 0) + c[n];
+  });
+  return Object.keys(junto).sort(function(a, b){ return junto[b] - junto[a]; })
+    .map(function(n){ return { nome: n, q: junto[n] }; });
+}
 // ===== FILTROS DA ABA LEADS =====
 // grupos são LISTAS: dá para marcar mais de uma opção (vazio = todos)
 function ldFiltrar(rows) {
@@ -5050,8 +5080,16 @@ function ldFiltrar(rows) {
       if (!bate) return false;
     }
     if (f.etapa.length && f.etapa.indexOf(ldEtapaDe(l)) === -1) return false;
-    if (f.dono === 'eu' && v2norm(l.dono || '') !== v2norm(ldEu())) return false;
-    if (f.dono === 'sem' && (l.dono || '').trim()) return false;
+    if (f.dono.length) {
+      var dn = ldDonoDe(l), bateD = false;
+      for (var iD = 0; iD < f.dono.length && !bateD; iD++) {
+        var alvo = f.dono[iD];
+        if (alvo === 'eu') bateD = ldMesmoDono(dn, ldEu());
+        else if (alvo === 'sem') bateD = !dn;
+        else bateD = ldMesmoDono(dn, alvo);
+      }
+      if (!bateD) return false;
+    }
     if (f.origem.length && f.origem.indexOf(l.origem) === -1) return false;
     if (f.faixa.length && f.faixa.indexOf(l.faixa) === -1) return false;
     // filtro pela nota de qualificação A/B/C/D (Bruno 19/08/2026)
@@ -5080,7 +5118,6 @@ function ldSetF(grupo, valor) {
   else if (grupo === 'sit') LD_F.sit = (LD_F.sit === valor) ? '' : valor;
   else if (grupo === 'score') LD_F.score = (LD_F.score === valor) ? 0 : valor;
   else if (grupo === 'novos') LD_F.novos = !LD_F.novos;
-  else if (grupo === 'dono') LD_F.dono = (LD_F.dono === valor) ? '' : valor;
   else if (grupo === 'etClint') {
     var iE = LD_F.etClint.indexOf(valor);
     if (iE === -1) LD_F.etClint.push(valor); else LD_F.etClint.splice(iE, 1);
@@ -5093,7 +5130,7 @@ function ldSetF(grupo, valor) {
   renderLeads();
 }
 function ldLimparF() {
-  LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: '', etClint: [] };
+  LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: [], etClint: [], classe: [] };
   LD_BUSCA = '';
   var b = document.querySelector('#s-leads .search-input');
   if (b) b.value = '';
@@ -5101,7 +5138,7 @@ function ldLimparF() {
 }
 function ldContaF() {
   return LD_F.origem.length + LD_F.faixa.length + LD_F.seg.length + LD_F.renda.length + LD_F.etapa.length + LD_F.etClint.length + LD_F.classe.length
-    + (LD_F.sit ? 1 : 0) + (LD_F.score ? 1 : 0) + (LD_F.novos ? 1 : 0) + (LD_F.dono ? 1 : 0);
+    + LD_F.dono.length + (LD_F.sit ? 1 : 0) + (LD_F.score ? 1 : 0) + (LD_F.novos ? 1 : 0);
 }
 // a barra de filtros fica escondida até o usuário pedir
 var LD_FILTROS_ABERTOS = false;
@@ -5141,9 +5178,13 @@ function montarFiltrosLeads() {
     + chip('faixa', 'nda', '⚪ Sem verba', LD_F.faixa.indexOf('nda') !== -1)
     + chip('faixa', 'sem', '❔ Não respondeu', LD_F.faixa.indexOf('sem') !== -1)
     + '</div>'
-    + '<span class="fi-label">✋ Atendimento:</span><div class="chart-chips" style="margin:0;">'
-    + chip('dono', 'eu', '👤 Meus leads', LD_F.dono === 'eu')
-    + chip('dono', 'sem', '🆓 Sem dono', LD_F.dono === 'sem')
+    + '<span class="fi-label">✋ Responsável:</span><div class="chart-chips" style="margin:0;">'
+    + (ldEu() ? chip('dono', 'eu', '👤 Meus leads', LD_F.dono.indexOf('eu') !== -1) : '')
+    + chip('dono', 'sem', '🆓 Sem responsável', LD_F.dono.indexOf('sem') !== -1)
+    + ldDonosExistentes().slice(0, 14).map(function(d) {
+        if (ldEu() && ldMesmoDono(d.nome, ldEu())) return '';   // já tem o "Meus leads"
+        return chip('dono', d.nome, '✋ ' + d.nome + ' (' + d.q + ')', LD_F.dono.indexOf(d.nome) !== -1);
+      }).join('')
     + '</div></div>'
     + '<div class="filtro-inline"><span class="fi-label">🚦 Etapa' + (CLINT_PAINEL && CLINT_PAINEL.success ? ' (Clint)' : '') + ':</span><div class="chart-chips" style="margin:0;">'
     + (CLINT_PAINEL && CLINT_PAINEL.success
@@ -7354,6 +7395,36 @@ function toastLeadNovo(lista) {
   setTimeout(function(){ if (d.parentNode) d.remove(); }, 12000);
 }
 
+// atalho rápido de responsável no topo do funil (a barra de filtros continua
+// permitindo marcar vários ao mesmo tempo) — pedido do Bruno 19/08/2026
+function montarAtalhoDono() {
+  var ds = ldDonosExistentes();
+  if (!ds.length && !ldEu()) return '';
+  var sel = LD_F.dono.length === 1 ? LD_F.dono[0] : (LD_F.dono.length ? '__varios__' : '');
+  function op(v, txt) {
+    var marcado = (v === '' || v === 'eu' || v === 'sem' || sel === 'eu' || sel === 'sem' || sel === '' || sel === '__varios__')
+      ? (sel === v) : ldMesmoDono(sel, v);
+    return '<option value="' + _fsEsc(v).replace(/"/g, '&quot;') + '"' + (marcado ? ' selected' : '') + '>' + _fsEsc(txt) + '</option>';
+  }
+  var ativo = LD_F.dono.length > 0;
+  return '<select onchange="ldSetDonoUnico(this.value)" title="Ver só os leads de um responsável"'
+    + ' style="cursor:pointer;font-size:.6rem;font-weight:800;letter-spacing:.4px;padding:4px 10px;border-radius:999px;'
+    + 'background:' + (ativo ? 'rgba(110,168,255,.2)' : 'rgba(255,255,255,.05)') + ';'
+    + 'color:' + (ativo ? '#6ea8ff' : 'var(--text-secondary)') + ';'
+    + 'border:1px solid ' + (ativo ? '#6ea8ff' : 'rgba(255,255,255,.14)') + ';outline:none;">'
+    + op('', '✋ Todos os responsáveis')
+    + (LD_F.dono.length > 1 ? op('__varios__', '✋ ' + LD_F.dono.length + ' responsáveis marcados') : '')
+    + (ldEu() ? op('eu', '👤 Meus leads (' + ldEu() + ')') : '')
+    + op('sem', '🆓 Sem responsável')
+    + ds.map(function(d){ return op(d.nome, d.nome + ' · ' + d.q); }).join('')
+    + '</select>';
+}
+function ldSetDonoUnico(v) {
+  if (v === '__varios__') return;          // já está assim, não mexe
+  LD_F.dono = v ? [v] : [];
+  renderLeads();
+}
+
 function renderLeads() {
   if (!LD.carregado) return;
   var lo = document.getElementById('ld-loading');
@@ -7749,6 +7820,7 @@ function renderLeads() {
               + '" onclick="ldSetF(\'classe\',\'' + k + '\')" title="' + i.txt + ' · ' + contagem[k] + ' leads">🏅 ' + k + '</span>';
           }).join('');
         })()
+    +   montarAtalhoDono()
     + '</div>'
     + (per.aviso ? '<div class="hint" style="margin:8px 0;color:#f6a350;">' + per.aviso + '</div>' : '');
   ET.forEach(function(e) {
