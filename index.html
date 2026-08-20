@@ -2133,7 +2133,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-20-1107';
+var VERSAO_DASH = '2026-08-20-1133';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6861,51 +6861,198 @@ function escolherBucketLeads(iniTs, fimTs, label) {
   if (!LD_RANGE) { var t = document.querySelector('#ld-chips [data-p="tudo"]'); if (t) t.classList.add('on'); }
   renderLeads();
 }
-// situação do lead na aba Vendas (casado pelo telefone) — índice montado uma vez por render
+// ===== QUEM É A MESMA PESSOA: telefone, e-mail e @ (Bruno 20/08/2026) =====
+// A pessoa some por meses e volta a marcar reunião — às vezes com OUTRO número.
+// Para reconhecer que é ela, juntamos as reuniões por telefone, e-mail e @.
+// Mas nem todo e-mail/@ escrito na planilha serve de identidade: tem lixo de
+// formulário ("@teste", "não tenho") e pedaço de e-mail que parecia @ do
+// Instagram ("fulano@gmail.com" virava o @gmail.com, e isso sozinho juntava
+// 19 pessoas diferentes numa só). Estas duas funções filtram isso.
+var _LIXO_ID = /^(teste|test|x+|sim|nao|nenhum|nenhuma|nada|eu|meu|minha|instagram|insta|arroba|ainda nao tenho|nao tenho|n tenho|nao possuo|\d+)$/;
+var _DOMINIO = /^(gmail|hotmail|outlook|yahoo|icloud|bol|uol|live|terra|globo|msn|me|proton|protonmail)\.(com|com\.br|br|net|org)$/;
+function idEmail(v) {
+  var s = v2norm(v);
+  if (!s || s.indexOf('@') === -1 || s.indexOf(' ') !== -1) return '';
+  if (/^(teste|test|exemplo|example|fulano|ciclano|abc|joao\.silva)@/.test(s)) return '';
+  if (/@(teste|test|exemplo|example)\./.test(s)) return '';
+  return 'e:' + s;
+}
+function idInsta(v) {
+  var s = v2norm(String(v || '').replace(/^@+/, ''));
+  if (!s || s.length < 3) return '';
+  if (s.indexOf('@') !== -1) return '';   // isso é e-mail, não @ do Instagram
+  if (s.indexOf(' ') !== -1) return '';   // "ainda nao tenho"
+  if (_DOMINIO.test(s)) return '';        // "gmail.com" saiu de dentro de um e-mail
+  if (_LIXO_ID.test(s)) return '';
+  return 'i:' + s;
+}
+// tira do texto os @ de verdade (o @ tem que começar palavra, senão é fim de e-mail)
+function _arrobasDe(txt) {
+  var achados = [];
+  String(txt || '').replace(/(^|[\s,;:()\[\]|/])@([A-Za-z0-9._]{3,})/g, function(m, a, g) {
+    var k = idInsta(g); if (k) achados.push(k); return m;
+  });
+  return achados;
+}
+// situação do lead na aba Vendas — índice montado uma vez por render
 var _ldIdx = null;
 function _ldMontarIdx() {
   _ldIdx = {};
   _ldIdxAlt = { email: {}, insta: {}, nome: {} };
   if (!V2.carregado) return;
   var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
-  V2.rows.forEach(function(r) {
-    var t = ldTel8(r.telefone);
-    var o = t ? (_ldIdx[t] || (_ldIdx[t] = { ag: true, re: false, vd: false, sns: {} }))
-              : { ag: true, re: false, vd: false, sns: {} };
-    if (!o.sns) o.sns = {};
+
+  // pagamentos e leads por telefone (para não varrer a lista inteira em cada linha)
+  var pagPorTel = {}, leadPorTel = {};
+  (PAG.rows || []).forEach(function(x){ var t = ldTel8(x.celular); if (t && !pagPorTel[t]) pagPorTel[t] = x; });
+  (LD.rows || []).forEach(function(l){ if (l.tel8 && !leadPorTel[l.tel8]) leadPorTel[l.tel8] = l; });
+
+  // 1) as chaves de identidade de cada reunião
+  var chaves = V2.rows.map(function(r) {
+    var t = ldTel8(r.telefone), ks = [];
+    if (t) ks.push('t:' + t);
+    // o registro de pagamento é achado SÓ pelo telefone — casar por nome juntava
+    // gente diferente (11 nomes se repetem em pessoas distintas na aba Vendas)
+    var pg = t ? pagPorTel[t] : null;
+    if (pg) { var pe = idEmail(pg.email); if (pe) ks.push(pe); var pi = idInsta(pg.insta); if (pi) ks.push(pi); }
+    var ld = t ? leadPorTel[t] : null;
+    if (ld) { var le = idEmail(ld.email); if (le) ks.push(le); var li = idInsta(ld.insta); if (li) ks.push(li); }
+    (String(r.obs || '').match(/[\w.+-]+@[\w.-]+\.\w+/g) || []).forEach(function(e){ var k = idEmail(e); if (k) ks.push(k); });
+    _arrobasDe(r.obs).forEach(function(k){ ks.push(k); });
+    var vistas = {};
+    return ks.filter(function(k){ if (vistas[k]) return false; vistas[k] = 1; return true; });
+  });
+
+  // 2) chave que aparece em muita gente é sujeira: não serve para juntar ninguém
+  var tocaTel = {};
+  chaves.forEach(function(ks) {
+    var t = ks.length && ks[0].indexOf('t:') === 0 ? ks[0] : '?';
+    ks.forEach(function(k){ if (k.indexOf('t:') !== 0) (tocaTel[k] || (tocaTel[k] = {}))[t] = 1; });
+  });
+  var suja = {};
+  Object.keys(tocaTel).forEach(function(k){ if (Object.keys(tocaTel[k]).length > 2) suja[k] = 1; });
+
+  // 3) junta as reuniões da mesma pessoa
+  var pai = {};
+  function achar(x){ while (pai[x] && pai[x] !== x) x = pai[x]; return x; }
+  function unir(a, b){ a = achar(a); b = achar(b); if (a !== b) pai[a] = b; }
+  // 3a) mesmo telefone = mesma pessoa, sem discussão
+  chaves.forEach(function(ks, i) {
+    var id = 'L' + i; pai[id] = id;
+    if (ks.length && ks[0].indexOf('t:') === 0) { if (!pai[ks[0]]) pai[ks[0]] = ks[0]; unir(id, ks[0]); }
+  });
+  // 3b) telefones DIFERENTES só viram a mesma pessoa com DOIS sinais batendo
+  // (e-mail + @, ou um deles + o mesmo nome). Um sinal só juntava gente
+  // diferente: duas pessoas com o mesmo e-mail na observação da reunião são
+  // quase sempre o SDR copiando o e-mail errado, não a pessoa voltando.
+  var grupoChaves = {}, grupoNomes = {};
+  chaves.forEach(function(ks, i) {
+    var g = achar('L' + i);
+    var cj = grupoChaves[g] || (grupoChaves[g] = {});
+    ks.forEach(function(k){ if (k.indexOf('t:') !== 0 && !suja[k]) cj[k] = 1; });
+    var nm = v2norm(V2.rows[i].nome);
+    if (nm) (grupoNomes[g] || (grupoNomes[g] = {}))[nm] = 1;
+  });
+  var quemTem = {};
+  Object.keys(grupoChaves).forEach(function(g) {
+    Object.keys(grupoChaves[g]).forEach(function(k){ (quemTem[k] || (quemTem[k] = [])).push(g); });
+  });
+  var emComum = {};
+  Object.keys(quemTem).forEach(function(k) {
+    var gs = quemTem[k];
+    for (var a = 0; a < gs.length; a++) for (var b = a + 1; b < gs.length; b++) {
+      var par = gs[a] < gs[b] ? gs[a] + '|' + gs[b] : gs[b] + '|' + gs[a];
+      emComum[par] = (emComum[par] || 0) + 1;
+    }
+  });
+  Object.keys(emComum).forEach(function(par) {
+    var p = par.split('|'), g1 = p[0], g2 = p[1];
+    var mesmoNome = Object.keys(grupoNomes[g1] || {}).some(function(n){ return (grupoNomes[g2] || {})[n]; });
+    if (emComum[par] >= 2 || (emComum[par] >= 1 && mesmoNome)) unir(g1, g2);
+  });
+
+  // 4) uma ficha de situação por pessoa, com o histórico das reuniões dela
+  var porGrupo = {};
+  V2.rows.forEach(function(r, i) {
+    var g = achar('L' + i);
+    var o = porGrupo[g] || (porGrupo[g] = { ag: true, re: false, vd: false, sns: {}, linhas: [] });
     if (REAL.indexOf(r.sn) !== -1) o.re = true;
     if (r.sn === 'vendido') o.vd = true;
-    if (r.sn) o.sns[r.sn] = 1;   // todos os status deste telefone na aba Vendas
-    if (r.origem && !o.origemVenda) o.origemVenda = r.origem;   // origem lançada na venda
-    // ===== 🔎 casar também por e-mail, @ e nome (Bruno 19/08/2026) =====
-    // A pessoa dá um número no formulário e outro na reunião — só o telefone
-    // deixava reunião e venda de fora da conta do criativo.
-    var pg = (PAG.rows || []).filter(function(x) {
-      var tt = ldTel8(x.celular);
-      return (tt && t && tt === t) || (r.nome && v2norm(x.nome) === v2norm(r.nome));
-    })[0];
-    var mails = [];
-    if (pg && pg.email) mails.push(pg.email);
-    var mo = String(r.obs || '').match(/[\w.+-]+@[\w.-]+\.\w+/g);
-    if (mo) mails = mails.concat(mo);
-    mails.forEach(function(e){ var k = v2norm(e); if (k) _ldIdxAlt.email[k] = o; });
-    var igs = [];
-    if (pg && pg.insta) igs.push(pg.insta);
-    var mi = String(r.obs || '').match(/@[A-Za-z0-9._]{3,}/g);
-    if (mi) igs = igs.concat(mi);
-    igs.forEach(function(g){ var k = v2norm(String(g).replace(/^@/, '')); if (k) _ldIdxAlt.insta[k] = o; });
-    // NÃO casamos por nome: "Patrícia" e "Juliana Souza" se repetem na base
-    // (558 nomes repetidos) e isso juntava gente diferente. E-mail e @ são únicos.
+    if (r.sn) o.sns[r.sn] = 1;
+    if (r.origem && !o.origemVenda) o.origemVenda = r.origem;
+    o.linhas.push(r);
+  });
+  // 5) cada chave da pessoa aponta para a ficha dela
+  Object.keys(porGrupo).forEach(function(g) {
+    var o = porGrupo[g];
+    o.linhas.sort(function(a, b){ return (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0); });
+    o.vezes = o.linhas.length;
+  });
+  chaves.forEach(function(ks, i) {
+    var o = porGrupo[achar('L' + i)];
+    ks.forEach(function(k) {
+      if (k.indexOf('t:') === 0) _ldIdx[k.slice(2)] = o;
+      else if (suja[k]) return;
+      else if (k.indexOf('e:') === 0) _ldIdxAlt.email[k.slice(2)] = o;
+      else if (k.indexOf('i:') === 0) _ldIdxAlt.insta[k.slice(2)] = o;
+    });
   });
 }
-// a situação do lead: tenta telefone, depois e-mail, @ e nome inteiro
+// a situação do lead: tenta telefone, depois e-mail e @ (nome fica de fora)
 function ldSituacao(l) {
   if (!l) return null;
   if (l.tel8 && _ldIdx && _ldIdx[l.tel8]) return _ldIdx[l.tel8];
   if (!_ldIdxAlt) return null;
-  if (l.email) { var e = _ldIdxAlt.email[v2norm(l.email)]; if (e) return e; }
-  if (l.insta) { var g = _ldIdxAlt.insta[v2norm(String(l.insta).replace(/^@/, ''))]; if (g) return g; }
+  var e = idEmail(l.email);
+  if (e) { var oe = _ldIdxAlt.email[e.slice(2)]; if (oe) return oe; }
+  var g = idInsta(l.insta);
+  if (g) { var og = _ldIdxAlt.insta[g.slice(2)]; if (og) return og; }
   return null;
+}
+// ===== O LEAD QUE VOLTOU (Bruno 20/08/2026) =====
+// Todas as reuniões da pessoa, da mais antiga para a mais nova. Quando tem mais
+// de uma, ela sumiu e voltou — e isso é informação de venda, não repetição.
+function ldReunioes(l) {
+  var st = ldSituacao(l);
+  return (st && st.linhas) ? st.linhas : [];
+}
+// voltou = mais de uma reunião com mais de 30 dias entre a primeira e a última
+// (menos que isso costuma ser remarcação da mesma reunião, não retorno)
+function ldVoltou(l) {
+  var rs = ldReunioes(l);
+  if (rs.length < 2) return null;
+  var ds = rs.map(function(r){ return r.date ? r.date.getTime() : 0; }).filter(Boolean);
+  if (ds.length < 2) return null;
+  var dias = Math.round((ds[ds.length - 1] - ds[0]) / 86400000);
+  return { vezes: rs.length, dias: dias, retorno: dias > 30, ultima: rs[rs.length - 1], primeira: rs[0] };
+}
+// o pagamento da pessoa, achado por telefone, e-mail ou @ — nunca por nome
+function ldPagamento(l) {
+  if (!l || !PAG.rows) return null;
+  var tels = {}, mails = {}, igs = {};
+  if (l.tel8) tels[l.tel8] = 1;
+  var le = idEmail(l.email); if (le) mails[le.slice(2)] = 1;
+  var li = idInsta(l.insta); if (li) igs[li.slice(2)] = 1;
+  ldReunioes(l).forEach(function(r){ var t = ldTel8(r.telefone); if (t) tels[t] = 1; });
+  return PAG.rows.filter(function(x) {
+    var t = ldTel8(x.celular); if (t && tels[t]) return true;
+    var xe = idEmail(x.email); if (xe && mails[xe.slice(2)]) return true;
+    var xi = idInsta(x.insta); if (xi && igs[xi.slice(2)]) return true;
+    return false;
+  })[0] || null;
+}
+// selo do card: mostra que a pessoa já esteve aqui antes
+function seloVoltou(l) {
+  var v = ldVoltou(l);
+  if (!v) return '';
+  var cor = v.retorno ? '#b98aff' : '#8b8fa3';
+  var txt = v.retorno
+    ? '🔄 voltou · ' + v.vezes + 'ª reunião'
+    : '📅 ' + v.vezes + ' reuniões';
+  var tit = v.vezes + ' reuniões na planilha · ' + (v.retorno
+    ? 'a primeira foi há ' + v.dias + ' dias — é um lead que sumiu e voltou'
+    : 'todas dentro de ' + v.dias + ' dias — parece remarcação da mesma reunião');
+  return ' <span class="ld-tag" style="background:' + cor + '26;color:' + cor + ';" title="' + tit + '">' + txt + '</span>';
 }
 function ldWa(l) {
   var d = String(l.tel || '').replace(/\D/g, '');
@@ -6970,7 +7117,7 @@ function ldRow(l, quente) {
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
     + '<div class="ld-info"><b>' + (l.nome || 'Sem nome')
     + (quente ? ' <span class="ld-selo rapido">🔥 CHAMAR RÁPIDO</span>' : '')
-    + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + seloVezes(l) + seloChance(l, true) + '</b>'
+    + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + seloVezes(l) + seloVoltou(l) + seloChance(l, true) + '</b>'
     + '<span>' + det + '</span></div>'
     + seloAnuncio(l, true)
     + (donoNome ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
@@ -7198,15 +7345,29 @@ function abrirFichaLead(i) {
   // ===== 📅 A REUNIÃO E O PAGAMENTO DESTE LEAD (Bruno 19/08/2026) =====
   // Se a pessoa virou reunião (e venda), tudo aparece aqui: quem atendeu, o que
   // foi vendido, por quanto, como pagou e o que o contrato diz.
-  var _reu = null, _pag = null;
-  if (l.tel8) {
-    _reu = (V2.rows || []).filter(function(r){ return ldTel8(r.telefone) === l.tel8; })
-             .sort(function(a, b){ return (b.date || 0) - (a.date || 0); })[0] || null;
-    _pag = (PAG.rows || []).filter(function(r) {
-      var t = ldTel8(r.celular);
-      if (t && t === l.tel8) return true;
-      return l.nome && v2norm(r.nome) === v2norm(l.nome);
-    })[0] || null;
+  // as reuniões vêm casadas por telefone, e-mail E @ (pedido do Bruno 20/08/2026):
+  // quem volta meses depois costuma dar outro número, e só o telefone perdia a pessoa
+  var _reus = ldReunioes(l);
+  var _reu = _reus.length ? _reus[_reus.length - 1] : null;   // a mais recente é a que vale
+  var _pag = ldPagamento(l);
+  // se a pessoa já esteve aqui antes, isso aparece ANTES de tudo
+  if (_reus.length > 1) {
+    var _v = ldVoltou(l);
+    var _cV = (_v && _v.retorno) ? '#b98aff' : '#8b8fa3';
+    h += '<div class="dtl-card" style="margin-top:12px;border:1px solid ' + _cV + '55;background:' + _cV + '12;">'
+      + '<div class="g-label">' + (_v && _v.retorno ? '🔄 Este lead já esteve aqui antes' : '📅 Histórico de reuniões') + '</div>'
+      + (_v && _v.retorno ? '<div class="hint" style="margin-bottom:7px;">Sumiu e voltou — passaram <b style="color:' + _cV + ';">'
+          + _v.dias + ' dias</b> entre a primeira reunião e a última. Vale ler o que travou da outra vez antes de falar com ele.</div>' : '')
+      + _reus.map(function(r, iR) {
+          var c = r.sn === 'vendido' ? '#3ddc97' : /nao vendido|no show|estorno/.test(r.sn) ? '#ff6b6b' : '#ffd166';
+          var ultima = iR === _reus.length - 1;
+          return '<div class="fs-calc-linha" style="' + (ultima ? 'opacity:1;' : 'opacity:.72;') + '">'
+            + '<span>' + (ultima ? '👉 ' : '') + (r.date ? r.date.toLocaleDateString('pt-BR') : 'sem data')
+            + (r.closer ? ' · ' + r.closer : '') + (r.sdr ? ' · ' + r.sdr : '') + '</span>'
+            + '<b style="text-align:right;color:' + c + ';">' + (r.status || '—')
+            + (r.sn === 'vendido' && r.valor ? ' · ' + v2moeda(r.valor) : '') + '</b></div>';
+        }).join('')
+      + '</div>';
   }
   if (_reu) {
     var stCor = _reu.sn === 'vendido' ? '#3ddc97' : /nao vendido|no show|estorno/.test(_reu.sn) ? '#ff6b6b' : '#ffd166';
@@ -9724,7 +9885,7 @@ function agProcurar(txt) {
       +   (l.insta && !/\s/.test(l.insta) ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
       + '</div>'
       + '<div style="flex:1;min-width:0;">'
-      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + seloVezes(l) + seloChance(l, true) + '</div>'
+      +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + seloVezes(l) + seloVoltou(l) + seloChance(l, true) + '</div>'
       +   '<div class="hint" style="margin-top:2px;">' + [l.tel, l.insta ? '@' + String(l.insta).replace(/^@/, '') : '', (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div>'
       +   '<div style="margin-top:3px;">' + seloAnuncio(l, true) + '</div>'
       + '</div>'
