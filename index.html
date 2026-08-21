@@ -2167,7 +2167,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-1852';
+var VERSAO_DASH = '2026-08-21-1859';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3168,6 +3168,15 @@ function _vendedorForms(v) {
   if (/tony/.test(t)) return 'Tony Londe';
   return String(v || '');
 }
+// plano B: o Google Forms de verdade, ja preenchido (usado se o robo nao conseguir responder o formulario)
+function abrirFormVendaGoogle(dados) {
+  dados = dados || _vendaAberta || {};
+  var partes = [];
+  Object.keys(FORM_VENDA_CAMPOS).forEach(function(k) {
+    if (dados[k] && FORM_VENDA_CAMPOS[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(String(dados[k])));
+  });
+  window.open(FORM_VENDA_URL + (partes.length ? '?usp=pp_url&' + partes.join('&') : ''), '_blank');
+}
 function abrirFormVenda(dados) {
   if (soOlhar()) return;
   dados = dados || {};
@@ -3180,18 +3189,27 @@ function abrirFormVenda(dados) {
     if (/entrada/i.test(b.tipo)) dados.teveEntrada = 'Sim'; else dados.teveBloqueio = 'Sim';
     dados.obs = (b.tipo || 'Bloqueio') + (b.valor ? ' de ' + b.valor : '') + (b.quando ? ' registrado em ' + String(b.quando).slice(0, 10) : '') + (b.forma ? ' (' + b.forma + ')' : '') + (b.fim ? ' · finaliza até ' + _dataBr(b.fim) : '');
   }
-  // do jeito que o Google Forms espera
+  // do jeito que o Google Forms espera (serve para a nossa tela e para o plano B)
   if (dados.vendedor) dados.vendedor = _vendedorForms(dados.vendedor);
   if (dados.programa) dados.programa = _programaForms(dados.programa);
   if (dados.insta) dados.insta = '@' + String(dados.insta).replace(/^@/, '');
   if (dados.cel) dados.cel = String(dados.cel).replace(/\D/g, '').replace(/^55(\d{10,11})$/, '$1');
-  var partes = [];
-  Object.keys(FORM_VENDA_CAMPOS).forEach(function(k) {
-    if (dados[k] && FORM_VENDA_CAMPOS[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(String(dados[k])));
-  });
-  var url = FORM_VENDA_URL + (partes.length ? '?usp=pp_url&' + partes.join('&') : '');
-  window.open(url, '_blank');
-  avisoRapido('📝 Formulário de venda aberto em outra aba' + (partes.length ? ' (já preenchido)' : '') + (dados.bloqueio ? ' · usando os dados do bloqueio de ' + dados.bloqueio.nome : '') + ' — ao enviar, a reunião vira Vendido sozinha');
+  // a NOSSA tela (formulario.html modo venda), ja preenchida; o robo responde o Google Forms por dentro
+  var partes = ['embed=1', 'modo=venda'];
+  var mapa = { nome: dados.nome, cel: dados.cel, email: dados.email, insta: dados.insta, seg: dados.seg, nicho: dados.nicho, vendedor: _nomeCurto(dados.vendedor), sdr: dados.sdr,
+    programa: dados.programa, clint: dados.clint, cpf: dados.cpf, valor: dados.valor, obs: dados.obs,
+    entrada: dados.teveEntrada === 'Sim' ? 'Sim' : '', valorEntrada: dados.bloqueio && dados.teveEntrada === 'Sim' ? dados.bloqueio.valor : '', bloqueio: dados.teveBloqueio === 'Sim' ? 'Sim' : '' };
+  Object.keys(mapa).forEach(function(k) { if (mapa[k]) partes.push(k + '=' + encodeURIComponent(String(mapa[k]))); });
+  var cx = document.getElementById('modal-venda');
+  if (!cx) return;
+  cx.innerHTML = '<div style="width:min(760px,96vw);height:min(92vh,900px);background:#0e0e20;border-radius:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.6);">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);">'
+    +   '<b style="flex:1;font-size:.85rem;">💰 Registrar venda' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
+    +   '<span class="hint">' + (dados.bloqueio ? 'com os dados do bloqueio · ' : '') + 'chega na planilha como se fosse pelo Forms</span>'
+    +   '<span class="hint" style="cursor:pointer;text-decoration:underline;" onclick="abrirFormVendaGoogle()" title="Abre o Google Forms de verdade, já preenchido">ou abrir no Google Forms</span>'
+    +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
+    + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
+  cx.style.display = 'flex';
 }
 // ===== 🔒 QUEM DEU BLOQUEIO / ENTRADA (Bruno 21/08/2026) =====
 // O robo le a aba "Bloqueio e Entrada"; o dash mostra a lista em Pagamentos, um
@@ -3328,6 +3346,8 @@ window.addEventListener('message', function(ev) {
   var m = ev && ev.data;
   if (!m || typeof m !== 'object') return;
   if (m.tipo === 'fecharVenda') { fecharFormVenda(); return; }
+  if (m.tipo === 'vendaFalhou') { fecharFormVenda(); abrirFormVendaGoogle(); avisoRapido('⚠️ O robô não conseguiu responder o formulário — abri o Google Forms já preenchido'); return; }
+  if (m.tipo === 'vendaFalhouSilencio') { return; }
   if (m.tipo === 'bloqueioRegistrado') {
     // o robo ja gravou e mudou o status na planilha; aqui so atualizamos a tela
     var t8b = ldTel8(m.celular || ''), nomeB = v2norm(m.nome || '');
@@ -3346,13 +3366,13 @@ window.addEventListener('message', function(ev) {
   var r = cand[0];
   var mudou = false;
   if (r && r.sn !== 'vendido') {
+    // o robo (gatilho do Forms) grava o Vendido na planilha; aqui so a tela e a agenda
     r.status = 'Vendido'; r.sn = 'vendido';
-    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Vendido', dataRef: v2dataRef(r), gid: V2_GID });
     try { sincronizarStatusEvento(r); } catch (e) {}
     mudou = true;
   }
-  setTimeout(function() { try { carregarPag(); } catch (e) {} try { renderV2(); } catch (e) {} try { if (LD.carregado) renderLeads(); } catch (e) {} }, 4000);
-  avisoRapido('✓ Venda de ' + (m.nome || 'cliente') + ' registrada' + (mudou ? ' · reunião marcada como Vendido' : '') + ' · a entrega foi avisada');
+  setTimeout(function() { try { carregarV2(); } catch (e) {} try { carregarPag(); } catch (e) {} try { carregarBloqueios(); } catch (e) {} try { if (LD.carregado) renderLeads(); } catch (e) {} }, 6000);
+  avisoRapido('✓ Venda de ' + (m.nome || 'cliente') + ' entrou no formulário' + (mudou ? ' · reunião marcada como Vendido' : '') + ' · a entrega foi avisada');
 });
 function avisoRapido(txt) {
   var el = document.getElementById('aviso-rapido');

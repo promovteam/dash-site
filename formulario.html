@@ -911,6 +911,8 @@ function submitVenda() {
     valor_mensal: (pgto === 'Cartão recorrente') ? document.getElementById('v-recorrente-valor').value : '',
     link_clint: document.getElementById('v-clint').value,
     observacao: document.getElementById('v-obs').value,
+    teve_bloqueio: window.__teveBloqueio || '',
+    pedidoId: (window.__pedidoId = 'v' + Date.now() + Math.random().toString(36).slice(2, 7)),
     nome: document.getElementById('c-nome').value,
     cpf: document.getElementById('c-cpf').value,
     rg: document.getElementById('c-rg').value,
@@ -940,18 +942,36 @@ function submitVenda() {
   };
 
   sendToGASSimple(payload, function() {
-    document.getElementById('sending').classList.remove('show');
-    document.getElementById('form-venda').style.display = 'none';
-    document.getElementById('prog-bar').style.display = 'none';
-    document.getElementById('prog-l').style.display = 'none';
-    document.getElementById('success-title').textContent = 'Venda registrada!';
-    document.getElementById('success-msg').textContent = 'Todos os dados de ' + document.getElementById('c-nome').value + ' foram registrados com sucesso na planilha.';
-    document.getElementById('success').classList.add('show');
-    // aberto por dentro do dash: avisa o dash para ele marcar a reuniao como Vendido e atualizar Pagamentos
-    try {
-      if (window.parent !== window) window.parent.postMessage({ tipo: 'vendaRegistrada', nome: payload.nome, celular: payload.celular,
-        programa: payload.programa, valor: payload.valor_total, vendedor: payload.vendedor, sdr: payload.sdr }, '*');
-    } catch (e) {}
+    // o envio e "as cegas": agora perguntamos ao robo se o Google Forms aceitou
+    var tentativas = 0;
+    (function consultar() {
+      tentativas++;
+      var cb = 'vr' + Date.now();
+      var sc = document.createElement('script');
+      window[cb] = function(res) {
+        try { sc.remove(); } catch (e) {} try { delete window[cb]; } catch (e) {}
+        if (!res || !res.pronto) { if (tentativas < 30) return setTimeout(consultar, 2000); res = { success: false, error: 'o robô não respondeu em 1 minuto' }; }
+        document.getElementById('sending').classList.remove('show');
+        document.getElementById('form-venda').style.display = 'none';
+        document.getElementById('prog-bar').style.display = 'none';
+        document.getElementById('prog-l').style.display = 'none';
+        if (res.success) {
+          document.getElementById('success-title').textContent = 'Venda registrada!';
+          document.getElementById('success-msg').innerHTML = 'A venda de <b>' + document.getElementById('c-nome').value + '</b> entrou no formulário de fechamento (planilha da entrega + contrato), como se tivesse sido preenchida lá.'
+            + (res.faltou && res.faltou.length ? '<br><br><span style="color:var(--red);">Campos que o formulário não aceitou (confira na planilha): ' + res.faltou.join('; ') + '</span>' : '');
+        } else {
+          document.getElementById('success-title').textContent = 'Não deu para enviar';
+          document.querySelector('#success .success-icon').textContent = '!';
+          document.getElementById('success-msg').innerHTML = '<span style="color:var(--red);">' + (res.error || 'erro') + '</span><br><br>Os dados NÃO foram gravados. Registre pelo Google Forms (abre já preenchido):'
+            + '<br><button type="button" class="btn" style="margin-top:12px;" onclick="try{window.parent.postMessage({tipo:\'vendaFalhou\',erro:' + JSON.stringify(res.error || '') + '},\'*\')}catch(e){}">📝 Abrir o Google Forms</button>';
+        }
+        document.getElementById('success').classList.add('show');
+        try { if (window.parent !== window) window.parent.postMessage({ tipo: res.success ? 'vendaRegistrada' : 'vendaFalhouSilencio', nome: payload.nome, celular: payload.celular, programa: payload.programa, valor: payload.valor_total, vendedor: payload.vendedor, sdr: payload.sdr, erro: res.error || '' }, '*'); } catch (e) {}
+      };
+      sc.onerror = function(){ window[cb](null); };
+      sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'vendaResultado', pedidoId: window.__pedidoId }));
+      document.body.appendChild(sc);
+    })();
   });
   } // end doSendVenda
 
@@ -1073,6 +1093,13 @@ function submitBloqueio() {
   }
   poe('c-nome', q.nome); poe('c-cel', q.cel); poe('c-email', q.email); poe('c-insta', q.insta); poe('c-seg', q.seg); poe('c-nicho', q.nicho);
   poe('v-vendedor', q.vendedor); poe('v-sdr', q.sdr); poe('v-programa', q.programa); poe('v-clint', q.clint);
+  poe('c-cpf', q.cpf); poe('v-valor', q.valor); poe('v-obs', q.obs);
+  if (q.entrada === 'Sim') { try { document.getElementById('v-ent-s').checked = true; toggleEntrada(); poe('v-entrada-valor', q.valorEntrada); } catch (e) {} }
+  window.__teveBloqueio = q.bloqueio === 'Sim' ? 'Sim' : '';
+  if (q.modo === 'venda') {
+    var esc2 = document.querySelectorAll('input[name="tiporeg"], input[name="tiporeg2"]');
+    for (var j = 0; j < esc2.length; j++) { var f2 = esc2[j].closest('.f'); if (f2) f2.style.display = 'none'; }
+  }
   if (q.modo === 'bloqueio') {
     // so bloqueio/entrada: entra direto nessa tela e esconde a escolha "Venda / Bloqueio"
     try {
