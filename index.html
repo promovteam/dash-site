@@ -1218,6 +1218,7 @@ img { max-width:100%; height:auto; }
       <div class="chart-chips fi-grupo" id="fg-mes" style="margin-bottom:0;"></div>
     </div>
 
+    <div id="pag-bloqueios"></div>
     <div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;" id="pag-kpis"></div>
 
     <!-- VISTA CARDS (igual à Pesquisa) -->
@@ -1544,6 +1545,7 @@ Instagram: @pr.joaosilva</div>
         <button class="btn" id="btn-copiar" style="padding:6px 14px;font-size:.7rem;" onclick="copiarDadosLead(this)">📋 Copiar</button>
         <button class="btn" id="btn-editar" style="padding:6px 14px;font-size:.7rem;" onclick="alternarEdicao()">✏️ Editar</button>
         <button class="btn" id="btn-venda-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="abrirFormVendaReuniao()" title="Abre o formulário de venda já preenchido com os dados desta reunião">💰 Registrar venda</button>
+        <button class="btn" id="btn-bloqueio-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="abrirFormBloqueioReuniao()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>
       </div>
     </div>
     <div id="lead-info"></div>
@@ -2165,7 +2167,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-1807';
+var VERSAO_DASH = '2026-08-21-1840';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3148,13 +3150,78 @@ function abrirFormVenda(dados) {
   if (soOlhar()) return;
   dados = dados || {};
   _vendaAberta = dados;
+  // quem deu bloqueio/entrada ja informou CPF, e-mail, valor, programa: entra tudo no formulario
+  var b = bloqueioDe(dados.cel, dados.nome);
+  if (b) { ['cpf', 'email', 'insta', 'programa', 'valor', 'forma', 'vendedor', 'clint'].forEach(function(k) { var vB = { cpf: b.cpf, email: b.email, insta: b.insta, programa: b.programa, valor: b.total, forma: b.forma, vendedor: b.vendedor, clint: b.clint }[k]; if (vB && !dados[k]) dados[k] = vB; }); dados.bloqueio = b; }
   var partes = [];
   Object.keys(FORM_VENDA_CAMPOS).forEach(function(k) {
     if (dados[k] && FORM_VENDA_CAMPOS[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(String(dados[k])));
   });
   var url = FORM_VENDA_URL + (partes.length ? '?usp=pp_url&' + partes.join('&') : '');
   window.open(url, '_blank');
-  avisoRapido('📝 Formulário de venda aberto em outra aba' + (partes.length ? ' (já preenchido)' : '') + ' — ao enviar, a reunião vira Vendido sozinha');
+  avisoRapido('📝 Formulário de venda aberto em outra aba' + (partes.length ? ' (já preenchido)' : '') + (dados.bloqueio ? ' · usando os dados do bloqueio de ' + dados.bloqueio.nome : '') + ' — ao enviar, a reunião vira Vendido sozinha');
+}
+// ===== 🔒 QUEM DEU BLOQUEIO / ENTRADA (Bruno 21/08/2026) =====
+// O robo le a aba "Bloqueio e Entrada"; o dash mostra a lista em Pagamentos, um
+// selo na ficha, e usa os dados (CPF, e-mail, valor...) no fechamento da venda.
+var BLQ = { lista: [], carregado: false, erro: '' };
+function carregarBloqueios() {
+  var nome = 'blqCb' + Math.random().toString(36).slice(2, 8);
+  var s = document.createElement('script');
+  var fim = function(d) {
+    try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    if (d && d.success) { BLQ.lista = d.lista || []; BLQ.carregado = true; BLQ.erro = ''; }
+    else BLQ.erro = (d && d.error) || 'sem resposta';
+    renderBloqueios();
+    if (_ldFichaAberta && typeof abrirFichaLead === 'function') { /* a ficha aberta ganha o selo no proximo redesenho */ }
+  };
+  window[nome] = fim;
+  s.onerror = function(){ fim(null); };
+  s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'listarBloqueios' }));
+  document.body.appendChild(s);
+  setTimeout(function(){ if (window[nome]) fim(null); }, 60000);
+}
+function bloqueioDe(tel, nome) {
+  var t8 = ldTel8(tel || ''), n = v2norm(nome || '');
+  var abertos = BLQ.lista.filter(function(b){ return !String(b.situacao || '').trim() && ((t8 && b.tel8 === t8) || (n && v2norm(b.nome) === n)); });
+  return abertos.length ? abertos[abertos.length - 1] : null;
+}
+function _dataBr(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(s || ''); }
+function seloBloqueio(tel, nome) {
+  var b = bloqueioDe(tel, nome);
+  if (!b) return '';
+  var ent = /entrada/i.test(b.tipo);
+  return '<span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;" title="' + (b.programa || '') + (b.total ? ' · total ' + b.total : '') + (b.fim ? ' · finaliza até ' + _dataBr(b.fim) : '') + '">'
+    + (ent ? '🔑 entrada' : '🔒 bloqueio') + (b.valor ? ' ' + b.valor : '') + (b.quando ? ' em ' + String(b.quando).slice(0, 5) : '') + '</span>';
+}
+function renderBloqueios() {
+  var el = document.getElementById('pag-bloqueios');
+  if (!el) return;
+  var abertos = BLQ.lista.filter(function(b){ return !String(b.situacao || '').trim(); });
+  if (!BLQ.carregado || !abertos.length) { el.innerHTML = ''; return; }
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  abertos.sort(function(a, b){ return String(a.fim || '9999').localeCompare(String(b.fim || '9999')); });
+  var h = '<div class="panel" style="margin-bottom:16px;border-color:rgba(255,209,102,.35);">'
+    + '<h3 style="margin-bottom:10px;">🔒 Bloqueios e entradas em aberto — ' + abertos.length + '</h3>'
+    + '<div class="hint" style="margin-bottom:10px;">Quem pagou para segurar a vaga e ainda não fechou. Clique em <b>Fechar venda</b>: o formulário abre com CPF, e-mail, telefone e valores já preenchidos.</div>';
+  abertos.forEach(function(b) {
+    var ent = /entrada/i.test(b.tipo);
+    var fimD = b.fim ? new Date(b.fim + 'T00:00:00') : null;
+    var atrasado = fimD && fimD < hoje;
+    var dias = fimD ? Math.round((fimD - hoje) / 86400000) : null;
+    var wa = b.tel ? 'https://wa.me/' + String(b.tel).replace(/\D/g, '').replace(/^(?!55)/, '55') : '';
+    h += '<div class="ld-row" style="' + (atrasado ? 'border-color:rgba(255,107,107,.5);' : '') + '">'
+      + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(b.nome) + ');">' + v2ini(b.nome) + '</div>'
+      + '<div class="ld-info"><b>' + b.nome + ' <span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;">' + (ent ? '🔑 Entrada' : '🔒 Bloqueio') + (b.valor ? ' · ' + b.valor : '') + '</span>'
+      + (b.fim ? ' <span class="ld-tag" style="background:' + (atrasado ? 'rgba(255,107,107,.18);color:#ff6b6b' : 'rgba(110,168,255,.14);color:#6ea8ff') + ';">' + (atrasado ? '⏰ venceu ' + _dataBr(b.fim) : (dias === 0 ? '⏰ finaliza hoje' : '📅 finaliza em ' + dias + ' dia' + (dias === 1 ? '' : 's'))) + '</span>' : '') + '</b>'
+      + '<span>' + [b.programa, b.total ? 'total ' + b.total : '', b.forma, b.vendedor ? 'vendedor ' + b.vendedor : '', b.quando ? 'registrado ' + String(b.quando).slice(0, 10) : ''].filter(Boolean).join(' · ') + '</span></div>'
+      + '<button class="ld-wa" style="background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVenda({ nome: ' + JSON.stringify(b.nome) + ', cel: ' + JSON.stringify(b.tel) + ' })">💰 Fechar venda</button>'
+      + (b.clint ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + b.clint + '" target="_blank">🟣 Clint</a>' : '')
+      + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank">💬 WhatsApp</a>' : '')
+      + '</div>';
+  });
+  h += '</div>';
+  el.innerHTML = h;
 }
 function fecharFormVenda() {
   var cx = document.getElementById('modal-venda');
@@ -3178,11 +3245,57 @@ function abrirFormVendaReuniao() {
     vendedor: r.closer ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: _nomeCurto(r.sdr),
     programa: r.produto, clint: (l && clintLink(l)) || clintLink({ tel: r.telefone }) });
 }
+// ===== 🔒 BLOQUEIO DE OFERTA / ENTRADA (Bruno 21/08/2026) =====
+// Usa a tela de bloqueio do formulario.html (so esse modo), ja preenchida. O robo
+// grava na aba "Bloqueio e Entrada" da planilha de vendas, poe a reuniao nesse
+// status e avisa a entrega.
+function abrirFormBloqueio(dados) {
+  if (soOlhar()) return;
+  dados = dados || {};
+  var partes = ['embed=1', 'modo=bloqueio'];
+  ['nome', 'cel', 'email', 'insta', 'vendedor', 'sdr', 'programa', 'clint'].forEach(function(k) {
+    if (dados[k]) partes.push(k + '=' + encodeURIComponent(String(dados[k])));
+  });
+  var cx = document.getElementById('modal-venda');
+  if (!cx) return;
+  cx.innerHTML = '<div style="width:min(760px,96vw);height:min(92vh,900px);background:#0e0e20;border-radius:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.6);">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);">'
+    +   '<b style="flex:1;font-size:.85rem;">🔒 Bloqueio de oferta / Entrada' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
+    +   '<span class="hint">já preenchido · complete valores e comprovante</span>'
+    +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
+    + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
+  cx.style.display = 'flex';
+}
+function abrirFormBloqueioLead() {
+  var v = _vendaLeadAtual; if (!v || !v.lead) return;
+  var l = v.lead, r = v.reuniao;
+  abrirFormBloqueio({ nome: l.nome, cel: l.tel, email: l.email, insta: _instaHandle(l.insta),
+    vendedor: (r && r.closer) ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: (r && r.sdr) ? _nomeCurto(r.sdr) : _nomeCurto(l.dono),
+    programa: r ? r.produto : '', clint: clintLink(l) });
+}
+function abrirFormBloqueioReuniao() {
+  var r = _v2reg[_fichaAtual]; if (!r) return;
+  var t8 = ldTel8(r.telefone);
+  var l = t8 ? (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] : null;
+  abrirFormBloqueio({ nome: r.nome, cel: r.telefone, email: l ? l.email : '', insta: _instaHandle(l ? l.insta : ''),
+    vendedor: r.closer ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: _nomeCurto(r.sdr),
+    programa: r.produto, clint: (l && clintLink(l)) || clintLink({ tel: r.telefone }) });
+}
 // o formulario avisa quando a venda entrou
 window.addEventListener('message', function(ev) {
   var m = ev && ev.data;
   if (!m || typeof m !== 'object') return;
   if (m.tipo === 'fecharVenda') { fecharFormVenda(); return; }
+  if (m.tipo === 'bloqueioRegistrado') {
+    // o robo ja gravou e mudou o status na planilha; aqui so atualizamos a tela
+    var t8b = ldTel8(m.celular || ''), nomeB = v2norm(m.nome || '');
+    var rb = (V2.rows || []).filter(function(r){ return (t8b && ldTel8(r.telefone) === t8b) || (nomeB && v2norm(r.nome) === nomeB); })
+      .sort(function(a, b){ return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); })[0];
+    if (rb && rb.sn !== 'vendido') { rb.status = m.subtipo || 'Bloqueio de oferta'; rb.sn = v2norm(rb.status); try { sincronizarStatusEvento(rb); } catch (e) {} }
+    setTimeout(function() { try { carregarV2(); } catch (e) {} try { carregarPag(); } catch (e) {} try { carregarBloqueios(); } catch (e) {} }, 4000);
+    avisoRapido('✓ ' + (m.subtipo || 'Bloqueio') + ' de ' + (m.nome || 'cliente') + ' registrado · a Suellen foi avisada');
+    return;
+  }
   if (m.tipo !== 'vendaRegistrada') return;
   var t8 = ldTel8(m.celular || ''), nomeN = v2norm(m.nome || '');
   // a reuniao desta pessoa vira "Vendido" (planilha + agenda), se ainda nao for
@@ -7505,7 +7618,7 @@ function abrirFichaLead(i) {
   var h = hAt + '<div class="fs-pag" style="margin-top:0;">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">'
     + '<span class="ld-selo" style="background:' + FX[1] + '22;color:' + FX[1] + ';border:1px solid ' + FX[1] + '66;">' + FX[0] + '</span>'
-    + '<span class="ld-selo morno">' + sit + '</span>'
+    + '<span class="ld-selo morno">' + sit + '</span>' + seloBloqueio(l.tel, l.nome)
     + '<span class="et-chip" style="background:' + ei.cor + '22;color:' + ei.cor + ';border-color:' + ei.cor + '66;">' + ei.ico + ' ' + ei.nome + '</span></div>';
   campos.forEach(function(c) {
     // c[3] === 'html' = o campo já vem pronto (usado no link do anúncio)
@@ -7587,6 +7700,7 @@ function abrirFichaLead(i) {
   _vendaLeadAtual = { lead: l, reuniao: _reu || null };
   h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">'
     + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda' + (_pag ? ' (já tem pagamento)' : '') + '</button>'
+    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>'
     + '</div>';
   if (wa || l.insta || clintLink(l)) {
     h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
@@ -8613,7 +8727,7 @@ function abrirLead(i) {
   document.getElementById('fl-avatar').textContent = v2ini(r.nome);
   document.getElementById('fl-avatar').style.background = 'linear-gradient(135deg,' + v2grad(r.nome) + ')';
   document.getElementById('fl-nome').textContent = r.nome || 'Sem nome';
-  document.getElementById('fl-sub').textContent = [r.leadId ? '🆔 ' + r.leadId : '', r.status, r.origem, r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).join(' · ');
+  document.getElementById('fl-sub').innerHTML = [r.leadId ? '🆔 ' + r.leadId : '', r.status, r.origem, r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).map(_fsEsc).join(' · ') + ' ' + seloBloqueio(r.telefone, r.nome);
   var tel = (r.telefone || '').replace(/\D/g, '');
   var wa = tel ? 'https://wa.me/' + (tel.length <= 11 ? '55' + tel : tel) : '';
   _ficha = [
@@ -10576,6 +10690,8 @@ carregarPag();
 setTimeout(carregarAgenda, 800);
 _cadaTanto(carregarV2, 120000);
 _cadaTanto(carregarPag, 300000);
+setTimeout(carregarBloqueios, 2500);
+_cadaTanto(carregarBloqueios, 300000);
 // código todo carregado: tira a tela de espera (a de login aparece por cima se precisar)
 try { var _bs = document.getElementById('boot-splash'); if (_bs) _bs.remove(); } catch (e) {}
 </script>

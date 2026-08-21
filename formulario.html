@@ -92,6 +92,30 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 @media(max-width:600px){.wrap{padding:16px 12px 40px}.sec{padding:16px;border-radius:16px}.fr{grid-template-columns:1fr}.hdr h1{font-size:.95rem}.hdr h1 small{display:none}.opt-row{flex-direction:column;gap:8px}}
 </style>
+<style>
+/* ===== mesmo visual do dash (Bruno 21/08/2026): fundo, cores e botões iguais ===== */
+:root{--bg:#0c0e12;--surface:#14171d;--card:#1a1e26;--border:rgba(255,255,255,.07);--glass-border:rgba(255,255,255,.09);--text:#fff;--text-2:#9aa3b2;--muted:#5c6470;
+  --primary:#f6a350;--grad-main:linear-gradient(135deg,#f6a350 0%,#ffd166 100%);--green:#3ddc97;--green-bg:rgba(61,220,151,.12);--red:#ff6b6b;--red-bg:rgba(255,107,107,.12);--radius:20px;--radius-sm:14px;--radius-xs:10px}
+body{background:var(--bg);background-image:none;color:var(--text)}
+.hdr{background:rgba(20,23,29,.92)}
+.hdr h1{background:none;-webkit-text-fill-color:#fff;color:#fff}
+.logo{background:var(--grad-main);color:#191204;box-shadow:0 4px 16px rgba(246,163,80,.3)}
+.sec{background:var(--surface);border:1px solid var(--border);backdrop-filter:none}
+.sec-t{color:var(--primary)}
+.sec-t .sec-badge{background:rgba(246,163,80,.12);border-color:rgba(246,163,80,.3);color:var(--primary)}
+input,select,textarea{background:rgba(0,0,0,.3)!important;border:1px solid var(--border)!important;color:var(--text)!important;border-radius:12px!important}
+input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;box-shadow:0 0 0 3px rgba(246,163,80,.15)!important;outline:none}
+.btn{background:var(--primary);color:#191204;border-radius:999px;box-shadow:none;font-weight:700}
+.btn:hover{filter:brightness(1.08);transform:none}
+.btn.secondary,.btn-back,.btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.opt-item label{border-color:var(--border)}
+.opt-item input:checked+label{background:rgba(246,163,80,.14);border-color:var(--primary);color:var(--primary)}
+.prog-s.act{background:var(--grad-main)}
+.file-upload{border-color:var(--border)}
+.file-upload:hover{border-color:var(--primary)}
+.success-icon{background:var(--green);color:#0b1a13}
+.spinner{border-top-color:var(--primary)}
+</style>
 </head>
 <body>
 <div class="hdr">
@@ -399,8 +423,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <label>SDR</label>
       <select id="b-sdr">
         <option value="">Selecione...</option>
-        <option>Fellipe</option>
+        <option>Selina</option>
+        <option>Ismael</option>
         <option>Sarah</option>
+        <option>Fellipe</option>
       </select>
     </div>
     <div class="f">
@@ -480,6 +506,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <input type="text" id="b-nome" placeholder="Nome completo do cliente" required>
     </div>
     <div class="f">
+      <label>Celular/WhatsApp do lead <span class="req">*</span></label>
+      <input type="tel" id="b-cel" placeholder="(62) 99999-9999" required>
+    </div>
+    <div class="f">
+      <label>E-mail <span class="req">*</span></label>
+      <input type="email" id="b-email" placeholder="email@exemplo.com" required>
+    </div>
+    <div class="f">
       <label>CPF <span class="req">*</span></label>
       <input type="text" id="b-cpf" placeholder="000.000.000-00" required>
     </div>
@@ -488,13 +522,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <input type="text" id="b-insta" placeholder="@usuario">
     </div>
     <div class="f">
-      <label>Link da Clint</label>
-      <input type="url" id="b-clint" placeholder="https://...">
+      <label>Conversa na Clint</label>
+      <input type="url" id="b-clint" placeholder="https://app.clint.digital/...">
     </div>
     <div class="f">
-      <label>Data da decisão do cliente</label>
-      <input type="date" id="b-data-decisao">
-      <div class="f-hint">Data limite para o cliente finalizar</div>
+      <label>Data de finalização do lead <span class="req">*</span></label>
+      <input type="date" id="b-data-decisao" required>
+      <div class="f-hint">Até quando o cliente vai finalizar (fechar ou desistir)</div>
     </div>
     <div class="f">
       <label>Comprovante de pagamento</label>
@@ -975,6 +1009,8 @@ function submitBloqueio() {
     recorrente_vezes: (pgto === 'Cartão recorrente') ? document.getElementById('b-recorrente-vezes').value : '',
     valor_mensal: (pgto === 'Cartão recorrente') ? document.getElementById('b-recorrente-valor').value : '',
     nome: document.getElementById('b-nome').value,
+    celular: document.getElementById('b-cel').value,
+    email: document.getElementById('b-email').value,
     cpf: document.getElementById('b-cpf').value,
     instagram: document.getElementById('b-insta').value,
     link_clint: document.getElementById('b-clint').value,
@@ -988,6 +1024,10 @@ function submitBloqueio() {
     document.getElementById('sending').classList.remove('show');
     document.getElementById('form-bloqueio').style.display = 'none';
     document.getElementById('success-title').textContent = subtipo + ' registrado!';
+    try {
+      if (window.parent !== window) window.parent.postMessage({ tipo: 'bloqueioRegistrado', subtipo: subtipo, nome: document.getElementById('b-nome').value,
+        celular: document.getElementById('b-cel').value, programa: document.getElementById('b-programa').value, valor: document.getElementById('b-bloqueio-valor').value }, '*');
+    } catch (e) {}
     document.getElementById('success-msg').textContent = subtipo + ' de ' + document.getElementById('b-nome').value + ' foi registrado com sucesso na planilha.';
     document.getElementById('success').classList.add('show');
   });
@@ -1033,6 +1073,19 @@ function submitBloqueio() {
   }
   poe('c-nome', q.nome); poe('c-cel', q.cel); poe('c-email', q.email); poe('c-insta', q.insta); poe('c-seg', q.seg); poe('c-nicho', q.nicho);
   poe('v-vendedor', q.vendedor); poe('v-sdr', q.sdr); poe('v-programa', q.programa); poe('v-clint', q.clint);
+  if (q.modo === 'bloqueio') {
+    // so bloqueio/entrada: entra direto nessa tela e esconde a escolha "Venda / Bloqueio"
+    try {
+      document.getElementById('reg-venda').checked = false; document.getElementById('reg-venda2').checked = false;
+      document.getElementById('reg-bloqueio').checked = true; document.getElementById('reg-bloqueio2').checked = true;
+      switchMode();
+    } catch (e) {}
+    var esc = document.querySelectorAll('input[name="tiporeg"], input[name="tiporeg2"]');
+    for (var i = 0; i < esc.length; i++) { var f = esc[i].closest('.f'); if (f) f.style.display = 'none'; }
+    poe('b-nome', q.nome); poe('b-cel', q.cel); poe('b-email', q.email); poe('b-insta', q.insta); poe('b-clint', q.clint);
+    poe('b-vendedor', q.vendedor); poe('b-sdr', q.sdr); poe('b-programa', q.programa);
+    var h1 = document.querySelector('.hdr h1'); if (h1) h1.childNodes[0].nodeValue = 'Bloqueio de oferta / Entrada';
+  }
   if (q.embed === '1') {
     var hdr = document.querySelector('.hdr'); if (hdr) hdr.style.display = 'none';
     document.body.style.backgroundImage = 'none';
