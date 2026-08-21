@@ -2165,7 +2165,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-1752';
+var VERSAO_DASH = '2026-08-21-1807';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3138,23 +3138,23 @@ function _vendedorLogado() {
   if (/tony/i.test(eu)) return 'Tony';
   return _primeiroNome(eu);
 }
+// O formulario de venda DE VERDADE e um Google Forms (gera o contrato pelo Form
+// Publisher). O formulario HTML antigo gravava numa planilha de teste — por isso
+// duas vendas de 21/08 "nao chegaram". Agora o botao abre o Google Forms numa aba
+// nova; o pre-preenchimento entra quando tivermos os codigos dos campos.
+var FORM_VENDA_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScjB00vxJKC8xFxwGKB6-EH9-MGcdXnu8dIqoX17N4I1C9U7w/viewform';
+var FORM_VENDA_CAMPOS = {};   // ex.: { nome: 'entry.123', cel: 'entry.456', ... } — preenchido quando o Bruno mandar o link preenchido
 function abrirFormVenda(dados) {
   if (soOlhar()) return;
   dados = dados || {};
   _vendaAberta = dados;
-  var partes = ['embed=1'];
-  ['nome', 'cel', 'email', 'insta', 'seg', 'vendedor', 'sdr', 'programa', 'clint', 'nicho'].forEach(function(k) {
-    if (dados[k]) partes.push(k + '=' + encodeURIComponent(String(dados[k])));
+  var partes = [];
+  Object.keys(FORM_VENDA_CAMPOS).forEach(function(k) {
+    if (dados[k] && FORM_VENDA_CAMPOS[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(String(dados[k])));
   });
-  var cx = document.getElementById('modal-venda');
-  if (!cx) return;
-  cx.innerHTML = '<div style="width:min(760px,96vw);height:min(92vh,900px);background:#0e0e20;border-radius:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.6);">'
-    + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);">'
-    +   '<b style="flex:1;font-size:.85rem;">💰 Registrar venda' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
-    +   '<span class="hint">já preenchido com o que o dash sabe · complete o resto</span>'
-    +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
-    + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
-  cx.style.display = 'flex';
+  var url = FORM_VENDA_URL + (partes.length ? '?usp=pp_url&' + partes.join('&') : '');
+  window.open(url, '_blank');
+  avisoRapido('📝 Formulário de venda aberto em outra aba' + (partes.length ? ' (já preenchido)' : '') + ' — ao enviar, a reunião vira Vendido sozinha');
 }
 function fecharFormVenda() {
   var cx = document.getElementById('modal-venda');
