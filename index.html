@@ -2167,7 +2167,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-1929';
+var VERSAO_DASH = '2026-08-21-2005';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3215,7 +3215,7 @@ function abrirFormVenda(dados) {
   cx.innerHTML = '<div style="width:min(760px,96vw);height:min(92vh,900px);background:#0e0e20;border-radius:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.6);">'
     + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);">'
     +   '<b style="flex:1;font-size:.85rem;">💰 Registrar venda' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
-    +   '<span class="hint">' + (dados.bloqueio ? 'com os dados do bloqueio · ' : '') + 'chega na planilha como se fosse pelo Forms</span>'
+    +   '<span class="hint">' + (dados.bloqueio ? 'com os dados do bloqueio · ' : '') + 'cole o texto do cliente → abre o Google Forms pronto → você confere e envia</span>'
     +   '<span class="hint" style="cursor:pointer;text-decoration:underline;" onclick="abrirFormVendaGoogle()" title="Abre o Google Forms de verdade, já preenchido">ou abrir no Google Forms</span>'
     +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
     + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
@@ -3357,8 +3357,17 @@ window.addEventListener('message', function(ev) {
   var m = ev && ev.data;
   if (!m || typeof m !== 'object') return;
   if (m.tipo === 'fecharVenda') { fecharFormVenda(); return; }
+  if (m.tipo === 'vendaDados') {   // a tela de venda manda o que esta preenchido (inclusive o texto colado do lead): o plano B (Google Forms) sai completo
+    _vendaAberta = _vendaAberta || {};
+    Object.keys(m.dados || {}).forEach(function(k) { if (m.dados[k] !== undefined && m.dados[k] !== null && String(m.dados[k]) !== '') _vendaAberta[k] = m.dados[k]; });
+    if (_vendaAberta.programa) _vendaAberta.programa = _programaForms(_vendaAberta.programa) || _vendaAberta.programa;
+    if (_vendaAberta.vendedor) _vendaAberta.vendedor = _vendedorForms(_vendaAberta.vendedor);
+    if (_vendaAberta.insta) _vendaAberta.insta = '@' + String(_vendaAberta.insta).replace(/^@+/, '');
+    return;
+  }
   if (m.tipo === 'vendaFalhou') { fecharFormVenda(); abrirFormVendaGoogle(); avisoRapido('⚠️ O robô não conseguiu responder o formulário — abri o Google Forms já preenchido'); return; }
   if (m.tipo === 'vendaFalhouSilencio') { return; }
+  if (m.tipo === 'formsAberto') { avisoRapido('📝 Google Forms aberto com os dados de ' + (m.nome || 'venda') + ' — confira e clique em Enviar lá'); return; }
   if (m.tipo === 'bloqueioRegistrado') {
     // o robo ja gravou e mudou o status na planilha; aqui so atualizamos a tela
     var t8b = ldTel8(m.celular || ''), nomeB = v2norm(m.nome || '');

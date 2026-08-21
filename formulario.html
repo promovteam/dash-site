@@ -105,6 +105,14 @@ body{background:var(--bg);background-image:none;color:var(--text)}
 .sec-t .sec-badge{background:rgba(246,163,80,.12);border-color:rgba(246,163,80,.3);color:var(--primary)}
 input,select,textarea{background:rgba(0,0,0,.3)!important;border:1px solid var(--border)!important;color:var(--text)!important;border-radius:12px!important}
 input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;box-shadow:0 0 0 3px rgba(246,163,80,.15)!important;outline:none}
+/* caixa "colar dados do lead" */
+.colar-box{background:rgba(246,163,80,.06);border:1px dashed rgba(246,163,80,.35);border-radius:14px;padding:12px 14px 10px;margin-bottom:14px}
+.colar-box label{color:var(--primary)}
+.colar-box textarea{min-height:64px;font-size:.78rem;line-height:1.35}
+.colar-row{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.colar-row .btn{padding:8px 14px;font-size:.78rem}
+.colar-msg{font-size:.72rem;color:var(--text-2)}
+.preenchido{border-color:var(--green)!important;box-shadow:0 0 0 2px rgba(61,220,151,.25)!important;transition:all .3s}
 .btn{background:var(--primary);color:#191204;border-radius:999px;box-shadow:none;font-weight:700}
 .btn:hover{filter:brightness(1.08);transform:none}
 .btn.secondary,.btn-back,.btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--border)}
@@ -283,6 +291,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
   <div class="sec" id="v-step2" style="display:none">
     <div class="sec-t">Dados do cliente</div>
 
+    <div class="f colar-box">
+      <label>📋 Colar os dados que o lead mandou</label>
+      <textarea id="c-colar" placeholder="Cole aqui o texto do lead, do jeito que ele mandou:&#10;Nome completo: ...&#10;CPF: ...&#10;Celular: ...&#10;E-mail: ...&#10;(uma linha por campo — os campos abaixo se preenchem sozinhos)"></textarea>
+      <div class="colar-row">
+        <button type="button" class="btn" onclick="preencherColado('c')">✨ Preencher com o texto</button>
+        <button type="button" class="btn" style="background:var(--surface);color:var(--text);border:1px solid var(--border);" onclick="abrirFormsPreenchido()">📝 Abrir o Google Forms preenchido</button>
+        <span class="colar-msg" id="c-colar-msg">Pode colar com TITULAR e SEGUNDA CADEIRA separados</span>
+      </div>
+    </div>
+
     <div class="f">
       <label>Nome completo <span class="req">*</span></label>
       <input type="text" id="c-nome" placeholder="Nome completo" required>
@@ -296,6 +314,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <div class="f"><label>Estado civil</label><select id="c-civil"><option value="">Selecione...</option><option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option><option>Viúvo(a)</option><option>União estável</option></select></div>
     </div>
     <div class="f"><label>Profissão</label><input type="text" id="c-prof" placeholder="Profissão"></div>
+    <div class="fr">
+      <div class="f"><label>Celular/WhatsApp <span class="req">*</span></label><input type="tel" id="c-cel" placeholder="(11) 99999-9999" required></div>
+      <div class="f"><label>E-mail <span class="req">*</span></label><input type="email" id="c-email" placeholder="seu@email.com" required></div>
+    </div>
 
     <div class="f">
       <label>Tipo de cliente</label>
@@ -318,14 +340,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
     </div>
   </div>
 
-  <!-- Step 3: Contato e redes -->
+  <!-- Step 3: Endereco e redes -->
   <div class="sec" id="v-step3" style="display:none">
-    <div class="sec-t">Contato e redes</div>
+    <div class="sec-t">Endereço e redes</div>
 
-    <div class="fr">
-      <div class="f"><label>Celular/WhatsApp <span class="req">*</span></label><input type="tel" id="c-cel" placeholder="(11) 99999-9999" required></div>
-      <div class="f"><label>E-mail <span class="req">*</span></label><input type="email" id="c-email" placeholder="seu@email.com" required></div>
-    </div>
     <div class="fr">
       <div class="f" style="grid-column:1/-1"><label>Rua <span class="req">*</span></label><input type="text" id="c-rua" placeholder="Nome da rua" required></div>
     </div>
@@ -382,7 +400,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
 
     <div class="btn-row">
       <button type="button" class="btn btn-back" onclick="vendaGoStep(2)">← Voltar</button>
-      <button type="button" class="btn" onclick="submitVenda()">Enviar tudo ✓</button>
+      <button type="button" class="btn" onclick="abrirFormsPreenchido()">📝 Abrir o Google Forms preenchido</button>
+    </div>
+    <div style="text-align:center;margin-top:10px;"><span class="colar-msg" style="cursor:pointer;text-decoration:underline;" onclick="submitVenda()" title="Tenta enviar pelo robô, sem abrir o Google Forms (precisa da permissão do robô)">ou enviar pelo robô</span>
     </div>
   </div>
 
@@ -501,6 +521,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
     <div class="divider"></div>
     <div class="sec-t" style="margin-top:4px;">Dados do cliente</div>
 
+    <div class="f colar-box">
+      <label>📋 Colar os dados que o lead mandou</label>
+      <textarea id="b-colar" placeholder="Cole aqui o texto do lead, do jeito que ele mandou:&#10;Nome completo: ...&#10;CPF: ...&#10;Celular: ...&#10;E-mail: ...&#10;(uma linha por campo — os campos abaixo se preenchem sozinhos)"></textarea>
+      <div class="colar-row">
+        <button type="button" class="btn" onclick="preencherColado('b')">✨ Preencher com o texto</button>
+        <span class="colar-msg" id="b-colar-msg">Pode colar com TITULAR e SEGUNDA CADEIRA separados</span>
+      </div>
+    </div>
+
     <div class="f">
       <label>Nome do cliente <span class="req">*</span></label>
       <input type="text" id="b-nome" placeholder="Nome completo do cliente" required>
@@ -576,6 +605,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
 // =====================================================================
 // CONFIG
 // =====================================================================
+// Google Forms de venda de verdade (Form Publisher gera o contrato). A tela abre ele ja preenchido; quem envia e a pessoa.
+var FORM_VENDA_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScjB00vxJKC8xFxwGKB6-EH9-MGcdXnu8dIqoX17N4I1C9U7w/viewform';
+var FORM_VENDA_CAMPOS = {
+  vendedor: 'entry.132724355', nome: 'entry.1137695915', cpf: 'entry.222990953', rg: 'entry.1663944257',
+  nascimento: 'entry.1159651567', estadoCivil: 'entry.1935127605', profissao: 'entry.390677220', endereco: 'entry.1288039919',
+  cel: 'entry.1972817688', email: 'entry.1059302852', insta: 'entry.1059087189',
+  programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
+  nicho: 'entry.1257400668', obs: 'entry.589500904'
+};
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbxXyVSOmH5LqDtSn3p2qjY7LsoY_-fioOKAmlI3VMz9QhEgBfD-QehQQGlKBUgsFwtp/exec';
 
 var currentStep = 1;
@@ -636,7 +674,7 @@ function switchMode() {
 // =====================================================================
 // PROGRESS BAR (Venda mode — 3 steps)
 // =====================================================================
-var stepLabels = {1: 'Dados da negociação', 2: 'Dados do cliente', 3: 'Contato e redes'};
+var stepLabels = {1: 'Dados da negociação', 2: 'Dados do cliente', 3: 'Endereço e redes'};
 
 function updateProgress() {
   document.getElementById('prog-l').textContent = 'Etapa ' + currentStep + ' de 3 — ' + (stepLabels[currentStep] || '');
@@ -771,6 +809,7 @@ function cpfMask(el) {
 function phoneMask(el) {
   if (!el) return;
   el.addEventListener('input', function() {
+    if (/^\+(?!55)/.test(this.value)) return;   // numero de fora (+1, +351...): deixa como esta
     var v = this.value.replace(/\D/g, '');
     if (v.length > 0) v = '(' + v;
     if (v.length > 3) v = v.slice(0, 3) + ') ' + v.slice(3);
@@ -1087,6 +1126,276 @@ function submitBloqueio() {
     doSendBloqueio();
   }
 }
+
+// =====================================================================
+// 📋 COLAR DADOS DO LEAD (Bruno 21/08/2026)
+// O lead manda um texto "Campo: valor" por linha (Nome completo, CPF, RG, Data de
+// nascimento, Estado civil, Profissão, Endereço completo, Celular, E-mail, Instagram,
+// Nicho...). A gente le, preenche os campos e, se tiver CEP, confere o endereco no
+// ViaCEP. Um bloco "SEGUNDA CADEIRA" / "DUPLA" preenche a dupla.
+// =====================================================================
+function _semAcento(s) { return String(s || '').toLowerCase().replace(/[áàãâä]/g, 'a').replace(/[éèêë]/g, 'e').replace(/[íìîï]/g, 'i').replace(/[óòõôö]/g, 'o').replace(/[úùûü]/g, 'u').replace(/ç/g, 'c'); }
+var UF_NOMES = [['mato grosso do sul', 'MS'], ['rio grande do norte', 'RN'], ['rio grande do sul', 'RS'], ['distrito federal', 'DF'], ['espirito santo', 'ES'], ['minas gerais', 'MG'], ['rio de janeiro', 'RJ'], ['santa catarina', 'SC'], ['mato grosso', 'MT'], ['sao paulo', 'SP'], ['acre', 'AC'], ['alagoas', 'AL'], ['amapa', 'AP'], ['amazonas', 'AM'], ['bahia', 'BA'], ['ceara', 'CE'], ['goias', 'GO'], ['maranhao', 'MA'], ['paraiba', 'PB'], ['parana', 'PR'], ['pernambuco', 'PE'], ['piaui', 'PI'], ['rondonia', 'RO'], ['roraima', 'RR'], ['sergipe', 'SE'], ['tocantins', 'TO'], ['para', 'PA']];
+var UF_SIGLAS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PE PI PR RJ RN RS RO RR SC SP SE TO'.split(' ');
+function _ufColada(v) {
+  var t = _semAcento(v).trim(); if (!t) return '';
+  if (UF_SIGLAS.indexOf(t.toUpperCase()) >= 0) return t.toUpperCase();
+  for (var i = 0; i < UF_NOMES.length; i++) if (t === UF_NOMES[i][0]) return UF_NOMES[i][1];
+  return String(v).trim();
+}
+function _cpfColado(v) {
+  var d = String(v || '').replace(/\D/g, '');
+  if (d.length === 11) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  if (d.length === 14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  return String(v || '').trim();
+}
+function _telColado(v) {
+  var s = String(v || '').trim(); if (!s) return '';
+  if (/^\+/.test(s) && !/^\+55/.test(s)) return s.replace(/\s+/g, ' ');   // numero de fora: fica como veio
+  var d = s.replace(/\D/g, '');
+  if (/^55/.test(d) && d.length >= 12) d = d.slice(2);
+  if (d.length === 10 || d.length === 11) return '(' + d.slice(0, 2) + ') ' + d.slice(2, d.length - 4) + '-' + d.slice(-4);
+  return s;
+}
+function _dataColada(v) {
+  var s = _semAcento(v), m = s.match(/(\d{1,2})[\/\-.\s](\d{1,2})[\/\-.\s](\d{2,4})/), d, mo, a;
+  if (m) { d = +m[1]; mo = +m[2]; a = +m[3]; }
+  else {
+    var meses = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    var m2 = s.match(/(\d{1,2})\s*(?:de)?\s*([a-z]{3,9})\.?\s*(?:de)?\s*(\d{2,4})/);
+    if (!m2) return '';
+    d = +m2[1]; a = +m2[3]; mo = 0;
+    for (var i = 0; i < meses.length; i++) if (meses[i].indexOf(m2[2].slice(0, 3)) === 0) mo = i + 1;
+    if (!mo) return '';
+  }
+  if (a < 100) a += (a > (new Date().getFullYear() % 100) ? 1900 : 2000);
+  if (d < 1 || d > 31 || mo < 1 || mo > 12 || a < 1900) return '';
+  return a + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2);
+}
+function _civilColado(v) {
+  var t = _semAcento(v);
+  if (/solteir/.test(t)) return 'Solteiro(a)';
+  if (/casad/.test(t)) return 'Casado(a)';
+  if (/divorc|separad/.test(t)) return 'Divorciado(a)';
+  if (/viuv/.test(t)) return 'Viúvo(a)';
+  if (/uniao|estavel|amasiad/.test(t)) return 'União estável';
+  return String(v || '').trim();
+}
+function _instaColado(v) {
+  var s = String(v || '').trim().replace(/^.*instagram\.com\//i, '').replace(/[?#].*$/, '').replace(/\/+$/, '').replace(/^@+/, '').trim();
+  return s ? '@' + s : '';
+}
+// "Avenida X, 55 Bairro Cidade - Goiás 73805-360" -> rua, numero, complemento, bairro, cidade, UF, CEP (melhor esforco; o CEP corrige depois)
+function separarEndereco(texto) {
+  var r = { rua: '', num: '', comp: '', bairro: '', cidade: '', uf: '', cep: '' };
+  var t = ' ' + String(texto || '').replace(/\s+/g, ' ').trim() + ' ';
+  var mCep = t.match(/\b(\d{5})[-. ]?(\d{3})\b/);
+  if (mCep) { r.cep = mCep[1] + '-' + mCep[2]; t = t.replace(mCep[0], ' '); }
+  t = t.replace(/\bcep\b\s*:?\s*/i, ' ');
+  // UF: sigla maiuscula isolada ou nome do estado
+  var mUf = t.match(/(?:^|[\s,\-\/])(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PE|PI|PR|RJ|RN|RS|RO|RR|SC|SP|SE|TO)(?=$|[\s,.\-\/])/);
+  if (mUf) { r.uf = mUf[1]; t = t.replace(mUf[0], ' '); }
+  else {
+    var tn = _semAcento(t);
+    for (var i = 0; i < UF_NOMES.length && !r.uf; i++) {
+      var nome = UF_NOMES[i][0];
+      if (nome === 'para' && !/par[áÁ]/.test(t)) continue;   // "para" e palavra comum
+      var re = new RegExp('(?:^|[\\s,\\-\\/])' + nome + '(?=$|[\\s,.\\-\\/])');
+      var m = tn.match(re);
+      if (m) { r.uf = UF_NOMES[i][1]; var ini = m.index, fim = m.index + m[0].length; t = t.slice(0, ini) + ' ' + t.slice(fim); }
+    }
+  }
+  t = t.replace(/\s+[-–\/]\s*$/, ' ').replace(/\s+/g, ' ').trim();
+  var partes = t.split(',').map(function(p){ return p.trim(); }).filter(Boolean);
+  if (!partes.length) return r;
+  r.rua = partes.shift();
+  var mN = r.rua.match(/^(.*?)[\s,]+(?:n[º°o]?\.?\s*)?(\d{1,6}|s\/n)\s*$/i);
+  if (mN) { r.rua = mN[1].trim(); r.num = mN[2].toUpperCase() === 'S/N' ? 'S/N' : mN[2]; }
+  var resto = partes.join(', ');
+  if (!r.num) { var mN2 = resto.match(/^\s*(?:n[º°o]?\.?\s*)?(\d{1,6}|s\/n)\b\s*[,\-]?\s*/i); if (mN2) { r.num = mN2[1].toUpperCase() === 'S/N' ? 'S/N' : mN2[1]; resto = resto.slice(mN2[0].length); } }
+  var mC = resto.match(/\b(apto?\.?|apartamento|ap\.?|bloco|bl\.?|casa|sala|loja|lote|lt\.?|qd\.?|quadra|cond(?:om[ií]nio)?|torre|andar|conj(?:unto)?|fundos|edif[ií]cio|ed\.)\b[^,\-]*/i);
+  if (mC) { r.comp = mC[0].trim(); resto = resto.replace(mC[0], ' '); }
+  var segs = resto.split(/\s*[,\-–\/]\s*/).map(function(p){ return p.trim(); }).filter(Boolean);
+  if (segs.length >= 2) { r.bairro = segs[0]; r.cidade = segs[segs.length - 1]; }
+  else if (segs.length === 1) {
+    var ws = segs[0].split(' ');
+    if (ws.length >= 2) { r.cidade = ws.pop(); r.bairro = ws.join(' '); } else r.cidade = segs[0];
+  }
+  return r;
+}
+function lerDadosColados(texto) {
+  var out = { titular: {}, dupla: {}, n: 0 }, quem = 'titular';
+  var chaves = [
+    ['nome', /^(nome( completo)?|nome do (mentorado|cliente|titular)|mentorad[oa]|titular)$/],
+    ['cpf', /^(cpf|cnpj|cpf ?\/ ?cnpj|cpf ou cnpj|documento)$/],
+    ['rg', /^(rg|identidade|rg ?\/ ?orgao emissor)$/],
+    ['nasc', /nascimento|^data de nasc|^nasc|^dn$/],
+    ['civil', /estado civil/],
+    ['prof', /profiss|ocupacao/],
+    ['cep', /^cep$/],
+    ['rua', /^(rua|logradouro|avenida|av)$/],
+    ['num', /^(numero|n|no|num|nº)$/],
+    ['comp', /^complemento$/],
+    ['bairro', /^bairro$/],
+    ['cidade', /^(cidade|municipio)$/],
+    ['uf', /^(estado|uf)$/],
+    ['endereco', /endere/],
+    ['cel', /celular|telefone|whats|fone|^tel|^cel|^contato|^numero do (cliente|lead)/],
+    ['email', /e ?-? ?mail/],
+    ['insta', /instagram|^insta|^ig$|^@$|^arroba/],
+    ['yt', /youtube|^canal/],
+    ['tik', /tiktok|tik tok/],
+    ['seg', /seguidor/],
+    ['nicho', /nicho|area de atuacao|segmento/]
+  ];
+  String(texto || '').split(/\r?\n/).forEach(function(l) {
+    var s = l.trim(); if (!s) return;
+    var sn = _semAcento(s).replace(/[*_#>\-•:]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/^(titular|mentorad[oa]|cliente|dados do (titular|cliente|mentorado)|comprador|primeira cadeira|1a cadeira)$/.test(sn)) { quem = 'titular'; return; }
+    if (/^(segunda cadeira|2a cadeira|2 cadeira|dupla|acompanhante|dados da (dupla|segunda cadeira)|segundo mentorado|segunda pessoa)$/.test(sn)) { quem = 'dupla'; return; }
+    var m = s.match(/^\s*[*_\-•]*\s*([^:：]{1,45}?)\s*[:：]\s*(.+)$/), chave = '', val = '';
+    if (m) { chave = _semAcento(m[1]).replace(/\(.*?\)/g, '').replace(/[^a-z0-9\/@º ]/g, ' ').replace(/\s+/g, ' ').trim(); val = m[2].trim(); }
+    else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) { chave = 'email'; val = s; }
+    else if (/^\+?[\d\s().\-]{8,}$/.test(s) && s.replace(/\D/g, '').length >= 8) { chave = 'celular'; val = s; }
+    else return;
+    if (!val) return;
+    for (var i = 0; i < chaves.length; i++) if (chaves[i][1].test(chave)) { out[quem][chaves[i][0]] = val; out.n++; return; }
+  });
+  return out;
+}
+function _poeColado(id, v, ids) {
+  var el = document.getElementById(id); if (!el || v === undefined || v === null || String(v).trim() === '') return;
+  if (el.tagName === 'SELECT') {
+    var ok = false;
+    for (var i = 0; i < el.options.length; i++) if (_semAcento(el.options[i].text).trim() === _semAcento(v).trim() || _semAcento(el.options[i].value).trim() === _semAcento(v).trim()) { el.selectedIndex = i; ok = true; break; }
+    if (!ok) { var o = document.createElement('option'); o.text = String(v); o.value = String(v); el.appendChild(o); el.value = String(v); }
+  } else el.value = String(v);
+  el.classList.add('preenchido'); ids.push(id);
+  try { el.dispatchEvent(new Event('change')); } catch (e) {}
+}
+function aplicarEndereco(e, ids, msg) {
+  _poeColado('c-cep', e.cep, ids); _poeColado('c-rua', e.rua, ids); _poeColado('c-num', e.num, ids); _poeColado('c-comp', e.comp, ids);
+  _poeColado('c-bairro', e.bairro, ids); _poeColado('c-cidade', e.cidade, ids); _poeColado('c-estado', e.uf, ids);
+  var cep8 = String(e.cep || '').replace(/\D/g, '');
+  if (cep8.length !== 8 || typeof fetch !== 'function') return;
+  fetch('https://viacep.com.br/ws/' + cep8 + '/json/').then(function(r){ return r.json(); }).then(function(v) {
+    if (!v || v.erro) { if (msg) msg.textContent += ' · CEP não encontrado, confira o endereço'; return; }
+    var ids2 = [];
+    if (v.logradouro) _poeColado('c-rua', v.logradouro, ids2);
+    if (v.bairro) _poeColado('c-bairro', v.bairro, ids2);
+    if (v.localidade) _poeColado('c-cidade', v.localidade, ids2);
+    if (v.uf) _poeColado('c-estado', v.uf, ids2);
+    if (msg) msg.textContent = msg.textContent.replace(' · confira o endereço', '') + ' · endereço conferido pelo CEP' + (e.num ? '' : ' (falta o número)');
+    setTimeout(function(){ ids2.forEach(function(id){ var el = document.getElementById(id); if (el) el.classList.remove('preenchido'); }); }, 4000);
+    avisarPaiDados();
+  }).catch(function(){});
+}
+function preencherColado(p) {   // p = 'c' (venda) ou 'b' (bloqueio)
+  var ta = document.getElementById(p + '-colar'); if (!ta) return;
+  var d = lerDadosColados(ta.value), t = d.titular, ids = [], msg = document.getElementById(p + '-colar-msg');
+  var temDupla = !!(d.dupla.nome || d.dupla.cel || d.dupla.email);
+  if (p === 'c') {
+    _poeColado('c-nome', t.nome, ids); _poeColado('c-cpf', _cpfColado(t.cpf), ids); _poeColado('c-rg', t.rg, ids); _poeColado('c-nasc', _dataColada(t.nasc), ids);
+    _poeColado('c-civil', _civilColado(t.civil), ids); _poeColado('c-prof', t.prof, ids);
+    _poeColado('c-cel', _telColado(t.cel), ids); _poeColado('c-email', t.email, ids);
+    _poeColado('c-insta', _instaColado(t.insta), ids); _poeColado('c-yt', t.yt, ids); _poeColado('c-tik', t.tik, ids); _poeColado('c-seg', t.seg, ids); _poeColado('c-nicho', t.nicho, ids);
+    var e = t.endereco ? separarEndereco(t.endereco) : { rua: '', num: '', comp: '', bairro: '', cidade: '', uf: '', cep: '' };
+    ['cep', 'rua', 'num', 'comp', 'bairro', 'cidade', 'uf'].forEach(function(k){ if (t[k]) e[k] = (k === 'uf') ? _ufColada(t[k]) : (k === 'cep' ? String(t[k]).replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2') : t[k]); });
+    if (temDupla) { try { document.getElementById('dupla-s').checked = true; toggleDupla(); } catch (er) {} _poeColado('c-dupla-nome', d.dupla.nome, ids); _poeColado('c-dupla-cel', _telColado(d.dupla.cel), ids); _poeColado('c-dupla-email', d.dupla.email, ids); }
+    aplicarEndereco(e, ids, msg);
+    if (msg) msg.textContent = ids.length ? '✓ ' + ids.length + ' campos preenchidos' + (t.endereco ? ' · confira o endereço' : '') + (temDupla ? ' · dupla incluída' : '') : 'Não achei "Campo: valor" no texto';
+  } else {
+    _poeColado('b-nome', t.nome, ids); _poeColado('b-cpf', _cpfColado(t.cpf), ids); _poeColado('b-cel', _telColado(t.cel), ids); _poeColado('b-email', t.email, ids); _poeColado('b-insta', _instaColado(t.insta), ids);
+    if (temDupla) { try { document.getElementById('bdupla-s').checked = true; toggleDuplaB(); } catch (er) {} _poeColado('b-dupla-nome', d.dupla.nome, ids); _poeColado('b-dupla-cel', _telColado(d.dupla.cel), ids); _poeColado('b-dupla-email', d.dupla.email, ids); }
+    if (msg) msg.textContent = ids.length ? '✓ ' + ids.length + ' campos preenchidos' + (temDupla ? ' · dupla incluída' : '') : 'Não achei "Campo: valor" no texto';
+  }
+  setTimeout(function(){ ids.forEach(function(id){ var el = document.getElementById(id); if (el) el.classList.remove('preenchido'); }); }, 4000);
+  avisarPaiDados();
+}
+// ---- abre o Google Forms de verdade ja preenchido; a pessoa confere, anexa o comprovante e clica em Enviar la ----
+function _programaFormsF(p) {
+  var t = _semAcento(p).replace(/\s+/g, ' ').trim(); if (!t) return '';
+  var base = /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : (/spark/.test(t) && /semest/.test(t)) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : String(p || '');
+  if (/cadeira/.test(t)) base += (base === 'Growth anual') ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA';
+  return base;
+}
+function _vendedorFormsF(v) { var t = _semAcento(v); if (/bruno/.test(t)) return 'Bruno Pardim'; if (/tony/.test(t)) return 'Tony Londe'; return String(v || '').trim(); }
+function dadosParaForms() {
+  var g = function(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  var pj = document.getElementById('tipo-pj') && document.getElementById('tipo-pj').checked;
+  var pgto = g('v-pagamento'), det = [];
+  if (pgto) det.push(pgto);
+  if (pgto === 'Cartão de crédito' && g('v-parcelas')) det.push(g('v-parcelas').replace(/x$/i, '') + 'x' + (g('v-parcela-valor') ? ' de ' + g('v-parcela-valor') : ''));
+  if (pgto === 'Cartão recorrente' && g('v-recorrente-vezes')) det.push('recorrente ' + g('v-recorrente-vezes') + 'x' + (g('v-recorrente-valor') ? ' de ' + g('v-recorrente-valor') : ''));
+  var entrada = document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked;
+  if (entrada && g('v-entrada-valor')) det.push('entrada ' + g('v-entrada-valor'));
+  var dupla = document.getElementById('dupla-s') && document.getElementById('dupla-s').checked;
+  if (dupla) det.push('dupla: ' + [g('c-dupla-nome'), g('c-dupla-cel'), g('c-dupla-email')].filter(Boolean).join(' '));
+  if (pj) det.push('PJ: ' + g('c-razao') + (g('c-cnpj') ? ' CNPJ ' + g('c-cnpj') : ''));
+  var nasc = g('c-nasc'), mN = nasc.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  var obs = [g('v-obs'), det.length ? 'Pagamento: ' + det.join(' · ') : '', g('v-clint') ? 'Clint: ' + g('v-clint') : '', g('c-seg') ? 'Seguidores: ' + g('c-seg') : '', g('v-sdr') ? 'SDR: ' + g('v-sdr') : '', 'Preenchido pelo dash'].filter(Boolean).join('\n');
+  return {
+    vendedor: _vendedorFormsF(g('v-vendedor')), nome: g('c-nome'), cpf: (pj && g('c-cnpj')) ? g('c-cnpj') : g('c-cpf'), rg: g('c-rg'),
+    nascimento: mN ? mN[3] + '/' + mN[2] + '/' + mN[1] : nasc, estadoCivil: g('c-civil'), profissao: g('c-prof'),
+    endereco: [g('c-rua'), g('c-num'), g('c-comp'), g('c-bairro'), g('c-cidade'), g('c-estado'), g('c-cep')].filter(Boolean).join(', '),
+    cel: g('c-cel'), email: g('c-email'), insta: g('c-insta') ? '@' + g('c-insta').replace(/^@+/, '') : '',
+    programa: _programaFormsF(g('v-programa')), teveEntrada: entrada ? 'Sim' : 'Não', teveBloqueio: window.__teveBloqueio ? 'Sim' : 'Não',
+    valor: g('v-valor'), nicho: g('c-nicho'), obs: obs
+  };
+}
+function linkFormsPreenchido() {
+  var d = dadosParaForms(), partes = [];
+  Object.keys(FORM_VENDA_CAMPOS).forEach(function(k){ if (d[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(d[k])); });
+  return FORM_VENDA_URL + '?usp=pp_url' + (partes.length ? '&' + partes.join('&') : '');
+}
+var _ultimoLinkForms = '';
+function abrirFormsPreenchido() {
+  _ultimoLinkForms = linkFormsPreenchido();
+  var w = window.open(_ultimoLinkForms, '_blank');
+  var d = dadosParaForms();
+  document.getElementById('form-venda').style.display = 'none';
+  document.getElementById('prog-bar').style.display = 'none';
+  document.getElementById('prog-l').style.display = 'none';
+  var ic = document.querySelector('#success .success-icon'); if (ic) ic.textContent = '📝';
+  document.getElementById('success-title').textContent = w ? 'Google Forms aberto em outra aba' : 'O navegador bloqueou a aba';
+  document.getElementById('success-msg').innerHTML = (w ? 'O formulário de <b>' + (d.nome || 'venda') + '</b> abriu já preenchido. ' : 'Clique no botão abaixo para abrir o formulário preenchido. ')
+    + 'Lá: <b>confira os dados, anexe o comprovante e clique em Enviar</b>.<br>Quando enviar, o robô marca a venda, avisa a Juliane e a Suellen e o contrato é gerado como sempre.'
+    + '<br><br><a class="btn" style="display:inline-block;text-decoration:none;" href="' + _ultimoLinkForms.replace(/"/g, '&quot;') + '" target="_blank">📝 Abrir o Google Forms' + (w ? ' de novo' : '') + '</a>'
+    + ' <button type="button" class="btn" style="background:var(--surface);color:var(--text);border:1px solid var(--border);" onclick="voltarParaTela()">✏️ Corrigir algo</button>';
+  document.getElementById('success').classList.add('show');
+  try { if (window.parent !== window) window.parent.postMessage({ tipo: 'formsAberto', nome: d.nome, celular: d.cel }, '*'); } catch (e) {}
+}
+function voltarParaTela() {
+  document.getElementById('success').classList.remove('show');
+  document.getElementById('form-venda').style.display = 'block';
+  document.getElementById('prog-bar').style.display = '';
+  document.getElementById('prog-l').style.display = 'block';
+}
+// colou = preenche na hora (sem precisar clicar)
+['c', 'b'].forEach(function(p) {
+  var ta = document.getElementById(p + '-colar');
+  if (ta) ta.addEventListener('paste', function(){ setTimeout(function(){ preencherColado(p); }, 50); });
+});
+// o dash (janela de fora) recebe o que esta na tela, para o plano B (Google Forms preenchido) ir completo
+var _avisarPaiTimer = null;
+function avisarPaiDados() {
+  if (window.parent === window) return;
+  clearTimeout(_avisarPaiTimer);
+  _avisarPaiTimer = setTimeout(function() {
+    var g = function(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+    var nasc = g('c-nasc'), mN = nasc.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    var dados = {
+      vendedor: g('v-vendedor'), programa: g('v-programa'), valor: g('v-valor'), forma: g('v-pagamento'), clint: g('v-clint'), obs: g('v-obs'),
+      teveEntrada: (document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked) ? 'Sim' : 'Não',
+      teveBloqueio: window.__teveBloqueio ? 'Sim' : 'Não',
+      nome: g('c-nome'), cpf: g('c-cpf'), rg: g('c-rg'), nascimento: mN ? mN[3] + '/' + mN[2] + '/' + mN[1] : nasc, estadoCivil: g('c-civil'), profissao: g('c-prof'),
+      endereco: [g('c-rua'), g('c-num'), g('c-comp'), g('c-bairro'), g('c-cidade'), g('c-estado'), g('c-cep')].filter(Boolean).join(', '),
+      cel: g('c-cel'), email: g('c-email'), insta: g('c-insta'), seg: g('c-seg'), nicho: g('c-nicho')
+    };
+    try { window.parent.postMessage({ tipo: 'vendaDados', dados: dados }, '*'); } catch (e) {}
+  }, 400);
+}
+(function(){ var f = document.getElementById('form-venda'); if (f) { f.addEventListener('input', avisarPaiDados); f.addEventListener('change', avisarPaiDados); } })();
 </script>
 <script>
 // =====================================================================
