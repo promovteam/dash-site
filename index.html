@@ -2167,7 +2167,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-1844';
+var VERSAO_DASH = '2026-08-21-1847';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3145,14 +3145,46 @@ function _vendedorLogado() {
 // duas vendas de 21/08 "nao chegaram". Agora o botao abre o Google Forms numa aba
 // nova; o pre-preenchimento entra quando tivermos os codigos dos campos.
 var FORM_VENDA_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScjB00vxJKC8xFxwGKB6-EH9-MGcdXnu8dIqoX17N4I1C9U7w/viewform';
-var FORM_VENDA_CAMPOS = {};   // ex.: { nome: 'entry.123', cel: 'entry.456', ... } — preenchido quando o Bruno mandar o link preenchido
+// codigos dos campos do Google Forms (do "link preenchido" que o Bruno mandou em 21/08/2026)
+var FORM_VENDA_CAMPOS = {
+  vendedor: 'entry.132724355', nome: 'entry.1137695915', cpf: 'entry.222990953', rg: 'entry.1663944257',
+  nascimento: 'entry.1159651567', estadoCivil: 'entry.1935127605', profissao: 'entry.390677220', endereco: 'entry.1288039919',
+  cel: 'entry.1972817688', email: 'entry.1059302852', insta: 'entry.1059087189',
+  programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
+  nicho: 'entry.1257400668', obs: 'entry.589500904'
+  // ainda sem codigo: forma de pagamento, link da Clint, seguidores (o Bruno nao preencheu no link de exemplo)
+};
+// o Forms tem opcoes fixas: o nome curto do dash vira o nome que o formulario conhece
+function _programaForms(p) {
+  var t = v2norm(p);
+  if (!t) return '';
+  var base = /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : /spark/.test(t) && /semest/.test(t) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : '';
+  if (!base) return '';
+  return base + (/cadeira/.test(t) ? (base === 'Growth anual' ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA') : '');
+}
+function _vendedorForms(v) {
+  var t = v2norm(v);
+  if (/bruno/.test(t)) return 'Bruno Pardim';
+  if (/tony/.test(t)) return 'Tony Londe';
+  return String(v || '');
+}
 function abrirFormVenda(dados) {
   if (soOlhar()) return;
   dados = dados || {};
   _vendaAberta = dados;
   // quem deu bloqueio/entrada ja informou CPF, e-mail, valor, programa: entra tudo no formulario
   var b = bloqueioDe(dados.cel, dados.nome);
-  if (b) { ['cpf', 'email', 'insta', 'programa', 'valor', 'forma', 'vendedor', 'clint'].forEach(function(k) { var vB = { cpf: b.cpf, email: b.email, insta: b.insta, programa: b.programa, valor: b.total, forma: b.forma, vendedor: b.vendedor, clint: b.clint }[k]; if (vB && !dados[k]) dados[k] = vB; }); dados.bloqueio = b; }
+  if (b) {
+    ['cpf', 'email', 'insta', 'programa', 'valor', 'forma', 'vendedor', 'clint'].forEach(function(k) { var vB = { cpf: b.cpf, email: b.email, insta: b.insta, programa: b.programa, valor: b.total, forma: b.forma, vendedor: b.vendedor, clint: b.clint }[k]; if (vB && !dados[k]) dados[k] = vB; });
+    dados.bloqueio = b;
+    if (/entrada/i.test(b.tipo)) dados.teveEntrada = 'Sim'; else dados.teveBloqueio = 'Sim';
+    dados.obs = (b.tipo || 'Bloqueio') + (b.valor ? ' de ' + b.valor : '') + (b.quando ? ' registrado em ' + String(b.quando).slice(0, 10) : '') + (b.forma ? ' (' + b.forma + ')' : '') + (b.fim ? ' · finaliza até ' + _dataBr(b.fim) : '');
+  }
+  // do jeito que o Google Forms espera
+  if (dados.vendedor) dados.vendedor = _vendedorForms(dados.vendedor);
+  if (dados.programa) dados.programa = _programaForms(dados.programa);
+  if (dados.insta) dados.insta = '@' + String(dados.insta).replace(/^@/, '');
+  if (dados.cel) dados.cel = String(dados.cel).replace(/\D/g, '').replace(/^55(\d{10,11})$/, '$1');
   var partes = [];
   Object.keys(FORM_VENDA_CAMPOS).forEach(function(k) {
     if (dados[k] && FORM_VENDA_CAMPOS[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(String(dados[k])));
