@@ -522,6 +522,20 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <input type="text" id="b-insta" placeholder="@usuario">
     </div>
     <div class="f">
+      <label>Segunda cadeira (dupla)?</label>
+      <div class="opt-row opt-sm">
+        <div class="opt-item"><input type="radio" name="bdupla" id="bdupla-n" value="Não" checked onchange="toggleDuplaB()"><label for="bdupla-n">Não</label></div>
+        <div class="opt-item"><input type="radio" name="bdupla" id="bdupla-s" value="Sim" onchange="toggleDuplaB()"><label for="bdupla-s">Sim</label></div>
+      </div>
+    </div>
+    <div id="bdupla-fields" style="display:none">
+      <div class="f"><label>Nome da segunda cadeira</label><input type="text" id="b-dupla-nome" placeholder="Nome completo"></div>
+      <div class="fr">
+        <div class="f"><label>Celular da segunda cadeira</label><input type="tel" id="b-dupla-cel" placeholder="(62) 99999-9999"></div>
+        <div class="f"><label>E-mail da segunda cadeira</label><input type="email" id="b-dupla-email" placeholder="email@exemplo.com"></div>
+      </div>
+    </div>
+    <div class="f">
       <label>Conversa na Clint</label>
       <input type="url" id="b-clint" placeholder="https://app.clint.digital/...">
     </div>
@@ -708,6 +722,9 @@ function togglePJ() {
 
 function toggleDupla() {
   document.getElementById('dupla-fields').style.display = document.getElementById('dupla-s').checked ? 'block' : 'none';
+}
+function toggleDuplaB() {
+  document.getElementById('bdupla-fields').style.display = document.getElementById('bdupla-s').checked ? 'block' : 'none';
 }
 
 // =====================================================================
@@ -1032,6 +1049,10 @@ function submitBloqueio() {
     celular: document.getElementById('b-cel').value,
     email: document.getElementById('b-email').value,
     cpf: document.getElementById('b-cpf').value,
+    dupla: document.getElementById('bdupla-s').checked ? 'Sim' : 'Não',
+    dupla_nome: document.getElementById('bdupla-s').checked ? document.getElementById('b-dupla-nome').value : '',
+    dupla_celular: document.getElementById('bdupla-s').checked ? document.getElementById('b-dupla-cel').value : '',
+    dupla_email: document.getElementById('bdupla-s').checked ? document.getElementById('b-dupla-email').value : '',
     instagram: document.getElementById('b-insta').value,
     link_clint: document.getElementById('b-clint').value,
     data_resposta: document.getElementById('b-data-decisao').value,
@@ -1094,6 +1115,9 @@ function submitBloqueio() {
   poe('c-nome', q.nome); poe('c-cel', q.cel); poe('c-email', q.email); poe('c-insta', q.insta); poe('c-seg', q.seg); poe('c-nicho', q.nicho);
   poe('v-vendedor', q.vendedor); poe('v-sdr', q.sdr); poe('v-programa', q.programa); poe('v-clint', q.clint);
   poe('c-cpf', q.cpf); poe('v-valor', q.valor); poe('v-obs', q.obs);
+  if (q.dupla === 'Sim') { try { document.getElementById('dupla-s').checked = true; toggleDupla(); poe('c-dupla-nome', q.duplaNome); poe('c-dupla-cel', q.duplaCel); poe('c-dupla-email', q.duplaEmail); } catch (e) {} }
+  // pagamento que ja tinha sido combinado no bloqueio/entrada
+  if (q.forma) { try { poe('v-pagamento', q.forma); togglePagamento(); poe('v-parcelas', q.parcelas); poe('v-parcela-valor', q.valorParcela); poe('v-recorrente-vezes', q.recorrente); poe('v-recorrente-valor', q.valorMensal); } catch (e) {} }
   if (q.entrada === 'Sim') { try { document.getElementById('v-ent-s').checked = true; toggleEntrada(); poe('v-entrada-valor', q.valorEntrada); } catch (e) {} }
   window.__teveBloqueio = q.bloqueio === 'Sim' ? 'Sim' : '';
   if (q.modo === 'venda') {
@@ -1111,6 +1135,7 @@ function submitBloqueio() {
     for (var i = 0; i < esc.length; i++) { var f = esc[i].closest('.f'); if (f) f.style.display = 'none'; }
     poe('b-nome', q.nome); poe('b-cel', q.cel); poe('b-email', q.email); poe('b-insta', q.insta); poe('b-clint', q.clint);
     poe('b-vendedor', q.vendedor); poe('b-sdr', q.sdr); poe('b-programa', q.programa); poe('b-valor', q.valor);
+    if (q.dupla === 'Sim') { try { document.getElementById('bdupla-s').checked = true; toggleDuplaB(); poe('b-dupla-nome', q.duplaNome); poe('b-dupla-cel', q.duplaCel); poe('b-dupla-email', q.duplaEmail); } catch (e) {} }
     var h1 = document.querySelector('.hdr h1'); if (h1) h1.childNodes[0].nodeValue = 'Bloqueio de oferta / Entrada';
   }
   if (q.embed === '1') {

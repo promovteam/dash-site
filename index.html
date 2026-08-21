@@ -2167,7 +2167,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-1920';
+var VERSAO_DASH = '2026-08-21-1926';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3184,12 +3184,19 @@ function abrirFormVenda(dados) {
   // quem deu bloqueio/entrada ja informou CPF, e-mail, valor, programa: entra tudo no formulario
   var b = bloqueioDe(dados.cel, dados.nome);
   if (b) {
-    ['cpf', 'email', 'insta', 'programa', 'valor', 'forma', 'vendedor', 'clint'].forEach(function(k) { var vB = { cpf: b.cpf, email: b.email, insta: b.insta, programa: b.programa, valor: b.total, forma: b.forma, vendedor: b.vendedor, clint: b.clint }[k]; if (vB && !dados[k]) dados[k] = vB; });
+    ['cpf', 'email', 'insta', 'programa', 'valor', 'forma', 'vendedor', 'clint'].forEach(function(k) { var vB = { cpf: b.cpf, email: b.email, insta: b.insta, programa: b.programa, valor: b.total, forma: b.forma, vendedor: b.vendedor, clint: b.clint }[k]; if (vB && (!dados[k] || k === 'programa' || k === 'valor')) dados[k] = vB; });   // programa e valor do bloqueio sao os mais recentes
     dados.bloqueio = b;
-    if (/entrada/i.test(b.tipo)) dados.teveEntrada = 'Sim'; else dados.teveBloqueio = 'Sim';
-    dados.obs = (b.tipo || 'Bloqueio') + (b.valor ? ' de ' + b.valor : '') + (b.quando ? ' registrado em ' + String(b.quando).slice(0, 10) : '') + (b.forma ? ' (' + b.forma + ')' : '') + (b.fim ? ' · finaliza até ' + _dataBr(b.fim) : '');
+    // o que ja foi pago (entrada OU bloqueio) vira "Teve entrada = Sim" com o valor; bloqueio tambem marca "Teve bloqueio"
+    dados.teveEntrada = 'Sim';
+    dados.valorEntrada = b.valor || '';
+    if (!/entrada/i.test(b.tipo)) dados.teveBloqueio = 'Sim';
+    if (/^sim/i.test(b.dupla || '')) { dados.dupla = 'Sim'; dados.duplaNome = b.duplaNome || ''; dados.duplaCel = b.duplaCel || ''; dados.duplaEmail = b.duplaEmail || ''; }
+    // pagamento combinado no bloqueio vem junto
+    dados.parcelas = b.parcelas || ''; dados.valorParcela = b.valorParcela || ''; dados.recorrente = b.recorrente || ''; dados.valorMensal = b.valorMensal || '';
+    dados.obs = (b.tipo || 'Bloqueio') + (b.valor ? ' de ' + b.valor + ' já pago' : '') + (b.quando ? ' em ' + String(b.quando).slice(0, 10) : '') + (b.forma ? ' (' + b.forma + ')' : '') + (b.fim ? ' · finaliza até ' + _dataBr(b.fim) : '');
   }
   if (!dados.valor && dados.programa) { var vp2 = valorPadraoDoProduto(dados.programa); if (vp2) dados.valor = v2moeda(vp2); }
+  if (!dados.dupla && /cadeira/i.test(dados.programa || '')) dados.dupla = 'Sim';   // programa com 2ª cadeira: ja abre o bloco da dupla
   // do jeito que o Google Forms espera (serve para a nossa tela e para o plano B)
   if (dados.vendedor) dados.vendedor = _vendedorForms(dados.vendedor);
   if (dados.programa) dados.programa = _programaForms(dados.programa);
@@ -3199,7 +3206,9 @@ function abrirFormVenda(dados) {
   var partes = ['embed=1', 'modo=venda'];
   var mapa = { nome: dados.nome, cel: dados.cel, email: dados.email, insta: dados.insta, seg: dados.seg, nicho: dados.nicho, vendedor: _nomeCurto(dados.vendedor), sdr: dados.sdr,
     programa: dados.programa, clint: dados.clint, cpf: dados.cpf, valor: dados.valor, obs: dados.obs,
-    entrada: dados.teveEntrada === 'Sim' ? 'Sim' : '', valorEntrada: dados.bloqueio && dados.teveEntrada === 'Sim' ? dados.bloqueio.valor : '', bloqueio: dados.teveBloqueio === 'Sim' ? 'Sim' : '' };
+    entrada: dados.teveEntrada === 'Sim' ? 'Sim' : '', valorEntrada: dados.valorEntrada || '', bloqueio: dados.teveBloqueio === 'Sim' ? 'Sim' : '',
+    dupla: dados.dupla === 'Sim' ? 'Sim' : '', duplaNome: dados.duplaNome || '', duplaCel: dados.duplaCel || '', duplaEmail: dados.duplaEmail || '',
+    forma: dados.forma || '', parcelas: dados.parcelas || '', valorParcela: dados.valorParcela || '', recorrente: dados.recorrente || '', valorMensal: dados.valorMensal || '' };
   Object.keys(mapa).forEach(function(k) { if (mapa[k]) partes.push(k + '=' + encodeURIComponent(String(mapa[k]))); });
   var cx = document.getElementById('modal-venda');
   if (!cx) return;
@@ -3313,8 +3322,9 @@ function abrirFormBloqueio(dados) {
   if (soOlhar()) return;
   dados = dados || {};
   if (!dados.valor && dados.programa) { var vp = valorPadraoDoProduto(dados.programa); if (vp) dados.valor = v2moeda(vp); }
+  if (!dados.dupla && /cadeira/i.test(dados.programa || '')) dados.dupla = 'Sim';
   var partes = ['embed=1', 'modo=bloqueio'];
-  ['nome', 'cel', 'email', 'insta', 'vendedor', 'sdr', 'programa', 'clint', 'valor'].forEach(function(k) {
+  ['nome', 'cel', 'email', 'insta', 'vendedor', 'sdr', 'programa', 'clint', 'valor', 'dupla'].forEach(function(k) {
     if (dados[k]) partes.push(k + '=' + encodeURIComponent(String(dados[k])));
   });
   var cx = document.getElementById('modal-venda');
