@@ -2167,7 +2167,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-1905';
+var VERSAO_DASH = '2026-08-21-1920';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3189,6 +3189,7 @@ function abrirFormVenda(dados) {
     if (/entrada/i.test(b.tipo)) dados.teveEntrada = 'Sim'; else dados.teveBloqueio = 'Sim';
     dados.obs = (b.tipo || 'Bloqueio') + (b.valor ? ' de ' + b.valor : '') + (b.quando ? ' registrado em ' + String(b.quando).slice(0, 10) : '') + (b.forma ? ' (' + b.forma + ')' : '') + (b.fim ? ' · finaliza até ' + _dataBr(b.fim) : '');
   }
+  if (!dados.valor && dados.programa) { var vp2 = valorPadraoDoProduto(dados.programa); if (vp2) dados.valor = v2moeda(vp2); }
   // do jeito que o Google Forms espera (serve para a nossa tela e para o plano B)
   if (dados.vendedor) dados.vendedor = _vendedorForms(dados.vendedor);
   if (dados.programa) dados.programa = _programaForms(dados.programa);
@@ -3284,7 +3285,7 @@ function abrirFormVendaLead() {
   var l = v.lead, r = v.reuniao;
   abrirFormVenda({ nome: l.nome, cel: l.tel, email: l.email, insta: _instaHandle(l.insta), seg: l.seg,
     vendedor: (r && r.closer) ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: (r && r.sdr) ? _nomeCurto(r.sdr) : _nomeCurto(l.dono),
-    programa: r ? r.produto : '', clint: clintLink(l) });
+    programa: r ? r.produto : '', valor: (r && r.valor > 0) ? v2moeda(r.valor) : '', clint: clintLink(l) });
 }
 // da ficha da REUNIAO (Visao Geral / Agenda)
 function abrirFormVendaReuniao() {
@@ -3293,7 +3294,7 @@ function abrirFormVendaReuniao() {
   var l = t8 ? (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] : null;   // o lead do diagnostico, se existir
   abrirFormVenda({ nome: r.nome, cel: r.telefone, email: l ? l.email : '', insta: _instaHandle(l ? l.insta : ''), seg: l ? l.seg : '',
     vendedor: r.closer ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: _nomeCurto(r.sdr),
-    programa: r.produto, clint: (l && clintLink(l)) || clintLink({ tel: r.telefone }) });
+    programa: r.produto, valor: r.valor > 0 ? v2moeda(r.valor) : '', clint: (l && clintLink(l)) || clintLink({ tel: r.telefone }) });
 }
 // ===== 🔒 BLOQUEIO DE OFERTA / ENTRADA (Bruno 21/08/2026) =====
 // Usa a tela de bloqueio do formulario.html (so esse modo), ja preenchida. O robo
