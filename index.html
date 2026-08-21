@@ -1522,6 +1522,8 @@ Instagram: @pr.joaosilva</div>
 </div>
 
 <!-- ============ FICHA DO LEAD (clique em qualquer cliente) ============ -->
+<!-- 💰 formulario de venda por dentro do dash (Bruno 21/08/2026): abre o formulario.html ja preenchido -->
+<div class="modal-overlay" id="modal-venda" onclick="if(event.target===this)fecharFormVenda()" style="z-index:10100;display:none;"></div>
 <div class="modal-overlay" id="modal-lead" onclick="if(event.target===this)fecharLead()" style="z-index:210;">
 <div class="modal" style="width:560px;">
   <div class="modal-head">
@@ -1541,6 +1543,7 @@ Instagram: @pr.joaosilva</div>
       <div style="display:flex;gap:8px;">
         <button class="btn" id="btn-copiar" style="padding:6px 14px;font-size:.7rem;" onclick="copiarDadosLead(this)">📋 Copiar</button>
         <button class="btn" id="btn-editar" style="padding:6px 14px;font-size:.7rem;" onclick="alternarEdicao()">✏️ Editar</button>
+        <button class="btn" id="btn-venda-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="abrirFormVendaReuniao()" title="Abre o formulário de venda já preenchido com os dados desta reunião">💰 Registrar venda</button>
       </div>
     </div>
     <div id="lead-info"></div>
@@ -2162,7 +2165,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-0956';
+var VERSAO_DASH = '2026-08-21-1327';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3108,6 +3111,94 @@ function salvarAnuncioEscolhido(nome) {
   avisoRapido('✓ marcado: ' + (valor === 'Orgânico (sem anúncio)' ? 'não veio de anúncio' : ldAnuncioLimpo(valor)));
 }
 // aviso curto no canto, para a pessoa ver que a escolha pegou
+// ===== 💰 FORMULARIO DE VENDA POR DENTRO DO DASH (Bruno 21/08/2026) =====
+// Abre o formulario.html (o mesmo de sempre) numa janela por cima da ficha, ja
+// preenchido com o que o dash sabe. Quando a venda entra, o formulario avisa o
+// dash: a reuniao vira "Vendido", a aba Pagamentos recarrega e o robo manda o
+// WhatsApp para a entrega.
+var _vendaLeadAtual = null, _vendaAberta = null;
+function _primeiroNome(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+// "SDR Felippe" -> "Felippe" · "SS Sarah" -> "Sarah" · "bruno" -> "Bruno" · "Tony Londe" -> "Tony"
+function _nomeCurto(n) {
+  var t = String(n || '').trim().replace(/^(sdr|ss|closer)\s+/i, '');
+  var p = t.split(/\s+/)[0] || '';
+  if (!p || /^(sdr|ss|—|-)$/i.test(p)) return '';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+// aceita "@maria", "maria" ou "https://www.instagram.com/maria?igsh=..." e devolve "maria"
+function _instaHandle(v) {
+  var t = String(v || '').trim();
+  var m = t.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
+  if (m) return m[1];
+  return t.replace(/^@/, '').split(/[?\s/]/)[0];
+}
+function _vendedorLogado() {
+  var eu = localStorage.getItem('v2Login') || ldEu() || '';
+  if (/bruno/i.test(eu)) return 'Bruno';
+  if (/tony/i.test(eu)) return 'Tony';
+  return _primeiroNome(eu);
+}
+function abrirFormVenda(dados) {
+  if (soOlhar()) return;
+  dados = dados || {};
+  _vendaAberta = dados;
+  var partes = ['embed=1'];
+  ['nome', 'cel', 'email', 'insta', 'seg', 'vendedor', 'sdr', 'programa', 'clint', 'nicho'].forEach(function(k) {
+    if (dados[k]) partes.push(k + '=' + encodeURIComponent(String(dados[k])));
+  });
+  var cx = document.getElementById('modal-venda');
+  if (!cx) return;
+  cx.innerHTML = '<div style="width:min(760px,96vw);height:min(92vh,900px);background:#0e0e20;border-radius:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.6);">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);">'
+    +   '<b style="flex:1;font-size:.85rem;">💰 Registrar venda' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
+    +   '<span class="hint">já preenchido com o que o dash sabe · complete o resto</span>'
+    +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
+    + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
+  cx.style.display = 'flex';
+}
+function fecharFormVenda() {
+  var cx = document.getElementById('modal-venda');
+  if (cx) { cx.style.display = 'none'; cx.innerHTML = ''; }
+  _vendaAberta = null;
+}
+// da ficha do LEAD (aba Leads)
+function abrirFormVendaLead() {
+  var v = _vendaLeadAtual; if (!v || !v.lead) return;
+  var l = v.lead, r = v.reuniao;
+  abrirFormVenda({ nome: l.nome, cel: l.tel, email: l.email, insta: _instaHandle(l.insta), seg: l.seg,
+    vendedor: (r && r.closer) ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: (r && r.sdr) ? _nomeCurto(r.sdr) : _nomeCurto(l.dono),
+    programa: r ? r.produto : '', clint: clintLink(l) });
+}
+// da ficha da REUNIAO (Visao Geral / Agenda)
+function abrirFormVendaReuniao() {
+  var r = _v2reg[_fichaAtual]; if (!r) return;
+  var t8 = ldTel8(r.telefone);
+  var l = t8 ? (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] : null;   // o lead do diagnostico, se existir
+  abrirFormVenda({ nome: r.nome, cel: r.telefone, email: l ? l.email : '', insta: _instaHandle(l ? l.insta : ''), seg: l ? l.seg : '',
+    vendedor: r.closer ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: _nomeCurto(r.sdr),
+    programa: r.produto, clint: (l && clintLink(l)) || clintLink({ tel: r.telefone }) });
+}
+// o formulario avisa quando a venda entrou
+window.addEventListener('message', function(ev) {
+  var m = ev && ev.data;
+  if (!m || typeof m !== 'object') return;
+  if (m.tipo === 'fecharVenda') { fecharFormVenda(); return; }
+  if (m.tipo !== 'vendaRegistrada') return;
+  var t8 = ldTel8(m.celular || ''), nomeN = v2norm(m.nome || '');
+  // a reuniao desta pessoa vira "Vendido" (planilha + agenda), se ainda nao for
+  var cand = (V2.rows || []).filter(function(r){ return (t8 && ldTel8(r.telefone) === t8) || (nomeN && v2norm(r.nome) === nomeN); })
+    .sort(function(a, b){ return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); });
+  var r = cand[0];
+  var mudou = false;
+  if (r && r.sn !== 'vendido') {
+    r.status = 'Vendido'; r.sn = 'vendido';
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Vendido', dataRef: v2dataRef(r), gid: V2_GID });
+    try { sincronizarStatusEvento(r); } catch (e) {}
+    mudou = true;
+  }
+  setTimeout(function() { try { carregarPag(); } catch (e) {} try { renderV2(); } catch (e) {} try { if (LD.carregado) renderLeads(); } catch (e) {} }, 4000);
+  avisoRapido('✓ Venda de ' + (m.nome || 'cliente') + ' registrada' + (mudou ? ' · reunião marcada como Vendido' : '') + ' · a entrega foi avisada');
+});
 function avisoRapido(txt) {
   var el = document.getElementById('aviso-rapido');
   if (!el) {
@@ -4542,7 +4633,7 @@ function reunioesSemResultado() {
 // Uma janela esquecida aberta cobre a tela inteira e engole todos os cliques —
 // era por isso que, depois de abrir e fechar algo, as barras do funil não abriam.
 var _JANELAS = ['modal-status-pendente', 'modal-quem', 'modal-busca-lead',
-                'modal-escolhe-anuncio', 'modal-criativo'];
+                'modal-escolhe-anuncio', 'modal-criativo', 'modal-venda'];
 function _temJanelaAberta() {
   if (document.getElementById('modal-b') && document.getElementById('modal-b').classList.contains('open')) return true;
   if (document.getElementById('modal-lead') && document.getElementById('modal-lead').classList.contains('open')) return true;
@@ -7492,8 +7583,13 @@ function abrirFichaLead(i) {
       + '</div>';
   }
   var wa = ldWa(l);
+  // 💰 registrar venda direto da ficha (formulario ja preenchido) — Bruno 21/08/2026
+  _vendaLeadAtual = { lead: l, reuniao: _reu || null };
+  h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">'
+    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda' + (_pag ? ' (já tem pagamento)' : '') + '</button>'
+    + '</div>';
   if (wa || l.insta || clintLink(l)) {
-    h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">'
+    h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
       + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank">🟣 Abrir na Clint</a>' : '')
       + (wa ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;" href="' + wa + '" target="_blank">💬 Chamar no WhatsApp</a>' : '')
       + (l.insta ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank">📷 Ver Instagram</a>' : '')
