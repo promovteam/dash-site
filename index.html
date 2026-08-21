@@ -1086,6 +1086,7 @@ img { max-width:100%; height:auto; }
       <input class="search-input" style="flex:1;min-width:200px;max-width:320px;margin-bottom:0;" placeholder="🔍  Buscar lead por nome ou telefone..." oninput="LD_BUSCA=this.value;renderLeads()">
     </div>
     <div id="ld-filtros" style="display:none;"></div>
+    <div id="ld-clint-status"></div>
     <div class="panel" id="ld-loading" style="text-align:center;color:var(--muted);padding:50px 20px;">
       <div style="font-size:2rem;margin-bottom:10px;">📥</div>
       Carregando leads da planilha…
@@ -2161,7 +2162,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-20-1909';
+var VERSAO_DASH = '2026-08-21-0956';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4010,35 +4011,83 @@ function clintTexto(l) {
 var CLINT_PAINEL = null;
 var _cpPedindo = false;
 var _espAvisados = {};
+// ===== O QUE ESTÁ ACONTECENDO COM A CLINT (Bruno 20/08/2026) =====
+// Quando o painel da Clint não chegava, o dash só escondia os botões 🟣 Clint,
+// as etapas e os donos — sem dizer nada. No computador da Sarah parecia que o
+// botão "não existia". Agora o dash mostra o estado, o motivo, e tenta de novo
+// sozinho em 30s (depois 60s, 120s) em vez de esperar 5 minutos.
+var CP_STATUS = { estado: 'nunca', motivo: '', quando: 0, falhas: 0 };
 function carregarClintPainel() {
   if (_cpPedindo) return;
   _cpPedindo = true;
+  CP_STATUS.estado = 'pedindo';
+  renderClintStatus();
   var nome = 'cpCb' + Math.random().toString(36).slice(2, 8);
   var s = document.createElement('script');
-  var fim = function(d) {
+  var comecou = Date.now();
+  var fim = function(d, motivo) {
     _cpPedindo = false;
     try { s.remove(); } catch (e) {}
     try { delete window[nome]; } catch (e) {}
     if (d && d.success) {
       var primeira = CLINT_PAINEL === null;
       CLINT_PAINEL = d;
+      CP_STATUS = { estado: 'ok', motivo: '', quando: Date.now(), falhas: 0 };
       avisarEsperando(primeira);
       renderLeads();
       renderAlertaClintHome();
       renderSemOrigem();
       renderAvisoCloser();
       renderStatusPendente();
-    } else if (!CLINT_PAINEL) {
-      CLINT_PAINEL = d || { success: false };
-      renderLeads();
+    } else {
+      CP_STATUS.falhas++;
+      CP_STATUS.estado = 'erro';
+      CP_STATUS.quando = Date.now();
+      CP_STATUS.motivo = motivo || (d && d.error ? 'o robô respondeu com erro: ' + d.error : 'o robô não devolveu o painel');
+      if (!CLINT_PAINEL) { CLINT_PAINEL = d || { success: false }; renderLeads(); }
+      // tenta de novo logo: 30s, 60s, 120s (depois volta ao ritmo normal de 5 min)
+      if (CP_STATUS.falhas <= 3) setTimeout(carregarClintPainel, [30000, 60000, 120000][CP_STATUS.falhas - 1]);
     }
+    renderClintStatus();
   };
   window[nome] = fim;
-  s.onerror = function(){ fim(null); };
+  // onerror = o navegador nem conseguiu baixar a resposta: sem internet, ou
+  // algo no computador (bloqueador de anúncios, antivírus, rede da empresa)
+  // barrando o endereço script.google.com
+  s.onerror = function(){ fim(null, 'o navegador não conseguiu falar com o robô (sem internet, ou algo neste computador está bloqueando o endereço script.google.com — bloqueador de anúncios, antivírus ou rede da empresa)'); };
   s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintPainel' }));
   document.body.appendChild(s);
   // a primeira chamada varre a Clint inteira e pode levar ~1 minuto
-  setTimeout(function(){ if (_cpPedindo) fim(null); }, 150000);
+  setTimeout(function(){ if (_cpPedindo) fim(null, 'o robô demorou mais de 2 minutos e meio para responder'); }, 150000);
+}
+function renderClintStatus() {
+  var el = document.getElementById('ld-clint-status');
+  if (!el) return;
+  var st = CP_STATUS.estado;
+  if (st === 'ok') {
+    var n = CLINT_PAINEL && CLINT_PAINEL.mapa ? Object.keys(CLINT_PAINEL.mapa).length : 0;
+    el.innerHTML = '<div class="hint" style="margin:-6px 0 10px;text-align:right;">🟣 Clint conectada'
+      + (n ? ' · ' + n.toLocaleString('pt-BR') + ' negócios' : '')
+      + ' · atualizado às ' + new Date(CP_STATUS.quando).toLocaleTimeString('pt-BR').slice(0, 5) + '</div>';
+    return;
+  }
+  if (st === 'pedindo' && !(CLINT_PAINEL && CLINT_PAINEL.success)) {
+    el.innerHTML = '<div class="hint" style="margin:-6px 0 10px;padding:9px 12px;border-radius:10px;background:rgba(108,71,255,.1);border:1px solid rgba(108,71,255,.3);color:#b9a6ff;">'
+      + '⏳ <b>Conectando à Clint…</b> pode levar até 1 minuto. Os botões <b>🟣 Clint</b>, as etapas e os donos aparecem quando terminar.</div>';
+    return;
+  }
+  if (st === 'erro') {
+    el.innerHTML = '<div style="margin:-6px 0 12px;padding:11px 14px;border-radius:12px;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.45);display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">'
+      + '<span style="font-size:1.2rem;">⚠️</span>'
+      + '<div style="flex:1;min-width:220px;"><b style="color:#ff6b6b;font-size:.82rem;">Não consegui falar com a Clint</b>'
+      + '<div class="hint" style="margin-top:3px;">' + CP_STATUS.motivo + '.</div>'
+      + '<div class="hint" style="margin-top:3px;">Sem isso não aparecem os botões <b>🟣 Clint</b>, as etapas nem os donos dos leads.'
+      + (CP_STATUS.falhas <= 3 ? ' Vou tentar de novo sozinho em instantes.' : ' Já tentei ' + CP_STATUS.falhas + ' vezes neste computador — se em outro computador funciona, o problema é aqui (bloqueador de anúncios, antivírus ou rede).') + '</div></div>'
+      + '<button class="btn primary" style="padding:7px 14px;" onclick="carregarClintPainel()">🔄 Tentar agora</button>'
+      + '</div>';
+    return;
+  }
+  el.innerHTML = '';
 }
 // ===== ORDEM OFICIAL DO PROCESSO (definida pelo Bruno em 14/08/2026) =====
 // As etapas aparecem SEMPRE nesta ordem; as demais etapas da Clint ficam num
