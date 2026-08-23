@@ -1087,6 +1087,7 @@ img { max-width:100%; height:auto; }
     </div>
     <div id="ld-filtros" style="display:none;"></div>
     <div id="ld-clint-status"></div>
+    <div id="ld-origens"></div>
     <div class="panel" id="ld-loading" style="text-align:center;color:var(--muted);padding:50px 20px;">
       <div style="font-size:2rem;margin-bottom:10px;">📥</div>
       Carregando leads da planilha…
@@ -2167,7 +2168,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-21-2005';
+var VERSAO_DASH = '2026-08-23-1818';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3423,13 +3424,13 @@ function v2row(r) {
   var det = [r.leadId, r.produto, r.date ? r.date.toLocaleDateString('pt-BR') : '', r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).join(' · ');
   // link para a Clint direto na lista (Bruno 19/08/2026)
   var lkC = (function(){
-    try { return clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (e) { return ''; }
+    try { return clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone), nome: r.nome }); } catch (e) { return ''; }
   })();
   return '<div class="cliente-row" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b><span>' + det + '</span></div>'
     + seloAnuncio(r, true)
-    + (lkC ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;padding:5px 9px;" href="' + lkC + '" target="_blank" onclick="event.stopPropagation();" title="abrir na Clint">🟣</a>' : '')
+    + (lkC ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;padding:5px 9px;" href="' + lkC + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa no atendimento da Clint">🟣</a>' : '')
     + (r.telefone ? '<a class="ld-wa" style="padding:5px 9px;" href="https://wa.me/55' + String(r.telefone).replace(/\D/g, '').slice(-11) + '" target="_blank" onclick="event.stopPropagation();" title="chamar no WhatsApp">💬</a>' : '')
     + dir + '</div>';
 }
@@ -4267,8 +4268,44 @@ function clintAplicarRegra(l) {
 }
 // link direto para a ficha do lead dentro da Clint
 // (o id do contato vem pela API; o endereço foi confirmado em 13/08/2026)
+// abre o lead no MODULO DE ATENDIMENTO da Clint (chat). Se ainda nao sabemos qual e a
+// conversa, abre a aba ja (senao o navegador bloqueia) e pergunta ao robo; conversa
+// achada -> vai para o chat; sem conversa -> pagina do contato (Bruno 23/08/2026)
+function abrirAtendimentoClint(ev, i) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  var l = _ldReg[i];
+  if (!l) return false;
+  var t8 = ldTel8(l.tel), c = t8 ? CLINT[t8] : undefined;
+  if (c && c.success && c.chatId) { window.open('https://app.clint.digital/chat/' + c.chatId, '_blank'); return false; }
+  var reserva = clintLink(l) || 'https://app.clint.digital/chat';
+  if (!t8 || (c && c.success && !c.chatId)) { window.open(reserva, '_blank'); return false; }   // ja sabemos que nao tem conversa
+  var win = window.open('', '_blank');
+  try { win.document.write('<body style="background:#14171d;color:#9aa3b2;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">🟣 procurando a conversa de ' + (l.nome || 'lead') + ' na Clint…</body>'); } catch (e) {}
+  var nome = 'clAt' + Math.random().toString(36).slice(2, 8), feito = false;
+  var s = document.createElement('script');
+  function fim(d) {
+    if (feito) return; feito = true;
+    try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    if (d && d.success) CLINT[t8] = d;
+    var alvo = (d && d.success && d.chatId) ? 'https://app.clint.digital/chat/' + d.chatId : (clintLink(l) || reserva);
+    try { win.location = alvo; } catch (e) {}
+  }
+  window[nome] = fim;
+  s.onerror = function(){ fim(null); };
+  var cid = '';
+  try { var mm = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[t8]; if (mm && mm[2]) cid = mm[2]; } catch (e) {}
+  if (!cid) { try { var pn2 = clintPorNome(l.nome); if (pn2) cid = pn2.contatoId; } catch (e) {} }
+  s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintLead', telefone: l.tel, contatoId: cid }));
+  document.body.appendChild(s);
+  setTimeout(function(){ fim(null); }, 20000);
+  return false;
+}
+function abrirAtendimentoClintPor(ev, tel, nome) {
+  var i = _ldReg.push({ tel: tel || '', nome: nome || '' }) - 1;
+  return abrirAtendimentoClint(ev, i);
+}
 function clintLink(l) {
-  var t = ldTel8(l.tel);
+  var t = ldTel8(l.tel || l.telefone);
   var c = CLINT[t];
   // se ja conhecemos a conversa, abre direto no modulo de atendimento (chat)
   if (c && c.success && c.chatId) return 'https://app.clint.digital/chat/' + c.chatId;
@@ -4278,6 +4315,8 @@ function clintLink(l) {
     var r = CLINT_PAINEL.mapa[t];
     if (r && r[2]) return 'https://app.clint.digital/contacts/' + r[2];
   }
+  // sem telefone (ou telefone que não bate): tenta pelo nome, se for único na Clint
+  if (l.nome) { var pn = clintPorNome(l.nome); if (pn && pn.contatoId) return 'https://app.clint.digital/contacts/' + pn.contatoId; }
   return '';
 }
 // texto do tempo sem resposta, já dizendo de quem é a bola
@@ -4661,6 +4700,41 @@ function _grupoAttr(nomes) {
 }
 
 // dono e etapa do lead: primeiro a consulta individual (mais fresca), senão o painel geral
+// acha a pessoa na Clint pelo NOME (só quando o telefone falta) — exige que
+// exatamente UMA pessoa da Clint tenha esse nome, senão devolve nada (nome repete!)
+var _clintNomeIdx = null, _clintNomeIdxN = 0;
+// "Michelly" e "Michely" são a mesma pessoa: compara sem acento e sem letra dobrada
+function _nomeChave(n) { return v2norm(n).replace(/(.)\1+/g, '$1'); }
+function clintPorNome(nome) {
+  if (!CLINT_PAINEL || !CLINT_PAINEL.success || !nome) return null;
+  var alvo = _nomeChave(nome);
+  if (!alvo || alvo.length < 5) return null;   // nome curto demais casa com gente errada
+  var ks = Object.keys(CLINT_PAINEL.mapa || {});
+  if (!_clintNomeIdx || _clintNomeIdxN !== ks.length) {
+    _clintNomeIdx = {};
+    ks.forEach(function(t8) {
+      var r = CLINT_PAINEL.mapa[t8];
+      var n = _nomeChave((r && r[3]) || '');
+      if (!n) return;
+      (_clintNomeIdx[n] = _clintNomeIdx[n] || []).push(t8);
+    });
+    _clintNomeIdxN = ks.length;
+  }
+  var achados = _clintNomeIdx[alvo] || [];
+  if (achados.length !== 1) {
+    // nome incompleto ("Michelly"): serve se só UMA pessoa da Clint começa assim
+    var cands = [];
+    for (var n2 in _clintNomeIdx) if (n2.indexOf(alvo) === 0) { cands.push(n2); if (cands.length > 1) break; }
+    if (cands.length === 1 && _clintNomeIdx[cands[0]].length === 1) achados = _clintNomeIdx[cands[0]];
+    else return null;
+  }
+  var t8 = achados[0], r = CLINT_PAINEL.mapa[t8];
+  if (!r) return null;
+  return { tel8: t8, tel: r[4] || '', nome: r[3] || '', contatoId: r[2] || '',
+    dono: r[0] >= 0 ? (CLINT_PAINEL.donos || [])[r[0]] || '' : '',
+    etapa: r[1] >= 0 ? (CLINT_PAINEL.nomesEtapas || [])[r[1]] || '' : '',
+    origem: (r[5] >= 0 && CLINT_PAINEL.origensClint) ? CLINT_PAINEL.origensClint[r[5]] || '' : '' };
+}
 function clintInfoDe(l) {
   var c = CLINT[l.tel8];
   if (c && c.success && (c.dono || c.etapaClint)) return { dono: c.dono || '', etapa: c.etapaClint || '' };
@@ -4670,6 +4744,11 @@ function clintInfoDe(l) {
       dono: r[0] >= 0 ? CLINT_PAINEL.donos[r[0]] : '',
       etapa: r[1] >= 0 ? CLINT_PAINEL.nomesEtapas[r[1]] : ''
     };
+  }
+  // sem telefone: tenta pelo nome (só vale se for único na Clint)
+  if (!l.tel8 && l.nome) {
+    var pn = clintPorNome(l.nome);
+    if (pn) return { dono: pn.dono, etapa: pn.etapa, peloNome: true };
   }
   return null;
 }
@@ -5056,6 +5135,78 @@ function verEsperando() {
   window.scrollTo(0, 0);
 }
 
+// ===== 🧲 ORIGEM DO LEAD (Bruno 23/08/2026) =====
+// Nome curto e legivel para a origem (a do formulario vem como "[Ads][Diag]" etc.);
+// a origem marcada a mao na ficha vale mais que a do formulario.
+function ldOrigemRotulo(l) {
+  var o = String((l && l.origemMan) || '').trim() || String((l && l.origem) || '').trim();
+  if (!o) return '(sem origem)';
+  var t = v2norm(o);
+  if (/\[ads\]|\bads\b|\bpago\b|paid/.test(t)) return '💰 Anúncio';
+  if (/mchat|manychat/.test(t)) return '🤖 ManyChat';
+  if (/\bbio\b/.test(t)) return '🔗 Link na bio';
+  if (/instagram social/.test(t)) return '📷 Instagram Social';
+  if (/\[org\]|organic|diagnostico.?org|\borg\b/.test(t)) return '🌱 Orgânico';
+  return o;
+}
+// grava a origem escolhida na ficha (coluna "Origem manual" da aba de leads)
+function ldSalvarOrigem(i, valor) {
+  if (soOlhar()) return;
+  var l = _ldReg[i];
+  if (!l) return;
+  if (valor === '__outro') {
+    valor = prompt('De onde esse lead veio? (ex.: Indicação da Maria, Evento X...)', l.origemMan || '');
+    if (valor === null) return;
+    valor = valor.trim();
+  }
+  if (!String(l.tel || '').trim()) { alert('Esse lead está sem telefone — não dá para achar a linha dele na planilha.'); return; }
+  if (l.origemForm === undefined) l.origemForm = l.origemMan ? '' : (l.origem || '');
+  l.origemMan = valor;
+  l.origem = valor || l.origemForm || '';
+  sendToGAS({ action: 'saveLeadAtendimento', gid: LEADS_GID, telefone: l.tel, origem: valor });
+  try { renderLeads(); } catch (e) {}
+  try { abrirFichaLead(_ldReg.indexOf(l)); } catch (e) {}
+}
+// quadro "de onde vem os leads": leads, reunioes, vendas e valor por origem
+function renderOrigens() {
+  var el = document.getElementById('ld-origens');
+  if (!el) return;
+  if (!LD.rows || !LD.rows.length) { el.innerHTML = ''; return; }
+  var g = {}, ordem = [];
+  ldUnicos(LD.rows).forEach(function(l) {
+    var k = ldOrigemRotulo(l);
+    if (!g[k]) { g[k] = { leads: 0, reun: 0, vend: 0, val: 0 }; ordem.push(k); }
+    var o = g[k];
+    o.leads++;
+    var rs = ldReunioes(l);
+    o.reun += rs.length;
+    var vds = rs.filter(function(r){ return r.sn === 'vendido'; });
+    if (vds.length) { o.vend++; o.val += vds.reduce(function(sm, r){ return sm + (r.valor > 0 ? r.valor : 0); }, 0); }
+  });
+  ordem.sort(function(a, b){ return g[b].leads - g[a].leads; });
+  var aberto = window._origAberto !== false;   // comeca aberto
+  var h = '<div class="panel" style="padding:14px 16px;">'
+    + '<div class="click" style="display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="window._origAberto=!' + (aberto ? 'true' : 'false') + ';renderOrigens();">'
+    + '<span style="font-size:1.15rem;">🧲</span><b style="flex:1;font-size:.85rem;">De onde vêm os leads</b>'
+    + '<span class="hint">' + (aberto ? '▲ fechar' : '▼ abrir') + '</span></div>';
+  if (aberto) {
+    h += '<div style="overflow-x:auto;margin-top:10px;"><table style="width:100%;font-size:.76rem;">'
+      + '<thead><tr><th style="text-align:left;">Origem</th><th>Leads</th><th>Reuniões</th><th>Vendas</th><th>Venda por lead</th><th style="text-align:right;">Valor vendido</th></tr></thead><tbody>';
+    ordem.forEach(function(k) {
+      var o = g[k], sem = k === '(sem origem)';
+      h += '<tr' + (sem ? ' style="opacity:.65;"' : '') + '>'
+        + '<td style="text-align:left;font-weight:700;">' + k + (sem ? ' <span class="hint">(abra o lead e marque)</span>' : '') + '</td>'
+        + '<td style="text-align:center;">' + o.leads + '</td>'
+        + '<td style="text-align:center;">' + o.reun + '</td>'
+        + '<td style="text-align:center;font-weight:800;color:' + (o.vend ? '#3ddc97' : 'var(--muted)') + ';">' + o.vend + '</td>'
+        + '<td style="text-align:center;">' + (o.leads ? (Math.round(o.vend / o.leads * 1000) / 10).toFixed(1).replace('.', ',') + '%' : '—') + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + (o.val ? 'R$ ' + Math.round(o.val).toLocaleString('pt-BR') : '—') + '</td></tr>';
+    });
+    h += '</tbody></table></div>'
+      + '<div class="hint" style="margin-top:7px;">Contando os leads do diagnóstico que estão na tela · reuniões e vendas casadas por telefone/e-mail/Instagram · a origem marcada à mão na ficha vale mais que a do formulário</div>';
+  }
+  el.innerHTML = h + '</div>';
+}
 // quanto tempo passou desde a última mexida no lead (ou desde que ele chegou)
 function ldHorasParado(l) {
   var base = null;
@@ -5430,6 +5581,10 @@ function carregarLeads() {
     if (C.origem === C.url) { // "Origem" e "Origem URL" batem no mesmo nome: pega a primeira
       for (var i = 0; i < head.length; i++) if (head[i] === 'origem') { C.origem = i; break; }
     }
+    // "Origem manual" (marcada na ficha do dash) — nao confundir com a coluna "Origem" do formulario
+    C.origemMan = -1;
+    for (var iOm = 0; iOm < head.length; iOm++) if (head[iOm].indexOf('origem manual') !== -1) { C.origemMan = iOm; break; }
+    if (C.origem === C.origemMan) { for (var iOm2 = 0; iOm2 < head.length; iOm2++) if (head[iOm2] === 'origem') { C.origem = iOm2; break; } }
     function cel(r, i){ return i >= 0 && r[i] !== undefined ? String(r[i]).trim() : ''; }
     var rows = [];
     for (var k = 1; k < linhas.length; k++) {
@@ -5443,7 +5598,10 @@ function carregarLeads() {
         renda: cel(r, C.renda), invest: invest,
         score: parseFloat(cel(r, C.score)) || 0,
         date: ldData(cel(r, C.data)), dataTxt: cel(r, C.data), aprox: false,
-        status: cel(r, C.status), origem: cel(r, C.origem), url: cel(r, C.url),
+        status: cel(r, C.status),
+        origem: (C.origemMan >= 0 && cel(r, C.origemMan).trim()) || cel(r, C.origem),
+        origemForm: cel(r, C.origem), origemMan: C.origemMan >= 0 ? cel(r, C.origemMan).trim() : '',
+        url: cel(r, C.url),
         utm: [cel(r, C.utmS), cel(r, C.utmM), cel(r, C.utmC)].filter(Boolean).join(' · '),
         anuncio: cel(r, C.utmCo), conjunto: cel(r, C.utmT), campanha: cel(r, C.utmC),
         fonte: cel(r, C.utmS), meio: cel(r, C.utmM),
@@ -6290,7 +6448,7 @@ function ldFundirSupabase() {
       seg: r.seg, obj: r.obj || '', renda: r.renda || '', invest: r.invest,
       score: 0, date: r.date, dataTxt: r.date ? r.date.toLocaleString('pt-BR') : '', aprox: false,
       status: r.completa ? 'Completa' : 'Pendente',
-      origem: r.origemForm || r.origem, url: '',
+      origem: r.origemForm || r.origem, origemForm: r.origemForm || r.origem, origemMan: '', url: '',
       utm: [r.fonte, r.campanha].filter(Boolean).join(' · '),
       anuncio: r.anuncio, conjunto: '', campanha: r.campanha, fonte: r.fonte,
       meio: /organic|bio|manychat/i.test(r.origem || '') ? '' : 'paid',
@@ -6641,7 +6799,7 @@ function verLeadsDoAnuncio(chave) {
           +   '<div class="hint" style="margin-top:1px;">' + [l.tel, (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div></div>'
           + selo + etapa + seloChance(l, true) + seloAnuncio(l, true)
           + (l.tel ? '<a class="ld-wa" onclick="event.stopPropagation();" href="https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11) + '" target="_blank">💬</a>' : '')
-          + (lk ? '<a class="ld-wa" onclick="event.stopPropagation();" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + lk + '" target="_blank">🟣</a>' : '')
+          + (lk ? '<a class="ld-wa" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + lk + '" target="_blank">🟣</a>' : '')
           + '<span style="color:#6ea8ff;font-weight:800;font-size:.66rem;">ver →</span>'
           + '</div>';
       }).join('')
@@ -7487,7 +7645,7 @@ function ldRow(l, quente) {
     + '<span>' + det + '</span></div>'
     + seloAnuncio(l, true)
     + (donoNome ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
-    + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="event.stopPropagation()" title="Abrir este lead na Clint">🟣 Clint</a>' : '')
+    + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abrir a conversa deste lead no atendimento da Clint">🟣 Clint</a>' : '')
     + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank" onclick="event.stopPropagation()">📷</a>' : '')
     + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation()">💬 WhatsApp</a>' : '')
     + '</div>';
@@ -7570,7 +7728,23 @@ function abrirFichaLead(i) {
     ['💼', 'Fonte de renda hoje', l.renda],
     ['🎯', 'Objetivos', l.obj],
     ['⭐', 'Score', l.score ? String(l.score) : ''],
-    ['🧲', 'Origem', l.origem],
+    ['🧲', 'Origem', (function(){
+        var ops = ['Indicação', 'Story', 'Direct', 'Comentário', 'Bio', 'Grupo', 'Workshop'];
+        var man = (l.origemMan || '').trim();
+        var h = '<div style="display:flex;flex-direction:column;gap:7px;align-items:flex-end;">';
+        if (man) h += '<div><b style="color:#3ddc97;">' + man + '</b> <span class="hint">(marcada aqui no dash)</span></div>';
+        else if ((l.origem || '').trim()) h += '<div><b>' + ldOrigemRotulo(l) + '</b>' + (ldOrigemRotulo(l) !== l.origem ? ' <span class="hint">(' + l.origem + ')</span>' : '') + '</div>';
+        else h += '<div class="hint" style="color:#f6a350;font-weight:700;">sem origem — de onde esse lead veio?</div>';
+        h += '<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">'
+          + ops.map(function(o) {
+              var sel = man === o;
+              return '<span class="ld-tag" style="cursor:pointer;' + (sel ? 'background:rgba(61,220,151,.2);color:#3ddc97;font-weight:800;' : 'background:rgba(255,255,255,.08);') + '" onclick="ldSalvarOrigem(' + i + ',' + JSON.stringify(o).replace(/"/g, '&quot;') + ')">' + o + '</span>';
+            }).join('')
+          + '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="ldSalvarOrigem(' + i + ',\'__outro\')">Outro…</span>'
+          + (man ? '<span class="ld-tag" style="cursor:pointer;background:rgba(255,107,107,.14);color:#ff6b6b;" onclick="ldSalvarOrigem(' + i + ',\'\')" title="volta a valer a origem do formulário">✕ limpar</span>' : '')
+          + '</div></div>';
+        return h;
+      })(), 'html'],
     ['📣', 'Anúncio que trouxe', (function(){
         var aa = anuncioDe(l);
         if (!aa.tem) {
@@ -7786,7 +7960,7 @@ function abrirFichaLead(i) {
     + '</div>';
   if (wa || l.insta || clintLink(l)) {
     h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
-      + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank">🟣 Abrir na Clint</a>' : '')
+      + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')">🟣 Abrir no atendimento da Clint</a>' : '')
       + (wa ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;" href="' + wa + '" target="_blank">💬 Chamar no WhatsApp</a>' : '')
       + (l.insta ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank">📷 Ver Instagram</a>' : '')
       + '</div>';
@@ -8031,6 +8205,7 @@ function renderLeadsLogo() {
 var _ultimoClique = 0;
 document.addEventListener('mousedown', function(){ _ultimoClique = Date.now(); }, true);
 function renderLeads() {
+  try { renderOrigens(); } catch (eOri) {}
   if (!LD.carregado) return;
   // alguém está no meio de um clique/seleção: espera um instante e tenta de novo
   if (Date.now() - _ultimoClique < 900) { renderLeadsLogo(); return; }
@@ -8142,7 +8317,7 @@ function renderLeads() {
             + '<b style="font-size:.76rem;flex:1;min-width:120px;">' + (x.l.nome || 'Sem nome') + '</b>'
             + '<span class="ld-tag" style="background:rgba(61,220,151,.15);color:#3ddc97;">aqui: ' + x.d.aqui + '</span>'
             + '<span class="ld-tag" style="background:rgba(255,107,107,.15);color:#ff6b6b;">Clint: ' + x.d.atual + '</span>'
-            + (clintLink(x.l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;padding:6px 10px;" href="' + clintLink(x.l) + '" target="_blank">🟣 abrir</a>' : '')
+            + (clintLink(x.l) ? '<a class="ld-wa" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.l.nome || '')).replace(/"/g, '&quot;') + ')" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;padding:6px 10px;" href="' + clintLink(x.l) + '" target="_blank">🟣 abrir</a>' : '')
             + '<button class="btn-assumir" onclick="corrigirDivergencia(\'' + x.l.tel8 + '\', this)">✔ mover para ' + x.d.esperado + '</button>'
             + '</div>';
         });
@@ -8165,7 +8340,7 @@ function renderLeads() {
       if (pAberto) {
         h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
         estL.forEach(function(x) {
-          h += '<a href="https://app.clint.digital/contacts/' + x.contatoId + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
+          h += '<a href="https://app.clint.digital/contacts/' + x.contatoId + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
             + '<b style="font-size:.76rem;flex:1;">' + (x.nome || ldNomePorTel8(x.tel8) || 'Sem nome') + '</b>'
             + '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">' + (x.tipo === 'qualificacao' ? 'Em qualificação' : 'Nutrição') + ' há ' + x.dias + ' dias</span>'
             + (x.dono ? '<span class="dono-chip">✋ ' + x.dono + '</span>' : '')
@@ -8196,7 +8371,7 @@ function renderLeads() {
         h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
         desqPerfil.slice(0, 120).forEach(function(l) {
           var infoQ = clintInfoDe(l);
-          h += '<a href="' + (clintLink(l) || '#') + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
+          h += '<a href="' + (clintLink(l) || '#') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
             + '<b style="font-size:.76rem;flex:1;">' + (l.nome || 'Sem nome') + '</b>'
             + '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">' + (l.invest || '').replace(/\s*\(.*$/, '') + '</span>'
             + ((infoQ && infoQ.dono) ? '<span class="dono-chip">✋ ' + infoQ.dono + '</span>' : '')
@@ -8243,7 +8418,7 @@ function renderLeads() {
           + (mc
               ? '<span class="ld-tag" style="background:rgba(108,71,255,.16);color:#8f6bff;" title="Já está na Clint">🟣 ' + (etapaC || 'na Clint') + '</span>'
                 + (donoC ? '<span class="dono-chip">✋ ' + donoC + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.14);color:#ff6b6b;">sem responsável</span>')
-                + (mc[2] ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="https://app.clint.digital/contacts/' + mc[2] + '" target="_blank" onclick="event.stopPropagation();">🟣 abrir</a>' : '')
+                + (mc[2] ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="https://app.clint.digital/contacts/' + mc[2] + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir</a>' : '')
               : '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;" title="Não existe na Clint">⚠️ fora da Clint</span>'
                 + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarPendenteNaClint(' + JSON.stringify(x.tel8).replace(/"/g, '&quot;') + ', this);" title="Cria o contato na Clint, no funil (etapa Base IA)">➕ criar na Clint</button>')
           + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;">⏱ ' + tempoDesde(x.date) + '</span>' : '')
@@ -8879,6 +9054,19 @@ function acharLeadDeTodoJeito(r, pagDele) {
   // Telefone, e-mail e @ são únicos — é neles que dá para confiar.
   return achou ? { lead: achou, como: como } : null;
 }
+// a reunião está sem telefone e a Clint sabe qual é: um clique grava na planilha
+function usarTelefoneClint() {
+  if (soOlhar()) return;
+  var r = window._flR;
+  if (!r) return;
+  var pn = clintPorNome(r.nome);
+  if (!pn || !pn.tel) { alert('Não achei o telefone na Clint.'); return; }
+  if (!confirm('Gravar o telefone ' + pn.tel + ' (da Clint) na reunião de ' + (r.nome || '') + '?')) return;
+  r.telefone = pn.tel;
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'telefone', valor: pn.tel, dataRef: v2dataRef(r), gid: V2_GID });
+  avisoRapido('📱 Telefone gravado — agora o dash acha ela na Clint pelo número');
+  try { mostrarFormularioDoLead(r); } catch (e) {}
+}
 function mostrarFormularioDoLead(r) {
   var cx = document.getElementById('fl-formulario');
   if (!cx) return;
@@ -8893,10 +9081,12 @@ function mostrarFormularioDoLead(r) {
   if (!l) {
     // sem formulário: mostra o que a Clint e o contrato sabem sobre a pessoa
     var cc = t8 ? CLINT[t8] : null;
+    window._flR = r;
+    var pn = (!cc || !cc.achou) ? clintPorNome(r.nome) : null;   // sem telefone: procura pelo nome
     var linhaS = function(ico, rot, val) {
       return val ? '<div class="dtl-line"><span>' + ico + ' ' + rot + '</span><b style="text-align:right;max-width:62%;">' + val + '</b></div>' : '';
     };
-    var temAlgo = !!(pagDele || (cc && cc.achou));
+    var temAlgo = !!(pagDele || (cc && cc.achou) || pn);
     cx.innerHTML = '<div class="dtl-card">'
       + '<div class="g-label">📋 Esta pessoa não preencheu o diagnóstico</div>'
       + '<div class="hint" style="padding:2px 0 8px;">Veio por prospecção ou indicação — abaixo, o que a Clint e o contrato sabem dela.</div>'
@@ -8908,9 +9098,16 @@ function mostrarFormularioDoLead(r) {
       + (cc && cc.achou ? linhaS('🟣', 'Etapa na Clint', cc.etapaClint)
                         + linhaS('🧲', 'Entrou na Clint por', cc.origemClint)
                         + linhaS('✋', 'Responsável', cc.dono) : '')
+      + (pn ? '<div class="hint" style="padding:6px 0 2px;color:#f6a350;">🟣 Achei <b>' + pn.nome + '</b> na Clint <b>pelo nome</b> (a reunião está sem telefone) — confira se é a mesma pessoa:</div>'
+            + linhaS('🟣', 'Etapa na Clint', pn.etapa)
+            + linhaS('✋', 'Responsável', pn.dono)
+            + linhaS('🧲', 'Entrou na Clint por', pn.origem)
+            + linhaS('📱', 'Telefone na Clint', pn.tel)
+            + (pn.tel ? '<div style="margin-top:8px;text-align:right;"><button class="btn-assumir" style="padding:6px 12px;font-size:.72rem;" onclick="usarTelefoneClint()">📱 usar esse número na reunião</button></div>' : '')
+          : '')
       + (!temAlgo ? '<div class="hint">Também não achei ela na Clint nem em contratos.</div>' : '')
-      + (t8 && clintLink({ tel: r.telefone, tel8: t8 })
-          ? '<div style="margin-top:9px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink({ tel: r.telefone, tel8: t8 }) + '" target="_blank">🟣 abrir na Clint</a></div>'
+      + ((t8 || pn) && clintLink({ tel: r.telefone, tel8: t8, nome: r.nome })
+          ? '<div style="margin-top:9px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink({ tel: r.telefone, tel8: t8, nome: r.nome }) + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a></div>'
           : '')
       + '</div>';
     return;
@@ -8944,7 +9141,7 @@ function mostrarFormularioDoLead(r) {
           + ' style="max-width:100%;max-height:200px;border-radius:12px;cursor:pointer;border:1px solid rgba(255,255,255,.12);" title="clique para ver o anúncio inteiro"></div>'
         : '')
     + '<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap;">'
-    +   (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank">🟣 abrir na Clint</a>' : '')
+    +   (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a>' : '')
     +   '<span class="ld-tag" style="cursor:pointer;background:rgba(110,168,255,.14);color:#6ea8ff;" onclick="verFormularioCompleto(\'' + t8 + '\')">ver a ficha completa do lead →</span>'
     + '</div></div>';
 }
@@ -10400,7 +10597,7 @@ function agMostrarOrigem(l) {
     + linha('atendendo', l.dono)
     + linha('etapa Clint', l.etapaClint)
     + (clintLink(l)
-        ? '<div style="margin-top:6px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank">🟣 abrir na Clint</a></div>'
+        ? '<div style="margin-top:6px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a></div>'
         : '<div class="hint" style="margin-top:6px;">Sem ficha na Clint ainda — o link fica em branco</div>')
     + '</div>';
   cx.style.display = 'block';
