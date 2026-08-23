@@ -2170,7 +2170,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-1959';
+var VERSAO_DASH = '2026-08-23-2001';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10472,6 +10472,29 @@ function marcarReuniaoDoLead(i) {
     + '<span class="hint" style="white-space:nowrap;">escolha o closer e clique num horário livre</span>'
     + '<span style="cursor:pointer;font-weight:800;color:#ff6b6b;font-size:.78rem;" onclick="cancelarMarcarDoLead()">✕ cancelar</span>';
   if (l.tel) { try { clintPerguntar(l, null); } catch (e) {} }   // ja vai buscando o cadastro na Clint por tras
+  // se esse numero JA TEM reuniao marcada, abre os dados dela em vez de marcar outra (Bruno 23/08/2026)
+  var tentaJa = 0;
+  (function vigiaJaTem() {
+    tentaJa++;
+    if (window._agLeadEscolhido !== l) return;   // ja marcou ou cancelou
+    if (!(V2.rows || []).length) { if (tentaJa < 25) setTimeout(vigiaJaTem, 1000); return; }
+    var rJa = _reuniaoAgendadaDe(l.tel8);
+    if (!rJa) return;
+    cancelarMarcarDoLead();
+    try { abrirLead(v2reg(rJa)); } catch (e) {}
+    try { avisoRapido('📅 ' + (rJa.nome || 'Esse número') + ' já tem reunião marcada dia ' + (rJa.date ? rJa.date.toLocaleDateString('pt-BR') : '') + ' — estes são os dados dela'); } catch (e) {}
+  })();
+}
+// o numero ja tem reuniao marcada (agendada/remarcada, de hoje em diante)?
+function _reuniaoAgendadaDe(t8) {
+  if (!t8) return null;
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  return (V2.rows || []).filter(function(r) {
+    if (ldTel8(r.telefone) !== t8) return false;
+    var sn = r.sn || v2norm(r.status || '');
+    if (sn.indexOf('agendada') === -1 && sn.indexOf('remarcada') === -1) return false;
+    return r.date && r.date >= hoje;
+  }).sort(function(a, b){ return a.date - b.date; })[0] || null;
 }
 function cancelarMarcarDoLead() {
   window._agLeadEscolhido = null;
