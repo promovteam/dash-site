@@ -2170,7 +2170,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-1948';
+var VERSAO_DASH = '2026-08-23-1953';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10424,7 +10424,15 @@ function abrirAgendarCom(dur, dataStr, hora) {
   if (typeof atualizarHorarios === 'function') atualizarHorarios();
   // veio da ficha do lead ("Marcar reunião"): o formulário já entra preenchido com ele
   if (window._agLeadEscolhido) {
-    try { agUsarLead(window._agLeadEscolhido, true); } catch (e) {}
+    var _le = window._agLeadEscolhido;
+    // o dash pode ter aberto direto pelo botão da Clint ANTES da base/painel carregarem:
+    // completa agora com o que já chegou (base do diagnóstico > nome do painel da Clint)
+    if (_le.tel8 && (!_le.nome || !_le.email)) {
+      var _lb = (LD.rows || []).filter(function(x){ return x.tel8 === _le.tel8; })[0];
+      if (_lb) _le = window._agLeadEscolhido = _lb;
+    }
+    if (!_le.nome && _le.tel8) { try { var _mm = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[_le.tel8]; if (_mm && _mm[3]) _le.nome = _mm[3]; } catch (e) {} }
+    try { agUsarLead(_le, true); } catch (e) {}
     cancelarMarcarDoLead();
   }
 }
