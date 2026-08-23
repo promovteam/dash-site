@@ -2171,7 +2171,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2030';
+var VERSAO_DASH = '2026-08-23-2036';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10577,7 +10577,8 @@ function cancelarMarcarDoLead() {
 // dash?marcar=TELEFONE — para chamar de fora (favorito do navegador em cima da Clint):
 // abre direto na agenda ja "marcando para" a pessoa daquele telefone
 function _marcarPelaUrl() {
-  var m = String(location.search || '').match(/[?&]marcar=([^&]+)/);
+  // aceita ?marcar=... e tambem #marcar=... (o #marcar permite reaproveitar uma aba ja aberta sem recarregar)
+  var m = String(location.search || '').match(/[?&]marcar=([^&]+)/) || String(location.hash || '').match(/[#&]marcar=([^&]+)/);
   if (!m) return;
   var dig = decodeURIComponent(m[1]).replace(/\D/g, '');
   if (dig.length < 8) return;
@@ -10591,6 +10592,12 @@ function _marcarPelaUrl() {
   }, 300);
 }
 try { _marcarPelaUrl(); } catch (e) {}
+// a extensao da Clint reaproveita uma aba do dash ja aberta trocando so o #marcar=...
+window.addEventListener('hashchange', function() {
+  if (String(location.hash || '').indexOf('marcar=') === -1) return;
+  try { cancelarMarcarDoLead(); } catch (e) {}
+  try { _marcarPelaUrl(); } catch (e) {}
+});
 // ===== 🔎 PUXAR OS DADOS DO LEAD NA HORA DE MARCAR A REUNIÃO =====
 // Pedido do Bruno 18/08/2026: em vez de digitar tudo de novo, o formulário acha
 // a pessoa na base (diagnóstico + site) e já preenche nome, telefone, e-mail,
