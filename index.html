@@ -2171,7 +2171,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2036';
+var VERSAO_DASH = '2026-08-23-2046';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10268,10 +10268,18 @@ function abrirMenuEvento(e, idx) {
 // So aparece em reuniao que esta em No-Show. O robo cria o evento novo na agenda
 // (mesmos convidados/descricao), muda a data NA MESMA linha da planilha (nao
 // duplica a pessoa) e avisa closer e SDR no WhatsApp (zapReuniaoMudou).
-function abrirRemarcarEvento() {
+function abrirRemarcarEvento() {   // modo VISUAL: escolher o novo horario na propria grade (Bruno 23/08/2026)
   var ev = _evAtual;
   if (!ev || !ev.id) return;
   if (soOlhar()) return;
+  window._agRemarcando = ev;
+  var b = document.getElementById('ag-banner-remarcar');
+  if (!b) { b = document.createElement('div'); b.id = 'ag-banner-remarcar'; document.body.appendChild(b); }
+  b.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9000;background:rgba(43,25,12,.97);border:1px solid rgba(255,154,90,.8);border-radius:999px;padding:10px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:94vw;';
+  b.innerHTML = '<span style="font-size:1.05rem;">🗓</span><b style="font-size:.8rem;color:#ff9a5a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">REMARCAÇÃO — ' + String(ev.title || '').replace(/</g, '&lt;').slice(0, 55) + '</b>'
+    + '<span class="hint" style="white-space:nowrap;">clique no NOVO horário livre na grade</span>'
+    + '<span style="cursor:pointer;font-weight:800;color:#ff6b6b;font-size:.78rem;" onclick="cancelarRemarcacao()">✕ cancelar</span>';
+  return;
   var cx = document.getElementById('modal-remarcar');
   if (!cx) {
     cx = document.createElement('div');
@@ -10296,6 +10304,27 @@ function abrirRemarcarEvento() {
     + '</div></div>';
 }
 function fecharRemarcar() { var cx = document.getElementById('modal-remarcar'); if (cx) cx.style.display = 'none'; }
+function cancelarRemarcacao() {
+  window._agRemarcando = null;
+  var b = document.getElementById('ag-banner-remarcar');
+  if (b) b.remove();
+}
+// clique num horario livre com a REMARCAÇÃO ligada: mesma pessoa, mesma linha — so muda a data
+function remarcarNoSlot(dataStr, hora) {
+  var ev = window._agRemarcando;
+  if (!ev) return;
+  var dp = dataStr.split('-');
+  if (!confirm('REMARCAR a reunião\n"' + (ev.title || '') + '"\npara ' + dp[2] + '/' + dp[1] + ' às ' + hora + '?\n\nÉ uma REMARCAÇÃO: mesma pessoa, mesma linha na planilha — não cria reunião nova. Closer e SDR recebem o aviso.')) return;
+  sendToGAS({ action: 'rescheduleEvent', calendar: ev._cal || AG.closer, eventId: ev.id, newDate: dataStr, newTime: hora, duration: ev.duration || 0 }).then(function(res) {
+    if (!res || !res.success) { alert('Não consegui remarcar: ' + ((res && res.error) || 'sem resposta do robô')); return; }
+    sendToGAS({ action: 'updateEventStatus', calendar: ev._cal || AG.closer, eventId: ev.id, status: 'remarcada' });
+    ev.status = 'remarcada'; ev._statusExplicit = true;
+    cancelarRemarcacao();
+    AG.cache = {};
+    try { carregarAgenda(); } catch (e) {}
+    try { avisoRapido('🗓 REMARCADA para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — closer e SDR avisados · mesma pessoa no dash'); } catch (e) {}
+  });
+}
 function confirmarRemarcar() {
   var ev = _evAtual;
   if (!ev || !ev.id) return;
@@ -10421,6 +10450,7 @@ function fecharAprovacao() {
 // horário 🔒 (reunião extra, sábado ou feriado): pede a aprovação do closer antes
 function agendarComAprovacao(e, dataStr, hora) {
   e.stopPropagation();
+  if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
   var closerNome = AG.closer === 'tony' ? 'Tony Londe' : AG.closer === 'ambos' ? 'responsável' : 'Bruno Pardim';
   pedirAprovacao(closerNome, hora, function() {
     escolherTipoExtra(dataStr, hora); // aprovado → já mostra as opções de agendar
@@ -10430,6 +10460,7 @@ function agendarComAprovacao(e, dataStr, hora) {
 // popup HT/Legado com data/hora reais
 function abrirTipoV2(e, dataStr, hora) {
   e.stopPropagation();
+  if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
   window._agAprovado = false;
   var dp = dataStr.split('-');
   var lbl = dp[2] + '/' + dp[1];
@@ -10592,6 +10623,21 @@ function _marcarPelaUrl() {
   }, 300);
 }
 try { _marcarPelaUrl(); } catch (e) {}
+// painel=agenda: versao enxuta para viver DENTRO da Clint (iframe da extensao)
+function _modoPainelAgenda() {
+  var tudo = String(location.search || '') + ' ' + String(location.hash || '');
+  if (tudo.indexOf('painel=agenda') === -1) return;
+  var st = document.createElement('style');
+  st.textContent = '.sidebar{display:none!important}.topbar{display:none!important}.main{padding:12px 14px!important}';
+  document.head.appendChild(st);
+  var vai = function() {
+    var item = document.querySelector('.nav-item[data-s="agenda"]');
+    if (item) item.click();
+  };
+  setTimeout(vai, 350);
+  setTimeout(vai, 1800);   // garante mesmo se algo redesenhar por cima na carga
+}
+try { _modoPainelAgenda(); } catch (e) {}
 // a extensao da Clint reaproveita uma aba do dash ja aberta trocando so o #marcar=...
 window.addEventListener('hashchange', function() {
   if (String(location.hash || '').indexOf('marcar=') === -1) return;
