@@ -2170,7 +2170,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-1953';
+var VERSAO_DASH = '2026-08-23-1959';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10433,6 +10433,21 @@ function abrirAgendarCom(dur, dataStr, hora) {
     }
     if (!_le.nome && _le.tel8) { try { var _mm = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[_le.tel8]; if (_mm && _mm[3]) _le.nome = _mm[3]; } catch (e) {} }
     try { agUsarLead(_le, true); } catch (e) {}
+    // o CADASTRO da Clint completa o que faltar (nome, e-mail, @, link) — robô v46
+    var _preencheClint = function(c) {
+      if (!c || !c.success || !c.achou) return;
+      var po = function(id, v){ var el = document.getElementById(id); if (el && v && !String(el.value || '').trim()) el.value = v; };
+      po('ag-nome', c.nomeClint);
+      po('ag-email', c.emailClint);
+      var igC = String(c.instaClint || '').replace(/^@+/, '');
+      if (igC && /^[A-Za-z0-9._]+$/.test(igC)) po('ag-insta', '@' + igC);
+      po('ag-clint', c.chatId ? 'https://app.clint.digital/chat/' + c.chatId : (c.contatoId ? 'https://app.clint.digital/contacts/' + c.contatoId : ''));
+    };
+    try {
+      var _cJa = _le.tel8 ? CLINT[_le.tel8] : null;
+      if (_cJa && _cJa.success) _preencheClint(_cJa);
+      else if (_le.tel) clintPerguntar(_le, _preencheClint);
+    } catch (e) {}
     cancelarMarcarDoLead();
   }
 }
@@ -10452,9 +10467,11 @@ function marcarReuniaoDoLead(i) {
   var b = document.getElementById('ag-banner-lead');
   if (!b) { b = document.createElement('div'); b.id = 'ag-banner-lead'; document.body.appendChild(b); }
   b.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9000;background:rgba(20,26,40,.97);border:1px solid rgba(110,168,255,.55);border-radius:999px;padding:10px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:92vw;';
-  b.innerHTML = '<span style="font-size:1.05rem;">📅</span><b style="font-size:.8rem;color:#6ea8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marcando para ' + String(l.nome || 'lead').replace(/</g, '&lt;') + '</b>'
+  var rotuloB = l.nome || (String(l.tel || '').replace(/\D/g, '').replace(/^55/, '').replace(/^(\d{2})(\d+)(\d{4})$/, '($1) $2-$3')) || 'lead';
+  b.innerHTML = '<span style="font-size:1.05rem;">📅</span><b style="font-size:.8rem;color:#6ea8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marcando para ' + String(rotuloB).replace(/</g, '&lt;') + '</b>'
     + '<span class="hint" style="white-space:nowrap;">escolha o closer e clique num horário livre</span>'
     + '<span style="cursor:pointer;font-weight:800;color:#ff6b6b;font-size:.78rem;" onclick="cancelarMarcarDoLead()">✕ cancelar</span>';
+  if (l.tel) { try { clintPerguntar(l, null); } catch (e) {} }   // ja vai buscando o cadastro na Clint por tras
 }
 function cancelarMarcarDoLead() {
   window._agLeadEscolhido = null;
@@ -10468,20 +10485,14 @@ function _marcarPelaUrl() {
   if (!m) return;
   var dig = decodeURIComponent(m[1]).replace(/\D/g, '');
   if (dig.length < 8) return;
-  var t8 = dig.slice(-8), tenta = 0;
-  (function espera() {
-    tenta++;
-    if (!(LD.rows || []).length && tenta < 60) return setTimeout(espera, 1000);
-    var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0];
-    if (!l) {   // fora da base: pega ao menos o nome na Clint pelo telefone
-      var nomeC = '';
-      try { var mm = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[t8]; if (mm && mm[3]) nomeC = mm[3]; } catch (e) {}
-      l = { nome: nomeC, tel: dig, tel8: t8, insta: '', email: '' };
-    }
+  var t8 = dig.slice(-8);
+  // abre a agenda NA HORA (sem esperar a base baixar); os dados entram no clique do horário
+  setTimeout(function() {
+    var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] || { nome: '', tel: dig, tel8: t8, insta: '', email: '' };
     var i = _ldReg.push(l) - 1;
     marcarReuniaoDoLead(i);
     try { history.replaceState(null, '', location.pathname); } catch (e) {}   // tira o ?marcar= para o F5 nao repetir
-  })();
+  }, 300);
 }
 try { _marcarPelaUrl(); } catch (e) {}
 // ===== 🔎 PUXAR OS DADOS DO LEAD NA HORA DE MARCAR A REUNIÃO =====
