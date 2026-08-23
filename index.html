@@ -1298,7 +1298,7 @@ img { max-width:100%; height:auto; }
                  background:linear-gradient(135deg,rgba(110,168,255,.16),rgba(185,138,255,.12));border:1px solid rgba(110,168,255,.45);color:var(--text);">
           <span style="font-size:1.1rem;">🔎</span>
           <span style="flex:1;text-align:left;"><b style="font-size:.8rem;display:block;">Procurar o lead na base</b>
-            <span class="hint">acha pelo nome, telefone ou @ e preenche tudo sozinho</span></span>
+            <span class="hint">acha pelo telefone, e-mail ou @ e preenche tudo sozinho (nome não vale — engana)</span></span>
           <span style="color:#6ea8ff;font-weight:800;font-size:.72rem;">abrir →</span>
         </button>
       </div>
@@ -1544,6 +1544,7 @@ Instagram: @pr.joaosilva</div>
       <div class="g-label" style="margin-bottom:0;">Informações</div>
       <div style="display:flex;gap:8px;">
         <button class="btn" id="btn-copiar" style="padding:6px 14px;font-size:.7rem;" onclick="copiarDadosLead(this)">📋 Copiar</button>
+        <button class="btn" id="btn-religar" style="padding:6px 14px;font-size:.7rem;display:none;background:rgba(185,138,255,.16);color:#b98aff;border:1px solid rgba(185,138,255,.4);" onclick="religarReuniaoAbrir()" title="Só Bruno e Adm: liga esta reunião à pessoa certa da base">🔁 Trocar a pessoa</button>
         <button class="btn" id="btn-editar" style="padding:6px 14px;font-size:.7rem;" onclick="alternarEdicao()">✏️ Editar</button>
         <button class="btn" id="btn-venda-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="abrirFormVendaReuniao()" title="Abre o formulário de venda já preenchido com os dados desta reunião">💰 Registrar venda</button>
         <button class="btn" id="btn-bloqueio-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="abrirFormBloqueioReuniao()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>
@@ -1759,7 +1760,8 @@ function abrirB(tipo){
   document.getElementById('mb-lista').innerHTML = html;
   document.getElementById('modal-b').classList.add('open');
 }
-function abrirLead(){ document.getElementById('modal-lead').classList.add('open'); _modoEdicao=false; desenharInfo(); }
+function abrirLead(){ document.getElementById('modal-lead').classList.add('open'); _modoEdicao=false; desenharInfo();
+  var bR = document.getElementById('btn-religar'); if (bR) bR.style.display = ehAdm() ? '' : 'none'; }
 function fecharLead(){
   var ml = document.getElementById('modal-lead');
   ml.classList.remove('open');
@@ -2168,7 +2170,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-1854';
+var VERSAO_DASH = '2026-08-23-1925';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4908,7 +4910,7 @@ function reunioesSemResultado() {
 // Uma janela esquecida aberta cobre a tela inteira e engole todos os cliques —
 // era por isso que, depois de abrir e fechar algo, as barras do funil não abriam.
 var _JANELAS = ['modal-status-pendente', 'modal-quem', 'modal-busca-lead',
-                'modal-escolhe-anuncio', 'modal-criativo', 'modal-venda'];
+                'modal-escolhe-anuncio', 'modal-criativo', 'modal-venda', 'modal-remarcar'];
 function _temJanelaAberta() {
   if (document.getElementById('modal-b') && document.getElementById('modal-b').classList.contains('open')) return true;
   if (document.getElementById('modal-lead') && document.getElementById('modal-lead').classList.contains('open')) return true;
@@ -10221,6 +10223,7 @@ function abrirMenuEvento(e, idx) {
     h += '<div class="lm-item" onclick="mudarStatusEvento(\'' + s[0] + '\')"><i class="st-dot" style="background:' + s[2] + ';"></i> ' + s[1] + '</div>';
   });
   h += '<div class="lm-sep"></div>';
+  if (v2norm(_evAtual.status || '') === 'noshow') h += '<div class="lm-item" style="color:#ff9a5a;font-weight:700;" onclick="fecharSlotMenu();abrirRemarcarEvento()">🗓 Remarcar — nova data e hora</div>';
   h += '<div class="lm-item" onclick="fecharSlotMenu();fichaDoEvento()">📇 Ver ficha do lead</div>';
   if (_evAtual.meetLink) h += '<a class="lm-item" href="' + _evAtual.meetLink + '" target="_blank" rel="noopener" onclick="fecharSlotMenu()">🎥 Abrir Meet</a>';
   if (_evAtual.recordingLink) h += '<a class="lm-item" href="' + _evAtual.recordingLink + '" target="_blank" rel="noopener" onclick="fecharSlotMenu()">🎬 Ver gravação</a>';
@@ -10228,6 +10231,62 @@ function abrirMenuEvento(e, idx) {
   m.classList.add('open');
   m.style.left = Math.min(e.clientX, window.innerWidth - 260) + 'px';
   m.style.top = Math.max(Math.min(e.clientY + 8, window.innerHeight - 430), 10) + 'px';
+}
+// ===== 🗓 REMARCAR NO-SHOW (Bruno 23/08/2026) =====
+// So aparece em reuniao que esta em No-Show. O robo cria o evento novo na agenda
+// (mesmos convidados/descricao), muda a data NA MESMA linha da planilha (nao
+// duplica a pessoa) e avisa closer e SDR no WhatsApp (zapReuniaoMudou).
+function abrirRemarcarEvento() {
+  var ev = _evAtual;
+  if (!ev || !ev.id) return;
+  if (soOlhar()) return;
+  var cx = document.getElementById('modal-remarcar');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-remarcar';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(6,6,16,.9);display:flex;align-items:center;justify-content:center;padding:20px;';
+    cx.onclick = function(e){ if (e.target === cx) fecharRemarcar(); };
+    document.body.appendChild(cx);
+  }
+  cx.style.display = 'flex';
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,154,90,.45);border-radius:20px;max-width:420px;width:100%;padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+    +   '<span style="font-size:1.3rem;">🗓</span><b style="flex:1;font-size:.95rem;">Remarcar: ' + String(ev.title || '').replace(/</g, '&lt;').slice(0, 60) + '</b>'
+    +   '<span style="cursor:pointer;font-size:1.2rem;opacity:.7;" onclick="fecharRemarcar()">✕</span></div>'
+    + '<div class="hint" style="margin-bottom:14px;">Cria o evento novo na agenda com os mesmos convidados, muda a data na <b>mesma linha</b> da planilha (não duplica a pessoa) e avisa o closer e o SDR no WhatsApp.</div>'
+    + '<div style="display:flex;gap:10px;margin-bottom:14px;">'
+    +   '<div style="flex:1;"><label class="hint" style="display:block;margin-bottom:4px;">Nova data</label><input type="date" id="rm-data" value="' + (ev.date || '') + '" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);padding:10px;"></div>'
+    +   '<div style="flex:1;"><label class="hint" style="display:block;margin-bottom:4px;">Horário</label><input type="time" id="rm-hora" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);padding:10px;"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:9px;justify-content:flex-end;">'
+    +   '<button class="btn-assumir" style="padding:9px 16px;background:rgba(255,255,255,.08);" onclick="fecharRemarcar()">Cancelar</button>'
+    +   '<button class="btn-assumir" id="rm-ok" style="padding:9px 16px;background:rgba(255,154,90,.2);color:#ff9a5a;border:1px solid rgba(255,154,90,.5);font-weight:800;" onclick="confirmarRemarcar()">✓ Remarcar</button>'
+    + '</div></div>';
+}
+function fecharRemarcar() { var cx = document.getElementById('modal-remarcar'); if (cx) cx.style.display = 'none'; }
+function confirmarRemarcar() {
+  var ev = _evAtual;
+  if (!ev || !ev.id) return;
+  var nd = (document.getElementById('rm-data') || {}).value || '';
+  var nt = (document.getElementById('rm-hora') || {}).value || '';
+  if (!nd || !nt) { alert('Escolha a nova data e o horário.'); return; }
+  var btn = document.getElementById('rm-ok');
+  if (btn) { btn.disabled = true; btn.textContent = 'remarcando…'; }
+  sendToGAS({ action: 'rescheduleEvent', calendar: ev._cal || AG.closer, eventId: ev.id, newDate: nd, newTime: nt, duration: ev.duration || 0 }).then(function(res) {
+    if (!res || !res.success) {
+      if (btn) { btn.disabled = false; btn.textContent = '✓ Remarcar'; }
+      alert('Não consegui remarcar: ' + ((res && res.error) || 'sem resposta do robô'));
+      return;
+    }
+    // o evento velho fica marcado como remarcada (senao o lembrete de 30 min dispararia nele)
+    sendToGAS({ action: 'updateEventStatus', calendar: ev._cal || AG.closer, eventId: ev.id, status: 'remarcada' });
+    ev.status = 'remarcada'; ev._statusExplicit = true;
+    fecharRemarcar();
+    AG.cache = {};
+    try { carregarAgenda(); } catch (e) {}
+    var dp = nd.split('-');
+    avisoRapido('🗓 Remarcada para ' + dp[2] + '/' + dp[1] + ' às ' + nt + ' — closer e SDR avisados · a pessoa continua a mesma no dash');
+  });
 }
 var MAPA_ST_PLANILHA = {
   agendada:'Reunião agendada', vendido:'Vendido', entrada:'Entrada', bloqueio:'Bloqueio de oferta',
@@ -10370,7 +10429,42 @@ function abrirAgendarCom(dur, dataStr, hora) {
 // Instagram e a origem — mostrando de qual anúncio ela veio.
 var _agLead = null;
 var _blLista = [];
-function agUsarDaLista(i) { agUsarLead(_blLista[i]); }
+function agUsarDaLista(i) {
+  if (window._buscaReligar !== undefined && window._buscaReligar !== null) { religarReuniao(_blLista[i]); return; }
+  agUsarLead(_blLista[i]);
+}
+// so Bruno e Adm trocam a pessoa ligada a uma reuniao (Bruno 23/08/2026)
+function ehAdm() {
+  var login = localStorage.getItem('v2Login');
+  if (login === null) return !loginPrecisa();   // uso local (sem login) = maquina do Bruno
+  var ok = false;
+  if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a){ if (a.nome === login && a.adm) ok = true; });
+  return ok;
+}
+function religarReuniaoAbrir() {
+  if (!ehAdm()) { alert('Só o Bruno e o Adm podem trocar a pessoa ligada.'); return; }
+  window._buscaReligar = _fichaAtual;
+  abrirBuscaLead();
+  var q = document.getElementById('bl-q');
+  if (q) q.placeholder = 'telefone, e-mail ou @ da pessoa CERTA';
+}
+function religarReuniao(l) {
+  var r = _v2reg[window._buscaReligar];
+  window._buscaReligar = null;
+  if (!r || !l) return;
+  var quem = localStorage.getItem('v2Login') || 'Adm';
+  if (!confirm('Trocar a pessoa ligada à reunião de "' + (r.nome || '') + '" para "' + (l.nome || '') + '" (' + (l.tel || 'sem telefone') + ')?\n\nTelefone e origem da reunião serão trocados na planilha.')) return;
+  r.telefone = l.tel || '';
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'telefone', valor: r.telefone, dataRef: v2dataRef(r), gid: V2_GID });
+  if (l.origem) { r.origem = l.origem; sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'origem', valor: l.origem, dataRef: v2dataRef(r), gid: V2_GID }); }
+  var extra = ['Pessoa religada por ' + quem + ' em ' + new Date().toLocaleDateString('pt-BR'),
+    l.email ? 'E-mail: ' + l.email : '', l.insta ? 'Instagram: @' + String(l.insta).replace(/^@/, '') : ''].filter(Boolean).join(' | ');
+  r.obs = (r.obs ? r.obs + ' | ' : '') + extra;
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+  avisoRapido('🔁 Reunião de ' + (r.nome || '') + ' religada a ' + (l.nome || 'lead'));
+  try { desenharInfo(); } catch (e) {}
+  try { renderV2(); } catch (e) {}
+}
 // janela de busca: abre por cima do formulário, com os leads em cartões
 function abrirBuscaLead() {
   var cx = document.getElementById('modal-busca-lead');
@@ -10387,7 +10481,7 @@ function abrirBuscaLead() {
     +     '<span style="font-size:1.2rem;">🔎</span>'
     +     '<b style="flex:1;font-size:.95rem;">Procurar o lead</b>'
     +     '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharBuscaLead()">✕</span></div>'
-    +   '<input id="bl-q" autocomplete="off" placeholder="nome, telefone ou @ do Instagram" oninput="agProcurar(this.value)"'
+    +   '<input id="bl-q" autocomplete="off" placeholder="telefone, e-mail ou @ do Instagram" oninput="agProcurar(this.value)"'
     +     ' onkeydown="if(event.key===\'Escape\')fecharBuscaLead();"'
     +     ' style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:12px;color:var(--text);padding:11px 13px;font-size:.9rem;">'
     + '</div>'
@@ -10409,8 +10503,7 @@ function clintProcurar(q, soDigitos, jaAchados) {
     var r = mapa[tel];
     var nome = r[3] || '';
     if (!nome) continue;
-    var casa = (soDigitos.length >= 4 && tel.indexOf(soDigitos.slice(-8)) !== -1)
-            || (q.length >= 3 && v2norm(nome).indexOf(q) !== -1);
+    var casa = (soDigitos.length >= 4 && tel.indexOf(soDigitos.slice(-8)) !== -1);   // so telefone: nome enganava
     if (!casa) continue;
     if (_ldIdx && _ldIdx[tel]) continue;      // já tem reunião marcada: não é lead novo
     vistos[tel] = 1;
@@ -10425,13 +10518,14 @@ function clintProcurar(q, soDigitos, jaAchados) {
   return fora;
 }
 function fecharBuscaLead() {
+  window._buscaReligar = null;
   var cx = document.getElementById('modal-busca-lead');
   if (cx) cx.style.display = 'none';
 }
 function agProcurar(txt) {
   var cx = document.getElementById('ag-result');
   if (!cx) return;
-  var q = v2norm(txt || '');
+  var q = v2norm(String(txt || '').replace(/^\s*@/, ''));   // "@maria" e "maria" procuram igual
   var soDigitos = String(txt || '').replace(/\D/g, '');
   var achados, cabecalho = '';
   if (q.length < 3 && soDigitos.length < 4) {
@@ -10445,8 +10539,8 @@ function agProcurar(txt) {
     achados = (LD.rows || []).filter(function(l) {
       if (soDigitos.length >= 4 && String(l.tel || '').replace(/\D/g, '').indexOf(soDigitos) !== -1) return true;
       if (q.length < 3) return false;
-      return v2norm(l.nome || '').indexOf(q) !== -1 || v2norm(l.insta || '').indexOf(q) !== -1
-          || v2norm(l.email || '').indexOf(q) !== -1;
+      // nome NAO procura mais (Bruno 23/08/2026): nome repete e ligava a pessoa errada
+      return v2norm(l.insta || '').indexOf(q) !== -1 || v2norm(l.email || '').indexOf(q) !== -1;
     }).slice(0, 30);
     // quem existe SÓ na Clint (não passou pelo diagnóstico) também entra na busca
     var daClint = clintProcurar(q, soDigitos, achados);
@@ -10455,7 +10549,7 @@ function agProcurar(txt) {
       + (daClint.length ? ' · <b style="color:#8f6bff;">' + daClint.length + '</b> só na Clint' : '') + '</div>';
   }
   if (!achados.length) {
-    cx.innerHTML = '<div class="hint" style="padding:16px;text-align:center;">Ninguém com esse nome, telefone ou @ na base.<br>Feche a janela e preencha na mão.</div>';
+    cx.innerHTML = '<div class="hint" style="padding:16px;text-align:center;">Ninguém com esse telefone, e-mail ou @ na base.<br><b>Nome não procura</b> — nomes repetem e ligavam a pessoa errada.<br>Sem um desses três, feche a janela e preencha na mão.</div>';
     return;
   }
   _blLista = achados;
