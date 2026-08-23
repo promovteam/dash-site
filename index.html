@@ -2170,7 +2170,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2006';
+var VERSAO_DASH = '2026-08-23-2013';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10432,6 +10432,12 @@ function abrirAgendarCom(dur, dataStr, hora) {
       if (_lb) _le = window._agLeadEscolhido = _lb;
     }
     if (!_le.nome && _le.tel8) { try { var _mm = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[_le.tel8]; if (_mm && _mm[3]) _le.nome = _mm[3]; } catch (e) {} }
+    // a base pode ter carregado so agora: se ja existe reuniao marcada, avisa antes de duplicar
+    try {
+      var _rJa2 = _reuniaoAgendadaDe(_le.tel8);
+      if (_rJa2 && !confirm((_rJa2.nome || 'Esse número') + ' JÁ TEM reunião marcada dia ' + (_rJa2.date ? _rJa2.date.toLocaleDateString('pt-BR') : '') + '.\n\nOK = ver os dados dela · Cancelar = marcar outra mesmo assim')) { /* segue marcando */ }
+      else if (_rJa2) { cancelarMarcarDoLead(); abrirLead(v2reg(_rJa2)); return; }
+    } catch (e) {}
     try { agUsarLead(_le, true); } catch (e) {}
     // o CADASTRO da Clint completa o que faltar (nome, e-mail, @, link) — robô v46
     var _preencheClint = function(c) {
@@ -10479,10 +10485,23 @@ function marcarReuniaoDoLead(i) {
     if (window._agLeadEscolhido !== l) return;   // ja marcou ou cancelou
     if (!(V2.rows || []).length) { if (tentaJa < 25) setTimeout(vigiaJaTem, 1000); return; }
     var rJa = _reuniaoAgendadaDe(l.tel8);
-    if (!rJa) return;
-    cancelarMarcarDoLead();
-    try { abrirLead(v2reg(rJa)); } catch (e) {}
-    try { avisoRapido('📅 ' + (rJa.nome || 'Esse número') + ' já tem reunião marcada dia ' + (rJa.date ? rJa.date.toLocaleDateString('pt-BR') : '') + ' — estes são os dados dela'); } catch (e) {}
+    if (rJa) {   // reuniao marcada de hoje em diante: abre os dados dela, nao deixa duplicar
+      cancelarMarcarDoLead();
+      try { abrirLead(v2reg(rJa)); } catch (e) {}
+      try { avisoRapido('📅 ' + (rJa.nome || 'Esse número') + ' já tem reunião marcada dia ' + (rJa.date ? rJa.date.toLocaleDateString('pt-BR') : '') + ' — estes são os dados dela'); } catch (e) {}
+      return;
+    }
+    // reuniao antiga (ou no-show/vendido/etc.): pode marcar outra, mas o aviso fica na faixa
+    var rVelha = _qualquerReuniaoDe(l.tel8);
+    if (rVelha && document.getElementById('ag-banner-lead')) {
+      var iV = v2reg(rVelha);
+      var chipV = document.createElement('span');
+      chipV.style.cssText = 'cursor:pointer;font-weight:800;color:#ffd166;font-size:.74rem;white-space:nowrap;';
+      chipV.textContent = '⚠️ já teve reunião ' + (rVelha.date ? rVelha.date.toLocaleDateString('pt-BR').slice(0, 5) : '') + (rVelha.status ? ' (' + rVelha.status + ')' : '') + ' · ver';
+      chipV.onclick = function(){ abrirLead(iV); };
+      var fecharB = document.querySelector('#ag-banner-lead span[onclick="cancelarMarcarDoLead()"]');
+      document.getElementById('ag-banner-lead').insertBefore(chipV, fecharB || null);
+    }
   })();
 }
 // o numero ja tem reuniao marcada (agendada/remarcada, de hoje em diante)?
@@ -10495,6 +10514,12 @@ function _reuniaoAgendadaDe(t8) {
     if (sn.indexOf('agendada') === -1 && sn.indexOf('remarcada') === -1) return false;
     return r.date && r.date >= hoje;
   }).sort(function(a, b){ return a.date - b.date; })[0] || null;
+}
+// qualquer reuniao registrada desse numero (a mais recente), independente de status/data
+function _qualquerReuniaoDe(t8) {
+  if (!t8) return null;
+  return (V2.rows || []).filter(function(r){ return ldTel8(r.telefone) === t8; })
+    .sort(function(a, b){ return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); })[0] || null;
 }
 function cancelarMarcarDoLead() {
   window._agLeadEscolhido = null;
