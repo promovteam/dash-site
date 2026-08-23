@@ -1546,6 +1546,7 @@ Instagram: @pr.joaosilva</div>
         <button class="btn" id="btn-copiar" style="padding:6px 14px;font-size:.7rem;" onclick="copiarDadosLead(this)">📋 Copiar</button>
         <button class="btn" id="btn-religar" style="padding:6px 14px;font-size:.7rem;display:none;background:rgba(185,138,255,.16);color:#b98aff;border:1px solid rgba(185,138,255,.4);" onclick="religarReuniaoAbrir()" title="Só Bruno e Adm: liga esta reunião à pessoa certa da base">🔁 Trocar a pessoa</button>
         <button class="btn" id="btn-editar" style="padding:6px 14px;font-size:.7rem;" onclick="alternarEdicao()">✏️ Editar</button>
+        <button class="btn" id="btn-remarcar-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;display:none;" onclick="irRemarcarNaAgenda(_fichaAtual)" title="Vai para a agenda, na semana da reunião, para remarcar">🗓 Remarcar</button>
         <button class="btn" id="btn-venda-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="abrirFormVendaReuniao()" title="Abre o formulário de venda já preenchido com os dados desta reunião">💰 Registrar venda</button>
         <button class="btn" id="btn-bloqueio-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="abrirFormBloqueioReuniao()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>
       </div>
@@ -2170,7 +2171,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2017';
+var VERSAO_DASH = '2026-08-23-2030';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3220,6 +3221,7 @@ function abrirFormVenda(dados) {
     +   '<b style="flex:1;font-size:.85rem;">💰 Registrar venda' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
     +   '<span class="hint">' + (dados.bloqueio ? 'com os dados do bloqueio · ' : '') + 'cole o texto do cliente → abre o Google Forms pronto → você confere e envia</span>'
     +   '<span class="hint" style="cursor:pointer;text-decoration:underline;" onclick="abrirFormVendaGoogle()" title="Abre o Google Forms de verdade, já preenchido">ou abrir no Google Forms</span>'
+    +   '<span class="hint" style="cursor:pointer;text-decoration:underline;" onclick="fecharFormVenda();avisoRapido(\'ok — o botão 💰 fica na ficha para preencher depois\')">preencher depois</span>'
     +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
     + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
   cx.style.display = 'flex';
@@ -3336,6 +3338,7 @@ function abrirFormBloqueio(dados) {
     + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);">'
     +   '<b style="flex:1;font-size:.85rem;">🔒 Bloqueio de oferta / Entrada' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
     +   '<span class="hint">já preenchido · complete valores e comprovante</span>'
+    +   '<span class="hint" style="cursor:pointer;text-decoration:underline;" onclick="fecharFormVenda();avisoRapido(\'ok — o botão 🔒 fica na ficha para preencher depois\')">preencher depois</span>'
     +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
     + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
   cx.style.display = 'flex';
@@ -5054,6 +5057,14 @@ function salvarResultadosStp(btn) {
       linha.style.opacity = '.5';
       linha.innerHTML = '<span style="font-size:.78rem;color:#3ddc97;font-weight:700;">✓ ' + (r.nome || '') + ' — ' + valor + ' · salvo na planilha</span>';
     }
+  });
+  // Vendido ou Bloqueio recém-marcado: já abre a tela para preencher (fechar = preencher depois)
+  var _abriuForm = false;
+  ids.forEach(function(i) {
+    if (_abriuForm || !_v2reg[i]) return;
+    var vlr = v2norm(STP_ESCOLHAS[i] || '');
+    if (vlr === 'vendido') { _fichaAtual = i; _abriuForm = true; setTimeout(function(){ try { fecharStatusPendente(); } catch (eF) {} abrirFormVendaReuniao(); }, 350); }
+    else if (vlr.indexOf('bloqueio') !== -1 || vlr === 'entrada') { _fichaAtual = i; _abriuForm = true; setTimeout(function(){ try { fecharStatusPendente(); } catch (eF) {} abrirFormBloqueioReuniao(); }, 350); }
   });
   STP_ESCOLHAS = {};
   if (btn) btn.textContent = '✓ ' + feitos + ' salvo' + (feitos === 1 ? '' : 's') + ' na planilha';
@@ -7959,11 +7970,21 @@ function abrirFichaLead(i) {
   var wa = ldWa(l);
   // 💰 registrar venda direto da ficha (formulario ja preenchido) — Bruno 21/08/2026
   _vendaLeadAtual = { lead: l, reuniao: _reu || null };
-  h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">'
-    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(110,168,255,.16);border-color:rgba(110,168,255,.5);color:#6ea8ff;font-weight:800;cursor:pointer;" onclick="marcarReuniaoDoLead(' + i + ')" title="Abre a agenda para escolher o closer e um horário livre — o formulário já vem com este lead">📅 Marcar reunião</button>'
-    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda' + (_pag ? ' (já tem pagamento)' : '') + '</button>'
-    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>'
-    + '</div>';
+  // botões pelo MOMENTO do lead (Bruno 23/08/2026): só aparece o que faz sentido agora
+  var _rsF = ldReunioes(l), _rUlt = _rsF.length ? _rsF[_rsF.length - 1] : null;
+  var _snU = _rUlt ? (_rUlt.sn || v2norm(_rUlt.status || '')) : '';
+  var _snBloqU = _snU.indexOf('bloqueio') !== -1 || _snU === 'entrada';
+  var _blqF = null; try { _blqF = bloqueioDe(l.tel, l.nome); } catch (eB2) {}
+  var _btH = [];
+  if (!_rUlt || _snU === 'nao vendido')
+    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(110,168,255,.16);border-color:rgba(110,168,255,.5);color:#6ea8ff;font-weight:800;cursor:pointer;" onclick="marcarReuniaoDoLead(' + i + ')" title="Abre a agenda para escolher o closer e um horário livre — o formulário já vem com este lead">📅 Marcar reunião</button>');
+  if (_rUlt && (_snU === 'no show' || _snU.indexOf('agendada') !== -1 || _snU.indexOf('remarcada') !== -1))
+    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;font-weight:800;cursor:pointer;" onclick="irRemarcarNaAgenda(' + v2reg(_rUlt) + ')" title="Vai para a agenda, na semana da reunião, para remarcar">🗓 Remarcar</button>');
+  if ((_snU === 'vendido' && !_pag) || (_snBloqU && _blqF))
+    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda</button>');
+  if (_snBloqU && !_blqF)
+    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>');
+  if (_btH.length) h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">' + _btH.join('') + '</div>';
   if (wa || l.insta || clintLink(l)) {
     h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
       + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')">🟣 Abrir no atendimento da Clint</a>' : '')
@@ -8986,6 +9007,16 @@ function abrirLead(i) {
   var r = _v2reg[i];
   if (!r) return;
   _fichaAtual = i;
+  // botões pelo momento da reunião (Bruno 23/08/2026)
+  try {
+    var _snR = r.sn || v2norm(r.status || '');
+    var _snBloqR = _snR.indexOf('bloqueio') !== -1 || _snR === 'entrada';
+    var _pagR = null; try { _pagR = ldPagamento({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (eP) {}
+    var _blqR = null; try { _blqR = bloqueioDe(r.telefone, r.nome); } catch (eQ) {}
+    var _bV = document.getElementById('btn-venda-reuniao'); if (_bV) _bV.style.display = ((_snR === 'vendido' && !_pagR) || (_snBloqR && _blqR)) ? '' : 'none';
+    var _bB = document.getElementById('btn-bloqueio-reuniao'); if (_bB) _bB.style.display = (_snBloqR && !_blqR) ? '' : 'none';
+    var _bR = document.getElementById('btn-remarcar-reuniao'); if (_bR) _bR.style.display = (_snR === 'no show' || _snR.indexOf('agendada') !== -1 || _snR.indexOf('remarcada') !== -1) ? '' : 'none';
+  } catch (eBt) {}
   document.getElementById('fl-avatar').textContent = v2ini(r.nome);
   document.getElementById('fl-avatar').style.background = 'linear-gradient(135deg,' + v2grad(r.nome) + ')';
   document.getElementById('fl-nome').textContent = r.nome || 'Sem nome';
@@ -10224,7 +10255,7 @@ function abrirMenuEvento(e, idx) {
     h += '<div class="lm-item" onclick="mudarStatusEvento(\'' + s[0] + '\')"><i class="st-dot" style="background:' + s[2] + ';"></i> ' + s[1] + '</div>';
   });
   h += '<div class="lm-sep"></div>';
-  if (v2norm(_evAtual.status || '') === 'noshow') h += '<div class="lm-item" style="color:#ff9a5a;font-weight:700;" onclick="fecharSlotMenu();abrirRemarcarEvento()">🗓 Remarcar — nova data e hora</div>';
+  if (['noshow', 'agendada', 'remarcada'].indexOf(v2norm(_evAtual.status || '')) !== -1) h += '<div class="lm-item" style="color:#ff9a5a;font-weight:700;" onclick="fecharSlotMenu();abrirRemarcarEvento()">🗓 Remarcar — nova data e hora</div>';
   h += '<div class="lm-item" onclick="fecharSlotMenu();fichaDoEvento()">📇 Ver ficha do lead</div>';
   if (_evAtual.meetLink) h += '<a class="lm-item" href="' + _evAtual.meetLink + '" target="_blank" rel="noopener" onclick="fecharSlotMenu()">🎥 Abrir Meet</a>';
   if (_evAtual.recordingLink) h += '<a class="lm-item" href="' + _evAtual.recordingLink + '" target="_blank" rel="noopener" onclick="fecharSlotMenu()">🎬 Ver gravação</a>';
@@ -10321,6 +10352,9 @@ function mudarStatusEvento(st) {
         sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: stPlan, dataRef: v2dataRef(r), gid: V2_GID });
         r.status = stPlan; r.sn = v2norm(stPlan);
         renderV2();
+        // marcou Vendido/Bloqueio pela agenda: já abre a tela para preencher (fechar = depois)
+        if (st === 'vendido') { _fichaAtual = v2reg(r); abrirFormVendaReuniao(); }
+        else if (st === 'bloqueio' || st === 'entrada') { _fichaAtual = v2reg(r); abrirFormBloqueioReuniao(); }
       }
     }
   });
@@ -10505,6 +10539,18 @@ function marcarReuniaoDoLead(i) {
       document.getElementById('ag-banner-lead').insertBefore(chipV, fecharB || null);
     }
   })();
+}
+// leva para a agenda, na semana da reuniao, para usar o "Remarcar" do evento
+function irRemarcarNaAgenda(i) {
+  var r = _v2reg[i];
+  if (!r) return;
+  try { document.getElementById('modal-lead').classList.remove('open'); } catch (e) {}
+  try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {}
+  if (r.date) { try { AG.weekStart = agSegunda(r.date); } catch (e) {} }
+  var item = document.querySelector('.nav-item[data-s="agenda"]');
+  if (item) item.click();
+  try { carregarAgenda(); } catch (e) {}
+  try { avisoRapido('🗓 Clique na reunião de ' + (r.nome || 'lead') + ' na grade e escolha "Remarcar — nova data e hora"'); } catch (e) {}
 }
 // o numero ja tem reuniao marcada (agendada/remarcada, de hoje em diante)?
 function _reuniaoAgendadaDe(t8) {
