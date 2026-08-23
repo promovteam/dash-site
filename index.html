@@ -2170,7 +2170,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-1925';
+var VERSAO_DASH = '2026-08-23-1948';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -7960,6 +7960,7 @@ function abrirFichaLead(i) {
   // 💰 registrar venda direto da ficha (formulario ja preenchido) — Bruno 21/08/2026
   _vendaLeadAtual = { lead: l, reuniao: _reu || null };
   h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">'
+    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(110,168,255,.16);border-color:rgba(110,168,255,.5);color:#6ea8ff;font-weight:800;cursor:pointer;" onclick="marcarReuniaoDoLead(' + i + ')" title="Abre a agenda para escolher o closer e um horário livre — o formulário já vem com este lead">📅 Marcar reunião</button>'
     + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda' + (_pag ? ' (já tem pagamento)' : '') + '</button>'
     + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>'
     + '</div>';
@@ -10421,8 +10422,60 @@ function abrirAgendarCom(dur, dataStr, hora) {
   }
   // fila automática decide o closer; só reavalia os horários com a data escolhida
   if (typeof atualizarHorarios === 'function') atualizarHorarios();
+  // veio da ficha do lead ("Marcar reunião"): o formulário já entra preenchido com ele
+  if (window._agLeadEscolhido) {
+    try { agUsarLead(window._agLeadEscolhido, true); } catch (e) {}
+    cancelarMarcarDoLead();
+  }
 }
 
+// ===== 📅 DO LEAD DIRETO PARA A AGENDA (Bruno 23/08/2026) =====
+// Na ficha do lead: "Marcar reunião" abre a AGENDA de verdade; a pessoa escolhe
+// o closer e clica num horário livre — o formulário abre já preenchido com o lead.
+function marcarReuniaoDoLead(i) {
+  if (soOlhar()) return;
+  var l = _ldReg[i];
+  if (!l) return;
+  window._agLeadEscolhido = l;
+  try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {}
+  var item = document.querySelector('.nav-item[data-s="agenda"]');
+  if (item) item.click();
+  window.scrollTo(0, 0);
+  var b = document.getElementById('ag-banner-lead');
+  if (!b) { b = document.createElement('div'); b.id = 'ag-banner-lead'; document.body.appendChild(b); }
+  b.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9000;background:rgba(20,26,40,.97);border:1px solid rgba(110,168,255,.55);border-radius:999px;padding:10px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:92vw;';
+  b.innerHTML = '<span style="font-size:1.05rem;">📅</span><b style="font-size:.8rem;color:#6ea8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Marcando para ' + String(l.nome || 'lead').replace(/</g, '&lt;') + '</b>'
+    + '<span class="hint" style="white-space:nowrap;">escolha o closer e clique num horário livre</span>'
+    + '<span style="cursor:pointer;font-weight:800;color:#ff6b6b;font-size:.78rem;" onclick="cancelarMarcarDoLead()">✕ cancelar</span>';
+}
+function cancelarMarcarDoLead() {
+  window._agLeadEscolhido = null;
+  var b = document.getElementById('ag-banner-lead');
+  if (b) b.remove();
+}
+// dash?marcar=TELEFONE — para chamar de fora (favorito do navegador em cima da Clint):
+// abre direto na agenda ja "marcando para" a pessoa daquele telefone
+function _marcarPelaUrl() {
+  var m = String(location.search || '').match(/[?&]marcar=([^&]+)/);
+  if (!m) return;
+  var dig = decodeURIComponent(m[1]).replace(/\D/g, '');
+  if (dig.length < 8) return;
+  var t8 = dig.slice(-8), tenta = 0;
+  (function espera() {
+    tenta++;
+    if (!(LD.rows || []).length && tenta < 60) return setTimeout(espera, 1000);
+    var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0];
+    if (!l) {   // fora da base: pega ao menos o nome na Clint pelo telefone
+      var nomeC = '';
+      try { var mm = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[t8]; if (mm && mm[3]) nomeC = mm[3]; } catch (e) {}
+      l = { nome: nomeC, tel: dig, tel8: t8, insta: '', email: '' };
+    }
+    var i = _ldReg.push(l) - 1;
+    marcarReuniaoDoLead(i);
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}   // tira o ?marcar= para o F5 nao repetir
+  })();
+}
+try { _marcarPelaUrl(); } catch (e) {}
 // ===== 🔎 PUXAR OS DADOS DO LEAD NA HORA DE MARCAR A REUNIÃO =====
 // Pedido do Bruno 18/08/2026: em vez de digitar tudo de novo, o formulário acha
 // a pessoa na base (diagnóstico + site) e já preenche nome, telefone, e-mail,
