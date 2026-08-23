@@ -2168,7 +2168,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-1820';
+var VERSAO_DASH = '2026-08-23-1854';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4702,16 +4702,17 @@ function _grupoAttr(nomes) {
 // dono e etapa do lead: primeiro a consulta individual (mais fresca), senão o painel geral
 // acha a pessoa na Clint pelo NOME (só quando o telefone falta) — exige que
 // exatamente UMA pessoa da Clint tenha esse nome, senão devolve nada (nome repete!)
-var _clintNomeIdx = null, _clintNomeIdxN = 0;
+var _clintNomeIdx = null, _clintNomeIdxN = 0, _clintNomeCache = {};
 // "Michelly" e "Michely" são a mesma pessoa: compara sem acento e sem letra dobrada
 function _nomeChave(n) { return v2norm(n).replace(/(.)\1+/g, '$1'); }
 function clintPorNome(nome) {
   if (!CLINT_PAINEL || !CLINT_PAINEL.success || !nome) return null;
   var alvo = _nomeChave(nome);
   if (!alvo || alvo.length < 5) return null;   // nome curto demais casa com gente errada
+  if (_clintNomeCache[alvo] !== undefined) return _clintNomeCache[alvo];   // ja procuramos esse nome: nao varre de novo (a varredura travava a tela por segundos)
   var ks = Object.keys(CLINT_PAINEL.mapa || {});
   if (!_clintNomeIdx || _clintNomeIdxN !== ks.length) {
-    _clintNomeIdx = {};
+    _clintNomeIdx = {}; _clintNomeCache = {};
     ks.forEach(function(t8) {
       var r = CLINT_PAINEL.mapa[t8];
       var n = _nomeChave((r && r[3]) || '');
@@ -4726,14 +4727,14 @@ function clintPorNome(nome) {
     var cands = [];
     for (var n2 in _clintNomeIdx) if (n2.indexOf(alvo) === 0) { cands.push(n2); if (cands.length > 1) break; }
     if (cands.length === 1 && _clintNomeIdx[cands[0]].length === 1) achados = _clintNomeIdx[cands[0]];
-    else return null;
+    else { _clintNomeCache[alvo] = null; return null; }
   }
   var t8 = achados[0], r = CLINT_PAINEL.mapa[t8];
-  if (!r) return null;
-  return { tel8: t8, tel: r[4] || '', nome: r[3] || '', contatoId: r[2] || '',
+  if (!r) { _clintNomeCache[alvo] = null; return null; }
+  return (_clintNomeCache[alvo] = { tel8: t8, tel: r[4] || '', nome: r[3] || '', contatoId: r[2] || '',
     dono: r[0] >= 0 ? (CLINT_PAINEL.donos || [])[r[0]] || '' : '',
     etapa: r[1] >= 0 ? (CLINT_PAINEL.nomesEtapas || [])[r[1]] || '' : '',
-    origem: (r[5] >= 0 && CLINT_PAINEL.origensClint) ? CLINT_PAINEL.origensClint[r[5]] || '' : '' };
+    origem: (r[5] >= 0 && CLINT_PAINEL.origensClint) ? CLINT_PAINEL.origensClint[r[5]] || '' : '' });
 }
 function clintInfoDe(l) {
   var c = CLINT[l.tel8];
@@ -5168,8 +5169,10 @@ function ldSalvarOrigem(i, valor) {
   try { abrirFichaLead(_ldReg.indexOf(l)); } catch (e) {}
 }
 // quadro "de onde vem os leads": leads, reunioes, vendas e valor por origem
-function renderOrigens() {
+function renderOrigens() {   // quadro desligado a pedido do Bruno (23/08/2026) — a função fica para religar facil
   var el = document.getElementById('ld-origens');
+  if (el) { el.innerHTML = ''; }
+  if (true) return;
   if (!el) return;
   if (!LD.rows || !LD.rows.length) { el.innerHTML = ''; return; }
   var g = {}, ordem = [];
@@ -8205,7 +8208,6 @@ function renderLeadsLogo() {
 var _ultimoClique = 0;
 document.addEventListener('mousedown', function(){ _ultimoClique = Date.now(); }, true);
 function renderLeads() {
-  try { renderOrigens(); } catch (eOri) {}
   if (!LD.carregado) return;
   // alguém está no meio de um clique/seleção: espera um instante e tenta de novo
   if (Date.now() - _ultimoClique < 900) { renderLeadsLogo(); return; }
