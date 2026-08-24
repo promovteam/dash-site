@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-1310';
+var VERSAO_DASH = '2026-08-24-1557';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2822,7 +2822,13 @@ function _ultCard(r) {
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b>'
     + '<span>' + [r.leadId, r.date.toLocaleDateString('pt-BR'), r.closer].filter(Boolean).join(' · ') + '</span></div>'
-    + seloAnuncio(r, true) + v2pill(r) + '</div>';
+    + seloAnuncio(r, true)
+    + (function(){   // 🟣 Clint aqui também (pedido do Bruno 24/08/2026 — no PC da Sarah só aparecia na aba Leads)
+        var lk = '';
+        try { lk = clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone), nome: r.nome }); } catch (e) { lk = ''; }
+        return lk ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;padding:5px 9px;" href="' + lk + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa no atendimento da Clint">🟣</a>' : '';
+      })()
+    + v2pill(r) + '</div>';
 }
 function filtrarUltimas(txt) {
   var t = v2norm(txt || '');
@@ -4437,6 +4443,7 @@ function carregarClintPainel() {
       CP_STATUS = { estado: 'ok', motivo: '', quando: Date.now(), falhas: 0 };
       avisarEsperando(primeira);
       renderLeads();
+      try { renderV2(); } catch (eV2) {}   // sem isto a lista de reuniões ficava sem os botões 🟣 (caso da Sarah, 24/08/2026)
       renderAlertaClintHome();
       renderSemOrigem();
       renderAvisoCloser();
