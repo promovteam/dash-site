@@ -1078,6 +1078,14 @@ img { max-width:100%; height:auto; }
         <button class="chart-chip" data-p="tri" onclick="mudarPeriodoLeads('tri', this)">Trimestre</button>
         <button class="chart-chip" data-p="ano" onclick="mudarPeriodoLeads('ano', this)">Ano</button>
         <button class="chart-chip" data-p="tudo" onclick="mudarPeriodoLeads('tudo', this)">Tudo</button>
+        <button class="chart-chip" id="ld-chip-datas" onclick="abrirDatasLeads()" title="Escolher um período de datas">📅 Datas…</button>
+      </div>
+      <div id="ld-datas" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.05);padding:8px 12px;border-radius:12px;">
+        <span class="hint" style="margin:0;">de</span>
+        <input type="date" id="ld-dt-ini" onchange="aplicarDatasLeads()" style="background:#181b22;color:#e8ecf3;border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 8px;font-size:.78rem;">
+        <span class="hint" style="margin:0;">até</span>
+        <input type="date" id="ld-dt-fim" onchange="aplicarDatasLeads()" style="background:#181b22;color:#e8ecf3;border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 8px;font-size:.78rem;">
+        <button class="btn" style="padding:6px 12px;" onclick="limparDatasLeads()">✕ limpar</button>
       </div>
       <span style="flex:1;"></span>
       <span class="eu-sel" title="Seu nome fica salvo neste computador e é usado quando você assume um lead">👤 Você:<select id="ld-eu" onchange="salvarEuLeads(this.value)"></select></span>
@@ -2172,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-1927';
+var VERSAO_DASH = '2026-08-24-1943';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2531,26 +2539,32 @@ function _emailDoLead(r) {
 function eventoDoLead(r, evs) {
   if (!r || !evs || !evs.length) return null;
   var idLead = String(r.leadId || '').trim().toUpperCase().replace(/\s/g, '');
+  var nId = idLead.match(/^L-?(\d+)$/);
   var t8 = (typeof ldTel8 === 'function') ? ldTel8(r.telefone) : '';
   var em = _emailDoLead(r);
   var ds = r.date ? (r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0')) : '';
-  function achar(teste) { for (var i = 0; i < evs.length; i++) if (teste(evs[i])) return evs[i]; return null; }
-  return (idLead ? achar(function(e){ return String(e.leadTag || '').toUpperCase().replace(/\s/g,'') === idLead; }) : null)
-      || (t8 ? achar(function(e){ return e.tel8 && String(e.tel8) === String(t8); }) : null)
-      || (em ? achar(function(e){ return e.email && String(e.email).toLowerCase() === em; }) : null)
-      || (ds ? (function(){                                  // mesma data: nome igual manda; "parecido" só se for o único
-            var doDia = evs.filter(function(e){ return e.date === ds; });
-            var exatos = doDia.filter(function(e){ return v2nomeChave(agNomeDoEvento(e.title)) === v2nomeChave(r.nome); });
-            if (exatos.length === 1) return exatos[0];
-            var parecidos = doDia.filter(function(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome); });
-            return parecidos.length === 1 ? parecidos[0] : null;   // dois parecidos no mesmo dia = não arrisca
-          })() : null)
-      || (idLead ? achar(function(e){                       // eventos antigos: número só vale com o nome batendo
-            var m = String(e.title || '').match(/L-?\s?(\d{2,})/i);
-            var rid = idLead.match(/^L-?(\d+)$/);
-            return m && rid && parseInt(m[1],10) === parseInt(rid[1],10) && v2mesmoLead(agNomeDoEvento(e.title), r.nome);
-          }) : null)
-      || null;
+  function nomeBate(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome); }
+  function idBate(e){
+    if (!idLead) return false;
+    if (String(e.leadTag || '').toUpperCase().replace(/\s/g,'') === idLead) return true;
+    var m = String(e.title || '').match(/L-?\s?(\d{2,})/i);
+    return !!(m && nId && parseInt(m[1],10) === parseInt(nId[1],10));
+  }
+  function telBate(e){ return !!(t8 && e.tel8 && String(e.tel8) === String(t8)); }
+  function emailBate(e){ return !!(em && e.email && String(e.email).toLowerCase() === em); }
+
+  // 1) o NOME tem que bater sempre — sem isso não é a mesma pessoa
+  var cand = evs.filter(nomeBate);
+  if (!cand.length) return null;
+  // 2) na agenda, o DIA também: se houver reunião no dia do lead, é entre essas
+  if (ds) { var doDia = cand.filter(function(e){ return e.date === ds; }); if (doDia.length) cand = doDia; }
+  // 3) e ainda uma segunda prova: número do lead, telefone ou e-mail
+  var comProva = cand.filter(function(e){ return idBate(e) || telBate(e) || emailBate(e); });
+  if (comProva.length === 1) return comProva[0];
+  if (comProva.length > 1) return null;                  // duas provas iguais: não arrisca
+  // 4) sem segunda prova, só aceita se for a única reunião do dia com esse nome
+  if (ds && cand.length === 1 && cand[0].date === ds) return cand[0];
+  return null;
 }
 // acha o LEAD da planilha que corresponde a um evento do Calendar (ID no título > nome parecido)
 function leadDoEvento(ev) {
@@ -4874,9 +4888,22 @@ function clintInfoDe(l) {
 }
 // conversas esperando resposta: recentes (até 7 dias) são as acionáveis
 function espRecentes() {
-  if (!CLINT_PAINEL || !CLINT_PAINEL.success) return { rec: [], antigas: 0 };
+  if (!CLINT_PAINEL || !CLINT_PAINEL.success) return { rec: [], antigas: 0, fora: [] };
   var rec = CLINT_PAINEL.esperando.filter(function(x){ return x.horas <= 168; });
-  return { rec: rec, antigas: CLINT_PAINEL.esperando.length - rec.length };
+  var antigas = CLINT_PAINEL.esperando.length - rec.length;
+  // Bruno 24/08/2026: os quadros seguem o período escolhido, pela data de ENTRADA do lead.
+  // Quem fica de fora não some: vira uma linha "fora deste período" dentro do quadro.
+  var fora = [];
+  try {
+    if (typeof LD_PER !== 'undefined' && (LD_RANGE || LD_PER !== 'tudo') && LD.carregado && LD.rows.length) {
+      var doPeriodo = {};
+      ldPeriodo().rows.forEach(function(l){ var t8 = ldTel8(l.tel || l.telefone); if (t8) doPeriodo[t8] = 1; });
+      var dentro = [];
+      rec.forEach(function(x){ if (x.tel8 && doPeriodo[x.tel8]) dentro.push(x); else fora.push(x); });
+      rec = dentro;
+    }
+  } catch (e) {}
+  return { rec: rec, antigas: antigas, fora: fora };
 }
 function espPorDono(lista) {
   var m = {};
@@ -4886,7 +4913,8 @@ function espPorDono(lista) {
 }
 // sirene + aviso quando surge conversa nova esperando resposta (até 24h)
 function avisarEsperando(primeiraCarga) {
-  var e = espRecentes();
+  // a sirene avisa de qualquer conversa nova, mesmo fora do período que está na tela
+  var e = { rec: (CLINT_PAINEL && CLINT_PAINEL.success ? CLINT_PAINEL.esperando.filter(function(x){ return x.horas <= 168; }) : []) };
   var novos = e.rec.filter(function(x){
     if (/insta/i.test(x.canal || '')) return false;   // a sirene é só do WhatsApp
     if (x.horas > 24) return false;
@@ -7722,9 +7750,49 @@ function comentCruza(c) {
 function mudarPeriodoLeads(p, el) {
   LD_PER = p;
   LD_RANGE = null; // escolher um chip desmarca a semana/mês do quadro
+  var chipD = document.getElementById('ld-chip-datas');
+  if (chipD) { chipD.classList.remove('on'); chipD.textContent = '📅 Datas…'; }
   document.querySelectorAll('#ld-chips .chart-chip').forEach(function(c){ c.classList.remove('on'); });
   if (el) el.classList.add('on');
   renderLeads();
+}
+// ===== 📅 FILTRO POR DATAS (Bruno 24/08/2026): escolher "de" e "até" =====
+function abrirDatasLeads() {
+  var cx = document.getElementById('ld-datas');
+  if (!cx) return;
+  var abrir = cx.style.display === 'none';
+  cx.style.display = abrir ? 'flex' : 'none';
+  if (abrir && !document.getElementById('ld-dt-ini').value) {
+    var hoje = new Date(), ini = new Date(hoje.getTime() - 6 * 864e5);
+    document.getElementById('ld-dt-ini').value = _ldISO(ini);
+    document.getElementById('ld-dt-fim').value = _ldISO(hoje);
+  }
+}
+function _ldISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function _ldDeISO(s){ var p = String(s || '').split('-'); return p.length === 3 ? new Date(+p[0], +p[1]-1, +p[2]) : null; }
+function aplicarDatasLeads() {
+  var a = _ldDeISO(document.getElementById('ld-dt-ini').value);
+  var b = _ldDeISO(document.getElementById('ld-dt-fim').value);
+  if (!a || !b) return;
+  if (a > b) { var tmp = a; a = b; b = tmp;
+    document.getElementById('ld-dt-ini').value = _ldISO(a);
+    document.getElementById('ld-dt-fim').value = _ldISO(b); }
+  var fim = new Date(b.getTime() + 864e5);              // o dia do "até" entra inteiro
+  LD_RANGE = { ini: a.getTime(), fim: fim.getTime(),
+               label: a.toLocaleDateString('pt-BR') + ' a ' + b.toLocaleDateString('pt-BR') };
+  document.querySelectorAll('#ld-chips .chart-chip').forEach(function(c){ c.classList.remove('on'); });
+  var chip = document.getElementById('ld-chip-datas');
+  if (chip) { chip.classList.add('on'); chip.textContent = '📅 ' + LD_RANGE.label; }
+  renderLeads();
+}
+function limparDatasLeads() {
+  LD_RANGE = null;
+  document.getElementById('ld-dt-ini').value = '';
+  document.getElementById('ld-dt-fim').value = '';
+  document.getElementById('ld-datas').style.display = 'none';
+  var chip = document.getElementById('ld-chip-datas');
+  if (chip) { chip.classList.remove('on'); chip.textContent = '📅 Datas…'; }
+  mudarPeriodoLeads('hoje', document.querySelector('#ld-chips .chart-chip[data-p="hoje"]'));
 }
 var LD_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 function ldDia(d){ var x = new Date(d); x.setHours(0,0,0,0); return x; }
@@ -8709,7 +8777,7 @@ function renderLeads() {
         + '<span style="font-size:.68rem;color:' + (x.horas >= 24 ? '#ff6b6b' : '#f6a350') + ';font-weight:800;">há ' + ldTempoTexto(x.horas) + '</span>'
         + '<span style="font-size:.66rem;color:#8f6bff;font-weight:800;">🟣 abrir ›</span></a>';
     };
-    var blocoEsp = function(chaveAberto, icone, cor, corFundo, titulo, lista, extras) {
+    var blocoEsp = function(chaveAberto, icone, cor, corFundo, titulo, lista, extras, foraN) {
       if (!lista.length) return '';
       var ab = !!window[chaveAberto];
       var b = '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;'
@@ -8718,7 +8786,8 @@ function renderLeads() {
         + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window.' + chaveAberto + '=!window.' + chaveAberto + ';renderLeads();">'
         + '<span style="font-size:1.2rem;">' + icone + '</span>'
         + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:' + cor + ';">' + lista.length + ' ' + titulo + '</b>'
-        + '<span class="hint" style="margin-left:8px;">' + espPorDono(lista) + '</span></div>'
+        + '<span class="hint" style="margin-left:8px;">' + espPorDono(lista) + '</span>'
+        + (foraN ? '<span class="hint" style="margin-left:8px;color:#f6a350;">+' + foraN + ' fora deste período</span>' : '') + '</div>'
         + '<span class="ld-selo morno" style="white-space:nowrap;" onclick="event.stopPropagation();carregarClintPainel();this.textContent=\'⏳ atualizando…\';" title="Busca agora na Clint (sozinho, ele atualiza a cada 5 minutos)">🔄 atualizar</span>'
         + '<span style="color:' + cor + ';font-weight:800;font-size:.72rem;white-space:nowrap;">' + (ab ? '▲ fechar' : '▼ ver lista') + '</span></div>';
       if (ab) {
@@ -8727,11 +8796,16 @@ function renderLeads() {
       }
       return b + '</div>';
     };
+    var foraWa = (esp.fora || []).filter(function(x){ return !/insta/i.test(x.canal || ''); }).length;
+    var foraIg = (esp.fora || []).filter(function(x){ return /insta/i.test(x.canal || ''); }).length;
+    var linhaFora = function(n) {
+      return n ? '<div class="hint">⚪ Fora deste período: <b>' + n + '</b> — clique em <b>Tudo</b> lá em cima para ver todas</div>' : '';
+    };
     h += blocoEsp('_espAberto', '🔴', '#ff6b6b', '',
       'sem resposta na Clint (WhatsApp)', espWa,
-      esp.antigas ? '<div class="hint">⚪ Fora da lista: ' + esp.antigas + ' conversas paradas há mais de 7 dias</div>' : '');
+      linhaFora(foraWa) + (esp.antigas ? '<div class="hint">⚪ Fora da lista: ' + esp.antigas + ' conversas paradas há mais de 7 dias</div>' : ''), foraWa);
     h += blocoEsp('_espIgAberto', '📷', '#b98aff', 'rgba(185,138,255,.08)',
-      'sem resposta no Instagram', espIg, '');
+      'sem resposta no Instagram', espIg, linhaFora(foraIg), foraIg);
   }
   // ===== ⚠️ Clint desatualizada (status daqui × etapa de lá) — barrinha que abre =====
   if (CLINT_PAINEL && CLINT_PAINEL.success && _ldIdx) {
