@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-1557';
+var VERSAO_DASH = '2026-08-24-1927';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2518,6 +2518,39 @@ function v2mesmoLead(nomeA, nomeB) {
   if (comuns.length >= 2) return true;
   if (ta[0] === tb[0] && ta[0].length > 2 && (ta.length === 1 || tb.length === 1)) return true;
   return false;
+}
+// ===== 🔑 QUAL EVENTO É DESTE LEAD (Bruno 24/08/2026) =====
+// O número "(L-xxx)" do título é um PALPITE que o dash fazia antes de a planilha decidir
+// e erra muito (37 de 52 reuniões estavam com o número de outra pessoa) — por isso a
+// Patrícia puxava o Meet da Pâmela. A ordem agora vai do mais confiável para o menos:
+// marca ##LEAD## > telefone > e-mail > nome + mesma data > (número E nome juntos).
+function _emailDoLead(r) {
+  var m = String((r && r.obs) || '').match(/e-?mail:\s*([^\s|]+@[^\s|]+)/i);
+  return m ? m[1].toLowerCase() : '';
+}
+function eventoDoLead(r, evs) {
+  if (!r || !evs || !evs.length) return null;
+  var idLead = String(r.leadId || '').trim().toUpperCase().replace(/\s/g, '');
+  var t8 = (typeof ldTel8 === 'function') ? ldTel8(r.telefone) : '';
+  var em = _emailDoLead(r);
+  var ds = r.date ? (r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0')) : '';
+  function achar(teste) { for (var i = 0; i < evs.length; i++) if (teste(evs[i])) return evs[i]; return null; }
+  return (idLead ? achar(function(e){ return String(e.leadTag || '').toUpperCase().replace(/\s/g,'') === idLead; }) : null)
+      || (t8 ? achar(function(e){ return e.tel8 && String(e.tel8) === String(t8); }) : null)
+      || (em ? achar(function(e){ return e.email && String(e.email).toLowerCase() === em; }) : null)
+      || (ds ? (function(){                                  // mesma data: nome igual manda; "parecido" só se for o único
+            var doDia = evs.filter(function(e){ return e.date === ds; });
+            var exatos = doDia.filter(function(e){ return v2nomeChave(agNomeDoEvento(e.title)) === v2nomeChave(r.nome); });
+            if (exatos.length === 1) return exatos[0];
+            var parecidos = doDia.filter(function(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome); });
+            return parecidos.length === 1 ? parecidos[0] : null;   // dois parecidos no mesmo dia = não arrisca
+          })() : null)
+      || (idLead ? achar(function(e){                       // eventos antigos: número só vale com o nome batendo
+            var m = String(e.title || '').match(/L-?\s?(\d{2,})/i);
+            var rid = idLead.match(/^L-?(\d+)$/);
+            return m && rid && parseInt(m[1],10) === parseInt(rid[1],10) && v2mesmoLead(agNomeDoEvento(e.title), r.nome);
+          }) : null)
+      || null;
 }
 // acha o LEAD da planilha que corresponde a um evento do Calendar (ID no título > nome parecido)
 function leadDoEvento(ev) {
@@ -9669,12 +9702,7 @@ function preencherGravacao(r) {
   function aplicar(data) {
     var evs = (data.bruno || []).map(function(e){ e._cal = 'bruno'; return e; })
       .concat((data.tony || []).map(function(e){ e._cal = 'tony'; return e; }));
-    var ds = r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0');
-    // 1º pelo ID no título do evento; 2º nome parecido + mesma data; 3º nome parecido
-    var meuId = String(r.leadId || '').match(/^L-?(\d+)$/i);
-    var ev = (meuId ? evs.find(function(e){ var m = String(e.title||'').match(/L-?\s?(\d{3,})/i); return m && parseInt(m[1],10) === parseInt(meuId[1],10); }) : null)
-          || evs.find(function(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome) && e.date === ds; })
-          || evs.find(function(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome); });
+    var ev = eventoDoLead(r, evs);
     if (!ev) return;
     r._ev = { id: ev.id, cal: ev._cal }; // vínculo planilha ↔ evento (para sincronizar edições)
     var links = [];
@@ -10877,10 +10905,7 @@ function sincronizarStatusEvento(r) {
   function achar(data) {
     var evs = (data.bruno || []).map(function(e){ e._cal = 'bruno'; return e; })
       .concat((data.tony || []).map(function(e){ e._cal = 'tony'; return e; }));
-    var ds = r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0');
-    var meuId = String(r.leadId || '').match(/^L-?(\d+)$/i);
-    var ev = (meuId ? evs.find(function(e){ var m = String(e.title||'').match(/L-?\s?(\d{3,})/i); return m && parseInt(m[1],10) === parseInt(meuId[1],10); }) : null)
-          || evs.find(function(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome) && e.date === ds; });
+    var ev = eventoDoLead(r, evs);
     if (!ev) return;
     r._ev = { id: ev.id, cal: ev._cal };
     _syncEvStatus(r._ev, st);
