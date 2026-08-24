@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2251';
+var VERSAO_DASH = '2026-08-23-2258';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -8217,6 +8217,33 @@ function abrirFichaLead(i) {
         })()
       + '</div>';
   }
+  // 📜 HISTORICO da pessoa (Bruno 23/08/2026): todas as reunioes dela, com contadores;
+  // clicar numa reuniao abre a ficha completa dela (com Meet, GRAVACAO e transcricao)
+  var rsH = ldReunioes(l);
+  if (rsH.length) {
+    var contaH = function(chave){ return rsH.filter(function(r){ return (r.sn || v2norm(r.status || '')) === chave; }).length; };
+    var nsH = contaH('no show'), nvH = contaH('nao vendido'), vdH = contaH('vendido');
+    var CORH = { 'vendido': '#3ddc97', 'no show': '#ff6b6b', 'nao vendido': '#8d8478', 'reuniao agendada': '#6ea8ff', 'remarcada 2 reuniao': '#ff9a5a', 'bloqueio de oferta': '#b98aff', 'entrada': '#ffd166', 'estorno': '#ff6b6b' };
+    h += '<div class="dtl-card" style="margin-top:12px;">'
+      + '<div class="g-label">📜 Histórico da pessoa</div>'
+      + '<div class="hint" style="padding:2px 0 8px;">' + rsH.length + ' reuni' + (rsH.length === 1 ? 'ão' : 'ões')
+      + (nsH ? ' · <b style="color:#ff6b6b;">' + nsH + ' no-show</b>' : '')
+      + (nvH ? ' · ' + nvH + ' não vendida' + (nvH === 1 ? '' : 's') : '')
+      + (vdH ? ' · <b style="color:#3ddc97;">' + vdH + ' vendida' + (vdH === 1 ? '' : 's') + '</b>' : '')
+      + ' — clique numa reunião para ver tudo dela (inclusive a gravação)</div>';
+    rsH.slice().reverse().slice(0, 12).forEach(function(r) {
+      var iH = v2reg(r);
+      var snH = r.sn || v2norm(r.status || '');
+      var corH = CORH[snH] || 'var(--muted)';
+      h += '<div class="click" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.04);margin-bottom:6px;cursor:pointer;flex-wrap:wrap;" onclick="abrirLead(' + iH + ')">'
+        + '<b style="font-size:.78rem;min-width:74px;">' + (r.date ? r.date.toLocaleDateString('pt-BR') : 'sem data') + '</b>'
+        + '<span class="ld-tag" style="background:' + corH + '22;color:' + corH + ';">' + (r.status || '—') + '</span>'
+        + '<span class="hint" style="flex:1;">' + [r.produto, r.closer, r.valor > 0 ? v2moeda(r.valor) : ''].filter(Boolean).join(' · ') + '</span>'
+        + '<span style="font-size:.66rem;color:#6ea8ff;font-weight:800;">🎬 ver ›</span>'
+        + '</div>';
+    });
+    h += '</div>';
+  }
   var wa = ldWa(l);
   // 💰 registrar venda direto da ficha (formulario ja preenchido) — Bruno 21/08/2026
   _vendaLeadAtual = { lead: l, reuniao: _reu || null };
@@ -10590,6 +10617,26 @@ function _faixaRemarcacao(titulo) {
     + '<span class="hint" style="white-space:nowrap;">clique no NOVO horário livre na grade</span>'
     + '<span style="cursor:pointer;font-weight:800;color:#ff6b6b;font-size:.78rem;" onclick="cancelarRemarcacao()">✕ cancelar</span>';
 }
+// pop-up bonito de confirmacao (no lugar da janela cinza do Chrome)
+function confirmarBonito(titulo, corpo, okTxt, aoOk) {
+  var cx = document.getElementById('modal-confirma');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-confirma';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10005;background:rgba(6,6,16,.9);display:flex;align-items:center;justify-content:center;padding:20px;';
+    document.body.appendChild(cx);
+  }
+  cx.style.display = 'flex';
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,154,90,.55);border-radius:20px;max-width:430px;width:100%;padding:22px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span style="font-size:1.4rem;">🗓</span><b style="flex:1;font-size:.95rem;color:#ff9a5a;">' + titulo + '</b></div>'
+    + '<div style="font-size:.83rem;line-height:1.6;color:var(--text-2);margin-bottom:16px;">' + corpo + '</div>'
+    + '<div style="display:flex;gap:9px;justify-content:flex-end;">'
+    + '<button class="btn-assumir" id="mc-nao" style="padding:10px 16px;background:rgba(255,255,255,.08);">Cancelar</button>'
+    + '<button class="btn-assumir" id="mc-sim" style="padding:10px 18px;background:rgba(255,154,90,.2);color:#ff9a5a;border:1px solid rgba(255,154,90,.55);font-weight:800;">' + (okTxt || '✓ Confirmar') + '</button>'
+    + '</div></div>';
+  document.getElementById('mc-nao').onclick = function(){ cx.style.display = 'none'; };
+  document.getElementById('mc-sim').onclick = function(){ cx.style.display = 'none'; aoOk(); };
+}
 function cancelarRemarcacao() {
   window._agRemarcando = null;
   var b = document.getElementById('ag-banner-remarcar');
@@ -10602,7 +10649,18 @@ function remarcarNoSlot(dataStr, hora) {
   var dp = dataStr.split('-');
   if (ev.soPlanilha) {   // veio da ficha: nao temos o evento antigo — mesma linha, evento novo
     var r = ev.r;
-    if (!confirm('REMARCAR a reunião de "' + (r.nome || '') + '" para ' + dp[2] + '/' + dp[1] + ' às ' + hora + '?\n\nÉ uma REMARCAÇÃO: a MESMA linha da planilha só muda de data (não cria outro nome) e o evento novo entra na agenda com os dados do lead.')) return;
+    confirmarBonito('Remarcar a reunião?',
+      '<b>' + String(r.nome || '').replace(/</g, '&lt;') + '</b> → <b style="color:#ff9a5a;">' + dp[2] + '/' + dp[1] + ' às ' + hora + '</b><br><br>É uma <b>REMARCAÇÃO</b>: a mesma linha da planilha só muda de data (não cria outro nome) e o evento novo entra na agenda com os dados do lead. Closer e SDR recebem o aviso.',
+      '🗓 Remarcar', function() { _remarcarPlanilhaOk(r, dataStr, hora); });
+    return;
+  }
+  confirmarBonito('Remarcar a reunião?',
+    '<b>' + String(ev.title || '').replace(/</g, '&lt;').slice(0, 60) + '</b> → <b style="color:#ff9a5a;">' + dp[2] + '/' + dp[1] + ' às ' + hora + '</b><br><br>É uma <b>REMARCAÇÃO</b>: mesma pessoa, mesma linha na planilha — não cria reunião nova. Closer e SDR recebem o aviso.',
+    '🗓 Remarcar', function() { _remarcarEventoOk(ev, dataStr, hora, dp); });
+}
+function _remarcarPlanilhaOk(r, dataStr, hora) {
+  var dp = dataStr.split('-');
+  {
     var dataBr = dp[2] + '/' + dp[1] + '/' + dp[0];
     sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'data', valor: dataBr, dataRef: v2dataRef(r), gid: V2_GID });
     sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Reunião agendada', dataRef: v2dataRef(r), gid: V2_GID });
@@ -10628,7 +10686,8 @@ function remarcarNoSlot(dataStr, hora) {
     try { avisoRapido('🗓 REMARCADA para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — mesma pessoa, mesma linha, evento novo na agenda de ' + (agendaKey === 'tony' ? 'Tony' : 'Bruno')); } catch (e) {}
     return;
   }
-  if (!confirm('REMARCAR a reunião\n"' + (ev.title || '') + '"\npara ' + dp[2] + '/' + dp[1] + ' às ' + hora + '?\n\nÉ uma REMARCAÇÃO: mesma pessoa, mesma linha na planilha — não cria reunião nova. Closer e SDR recebem o aviso.')) return;
+}
+function _remarcarEventoOk(ev, dataStr, hora, dp) {
   sendToGAS({ action: 'rescheduleEvent', calendar: ev._cal || AG.closer, eventId: ev.id, newDate: dataStr, newTime: hora, duration: ev.duration || 0 }).then(function(res) {
     if (!res || !res.success) { alert('Não consegui remarcar: ' + ((res && res.error) || 'sem resposta do robô')); return; }
     sendToGAS({ action: 'updateEventStatus', calendar: ev._cal || AG.closer, eventId: ev.id, status: 'remarcada' });
