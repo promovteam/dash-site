@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2235';
+var VERSAO_DASH = '2026-08-23-2251';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -8234,6 +8234,7 @@ function abrirFichaLead(i) {
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda</button>');
   if (_snBloqU && !_blqF)
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>');
+  if (!_rUlt) _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="ldProcurarReuniao(' + i + ')" title="A reunião existe mas não ligou com este lead (telefone diferente)? Procure e ligue aqui">🔍 já teve reunião? procurar</button>');
   if (_btH.length) h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">' + _btH.join('') + '</div>';
   if (wa || l.insta || clintLink(l)) {
     h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
@@ -10837,6 +10838,78 @@ function abrirAgendarCom(dur, dataStr, hora) {
   }
 }
 
+// ===== 🔍 PROCURAR E LIGAR UMA REUNIAO "PERDIDA" (Bruno 23/08/2026) =====
+// O lead existe e a reuniao tambem, mas com telefone diferente e sem e-mail/@ na
+// observacao — ai o casamento automatico nao fecha. Aqui a pessoa procura a reuniao
+// (nome parecido, e-mail nas observacoes) e liga: o vinculo (e-mail/@ do lead) e
+// gravado na Observacao da reuniao e passa a valer para sempre.
+function ldProcurarReuniao(i) {
+  var l = _ldReg[i];
+  if (!l) return;
+  var chaveN = _nomeChave(l.nome || ''), prim = v2norm(l.nome || '').split(' ')[0] || '';
+  var le = idEmail(l.email), ig = idInsta(l.insta);
+  var cands = (V2.rows || []).map(function(r) {
+    var n = v2norm(r.nome || ''), sc = 0;
+    if (chaveN && _nomeChave(r.nome || '') === chaveN) sc = 3;
+    else if (prim.length >= 4 && n.indexOf(prim) === 0) sc = 2;
+    else if (prim.length >= 4 && n.indexOf(prim) !== -1) sc = 1;
+    var obsL = String(r.obs || '').toLowerCase();
+    if (le && obsL.indexOf(le.slice(2)) !== -1) sc += 3;
+    if (ig && obsL.indexOf(ig.slice(2)) !== -1) sc += 3;
+    return { r: r, sc: sc };
+  }).filter(function(x){ return x.sc > 0; })
+    .sort(function(a, b){ return b.sc - a.sc || ((b.r.date ? b.r.date.getTime() : 0) - (a.r.date ? a.r.date.getTime() : 0)); })
+    .slice(0, 10);
+  var cx = document.getElementById('modal-procura-reuniao');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-procura-reuniao';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(6,6,16,.9);display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;overflow-y:auto;';
+    cx.onclick = function(e){ if (e.target === cx) cx.style.display = 'none'; };
+    document.body.appendChild(cx);
+  }
+  cx.style.display = 'flex';
+  var h = '<div style="background:var(--card,#15152b);border:1px solid rgba(110,168,255,.5);border-radius:20px;max-width:560px;width:100%;padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.3rem;">🔍</span><b style="flex:1;font-size:.95rem;">Qual é a reunião de ' + String(l.nome || '').replace(/</g, '&lt;') + '?</b>'
+    + '<span style="cursor:pointer;font-size:1.2rem;opacity:.7;" onclick="document.getElementById(\'modal-procura-reuniao\').style.display=\'none\'">✕</span></div>'
+    + '<div class="hint" style="margin-bottom:10px;">Parecidas pelo nome' + (le ? ' e pelo e-mail' : '') + '. Ao ligar, o e-mail/@ do lead entra na observação da reunião e o vínculo vale para sempre.</div>';
+  if (!cands.length) h += '<div class="hint" style="padding:14px;text-align:center;">Nenhuma reunião parecida — confira o nome ou me mostre o caso.</div>';
+  cands.forEach(function(c) {
+    var r = c.r, iR = v2reg(r);
+    h += '<div class="click" style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.05);margin-bottom:7px;cursor:pointer;flex-wrap:wrap;" onclick="ldVincularReuniao(' + i + ',' + iR + ')">'
+      + '<b style="font-size:.82rem;flex:1;min-width:120px;">' + (r.nome || '') + '</b>'
+      + '<span class="hint">' + (r.date ? r.date.toLocaleDateString('pt-BR') : '') + (r.status ? ' · ' + r.status : '') + (r.closer ? ' · ' + r.closer : '') + (r.telefone ? ' · ' + r.telefone : ' · sem telefone') + '</span>'
+      + '</div>';
+  });
+  h += '</div>';
+  cx.innerHTML = h;
+}
+function ldVincularReuniao(iLead, iReu) {
+  var l = _ldReg[iLead], r = _v2reg[iReu];
+  if (!l || !r) return;
+  if (!confirm('Ligar o lead "' + (l.nome || '') + '" à reunião de "' + (r.nome || '') + '" (' + (r.date ? r.date.toLocaleDateString('pt-BR') : '') + (r.status ? ' · ' + r.status : '') + ')?')) return;
+  var marcas = [];
+  if (l.email) marcas.push('E-mail: ' + l.email);
+  if (l.insta) marcas.push('Instagram: @' + String(l.insta).replace(/^@+/, ''));
+  if (!String(r.telefone || '').trim() && l.tel) {
+    r.telefone = l.tel;
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'telefone', valor: String(l.tel), dataRef: v2dataRef(r), gid: V2_GID });
+  }
+  if (marcas.length) {
+    r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '') + 'Vínculo com o lead: ' + marcas.join(' · ');
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+  } else if (String(r.telefone || '').trim() && l.tel && ldTel8(r.telefone) !== ldTel8(l.tel)) {
+    // lead sem e-mail nem @: o unico jeito de unir e a observacao com o telefone do lead
+    r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '') + 'Vínculo com o lead — WhatsApp: ' + l.tel + ' (na reunião ficou ' + r.telefone + ')';
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+  }
+  document.getElementById('modal-procura-reuniao').style.display = 'none';
+  _ldIdx = null; _nomeTelIdx = null;
+  try { _ldMontarIdx(); } catch (e) {}
+  try { avisoRapido('🔗 Ligado — a reunião agora aparece no lead'); } catch (e) {}
+  try { renderLeads(); } catch (e) {}
+  try { abrirFichaLead(iLead); } catch (e) {}
+}
 // ===== 📅 DO LEAD DIRETO PARA A AGENDA (Bruno 23/08/2026) =====
 // Na ficha do lead: "Marcar reunião" abre a AGENDA de verdade; a pessoa escolhe
 // o closer e clica num horário livre — o formulário abre já preenchido com o lead.
@@ -10979,6 +11052,18 @@ function abrirFichaDoTelefone(dig) {
     if (l) { try { abrirFichaLead(_ldReg.push(l) - 1); } catch (e) {} return; }
     var rr = _qualquerReuniaoDe(t8);   // nao preencheu o diagnostico: mostra a ficha da reuniao
     if (rr) { try { abrirLead(v2reg(rr)); } catch (e) {} return; }
+    // telefone nao bateu em nada: tenta pelo NOME que a Clint conhece para esse numero
+    // (caso Raynara: o cadastro da Clint tem um telefone e a planilha/formulario outro)
+    var nomeC = '';
+    try { var mmF = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[t8]; if (mmF && mmF[3]) nomeC = mmF[3]; } catch (e) {}
+    try { var cF = CLINT[t8]; if (!nomeC && cF && cF.nomeClint) nomeC = cF.nomeClint; } catch (e) {}
+    if (nomeC) {
+      var chaveN = _nomeChave(nomeC);
+      var lN = ldUnicos(LD.rows).filter(function(x){ return _nomeChave(x.nome || '') === chaveN; });
+      if (lN.length === 1) { try { avisoRapido('⚠️ Telefone diferente do cadastro — achei ' + nomeC + ' pelo NOME; confira se é a mesma pessoa'); } catch (e) {} try { abrirFichaLead(_ldReg.push(lN[0]) - 1); } catch (e) {} return; }
+      var rN = (V2.rows || []).filter(function(x){ return _nomeChave(x.nome || '') === chaveN || (v2norm(nomeC) && v2norm(x.nome || '').indexOf(v2norm(nomeC)) === 0); });
+      if (rN.length === 1) { try { avisoRapido('⚠️ Telefone diferente — achei a reunião de ' + nomeC + ' pelo NOME; confira'); } catch (e) {} try { abrirLead(v2reg(rN[0])); } catch (e) {} return; }
+    }
     try { avisoRapido('Esse número não está na base de leads nem tem reunião registrada — os dados dele estão só na Clint.'); } catch (e) {}
   })();
 }
