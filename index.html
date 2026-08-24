@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-1248';
+var VERSAO_DASH = '2026-08-24-1310';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10858,11 +10858,34 @@ var MAPA_ST_AGENDA = {
   'remarcada 2 reuniao':'remarcada', 'nao vendido':'naovendido', 'no show':'noshow'
 };
 // status editado na ficha/planilha → atualiza o evento no Google Calendar
+// (se a ficha ainda não criou o vínculo r._ev, procura o evento sozinho — antes desistia em silêncio
+// e o evento ficava com a cor velha no calendário)
 function sincronizarStatusEvento(r) {
-  if (!r || !r._ev) return;
+  if (!r) return;
   var st = MAPA_ST_AGENDA[v2norm(r.status)];
   if (!st) return;
-  sendToGAS({ action: 'updateEventStatus', calendar: r._ev.cal, eventId: r._ev.id, status: st });
+  if (r._ev) { _syncEvStatus(r._ev, st); return; }
+  if (!r.date || typeof AG === 'undefined') return;
+  var wk = agDataStr(agSegunda(r.date));
+  function achar(data) {
+    var evs = (data.bruno || []).map(function(e){ e._cal = 'bruno'; return e; })
+      .concat((data.tony || []).map(function(e){ e._cal = 'tony'; return e; }));
+    var ds = r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0');
+    var meuId = String(r.leadId || '').match(/^L-?(\d+)$/i);
+    var ev = (meuId ? evs.find(function(e){ var m = String(e.title||'').match(/L-?\s?(\d{3,})/i); return m && parseInt(m[1],10) === parseInt(meuId[1],10); }) : null)
+          || evs.find(function(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome) && e.date === ds; });
+    if (!ev) return;
+    r._ev = { id: ev.id, cal: ev._cal };
+    _syncEvStatus(r._ev, st);
+  }
+  if (AG.cache[wk]) { achar(AG.cache[wk]); return; }
+  fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + wk, { redirect: 'follow' })
+    .then(function(x){ return x.json(); })
+    .then(function(data){ if (data && data.success) { AG.cache[wk] = data; achar(data); } })
+    .catch(function(e){});
+}
+function _syncEvStatus(ev, st) {
+  sendToGAS({ action: 'updateEventStatus', calendar: ev.cal, eventId: ev.id, status: st });
   AG.cache = {}; // agenda recarrega com o status novo
 }
 function mudarStatusEvento(st) {
