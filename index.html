@@ -2171,7 +2171,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2113';
+var VERSAO_DASH = '2026-08-23-2121';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10609,6 +10609,8 @@ function cancelarMarcarDoLead() {
 // abre direto na agenda ja "marcando para" a pessoa daquele telefone
 function _marcarPelaUrl() {
   // aceita ?marcar=... e tambem #marcar=... (o #marcar permite reaproveitar uma aba ja aberta sem recarregar)
+  var tudoM = String(location.search || '') + ' ' + String(location.hash || '');
+  if (tudoM.indexOf('painel=lead') !== -1) return;   // painel=lead quer a FICHA, nao o marcar
   var m = String(location.search || '').match(/[?&]marcar=([^&]+)/) || String(location.hash || '').match(/[#&]marcar=([^&]+)/);
   if (!m) return;
   var dig = decodeURIComponent(m[1]).replace(/\D/g, '');
@@ -10626,23 +10628,54 @@ try { _marcarPelaUrl(); } catch (e) {}
 // painel=agenda: versao enxuta para viver DENTRO da Clint (iframe da extensao)
 function _modoPainelAgenda() {
   var tudo = String(location.search || '') + ' ' + String(location.hash || '');
-  if (tudo.indexOf('painel=agenda') === -1) return;
-  var st = document.createElement('style');
-  st.textContent = '.sidebar{display:none!important}.topbar{display:none!important}.main{padding:8px 10px!important}body{zoom:.82}.drawer{right:-110%}';
-  document.head.appendChild(st);
-  var vai = function() {
-    var item = document.querySelector('.nav-item[data-s="agenda"]');
-    if (item) item.click();
-    try { fecharFiltros(); } catch (e) {}
-  };
-  setTimeout(vai, 350);
-  setTimeout(vai, 1800);   // garante mesmo se algo redesenhar por cima na carga
+  var eAgenda = tudo.indexOf('painel=agenda') !== -1, eLead = tudo.indexOf('painel=lead') !== -1;
+  if (!eAgenda && !eLead) return;
+  if (!document.getElementById('painel-css')) {
+    var st = document.createElement('style');
+    st.id = 'painel-css';
+    st.textContent = '.sidebar{display:none!important}.topbar{display:none!important}.main{padding:8px 10px!important}body{zoom:.82}.drawer{right:-110%}';
+    document.head.appendChild(st);
+  }
+  if (eAgenda) {
+    var vai = function() {
+      var item = document.querySelector('.nav-item[data-s="agenda"]');
+      if (item) item.click();
+      try { fecharFiltros(); } catch (e) {}
+    };
+    setTimeout(vai, 350);
+    setTimeout(vai, 1800);   // garante mesmo se algo redesenhar por cima na carga
+  }
+  if (eLead) {
+    var mL = tudo.match(/marcar=(\d+)/);
+    if (mL) abrirFichaDoTelefone(mL[1]);
+  }
+}
+// ficha COMPLETA da pessoa daquele telefone (usada pelo painel da extensao na Clint)
+function abrirFichaDoTelefone(dig) {
+  var t8 = String(dig).replace(/\D/g, '').slice(-8), tenta = 0;
+  (function espera() {
+    tenta++;
+    if ((!(LD.rows || []).length || !(V2.rows || []).length) && tenta < 40) return setTimeout(espera, 1000);
+    var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0];
+    if (l) { try { abrirFichaLead(_ldReg.push(l) - 1); } catch (e) {} return; }
+    var rr = _qualquerReuniaoDe(t8);   // nao preencheu o diagnostico: mostra a ficha da reuniao
+    if (rr) { try { abrirLead(v2reg(rr)); } catch (e) {} return; }
+    try { avisoRapido('Esse número não está na base de leads nem tem reunião registrada — os dados dele estão só na Clint.'); } catch (e) {}
+  })();
 }
 try { _modoPainelAgenda(); } catch (e) {}
 // a extensao da Clint reaproveita uma aba do dash ja aberta trocando so o #marcar=...
 window.addEventListener('hashchange', function() {
-  if (String(location.hash || '').indexOf('marcar=') === -1) return;
+  var hx = String(location.hash || '');
+  if (hx.indexOf('marcar=') === -1) return;
   try { cancelarMarcarDoLead(); } catch (e) {}
+  if (hx.indexOf('painel=lead') !== -1) {
+    try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {}
+    try { document.getElementById('modal-lead').classList.remove('open'); } catch (e) {}
+    var mH = hx.match(/marcar=(\d+)/);
+    if (mH) { try { abrirFichaDoTelefone(mH[1]); } catch (e) {} }
+    return;
+  }
   try { _marcarPelaUrl(); } catch (e) {}
 });
 // ===== 🔎 PUXAR OS DADOS DO LEAD NA HORA DE MARCAR A REUNIÃO =====
