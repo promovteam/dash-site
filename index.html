@@ -1546,6 +1546,7 @@ Instagram: @pr.joaosilva</div>
         <button class="btn" id="btn-copiar" style="padding:6px 14px;font-size:.7rem;" onclick="copiarDadosLead(this)">📋 Copiar</button>
         <button class="btn" id="btn-religar" style="padding:6px 14px;font-size:.7rem;display:none;background:rgba(185,138,255,.16);color:#b98aff;border:1px solid rgba(185,138,255,.4);" onclick="religarReuniaoAbrir()" title="Só Bruno e Adm: liga esta reunião à pessoa certa da base">🔁 Trocar a pessoa</button>
         <button class="btn" id="btn-editar" style="padding:6px 14px;font-size:.7rem;" onclick="alternarEdicao()">✏️ Editar</button>
+        <button class="btn" id="btn-desvincular" style="padding:6px 14px;font-size:.7rem;background:rgba(110,168,255,.14);border-color:rgba(110,168,255,.4);color:#6ea8ff;display:none;" onclick="vsfDesvincular()" title="Só Bruno e Adm: desfaz o vínculo manual com o formulário">🔗 Desfazer vínculo</button>
         <button class="btn" id="btn-remarcar-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;display:none;" onclick="irRemarcarNaAgenda(_fichaAtual)" title="Vai para a agenda, na semana da reunião, para remarcar">🗓 Remarcar</button>
         <button class="btn" id="btn-venda-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="abrirFormVendaReuniao()" title="Abre o formulário de venda já preenchido com os dados desta reunião">💰 Registrar venda</button>
         <button class="btn" id="btn-bloqueio-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="abrirFormBloqueioReuniao()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>
@@ -2171,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2139';
+var VERSAO_DASH = '2026-08-23-2150';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3264,7 +3265,10 @@ function seloBloqueio(tel, nome) {
 function seloVendaSemForm(l) {
   var st = ldSituacao(l);
   if (!st || !st.vd) return '';
+  var rsV = ldReunioes(l), rV = rsV.length ? rsV[rsV.length - 1] : null;
+  if (rV && (!rV.date || rV.date < VSF_DESDE)) return '';   // so daqui para frente
   var pago = null; try { pago = ldPagamento(l); } catch (e) {}
+  if (!pago && rV) { try { pago = pagVinculado(rV); } catch (e2) {} }
   if (pago) return '';
   return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="Está Vendido mas o formulário de venda não foi preenchido — abra e use 💰 Registrar venda">💰 sem formulário</span>';
 }
@@ -5075,22 +5079,37 @@ function fupResponder(i, temChance) {
 // ===== 💰 POP-UP: VENDIDOS SEM OS DADOS DA VENDA (Bruno 23/08/2026) =====
 // Ao abrir o dash: vendas dos ultimos 30 dias que estao "Vendido" mas sem o
 // formulario preenchido. Cada closer ve as dele; Bruno/Adm veem todas.
-var _vsfMostrou = false;
-function renderVendidosSemForm() {
-  if (_vsfMostrou) return;
-  if (!PAG.rows || !PAG.rows.length) return;   // ainda carregando os pagamentos: tenta na proxima
+var VSF_DESDE = new Date(2026, 7, 23);   // "considere somente daqui para frente" (Bruno 23/08/2026)
+// vinculo feito a mao: a reuniao ganha ##PAGVINC:telefone## na Observacao
+function pagVinculado(r) {
+  var m = String(r.obs || '').match(/##PAGVINC:(\d+)##/);
+  if (!m) return null;
+  var t8 = String(m[1]).slice(-8);
+  return (PAG.rows || []).filter(function(x){ return ldTel8(x.celular) === t8; })[0] || null;
+}
+function _vsfLista() {
   var quem = _euSouCloser(), adm = (typeof ehAdm === 'function') && ehAdm();
-  if (!quem && !adm) return;
-  var corte = Date.now() - 30 * 86400000;
-  var lista = (V2.rows || []).filter(function(r) {
+  if ((!quem && !adm) || !PAG.rows || !PAG.rows.length) return [];
+  return (V2.rows || []).filter(function(r) {
     if ((r.sn || v2norm(r.status || '')) !== 'vendido') return false;
-    if (!r.date || r.date.getTime() < corte) return false;
+    if (!r.date || r.date < VSF_DESDE) return false;
     if (!adm && v2norm(r.closer || '').indexOf(quem) === -1) return false;
     var pago = null; try { pago = ldPagamento({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (e) {}
-    return !pago;
+    return !pago && !pagVinculado(r);
   });
-  if (!lista.length) { _vsfMostrou = true; return; }
-  _vsfMostrou = true;
+}
+function renderVendidosSemForm(abrir) {
+  var lista = _vsfLista();
+  // botao flutuante com a contagem (em vez de pop-up automatico — Bruno 23/08/2026)
+  var fb = document.getElementById('vsf-btn');
+  if (!lista.length) { if (fb) fb.remove(); var mv = document.getElementById('modal-vsf'); if (mv && abrir !== true) mv.style.display = 'none'; if (!abrir) return; }
+  if (lista.length) {
+    if (!fb) { fb = document.createElement('div'); fb.id = 'vsf-btn'; document.body.appendChild(fb); fb.onclick = function(){ renderVendidosSemForm(true); }; }
+    fb.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:8999;background:rgba(255,107,107,.92);color:#fff;font-weight:800;font-size:.78rem;padding:11px 16px;border-radius:999px;cursor:pointer;box-shadow:0 10px 26px rgba(255,107,107,.35);';
+    fb.textContent = '💰 ' + lista.length + ' venda' + (lista.length === 1 ? '' : 's') + ' sem dados';
+  }
+  if (abrir !== true) return;
+  if (!lista.length) { avisoRapido('✓ Nenhuma venda sem dados'); return; }
   var cx = document.getElementById('modal-vsf');
   if (!cx) {
     cx = document.createElement('div');
@@ -5110,10 +5129,56 @@ function renderVendidosSemForm() {
       + '<b style="font-size:.82rem;flex:1;min-width:120px;">' + (r.nome || '') + '</b>'
       + '<span class="hint">' + (r.date ? r.date.toLocaleDateString('pt-BR') : '') + (r.closer ? ' · ' + r.closer : '') + (r.valor > 0 ? ' · ' + v2moeda(r.valor) : '') + '</span>'
       + '<button class="btn-assumir" style="padding:6px 12px;background:rgba(61,220,151,.16);color:#3ddc97;border:1px solid rgba(61,220,151,.5);font-weight:800;" onclick="_fichaAtual=' + i + ';document.getElementById(\'modal-vsf\').style.display=\'none\';abrirFormVendaReuniao();">💰 Registrar agora</button>'
+      + '<button class="btn-assumir" style="padding:6px 12px;background:rgba(110,168,255,.14);color:#6ea8ff;border:1px solid rgba(110,168,255,.4);" onclick="vsfEscolherVinculo(' + i + ')" title="Os dados dessa venda já estão no formulário com outro telefone/nome: aponte qual é">✔ já tem os dados</button>'
       + '</div>';
   });
-  h += '<div class="hint" style="margin-top:6px;">Fechar esta janela = registrar depois (ela volta na próxima vez que o dash abrir · o robô também cobra às 8h30)</div></div>';
+  h += '<div class="hint" style="margin-top:6px;">O botão vermelho no canto fica aí até tudo ter dados · o robô também cobra às 8h30</div></div>';
   cx.innerHTML = h;
+}
+// "ja tem os dados": aponta qual resposta do formulario e dessa venda (##PAGVINC##)
+function vsfEscolherVinculo(i) {
+  var r = _v2reg[i];
+  if (!r) return;
+  var alvo = v2norm(r.nome || '');
+  var cands = (PAG.rows || []).slice().sort(function(a, b) {
+    var pa = (alvo && v2norm(a.nome).indexOf(alvo.split(' ')[0]) !== -1) ? 0 : 1;
+    var pb = (alvo && v2norm(b.nome).indexOf(alvo.split(' ')[0]) !== -1) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0);
+  }).slice(0, 15);
+  var cx = document.getElementById('modal-vsf');
+  var h = '<div style="background:var(--card,#15152b);border:1px solid rgba(110,168,255,.5);border-radius:20px;max-width:540px;width:100%;padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.3rem;">🔗</span><b style="flex:1;font-size:.95rem;">Qual formulário é a venda de ' + String(r.nome || '').replace(/</g, '&lt;') + '?</b>'
+    + '<span style="cursor:pointer;font-size:1.2rem;opacity:.7;" onclick="renderVendidosSemForm(true)">←</span></div>'
+    + '<div class="hint" style="margin-bottom:10px;">Escolha a resposta certa — o vínculo fica anotado na reunião e só o Bruno/Adm desfaz.</div>';
+  cands.forEach(function(x) {
+    var telD = String(x.celular || '').replace(/\D/g, '');
+    h += '<div class="click" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);margin-bottom:6px;cursor:pointer;" onclick="vsfVincular(' + i + ',\'' + telD + '\')">'
+      + '<b style="font-size:.8rem;flex:1;">' + (x.nome || '') + '</b>'
+      + '<span class="hint">' + (x.date ? x.date.toLocaleDateString('pt-BR') : '') + (x.celular ? ' · ' + x.celular : '') + (x.programa ? ' · ' + x.programa : '') + '</span></div>';
+  });
+  h += '</div>';
+  cx.innerHTML = h;
+}
+function vsfVincular(i, telD) {
+  var r = _v2reg[i];
+  if (!r || !telD) return;
+  if (!confirm('Vincular a venda de "' + (r.nome || '') + '" a esse formulário?\n\nEla sai da lista de "sem dados". Só o Bruno/Adm desfaz.')) return;
+  r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '') + '##PAGVINC:' + telD + '##';
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+  avisoRapido('🔗 Vinculado — saiu da lista de vendas sem dados');
+  renderVendidosSemForm(true);
+}
+function vsfDesvincular() {   // so Bruno/Adm — na ficha da reuniao
+  if (!ehAdm()) { alert('Só o Bruno e o Adm desfazem o vínculo.'); return; }
+  var r = _v2reg[_fichaAtual];
+  if (!r) return;
+  if (!confirm('Desfazer o vínculo do formulário desta reunião? Ela volta para a lista de "vendas sem dados".')) return;
+  r.obs = String(r.obs || '').replace(/\s*\|?\s*##PAGVINC:\d+##/g, '').trim();
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+  avisoRapido('Vínculo desfeito');
+  try { abrirLead(_fichaAtual); } catch (e) {}
+  try { renderVendidosSemForm(); } catch (e) {}
 }
 // selo: nao vendido com data de tentar fechar
 function seloFup(l) {
@@ -9198,9 +9263,11 @@ function abrirLead(i) {
     var _snBloqR = _snR.indexOf('bloqueio') !== -1 || _snR === 'entrada';
     var _pagR = null; try { _pagR = ldPagamento({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (eP) {}
     var _blqR = null; try { _blqR = bloqueioDe(r.telefone, r.nome); } catch (eQ) {}
-    var _bV = document.getElementById('btn-venda-reuniao'); if (_bV) _bV.style.display = ((_snR === 'vendido' && !_pagR) || (_snBloqR && _blqR)) ? '' : 'none';
+    var _pagVincR = null; try { _pagVincR = pagVinculado(r); } catch (eV2) {}
+    var _bV = document.getElementById('btn-venda-reuniao'); if (_bV) _bV.style.display = ((_snR === 'vendido' && !_pagR && !_pagVincR) || (_snBloqR && _blqR)) ? '' : 'none';
     var _bB = document.getElementById('btn-bloqueio-reuniao'); if (_bB) _bB.style.display = (_snBloqR && !_blqR) ? '' : 'none';
     var _bR = document.getElementById('btn-remarcar-reuniao'); if (_bR) _bR.style.display = (_snR === 'no show' || _snR.indexOf('agendada') !== -1 || _snR.indexOf('remarcada') !== -1) ? '' : 'none';
+    var _bD = document.getElementById('btn-desvincular'); if (_bD) _bD.style.display = (/##PAGVINC:/.test(String(r.obs || '')) && (typeof ehAdm === 'function') && ehAdm()) ? '' : 'none';
   } catch (eBt) {}
   document.getElementById('fl-avatar').textContent = v2ini(r.nome);
   document.getElementById('fl-avatar').style.background = 'linear-gradient(135deg,' + v2grad(r.nome) + ')';
@@ -10458,12 +10525,7 @@ function abrirRemarcarEvento() {   // modo VISUAL: escolher o novo horario na pr
   if (!ev || !ev.id) return;
   if (soOlhar()) return;
   window._agRemarcando = ev;
-  var b = document.getElementById('ag-banner-remarcar');
-  if (!b) { b = document.createElement('div'); b.id = 'ag-banner-remarcar'; document.body.appendChild(b); }
-  b.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9000;background:rgba(43,25,12,.97);border:1px solid rgba(255,154,90,.8);border-radius:999px;padding:10px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:94vw;';
-  b.innerHTML = '<span style="font-size:1.05rem;">🗓</span><b style="font-size:.8rem;color:#ff9a5a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">REMARCAÇÃO — ' + String(ev.title || '').replace(/</g, '&lt;').slice(0, 55) + '</b>'
-    + '<span class="hint" style="white-space:nowrap;">clique no NOVO horário livre na grade</span>'
-    + '<span style="cursor:pointer;font-weight:800;color:#ff6b6b;font-size:.78rem;" onclick="cancelarRemarcacao()">✕ cancelar</span>';
+  _faixaRemarcacao(ev.title || '');
   return;
   var cx = document.getElementById('modal-remarcar');
   if (!cx) {
@@ -10489,6 +10551,14 @@ function abrirRemarcarEvento() {   // modo VISUAL: escolher o novo horario na pr
     + '</div></div>';
 }
 function fecharRemarcar() { var cx = document.getElementById('modal-remarcar'); if (cx) cx.style.display = 'none'; }
+function _faixaRemarcacao(titulo) {
+  var b = document.getElementById('ag-banner-remarcar');
+  if (!b) { b = document.createElement('div'); b.id = 'ag-banner-remarcar'; document.body.appendChild(b); }
+  b.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9000;background:rgba(43,25,12,.97);border:1px solid rgba(255,154,90,.8);border-radius:999px;padding:10px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:94vw;';
+  b.innerHTML = '<span style="font-size:1.05rem;">🗓</span><b style="font-size:.8rem;color:#ff9a5a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">REMARCAÇÃO — ' + String(titulo).replace(/</g, '&lt;').slice(0, 55) + '</b>'
+    + '<span class="hint" style="white-space:nowrap;">clique no NOVO horário livre na grade</span>'
+    + '<span style="cursor:pointer;font-weight:800;color:#ff6b6b;font-size:.78rem;" onclick="cancelarRemarcacao()">✕ cancelar</span>';
+}
 function cancelarRemarcacao() {
   window._agRemarcando = null;
   var b = document.getElementById('ag-banner-remarcar');
@@ -10499,6 +10569,34 @@ function remarcarNoSlot(dataStr, hora) {
   var ev = window._agRemarcando;
   if (!ev) return;
   var dp = dataStr.split('-');
+  if (ev.soPlanilha) {   // veio da ficha: nao temos o evento antigo — mesma linha, evento novo
+    var r = ev.r;
+    if (!confirm('REMARCAR a reunião de "' + (r.nome || '') + '" para ' + dp[2] + '/' + dp[1] + ' às ' + hora + '?\n\nÉ uma REMARCAÇÃO: a MESMA linha da planilha só muda de data (não cria outro nome) e o evento novo entra na agenda com os dados do lead.')) return;
+    var dataBr = dp[2] + '/' + dp[1] + '/' + dp[0];
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'data', valor: dataBr, dataRef: v2dataRef(r), gid: V2_GID });
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Reunião agendada', dataRef: v2dataRef(r), gid: V2_GID });
+    r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '') + 'Remarcada para ' + dp[2] + '/' + dp[1] + ' ' + hora + (r.date ? ' (era ' + r.date.toLocaleDateString('pt-BR').slice(0, 5) + ')' : '');
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+    // evento novo ja com os dados do lead (Instagram, Clint, e-mail — o que a base souber)
+    var lR = (LD.rows || []).filter(function(x){ return x.tel8 === ldTel8(r.telefone); })[0];
+    var agendaKey = /tony/i.test(r.closer || '') ? 'tony' : /bruno/i.test(r.closer || '') ? 'bruno' : (AG.closer !== 'ambos' ? AG.closer : 'bruno');
+    sendToGAS({ action: 'addCalendarOnly', calendar: {
+      agenda: agendaKey, data: dataBr, hora: hora, duracao: /legado/i.test(r.produto || '') ? 50 : 100,
+      nome: r.nome, sdr: r.sdr || '', telefone: r.telefone || '',
+      instagram: lR && lR.insta ? '@' + String(lR.insta).replace(/^@/, '') : '',
+      clint: clintLink({ tel: r.telefone, nome: r.nome }) || '',
+      emailLead: lR ? lR.email : '',
+      obs: 'Remarcação — reunião anterior' + (r.date ? ' em ' + r.date.toLocaleDateString('pt-BR') : '')
+    } });
+    var hp = hora.split(':');
+    r.date = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), parseInt(hp[0] || 0, 10), parseInt(hp[1] || 0, 10));
+    r.status = 'Reunião agendada'; r.sn = 'reuniao agendada';
+    cancelarRemarcacao();
+    AG.cache = {};
+    setTimeout(function(){ try { carregarAgenda(); } catch (e) {} try { renderV2(); } catch (e) {} }, 2500);
+    try { avisoRapido('🗓 REMARCADA para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — mesma pessoa, mesma linha, evento novo na agenda de ' + (agendaKey === 'tony' ? 'Tony' : 'Bruno')); } catch (e) {}
+    return;
+  }
   if (!confirm('REMARCAR a reunião\n"' + (ev.title || '') + '"\npara ' + dp[2] + '/' + dp[1] + ' às ' + hora + '?\n\nÉ uma REMARCAÇÃO: mesma pessoa, mesma linha na planilha — não cria reunião nova. Closer e SDR recebem o aviso.')) return;
   sendToGAS({ action: 'rescheduleEvent', calendar: ev._cal || AG.closer, eventId: ev.id, newDate: dataStr, newTime: hora, duration: ev.duration || 0 }).then(function(res) {
     if (!res || !res.success) { alert('Não consegui remarcar: ' + ((res && res.error) || 'sem resposta do robô')); return; }
@@ -10757,17 +10855,21 @@ function marcarReuniaoDoLead(i) {
     }
   })();
 }
-// leva para a agenda, na semana da reuniao, para usar o "Remarcar" do evento
+// Remarcar pela FICHA: entra direto no modo REMARCAÇÃO (mesma linha, sem criar outro nome).
+// A pessoa escolhe o novo horário na grade; a linha só muda de data e o evento novo
+// entra na agenda já com os dados do lead.
 function irRemarcarNaAgenda(i) {
   var r = _v2reg[i];
   if (!r) return;
+  if (soOlhar()) return;
   try { document.getElementById('modal-lead').classList.remove('open'); } catch (e) {}
   try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {}
-  if (r.date) { try { AG.weekStart = agSegunda(r.date); } catch (e) {} }
+  try { AG.weekStart = agSegunda(new Date()); } catch (e) {}   // o horario novo e para frente
   var item = document.querySelector('.nav-item[data-s="agenda"]');
   if (item) item.click();
   try { carregarAgenda(); } catch (e) {}
-  try { avisoRapido('🗓 Clique na reunião de ' + (r.nome || 'lead') + ' na grade e escolha "Remarcar — nova data e hora"'); } catch (e) {}
+  window._agRemarcando = { soPlanilha: true, r: r, title: (r.nome || 'lead') + (r.date ? ' (era ' + r.date.toLocaleDateString('pt-BR').slice(0, 5) + ')' : '') };
+  _faixaRemarcacao(window._agRemarcando.title);
 }
 // o numero ja tem reuniao marcada (agendada/remarcada, de hoje em diante)?
 function _reuniaoAgendadaDe(t8) {
