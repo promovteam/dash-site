@@ -2171,7 +2171,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2128';
+var VERSAO_DASH = '2026-08-23-2134';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4378,6 +4378,8 @@ function carregarClintPainel() {
       renderSemOrigem();
       renderAvisoCloser();
       renderStatusPendente();
+      try { renderFollowups(); } catch (eFup) {}
+      try { renderVendidosSemForm(); } catch (eVsf) {}
     } else {
       CP_STATUS.falhas++;
       CP_STATUS.estado = 'erro';
@@ -4950,6 +4952,178 @@ document.addEventListener('keydown', function(e) {
   if (ml && ml.classList.contains('open')) fecharLead();
 });
 // na Visão Geral vira só uma linha discreta; o conteúdo abre em janela (pop-up)
+// ===== 🔄 CICLO DO NAO VENDIDO (Bruno 23/08/2026) =====
+// Ao marcar "Nao vendido": pergunta POR QUE nao fechou + a DATA para tentar fechar.
+// No dia marcado, um pop-up cobra: o que aconteceu? ainda tem possibilidade?
+// Sim -> nova data (ciclo continua) · Nao -> encerra. Tudo fica na Observacao
+// da reuniao com a etiqueta ##FUP:aaaa-mm-dd## (ou ##FUP:nao## quando encerra).
+function fupDe(r) {
+  var ms = String(r.obs || '').match(/##FUP:([0-9-]+|nao)##/g);
+  if (!ms || !ms.length) return null;
+  var ult = ms[ms.length - 1].replace(/##FUP:|##/g, '');
+  if (ult === 'nao') return null;
+  var p = ult.split('-');
+  if (p.length !== 3) return null;
+  return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+}
+function _fupGravarObs(r, extra) {
+  r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '') + extra;
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+}
+function pedirMotivoNaoVendido(i) {
+  var r = _v2reg[i];
+  if (!r) return;
+  var cx = document.getElementById('modal-fup');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-fup';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(6,6,16,.9);display:flex;align-items:center;justify-content:center;padding:20px;';
+    document.body.appendChild(cx);
+  }
+  cx.style.display = 'flex';
+  cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,107,107,.5);border-radius:20px;max-width:440px;width:100%;padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔄</span><b style="flex:1;font-size:.95rem;">Não vendido: ' + String(r.nome || '').replace(/</g, '&lt;') + '</b></div>'
+    + '<div class="hint" style="margin-bottom:12px;">Antes de seguir: por que não fechou, e quando vamos tentar de novo? No dia marcado o dash te lembra.</div>'
+    + '<label class="hint" style="display:block;margin-bottom:4px;">Por que não fechou? <b style="color:#ff6b6b;">*</b></label>'
+    + '<textarea id="fup-motivo" style="width:100%;min-height:70px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);padding:10px;margin-bottom:12px;" placeholder="Ex.: vai falar com o marido, achou caro, esperando receber..."></textarea>'
+    + '<label class="hint" style="display:block;margin-bottom:4px;">Data para tentar fechar <b style="color:#ff6b6b;">*</b></label>'
+    + '<input type="date" id="fup-data" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);padding:10px;margin-bottom:14px;">'
+    + '<div style="display:flex;gap:9px;justify-content:flex-end;">'
+    + '<button class="btn-assumir" style="padding:9px 16px;background:rgba(255,255,255,.08);" onclick="document.getElementById(\'modal-fup\').style.display=\'none\'">agora não</button>'
+    + '<button class="btn-assumir" style="padding:9px 16px;background:rgba(255,107,107,.18);color:#ff6b6b;border:1px solid rgba(255,107,107,.5);font-weight:800;" onclick="salvarMotivoNaoVendido(' + i + ')">💾 Salvar</button>'
+    + '</div></div>';
+}
+function salvarMotivoNaoVendido(i) {
+  var r = _v2reg[i];
+  var motivo = (document.getElementById('fup-motivo') || {}).value || '';
+  var data = (document.getElementById('fup-data') || {}).value || '';
+  if (!motivo.trim()) { alert('Conta em uma frase por que não fechou.'); return; }
+  if (!data) { alert('Escolha a data para tentar fechar.'); return; }
+  _fupGravarObs(r, 'Não fechou: ' + motivo.trim() + ' ##FUP:' + data + '##');
+  sendToGAS({ action: 'addFollowup', nome: r.nome, telefone: r.telefone, closer: r.closer, etapa: 'não fechou', texto: motivo.trim(), chance: 'sim', proxima: data.split('-').reverse().join('/') });
+  document.getElementById('modal-fup').style.display = 'none';
+  var dp = data.split('-');
+  avisoRapido('🔄 Anotado — o dash vai te lembrar dia ' + dp[2] + '/' + dp[1]);
+  try { renderV2(); } catch (e) {}
+}
+// pop-up do DIA: nao vendidos cuja data de tentar fechar chegou
+var _fupMostrou = false;
+function renderFollowups() {
+  if (_fupMostrou) return;
+  _fupMostrou = true;
+  var quem = _euSouCloser(), adm = (typeof ehAdm === 'function') && ehAdm();
+  if (!quem && !adm) return;
+  var hoje = new Date(); hoje.setHours(23, 59, 59, 0);
+  var lista = (V2.rows || []).filter(function(r) {
+    if ((r.sn || v2norm(r.status || '')) !== 'nao vendido') return false;
+    var f = fupDe(r);
+    if (!f || f > hoje) return false;
+    if (adm) return true;
+    return v2norm(r.closer || '').indexOf(quem) !== -1;
+  });
+  if (!lista.length) return;
+  var cx = document.getElementById('modal-fup-dia');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-fup-dia';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(6,6,16,.9);display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;overflow-y:auto;';
+    document.body.appendChild(cx);
+  }
+  cx.style.display = 'flex';
+  var h = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,209,102,.5);border-radius:20px;max-width:560px;width:100%;padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.4rem;">🔄</span><b style="flex:1;font-size:1rem;color:#ffd166;">Hoje é o dia de tentar fechar</b>'
+    + '<span style="cursor:pointer;font-size:1.2rem;opacity:.7;" onclick="document.getElementById(\'modal-fup-dia\').style.display=\'none\'">✕</span></div>'
+    + '<div class="hint" style="margin-bottom:12px;">' + lista.length + ' não vendido' + (lista.length === 1 ? '' : 's') + ' com a data de retorno chegando. Conta o que aconteceu:</div>';
+  lista.slice(0, 10).forEach(function(r) {
+    var i = v2reg(r);
+    var mot = (String(r.obs || '').match(/Não fechou: ([^|#]+)/) || [])[1] || '';
+    h += '<div id="fup-dia-' + i + '" style="border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:12px;margin-bottom:10px;">'
+      + '<b style="font-size:.85rem;">' + (r.nome || '') + '</b> <span class="hint">' + (r.produto || '') + (mot ? ' · motivo: ' + mot.trim() : '') + '</span>'
+      + '<textarea id="fup-oq-' + i + '" style="width:100%;min-height:52px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);padding:8px;margin:8px 0;" placeholder="O que aconteceu hoje? (falei com ele, adiou, sumiu...)"></textarea>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<span class="hint">Ainda tem possibilidade?</span>'
+      + '<input type="date" id="fup-nova-' + i + '" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:7px;">'
+      + '<button class="btn-assumir" style="padding:7px 12px;background:rgba(61,220,151,.16);color:#3ddc97;border:1px solid rgba(61,220,151,.5);" onclick="fupResponder(' + i + ', true)">✓ Sim, nova data</button>'
+      + '<button class="btn-assumir" style="padding:7px 12px;background:rgba(255,107,107,.14);color:#ff6b6b;border:1px solid rgba(255,107,107,.4);" onclick="fupResponder(' + i + ', false)">✕ Não, encerrar</button>'
+      + '</div></div>';
+  });
+  h += '</div>';
+  cx.innerHTML = h;
+}
+function fupResponder(i, temChance) {
+  var r = _v2reg[i];
+  if (!r) return;
+  var oq = (document.getElementById('fup-oq-' + i) || {}).value || '';
+  if (!oq.trim()) { alert('Conta em uma frase o que aconteceu.'); return; }
+  var hoje = new Date();
+  var carimbo = ('0' + hoje.getDate()).slice(-2) + '/' + ('0' + (hoje.getMonth() + 1)).slice(-2);
+  if (temChance) {
+    var nova = (document.getElementById('fup-nova-' + i) || {}).value || '';
+    if (!nova) { alert('Escolha a nova data para tentar fechar.'); return; }
+    _fupGravarObs(r, carimbo + ': ' + oq.trim() + ' ##FUP:' + nova + '##');
+    sendToGAS({ action: 'addFollowup', nome: r.nome, telefone: r.telefone, closer: r.closer, etapa: 'retorno do dia', texto: oq.trim(), chance: 'sim', proxima: nova.split('-').reverse().join('/') });
+    var dp = nova.split('-');
+    avisoRapido('🔄 Anotado — lembro de novo dia ' + dp[2] + '/' + dp[1]);
+  } else {
+    _fupGravarObs(r, carimbo + ': ' + oq.trim() + ' · sem possibilidade ##FUP:nao##');
+    sendToGAS({ action: 'addFollowup', nome: r.nome, telefone: r.telefone, closer: r.closer, etapa: 'retorno do dia', texto: oq.trim(), chance: 'não', proxima: '' });
+    avisoRapido('Encerrado — fica registrado na observação');
+  }
+  var bloco = document.getElementById('fup-dia-' + i);
+  if (bloco) { bloco.style.opacity = '.45'; bloco.innerHTML = '<span style="color:#3ddc97;font-weight:700;font-size:.8rem;">✓ ' + (r.nome || '') + ' — registrado</span>'; }
+}
+// ===== 💰 POP-UP: VENDIDOS SEM OS DADOS DA VENDA (Bruno 23/08/2026) =====
+// Ao abrir o dash: vendas dos ultimos 30 dias que estao "Vendido" mas sem o
+// formulario preenchido. Cada closer ve as dele; Bruno/Adm veem todas.
+var _vsfMostrou = false;
+function renderVendidosSemForm() {
+  if (_vsfMostrou) return;
+  if (!PAG.rows || !PAG.rows.length) return;   // ainda carregando os pagamentos: tenta na proxima
+  var quem = _euSouCloser(), adm = (typeof ehAdm === 'function') && ehAdm();
+  if (!quem && !adm) return;
+  var corte = Date.now() - 30 * 86400000;
+  var lista = (V2.rows || []).filter(function(r) {
+    if ((r.sn || v2norm(r.status || '')) !== 'vendido') return false;
+    if (!r.date || r.date.getTime() < corte) return false;
+    if (!adm && v2norm(r.closer || '').indexOf(quem) === -1) return false;
+    var pago = null; try { pago = ldPagamento({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (e) {}
+    return !pago;
+  });
+  if (!lista.length) { _vsfMostrou = true; return; }
+  _vsfMostrou = true;
+  var cx = document.getElementById('modal-vsf');
+  if (!cx) {
+    cx = document.createElement('div');
+    cx.id = 'modal-vsf';
+    cx.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(6,6,16,.9);display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;overflow-y:auto;';
+    cx.onclick = function(e){ if (e.target === cx) cx.style.display = 'none'; };
+    document.body.appendChild(cx);
+  }
+  cx.style.display = 'flex';
+  var h = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,107,107,.5);border-radius:20px;max-width:540px;width:100%;padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.4rem;">💰</span><b style="flex:1;font-size:1rem;color:#ff6b6b;">Vendido sem os dados da venda</b>'
+    + '<span style="cursor:pointer;font-size:1.2rem;opacity:.7;" onclick="document.getElementById(\'modal-vsf\').style.display=\'none\'">✕</span></div>'
+    + '<div class="hint" style="margin-bottom:12px;">' + lista.length + ' venda' + (lista.length === 1 ? '' : 's') + ' dos últimos 30 dias sem o formulário — o contrato não sai sem ele:</div>';
+  lista.slice(0, 12).forEach(function(r) {
+    var i = v2reg(r);
+    h += '<div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.05);margin-bottom:7px;flex-wrap:wrap;">'
+      + '<b style="font-size:.82rem;flex:1;min-width:120px;">' + (r.nome || '') + '</b>'
+      + '<span class="hint">' + (r.date ? r.date.toLocaleDateString('pt-BR') : '') + (r.closer ? ' · ' + r.closer : '') + (r.valor > 0 ? ' · ' + v2moeda(r.valor) : '') + '</span>'
+      + '<button class="btn-assumir" style="padding:6px 12px;background:rgba(61,220,151,.16);color:#3ddc97;border:1px solid rgba(61,220,151,.5);font-weight:800;" onclick="_fichaAtual=' + i + ';document.getElementById(\'modal-vsf\').style.display=\'none\';abrirFormVendaReuniao();">💰 Registrar agora</button>'
+      + '</div>';
+  });
+  h += '<div class="hint" style="margin-top:6px;">Fechar esta janela = registrar depois (ela volta na próxima vez que o dash abrir · o robô também cobra às 8h30)</div></div>';
+  cx.innerHTML = h;
+}
+// selo: nao vendido com data de tentar fechar
+function seloFup(l) {
+  var rs = ldReunioes(l);
+  var r = rs.length ? rs[rs.length - 1] : null;
+  if (!r || (r.sn || '') !== 'nao vendido') return '';
+  var f = fupDe(r);
+  if (!f) return '';
+  return ' <span class="ld-tag" style="background:rgba(255,209,102,.15);color:#ffd166;" title="Combinado tentar fechar de novo nessa data">🔄 tentar fechar ' + ('0' + f.getDate()).slice(-2) + '/' + ('0' + (f.getMonth() + 1)).slice(-2) + '</span>';
+}
 function renderStatusPendente() {
   var el = document.getElementById('v2-statuspendente');
   if (!el) return;
@@ -5074,6 +5248,7 @@ function salvarResultadosStp(btn) {
     var vlr = v2norm(STP_ESCOLHAS[i] || '');
     if (vlr === 'vendido') { _fichaAtual = i; _abriuForm = true; setTimeout(function(){ try { fecharStatusPendente(); } catch (eF) {} abrirFormVendaReuniao(); }, 350); }
     else if (vlr.indexOf('bloqueio') !== -1 || vlr === 'entrada') { _fichaAtual = i; _abriuForm = true; setTimeout(function(){ try { fecharStatusPendente(); } catch (eF) {} abrirFormBloqueioReuniao(); }, 350); }
+    else if (vlr === 'nao vendido') { _abriuForm = true; setTimeout(function(){ try { fecharStatusPendente(); } catch (eF) {} pedirMotivoNaoVendido(i); }, 350); }
   });
   STP_ESCOLHAS = {};
   if (btn) btn.textContent = '✓ ' + feitos + ' salvo' + (feitos === 1 ? '' : 's') + ' na planilha';
@@ -7620,6 +7795,7 @@ function ldRow(l, quente) {
     if (st.vd) tags = '<span class="ld-tag vd">💰 VENDIDO</span>' + seloVendaSemForm(l);
     else if (st.re) tags = '<span class="ld-tag re">✅ Reunião feita</span>';
     else tags = '<span class="ld-tag ag">📅 Agendado</span>';
+    tags += seloFup(l);
   }
   var det = [
     ldDataTxt(l),
@@ -10393,6 +10569,7 @@ function mudarStatusEvento(st) {
         // marcou Vendido/Bloqueio pela agenda: já abre a tela para preencher (fechar = depois)
         if (st === 'vendido') { _fichaAtual = v2reg(r); abrirFormVendaReuniao(); }
         else if (st === 'bloqueio' || st === 'entrada') { _fichaAtual = v2reg(r); abrirFormBloqueioReuniao(); }
+        else if (st === 'naovendido') { pedirMotivoNaoVendido(v2reg(r)); }
       }
     }
   });
