@@ -2171,7 +2171,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2121';
+var VERSAO_DASH = '2026-08-23-2128';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3257,7 +3257,16 @@ function seloBloqueio(tel, nome) {
   if (!b) return '';
   var ent = /entrada/i.test(b.tipo);
   return '<span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;" title="' + (b.programa || '') + (b.total ? ' · total ' + b.total : '') + (b.fim ? ' · finaliza até ' + _dataBr(b.fim) : '') + '">'
-    + (ent ? '🔑 entrada' : '🔒 bloqueio') + (b.valor ? ' ' + b.valor : '') + (b.quando ? ' em ' + String(b.quando).slice(0, 5) : '') + '</span>';
+    + (ent ? '🔑 entrada' : '🔒 bloqueio') + (b.valor ? ' ' + b.valor : '') + (b.quando ? ' em ' + String(b.quando).slice(0, 5) : '')
+    + (b.fim ? ' · ⏳ retorno ' + _dataBr(b.fim).slice(0, 5) : '') + '</span>';
+}
+// Vendido que ainda NAO preencheu o formulario de venda: selo de cobranca (Bruno 23/08/2026)
+function seloVendaSemForm(l) {
+  var st = ldSituacao(l);
+  if (!st || !st.vd) return '';
+  var pago = null; try { pago = ldPagamento(l); } catch (e) {}
+  if (pago) return '';
+  return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="Está Vendido mas o formulário de venda não foi preenchido — abra e use 💰 Registrar venda">💰 sem formulário</span>';
 }
 function renderBloqueios() {
   var el = document.getElementById('pag-bloqueios');
@@ -7608,7 +7617,7 @@ function ldRow(l, quente) {
   var st = ldSituacao(l);
   var tags = '';
   if (st) {
-    if (st.vd) tags = '<span class="ld-tag vd">💰 VENDIDO</span>';
+    if (st.vd) tags = '<span class="ld-tag vd">💰 VENDIDO</span>' + seloVendaSemForm(l);
     else if (st.re) tags = '<span class="ld-tag re">✅ Reunião feita</span>';
     else tags = '<span class="ld-tag ag">📅 Agendado</span>';
   }
@@ -7890,7 +7899,7 @@ function abrirFichaLead(i) {
   var h = hAt + '<div class="fs-pag" style="margin-top:0;">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">'
     + '<span class="ld-selo" style="background:' + FX[1] + '22;color:' + FX[1] + ';border:1px solid ' + FX[1] + '66;">' + FX[0] + '</span>'
-    + '<span class="ld-selo morno">' + sit + '</span>' + seloBloqueio(l.tel, l.nome)
+    + '<span class="ld-selo morno">' + sit + '</span>' + seloBloqueio(l.tel, l.nome) + seloVendaSemForm(l)
     + '<span class="et-chip" style="background:' + ei.cor + '22;color:' + ei.cor + ';border-color:' + ei.cor + '66;">' + ei.ico + ' ' + ei.nome + '</span></div>';
   campos.forEach(function(c) {
     // c[3] === 'html' = o campo já vem pronto (usado no link do anúncio)
