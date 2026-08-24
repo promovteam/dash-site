@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2227';
+var VERSAO_DASH = '2026-08-23-2235';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9355,6 +9355,34 @@ function usarTelefoneClint() {
   avisoRapido('📱 Telefone gravado — agora o dash acha ela na Clint pelo número');
   try { mostrarFormularioDoLead(r); } catch (e) {}
 }
+// 💳 resumo do PAGAMENTO (formulário de venda) com botão para ver/editar tudo
+function abrirFichaPagDireto(iRows) {
+  // a ficha de pagamento usa a lista ordenada da aba Pagamentos — se ela ainda nao foi montada, monta na hora
+  var p = (PAG.rows || [])[iRows];
+  if (!p) return;
+  if (!window._pagOrdenado || !window._pagOrdenado.length) window._pagOrdenado = (PAG.rows || []).slice();
+  var i = window._pagOrdenado.indexOf(p);
+  if (i < 0) { window._pagOrdenado.push(p); i = window._pagOrdenado.length - 1; }
+  abrirFichaPag(i);
+}
+function _blocoPagamento(p) {
+  if (!p) return '';
+  var i = (PAG.rows || []).indexOf(p);
+  var linha = function(ico, rot, val) {
+    return val ? '<div class="dtl-line"><span>' + ico + ' ' + rot + '</span><b style="text-align:right;max-width:62%;">' + val + '</b></div>' : '';
+  };
+  return '<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);">'
+    + '<div class="g-label" style="font-size:.66rem;">💳 Pagamento (formulário de venda)</div>'
+    + linha('🎯', 'Programa', p.programa)
+    + linha('💰', 'Valor', p.valor > 0 ? v2moeda(p.valor) : '')
+    + linha('💳', 'Forma', p.forma)
+    + linha('🔑', 'Entrada', p.entrada)
+    + linha('🏆', 'Vendedor', p.vendedor)
+    + linha('📅', 'Registrado em', p.date ? p.date.toLocaleDateString('pt-BR') : '')
+    + linha('📄', 'Contrato', p.contrato || p.stC)
+    + (i >= 0 ? '<div style="margin-top:8px;text-align:right;"><button class="btn-assumir" style="padding:6px 12px;font-size:.7rem;" onclick="try{document.getElementById(\'modal-lead\').classList.remove(\'open\')}catch(e){};abrirFichaPagDireto(' + i + ')">✏️ Ver / alterar tudo</button></div>' : '')
+    + '</div>';
+}
 function mostrarFormularioDoLead(r) {
   var cx = document.getElementById('fl-formulario');
   if (!cx) return;
@@ -9382,7 +9410,8 @@ function mostrarFormularioDoLead(r) {
                  + linhaS('📷', 'Instagram', pagDele.insta)
                  + linhaS('📱', 'WhatsApp', pagDele.celular)
                  + linhaS('👥', 'Seguidores', (pagDele.extras || {})['21. Número de seguidores'] || '')
-                 + linhaS('🎯', 'Nicho', (pagDele.extras || {})['22. Nicho de atuação'] || '') : '')
+                 + linhaS('🎯', 'Nicho', (pagDele.extras || {})['22. Nicho de atuação'] || '')
+                 + _blocoPagamento(pagDele) : '')
       + (cc && cc.achou ? linhaS('🟣', 'Etapa na Clint', cc.etapaClint)
                         + linhaS('🧲', 'Entrou na Clint por', cc.origemClint)
                         + linhaS('✋', 'Responsável', cc.dono) : '')
@@ -9422,6 +9451,7 @@ function mostrarFormularioDoLead(r) {
     + linha('✉️', 'E-mail', l.email)
     + linha('🧲', 'Origem', l.origem || l.fonte)
     + linha('📊', 'Campanha', l.campanha)
+    + _blocoPagamento(pagDele)
     + '<div class="dtl-line"><span>📣 Anúncio que trouxe</span>'
     +   '<span style="text-align:right;">' + (seloAnuncio(l) || '<span class="hint">—</span>') + '</span></div>'
     + (a.cri && a.cri.foto
