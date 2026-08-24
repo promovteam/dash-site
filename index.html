@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2258';
+var VERSAO_DASH = '2026-08-23-2343';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2918,11 +2918,31 @@ function escolherAnuncio(t8) {
     +       '<div class="hint" style="margin-top:2px;">' + (l.nome || 'lead') + (l.origem ? ' · ' + l.origem : '')
     +         (/\[org\]|organic|\bbio\b|mchat|manychat/i.test(String(l.origem || '')) ? ' · <b style="color:#3ddc97;">orgânico: cole o link do post do Instagram</b>' : '') + '</div></div>'
     +     '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharEscolheAnuncio()">✕</span></div>'
+    +   '<div id="ea-print-zone" style="border:1px dashed rgba(61,220,151,.45);border-radius:12px;padding:8px 12px;margin-bottom:9px;font-size:.72rem;color:#3ddc97;cursor:pointer;" title="Aperte Ctrl+V (ou Cmd+V) com um print do post copiado">📷 Post orgânico? Cole um PRINT aqui (Ctrl+V) — ele vira a foto do post para todo mundo</div>'
     +   '<input id="ea-q" autocomplete="off" placeholder="procurar o anúncio pelo nome" oninput="listarAnunciosEscolha(this.value)"'
     +     ' style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(185,138,255,.4);border-radius:12px;color:var(--text);padding:10px 13px;font-size:.86rem;">'
     + '</div>'
     + '<div id="ea-lista" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;"></div></div>';
   cx.style.display = 'flex';
+  window._eaPrint = null;
+  cx.onpaste = function(ev) {
+    var its = (ev.clipboardData || {}).items || [];
+    for (var k = 0; k < its.length; k++) {
+      if (its[k].type && its[k].type.indexOf('image/') === 0) {
+        var f = its[k].getAsFile();
+        var rd = new FileReader();
+        rd.onload = function(e2) {
+          var b64 = String(e2.target.result).split(',')[1];
+          window._eaPrint = { base64: b64, mime: f.type || 'image/png' };
+          var z = document.getElementById('ea-print-zone');
+          if (z) z.innerHTML = '✓ Print colado! <img src="' + e2.target.result + '" style="height:44px;border-radius:8px;vertical-align:middle;margin-left:8px;border:1px solid rgba(255,255,255,.2);"> — agora cole o link do post na lista e confirme';
+        };
+        rd.readAsDataURL(f);
+        ev.preventDefault();
+        return;
+      }
+    }
+  };
   listarAnunciosEscolha('');
   setTimeout(function(){ var q = document.getElementById('ea-q'); if (q) q.focus(); }, 60);
 }
@@ -2962,6 +2982,28 @@ function _lerPost(bruto) {
   var i = resto.lastIndexOf('|');
   return { bruto: bruto, apelido: i > 0 ? resto.slice(0, i) : resto, link: i > 0 ? resto.slice(i + 1) : '' };
 }
+// prints dos posts organicos (aba "Posts Orgânicos" via robo): link -> foto do Drive
+var POSTS_ORG = { porLink: {}, carregado: false };
+function carregarPostsOrganicos() {
+  var nome = 'poCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  window[nome] = function(d) {
+    try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    if (d && d.success) {
+      POSTS_ORG.porLink = {};
+      (d.lista || []).forEach(function(p){ if (p.link && p.fotoId) POSTS_ORG.porLink[p.link] = p; });
+      POSTS_ORG.carregado = true;
+    }
+  };
+  sc.onerror = function(){ try { delete window[nome]; } catch (e) {} };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'listarPostsOrganicos' }));
+  document.body.appendChild(sc);
+}
+try { carregarPostsOrganicos(); } catch (e) {}
+function fotoDoPost(link) {
+  var p = POSTS_ORG.porLink[String(link || '').trim()];
+  return p && p.fotoId ? 'https://drive.google.com/thumbnail?id=' + p.fotoId + '&sz=w400' : '';
+}
 function guardarPostOrganico(apelido, link) {
   var meus = [];
   try { meus = JSON.parse(localStorage.getItem('v2PostsOrganicos') || '[]'); } catch (e) {}
@@ -2984,6 +3026,12 @@ function acrescentarPostOrganico() {
   }
   apelido = apelido.replace(/\|/g, '-');
   guardarPostOrganico(apelido, link);
+  if (window._eaPrint) {   // o print vai para o Drive e vira a foto do post (para todo mundo)
+    sendToGAS({ action: 'salvarPrintPost', apelido: apelido, link: link, base64: window._eaPrint.base64, mime: window._eaPrint.mime });
+    window._eaPrint = null;
+    setTimeout(carregarPostsOrganicos, 6000);
+    avisoRapido('📷 Print guardado — o post agora aparece com foto, como os pagos');
+  }
   salvarAnuncioEscolhido('POST:' + apelido + '|' + link);
 }
 function listarAnunciosEscolha(txt) {
@@ -6722,6 +6770,19 @@ function ldFundirSupabase() {
       pendente: !r.completa, aoVivo: true
     };
   });
+  // a versao "ao vivo" (site) nao traz o que so a PLANILHA sabe: post/anuncio marcado,
+  // dono, situacao, origem manual... completa com a versao da planilha do MESMO telefone
+  var daPlanilha = {};
+  LD.rows.forEach(function(lp){ if (lp.tel8) daPlanilha[lp.tel8] = lp; });
+  novos.forEach(function(nv) {
+    var p = daPlanilha[nv.tel8];
+    if (!p) return;
+    ['anuncio', 'origemMan', 'dono', 'situacao', 'quando', 'motivo', 'email', 'insta', 'conjunto', 'campanha'].forEach(function(k) {
+      if (!String(nv[k] || '').trim() && p[k]) nv[k] = p[k];
+    });
+    if (!String(nv.origem || '').trim() && p.origem) nv.origem = p.origem;
+    if (nv.origemMan) nv.origem = nv.origemMan;
+  });
   // Da planilha fica TUDO que a base do site não tem (casamos pelo telefone).
   // Antes, quem chegou depois do corte era descartado mesmo sem estar na base do
   // site — e a planilha recebe leads de outras portas (ManyChat, formulário antigo),
@@ -8013,6 +8074,17 @@ function abrirFichaLead(i) {
       })(), 'html'],
     ['📣', 'Anúncio que trouxe', (function(){
         var aa = anuncioDe(l);
+        if (aa.tem && aa.organico) {   // post organico aparece COMO os pagos (foto do print)
+          var fo = fotoDoPost(aa.post.link);
+          return '<div style="display:flex;align-items:center;gap:9px;justify-content:flex-end;flex-wrap:wrap;">'
+            + (fo ? '<a href="' + (aa.post.link || '#') + '" target="_blank"><img src="' + fo + '" style="width:74px;height:74px;object-fit:cover;border-radius:9px;border:1px solid rgba(61,220,151,.4);"></a>' : '')
+            + '<div style="text-align:right;"><b>📱 ' + aa.txt + '</b>'
+            + '<div class="hint" style="margin-top:2px;">post orgânico</div>'
+            + '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap;">'
+            + (aa.post.link ? '<a class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;text-decoration:none;" href="' + aa.post.link + '" target="_blank">abrir o post ↗</a>' : '')
+            + '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">' + (fo ? 'trocar' : '📷 colar o print') + '</span>'
+            + '</div></div></div>';
+        }
         if (!aa.tem) {
           var _br = String(l.origem || '') + ' ' + String(l.fonte || '') + ' ' + String(l.utm || '');
           var org = !(/\[ads\]|\bads\b|paid/i.test(_br) || l.meio === 'paid')
@@ -8257,7 +8329,7 @@ function abrirFichaLead(i) {
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(110,168,255,.16);border-color:rgba(110,168,255,.5);color:#6ea8ff;font-weight:800;cursor:pointer;" onclick="marcarReuniaoDoLead(' + i + ')" title="Abre a agenda para escolher o closer e um horário livre — o formulário já vem com este lead">📅 Marcar reunião</button>');
   if (_rUlt && (_snU === 'no show' || _snU.indexOf('agendada') !== -1 || _snU.indexOf('remarcada') !== -1))
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;font-weight:800;cursor:pointer;" onclick="irRemarcarNaAgenda(' + v2reg(_rUlt) + ')" title="Vai para a agenda, na semana da reunião, para remarcar">🗓 Remarcar</button>');
-  if ((_snU === 'vendido' && !_pag) || (_snBloqU && _blqF))
+  if ((_snU === 'vendido' && !_pag) || (_snBloqU && !_pag))
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda</button>');
   if (_snBloqU && !_blqF)
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>');
@@ -9292,7 +9364,7 @@ function abrirLead(i) {
     var _pagR = null; try { _pagR = ldPagamento({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (eP) {}
     var _blqR = null; try { _blqR = bloqueioDe(r.telefone, r.nome); } catch (eQ) {}
     var _pagVincR = null; try { _pagVincR = pagVinculado(r); } catch (eV2) {}
-    var _bV = document.getElementById('btn-venda-reuniao'); if (_bV) _bV.style.display = ((_snR === 'vendido' && !_pagR && !_pagVincR) || (_snBloqR && _blqR)) ? '' : 'none';
+    var _bV = document.getElementById('btn-venda-reuniao'); if (_bV) _bV.style.display = ((_snR === 'vendido' && !_pagR && !_pagVincR) || (_snBloqR && !_pagR && !_pagVincR)) ? '' : 'none';
     var _bB = document.getElementById('btn-bloqueio-reuniao'); if (_bB) _bB.style.display = (_snBloqR && !_blqR) ? '' : 'none';
     var _bR = document.getElementById('btn-remarcar-reuniao'); if (_bR) _bR.style.display = (_snR === 'no show' || _snR.indexOf('agendada') !== -1 || _snR.indexOf('remarcada') !== -1) ? '' : 'none';
     var _bD = document.getElementById('btn-desvincular'); if (_bD) _bD.style.display = (/##PAGVINC:/.test(String(r.obs || '')) && (typeof ehAdm === 'function') && ehAdm()) ? '' : 'none';
