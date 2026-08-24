@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-23-2348';
+var VERSAO_DASH = '2026-08-24-0757';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4963,12 +4963,24 @@ function reunioesSemResultado() {
   var nomeCloser = quem === 'tony' ? 'tony londe' : 'bruno pardim';
   var agora = Date.now();
   var limite = agora - 30 * 86400000;   // não cobra reunião de mais de um mês atrás
+  // cobra só no PERÍODO seguinte (Bruno 24/08/2026): manhã→à tarde, tarde→à noite,
+  // noite (ou linha sem hora)→no dia seguinte. Antes cobrava reunião que nem aconteceu.
+  var agoraD = new Date();
+  var hoje00 = new Date(); hoje00.setHours(0, 0, 0, 0);
+  function podeCobrar(r) {
+    var temHora = r.date.getHours() !== 0 || r.date.getMinutes() !== 0;
+    if (!temHora) return r.date < hoje00;                     // sem hora: só no dia seguinte
+    if (r.date < hoje00) return true;                          // dias anteriores: sempre
+    var hR = r.date.getHours(), hA = agoraD.getHours();
+    if (hR < 13) return hA >= 13;                              // de manhã: cobra à tarde
+    if (hR < 18) return hA >= 19;                              // de tarde: cobra à noite
+    return false;                                              // de noite: só amanhã
+  }
   return (V2.rows || []).filter(function(r) {
     if (!r.date) return false;
     if (v2norm(r.closer || '').indexOf(quem === 'tony' ? 'tony' : 'bruno') === -1) return false;
-    var t = r.date.getTime();
-    if (t > agora - 3600000) return false;      // ainda não acabou (dá 1h de folga)
-    if (t < limite) return false;
+    if (r.date.getTime() < limite) return false;
+    if (!podeCobrar(r)) return false;
     return v2norm(r.status || '') === v2norm('Reunião agendada') || !(r.status || '').trim();
   }).sort(function(a, b){ return b.date - a.date; });
 }
@@ -8295,6 +8307,8 @@ function abrirFichaLead(i) {
   if (rsH.length) {
     var contaH = function(chave){ return rsH.filter(function(r){ return (r.sn || v2norm(r.status || '')) === chave; }).length; };
     var nsH = contaH('no show'), nvH = contaH('nao vendido'), vdH = contaH('vendido');
+    var nsRem = 0; rsH.forEach(function(r){ nsRem += (String(r.obs || '').match(/##NOSHOW##/g) || []).length; });
+    nsH += nsRem;   // no-shows que foram remarcados (a marca fica na observação)
     var CORH = { 'vendido': '#3ddc97', 'no show': '#ff6b6b', 'nao vendido': '#8d8478', 'reuniao agendada': '#6ea8ff', 'remarcada 2 reuniao': '#ff9a5a', 'bloqueio de oferta': '#b98aff', 'entrada': '#ffd166', 'estorno': '#ff6b6b' };
     h += '<div class="dtl-card" style="margin-top:12px;">'
       + '<div class="g-label">📜 Histórico da pessoa</div>'
@@ -10270,7 +10284,15 @@ function alternarEdicao() {
       if (m.campo === 'telefone') r.telefone = m.valor;
       if (m.campo === 'produto') r.produto = m.valor;
       if (m.campo === 'origem') r.origem = m.valor;
-      if (m.campo === 'statusReuniao') { r.status = m.valor; r.sn = v2norm(m.valor); sincronizarStatusEvento(r); }
+      if (m.campo === 'statusReuniao') {
+        r.status = m.valor; r.sn = v2norm(m.valor);
+        sincronizarStatusEvento(r);   // espelha na agenda
+        // mesmos fluxos de quando o status muda em qualquer outro lugar
+        var _vN = v2norm(m.valor);
+        if (_vN === 'vendido') { setTimeout(function(){ try { abrirFormVendaReuniao(); } catch (e) {} }, 400); }
+        else if (_vN.indexOf('bloqueio') !== -1 || _vN === 'entrada') { setTimeout(function(){ try { abrirFormBloqueioReuniao(); } catch (e) {} }, 400); }
+        else if (_vN === 'nao vendido') { setTimeout(function(){ try { pedirMotivoNaoVendido(_fichaAtual); } catch (e) {} }, 400); }
+      }
       if (m.campo === 'valor') r.valor = v2valor(m.valor);
       if (m.campo === 'forma_de_pagamento') r.forma = m.valor;
       if (m.campo === 'sdr') r.sdr = m.valor;
@@ -10282,6 +10304,8 @@ function alternarEdicao() {
     });
     btn.disabled = false;
     btn.textContent = '✓ Salvo na planilha!';
+    try { renderV2(); } catch (e) {}
+    try { renderLeads(); } catch (e) {}
     desenharInfo();
     btn.textContent = '✓ Salvo na planilha!';
     setTimeout(function() {
@@ -10736,7 +10760,10 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
     var dataBr = dp[2] + '/' + dp[1] + '/' + dp[0];
     sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'data', valor: dataBr, dataRef: v2dataRef(r), gid: V2_GID });
     sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Reunião agendada', dataRef: v2dataRef(r), gid: V2_GID });
-    r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '') + 'Remarcada para ' + dp[2] + '/' + dp[1] + ' ' + hora + (r.date ? ' (era ' + r.date.toLocaleDateString('pt-BR').slice(0, 5) + ')' : '');
+    var _eraNoShow = (r.sn || v2norm(r.status || '')) === 'no show';
+    r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '')
+      + (_eraNoShow ? '🔴 No-show em ' + (r.date ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : '') + ' ##NOSHOW## | ' : '')
+      + 'Remarcada para ' + dp[2] + '/' + dp[1] + ' ' + hora + (r.date ? ' (era ' + r.date.toLocaleDateString('pt-BR').slice(0, 5) + ')' : '');
     sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
     // evento novo ja com os dados do lead (Instagram, Clint, e-mail — o que a base souber)
     var lR = (LD.rows || []).filter(function(x){ return x.tel8 === ldTel8(r.telefone); })[0];
@@ -10760,6 +10787,16 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
   }
 }
 function _remarcarEventoOk(ev, dataStr, hora, dp) {
+  // se o evento estava em NO-SHOW, a marca do no-show fica na observação da linha (não some da história)
+  try {
+    if (v2norm(ev.status || '') === 'noshow') {
+      var rNS = leadDoEvento(ev);
+      if (rNS) {
+        rNS.obs = (String(rNS.obs || '').trim() ? String(rNS.obs).trim() + ' | ' : '') + '🔴 No-show em ' + (rNS.date ? rNS.date.toLocaleDateString('pt-BR').slice(0, 5) : '') + ' ##NOSHOW## — remarcada para ' + dp[2] + '/' + dp[1] + ' ' + hora;
+        sendToGAS({ action: 'updateCell', cpf: '', nome: rNS.nome, campo: 'observacao', valor: rNS.obs, dataRef: v2dataRef(rNS), gid: V2_GID });
+      }
+    }
+  } catch (eNS) {}
   sendToGAS({ action: 'rescheduleEvent', calendar: ev._cal || AG.closer, eventId: ev.id, newDate: dataStr, newTime: hora, duration: ev.duration || 0 }).then(function(res) {
     if (!res || !res.success) { alert('Não consegui remarcar: ' + ((res && res.error) || 'sem resposta do robô')); return; }
     sendToGAS({ action: 'updateEventStatus', calendar: ev._cal || AG.closer, eventId: ev.id, status: 'remarcada' });
@@ -10826,6 +10863,7 @@ function mudarStatusEvento(st) {
         sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: stPlan, dataRef: v2dataRef(r), gid: V2_GID });
         r.status = stPlan; r.sn = v2norm(stPlan);
         renderV2();
+        try { renderLeads(); } catch (eRl) {}   // a aba Leads espelha na hora
         // marcou Vendido/Bloqueio pela agenda: já abre a tela para preencher (fechar = depois)
         if (st === 'vendido') { _fichaAtual = v2reg(r); abrirFormVendaReuniao(); }
         else if (st === 'bloqueio' || st === 'entrada') { _fichaAtual = v2reg(r); abrirFormBloqueioReuniao(); }
