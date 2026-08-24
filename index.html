@@ -2172,7 +2172,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-0759';
+var VERSAO_DASH = '2026-08-24-0802';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3031,6 +3031,17 @@ function acrescentarPostOrganico() {
     window._eaPrint = null;
     setTimeout(carregarPostsOrganicos, 6000);
     avisoRapido('📷 Print guardado — o post agora aparece com foto, como os pagos');
+  } else if (!fotoDoPost(link)) {
+    // sem print: o robô tenta puxar a foto direto do link (o Instagram costuma bloquear; se der, ótimo)
+    var nomeCbF = 'bfCb' + Math.random().toString(36).slice(2, 8);
+    var scF = document.createElement('script');
+    window[nomeCbF] = function(d) {
+      try { scF.remove(); } catch (e) {} try { delete window[nomeCbF]; } catch (e) {}
+      if (d && d.fotoId) { avisoRapido('✨ Consegui puxar a foto do link — o post já aparece com imagem!'); carregarPostsOrganicos(); }
+    };
+    scF.onerror = function(){ try { delete window[nomeCbF]; } catch (e) {} };
+    scF.src = APPS_SCRIPT_URL + '?callback=' + nomeCbF + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'buscarFotoPost', link: link, apelido: apelido }));
+    document.body.appendChild(scF);
   }
   salvarAnuncioEscolhido('POST:' + apelido + '|' + link);
 }
