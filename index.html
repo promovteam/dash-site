@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0844';
+var VERSAO_DASH = '2026-08-25-0851';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3167,7 +3167,7 @@ function igResumo(per) {
   if (!IGO.carregado) return null;
   var r = { posts: 0, comentarios: 0, pedidos: 0, pessoas: 0, base: 0, mql: 0, ht: 0, ag: 0, re: 0, vd: 0,
             fat: 0, grandes: 0, seguidores: 0, semDados: 0,
-            quem: { com: [], pre: [], mql: [], ag: [], re: [], vd: [] } };
+            quem: { com: [], pre: [], nao: [], mql: [], ag: [], re: [], vd: [] } };
   var vistos = {};
   IGO.posts.forEach(function(p) {
     var noPeriodo = (IGO.porLink[p.link] || []).filter(function(x) {
@@ -3199,6 +3199,9 @@ function igResumo(per) {
         r.quem.pre.push(pessoa);
         if (l.faixa === 'alta' || l.faixa === 'media') { r.mql++; r.quem.mql.push(pessoa); }
         if (l.faixa === 'alta') r.ht++;
+      } else {
+        r.naoPreencheu = (r.naoPreencheu || 0) + 1;
+        r.quem.nao.push(pessoa);
       }
       var st = l ? ldSituacao(l) : (_ldIdxAlt ? _ldIdxAlt.insta[v2norm(u)] : null);
       if (st) {
@@ -3241,6 +3244,7 @@ function igPainelResumo(per) {
     + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
     +   igCaixa(r.pedidos, 'COMENTARAM', '#3ddc97', r.pessoas ? r.pessoas.toLocaleString('pt-BR') + ' pessoas diferentes' : '', 'com')
+    +   igCaixa(r.naoPreencheu || 0, 'NÃO PREENCHEU', '#ff6b6b', pc(r.naoPreencheu || 0, r.pessoas) + ' de quem comentou', 'nao')
     +   igCaixa(r.base, 'PREENCHEU', '#6ea8ff', pc(r.base, r.pessoas) + ' de quem comentou', 'pre')
     +   igCaixa(r.mql, 'MQL', '#f6a350', pc(r.mql, r.base) + ' de quem preencheu' + (r.ht ? ' · ' + r.ht + ' HT' : ''), 'mql')
     +   igCaixa(r.ag, 'AGENDARAM', '#ffd166', pc(r.ag, r.mql) + ' dos MQL', 'ag')
@@ -7547,7 +7551,8 @@ function cardMini(v, l, cor, chave) {
 // 👥 quem são os leads por trás do número (clique em LEADS, MQL, PERFIL HT, AGENDOU…)
 var _anRotulo = { n:'leads', mql:'MQL', q:'perfil HT (R$2–4mil)', ag:'agendaram', re:'fizeram a reunião', vd:'compraram',
                   igPediu:'pediram diagnóstico neste post', igNovo:'pediram e ainda NÃO estão na base',
-                  com:'comentaram pedindo diagnóstico', pre:'preencheram a pesquisa' };
+                  com:'comentaram pedindo diagnóstico', pre:'comentaram E preencheram a pesquisa',
+                  nao:'comentaram e NÃO preencheram a pesquisa' };
 function verLeadsDoAnuncio(chave) {
   var d = _anDados[_anAtual];
   if (!d) return;
