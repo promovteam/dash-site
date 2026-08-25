@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-2354';
+var VERSAO_DASH = '2026-08-25-0013';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6749,6 +6749,7 @@ function anPeriodo() {
 // no Orgânico o padrão passa a ser ordenar por Pedidos (é o número que interessa lá)
 var AN_QUANTOS = 40;   // quantos cards a tela mostra de uma vez (botão "mostrar mais")
 var AN_BUSCA = '';     // achar um post/anúncio pelo texto ou pelo link
+var AN_SO = '';        // '' = todos · 'venda' = só os que venderam · 'reuniao' = só os que geraram reunião
 // 'auto' só vale enquanto o Bruno não escolhe: se ele clicar em Vendas, é Vendas.
 function AN_ORD_EFETIVA() {
   if (AN_ORD && AN_ORD !== 'auto') return AN_ORD;
@@ -6898,6 +6899,9 @@ function renderAnuncios() {
     var _b = v2norm(AN_BUSCA.trim());
     chaves = chaves.filter(function(k){ return v2norm(k).indexOf(_b) !== -1; });
   }
+  if (AN_SO === 'venda') chaves = chaves.filter(function(k){ return an[k].vd > 0; });
+  else if (AN_SO === 'reuniao') chaves = chaves.filter(function(k){ return an[k].re > 0; });
+  else if (AN_SO === 'agend') chaves = chaves.filter(function(k){ return an[k].ag > 0; });
   var ordFn = { vendas:function(a,b){return an[b].vd-an[a].vd||an[b].ag-an[a].ag},
                 agend:function(a,b){return an[b].ag-an[a].ag},
                 reuni:function(a,b){return an[b].re-an[a].re},
@@ -6919,7 +6923,10 @@ function renderAnuncios() {
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">'
     + '<input class="search-input" id="an-busca" value="' + String(AN_BUSCA || '').replace(/"/g, '&quot;') + '" placeholder="🔍 achar post ou anúncio…" style="margin-bottom:0;flex:1;min-width:160px;max-width:280px;padding:7px 11px;font-size:.75rem;" oninput="AN_BUSCA=this.value;clearTimeout(window._anBt);window._anBt=setTimeout(function(){renderAnuncios();document.getElementById(\'an-busca\').focus();},400);">'
     + [['todos','Todos'],['pago','💰 Tráfego pago'],['organico','🌱 Orgânico']].map(function(o){
-        return '<span class="chart-chip' + (AN_TIPO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_TIPO=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>'; }).join('')
+        return '<span class="chart-chip' + (AN_TIPO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_TIPO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
+    + '<span style="width:10px;"></span>'
+    + [['','Tudo'],['agend','📅 só com agendamento'],['reuniao','✅ só com reunião'],['venda','💰 só com venda']].map(function(o){
+        return '<span class="chart-chip' + (AN_SO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_SO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '</div>';
   if (!META.dados) {
     h += '<div class="hint" style="margin-top:9px;color:#f6a350;">💸 '
