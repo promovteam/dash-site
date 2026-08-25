@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-2047';
+var VERSAO_DASH = '2026-08-25-2059';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3067,7 +3067,8 @@ function _lerPost(bruto) {
 // (uma linha por comentario pedindo diagnostico/analise). Aqui os posts entram na
 // aba Criativos como orgânicos, com o mesmo funil dos pagos: quem pediu, quem
 // preencheu a pesquisa, quem agendou, quem fez a reuniao e quem comprou.
-var IGO = { posts: [], porLink: {}, porUser: {}, seg: {}, texto: {}, perfil: {}, carregado: false, buscando: false, erro: '' };
+var IGO = { posts: [], porLink: {}, porUser: {}, seg: {}, texto: {}, perfil: {}, iscas: {}, carregado: false, buscando: false, erro: '' };
+var IG_ISCA = '';   // '' = todas as iscas · 'diagnostico' · 'legado' · …
 function carregarIGOrganico() {
   if (IGO.carregado || IGO.buscando) return;
   IGO.buscando = true;
@@ -3089,16 +3090,17 @@ function carregarIGOrganico() {
       IGO.posts.push({ link: String(r[0]).trim(), date: (d && !isNaN(d)) ? d : null, tipo: r[2] || '',
                        legenda: r[3] || '', curtidas: +(r[4] || 0), coment: +(r[5] || 0), pedidos: +(r[6] || 0) });
     }
-    IGO.porLink = {}; IGO.porUser = {}; IGO.seg = {}; IGO.texto = {};
+    IGO.porLink = {}; IGO.porUser = {}; IGO.seg = {}; IGO.texto = {}; IGO.iscas = {};
     for (var j = 1; j < lc.length; j++) {
       var c = lc[j];
       if (!c || !c[0] || !c[1]) continue;
       var u = String(c[0]).replace(/^@/, '').toLowerCase(), lk = String(c[1]).trim();
       var _dq = c[2] ? new Date(c[2]) : null;
-      (IGO.porLink[lk] || (IGO.porLink[lk] = [])).push({ u: u, t: (_dq && !isNaN(_dq)) ? _dq.getTime() : null });
+      (IGO.porLink[lk] || (IGO.porLink[lk] = [])).push({ u: u, t: (_dq && !isNaN(_dq)) ? _dq.getTime() : null, i: c[6] || 'diagnostico' });
+      IGO.iscas[c[6] || 'diagnostico'] = (IGO.iscas[c[6] || 'diagnostico'] || 0) + 1;
       var jaU = IGO.porUser[u];
-      if (!jaU) IGO.porUser[u] = { vezes: 1, post: lk, quando: c[2] || '', texto: String(c[3] || '').slice(0, 140) };
-      else { jaU.vezes++; if ((c[2] || '') > (jaU.quando || '')) { jaU.post = lk; jaU.quando = c[2] || ''; jaU.texto = String(c[3] || '').slice(0, 140); } }
+      if (!jaU) IGO.porUser[u] = { vezes: 1, post: lk, quando: c[2] || '', texto: String(c[3] || '').slice(0, 140), isca: c[6] || 'diagnostico' };
+      else { jaU.vezes++; if ((c[2] || '') > (jaU.quando || '')) { jaU.post = lk; jaU.quando = c[2] || ''; jaU.texto = String(c[3] || '').slice(0, 140); jaU.isca = c[6] || 'diagnostico'; } }
       if (c[4] !== '' && c[4] != null && !IGO.seg[u]) IGO.seg[u] = c[4];
       if (!IGO.texto[u]) IGO.texto[u] = String(c[3] || '').slice(0, 120);
     }
@@ -3169,10 +3171,11 @@ function igResumo(per) {
   if (!IGO.carregado) return null;
   var r = { posts: 0, comentarios: 0, pedidos: 0, pessoas: 0, base: 0, mql: 0, ht: 0, ag: 0, re: 0, vd: 0,
             fat: 0, grandes: 0, seguidores: 0, semDados: 0,
-            quem: { com: [], pre: [], nao: [], nao5k: [], nao10k: [], mql: [], ag: [], re: [], vd: [] } };
+            quem: { com: [], pre: [], nao: [], nao5k: [], nao10k: [], g50: [], g100: [], mql: [], ag: [], re: [], vd: [], top: [], topSem: [] } };
   var vistos = {};
   IGO.posts.forEach(function(p) {
     var noPeriodo = (IGO.porLink[p.link] || []).filter(function(x) {
+      if (IG_ISCA && (x.i || 'diagnostico') !== IG_ISCA) return false;
       if (!per || (per.ini === null && per.fim === null)) return true;
       if (x.t === null) return true;
       return !((per.ini !== null && x.t < per.ini) || (per.fim !== null && x.t >= per.fim));
@@ -3199,11 +3202,22 @@ function igResumo(per) {
       pessoa._igBio = (pf && pf.bio) ? pf.bio : '';
       pessoa._igSite = (pf && pf.site) ? pf.site : '';
       r.quem.com.push(pessoa);
+      if (pessoa._igSegN >= 50000) r.quem.g50.push(pessoa);
+      if (pessoa._igSegN >= 100000) r.quem.g100.push(pessoa);
       if (l) {
         r.base++;
         r.quem.pre.push(pessoa);
         if (l.faixa === 'alta' || l.faixa === 'media') { r.mql++; r.quem.mql.push(pessoa); }
         if (l.faixa === 'alta') r.ht++;
+        // 🏅 nota A ou B: os mais qualificados que interagiram
+        var _cl = null;
+        try { _cl = classeDoLead(l); } catch (eC) {}
+        if (_cl && (_cl.classe === 'A' || _cl.classe === 'B')) {
+          pessoa._nota = _cl.nota;
+          r.quem.top.push(pessoa);
+          var _st0 = ldSituacao(l);
+          if (!_st0) r.quem.topSem.push(pessoa);   // qualificado e ainda sem reunião marcada
+        }
       } else {
         r.naoPreencheu = (r.naoPreencheu || 0) + 1;
         r.quem.nao.push(pessoa);
@@ -3250,6 +3264,18 @@ function igPainelResumo(per) {
     +   '<h3 style="margin:0;">📷 Pedidos no orgânico</h3>'
     +   '<span class="hint">@' + (IGO.perfil && IGO.posts.length ? 'joaostecca' : '') + ' · ' + r.posts + ' publicações no período · ' + r.comentarios.toLocaleString('pt-BR') + ' comentários lidos</span>'
     + '</div>'
+    + (function(){
+        var ks = Object.keys(IGO.iscas || {}).sort(function(a, b){ return IGO.iscas[b] - IGO.iscas[a]; });
+        if (ks.length < 2) return '';
+        return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center;">'
+          + '<span class="hint" style="font-weight:800;">🎣 Isca:</span>'
+          + '<span class="chart-chip' + (IG_ISCA === '' ? ' on' : '') + '" style="cursor:pointer;" onclick="IG_ISCA=\'\';renderAnuncios();">todas</span>'
+          + ks.map(function(k){
+              return '<span class="chart-chip' + (IG_ISCA === k ? ' on' : '') + '" style="cursor:pointer;" onclick="IG_ISCA=' + JSON.stringify(k).replace(/"/g, '&quot;') + ';renderAnuncios();">'
+                + k + ' <b style="opacity:.65;">' + IGO.iscas[k].toLocaleString('pt-BR') + '</b></span>';
+            }).join('')
+        + '</div>';
+      })()
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
     +   igCaixa(r.pedidos, 'COMENTARAM', '#3ddc97', r.pessoas ? r.pessoas.toLocaleString('pt-BR') + ' pessoas diferentes' : '', 'com')
     +   igCaixa(r.naoPreencheu || 0, 'NÃO PREENCHEU', '#ff6b6b', pc(r.naoPreencheu || 0, r.pessoas) + ' de quem comentou', 'nao')
@@ -3262,9 +3288,13 @@ function igPainelResumo(per) {
     + ((r.quem.nao5k.length || r.quem.nao10k.length)
         ? '<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:11px;">'
           + '<span class="hint" style="font-weight:800;color:#ffd166;">🎯 Social selling:</span>'
+          + (r.quem.topSem.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(255,209,102,.6);color:#ffd166;font-weight:800;" onclick="igVerEtapa(\'topSem\')">🏅 ' + r.quem.topSem.length + ' nota A/B sem reunião</span>' : '')
+          + (r.quem.top.length ? '<span class="chart-chip" style="cursor:pointer;" onclick="igVerEtapa(\'top\')">🏅 ' + r.quem.top.length + ' nota A/B no total</span>' : '')
           + (r.quem.nao5k.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="igVerEtapa(\'nao5k\')">👥 ' + r.quem.nao5k.length + ' com 5 mil+ que não preencheram</span>' : '')
           + (r.quem.nao10k.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="igVerEtapa(\'nao10k\')">👥 ' + r.quem.nao10k.length + ' com 10 mil+</span>' : '')
-          + '<span class="hint">a lista abre com os maiores primeiro</span>'
+          + (r.quem.g50.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(185,138,255,.6);color:#b98aff;font-weight:800;" onclick="igVerEtapa(\'g50\')">⭐ ' + r.quem.g50.length + ' com 50 mil+</span>' : '')
+          + (r.quem.g100.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(185,138,255,.6);color:#b98aff;" onclick="igVerEtapa(\'g100\')">⭐ ' + r.quem.g100.length + ' com 100 mil+</span>' : '')
+          + '<span class="hint">a lista abre com os melhores primeiro</span>'
         + '</div>' : '')
     + '</div>';
 }
@@ -3291,6 +3321,7 @@ function igCardsOrganicos(per) {
     // post de novembro que segue recebendo pedido em agosto continua valendo
     // (Bruno 25/08/2026)
     var users = (IGO.porLink[p.link] || []).filter(function(x) {
+      if (IG_ISCA && (x.i || 'diagnostico') !== IG_ISCA) return false;
       if (!per || (per.ini === null && per.fim === null)) return true;
       if (x.t === null) return true;   // sem data no comentário: não some da lista
       return !((per.ini !== null && x.t < per.ini) || (per.fim !== null && x.t >= per.fim));
@@ -7569,7 +7600,11 @@ var _anRotulo = { n:'leads', mql:'MQL', q:'perfil HT (R$2–4mil)', ag:'agendara
                   com:'comentaram pedindo diagnóstico', pre:'comentaram E preencheram a pesquisa',
                   nao:'comentaram e NÃO preencheram a pesquisa',
                   nao5k:'perfis de 5 mil+ que pediram e não preencheram',
-                  nao10k:'perfis de 10 mil+ que pediram e não preencheram' };
+                  nao10k:'perfis de 10 mil+ que pediram e não preencheram',
+                  g50:'perfis de 50 mil+ que interagiram (os verificados estão aqui)',
+                  g100:'perfis de 100 mil+ que interagiram',
+                  top:'nota A ou B que interagiram no Instagram',
+                  topSem:'nota A ou B que interagiram e ainda NÃO agendaram' };
 function verLeadsDoAnuncio(chave) {
   var d = _anDados[_anAtual];
   if (!d) return;
@@ -7606,7 +7641,9 @@ function verLeadsDoAnuncio(chave) {
     +   '<button class="btn" style="padding:6px 11px;font-size:.68rem;" onclick="baixarQuem(\'' + chave + '\')">📊 planilha</button>'
     +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharQuem()">✕</span></div>'
     + '<div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;">'
-    + (function(){   // social selling: perfil grande primeiro (Bruno 25/08/2026)
+    + (function(){   // social selling: melhor primeiro (Bruno 25/08/2026)
+        var temNota = lista.some(function(x){ return x._nota != null; });
+        if (temNota) { lista.sort(function(a, b){ return (b._nota || 0) - (a._nota || 0); }); return ''; }
         var temSeg = lista.some(function(x){ return x._igSegN != null && x._igSegN >= 0; });
         if (temSeg) lista.sort(function(a, b){ return (b._igSegN == null ? -1 : b._igSegN) - (a._igSegN == null ? -1 : a._igSegN); });
         return '';
@@ -10766,20 +10803,20 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec';
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec (13ª implantação, v21)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7posSzLxbj_v_X8l_mE57JDxFa7DKd3aaF9EOJApJZ9qSVDK4p4u2TrfZ7MfqSGwj/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
