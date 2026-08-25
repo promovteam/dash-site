@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0013';
+var VERSAO_DASH = '2026-08-25-0024';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6855,7 +6855,7 @@ function renderAnuncios() {
     var nome = (String(bruto || '').indexOf('POST:') === 0) ? bruto : ldAnuncioLimpo(bruto);
     if (nome === '(sem anúncio)') return;
     var tipo = tipoDoAnuncio(nome, ldTipoTrafego(l));
-    if (AN_TIPO !== 'todos' && tipo !== AN_TIPO) return;
+    if (AN_TIPO !== 'todos' && AN_TIPO !== 'sem' && tipo !== AN_TIPO) return;
     var a = an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo,
       _tipoFixo: true,
       quem: { n:[], q:[], mql:[], ag:[], re:[], vd:[] } });   // guarda quem é, para poder clicar e ver
@@ -6899,6 +6899,17 @@ function renderAnuncios() {
     var _b = v2norm(AN_BUSCA.trim());
     chaves = chaves.filter(function(k){ return v2norm(k).indexOf(_b) !== -1; });
   }
+  // 🔗 origens sem imagem (manychat, link na bio, utm solta…) ficam numa aba à parte,
+  // para a lista de criativos mostrar só o que dá para ver — Bruno 25/08/2026
+  function _temImagem(k) {
+    if (String(k).indexOf('POST:') === 0) return true;
+    var mm = metaPor[_chaveAnuncio(k)] || {};
+    if (mm.foto) return true;
+    try { var cc = criativoDe(k, mm.adId); if (cc && cc.foto) return true; } catch (e) {}
+    return false;
+  }
+  var _semImagem = chaves.filter(function(k){ return !_temImagem(k); });
+  chaves = (AN_TIPO === 'sem') ? _semImagem : chaves.filter(_temImagem);
   if (AN_SO === 'venda') chaves = chaves.filter(function(k){ return an[k].vd > 0; });
   else if (AN_SO === 'reuniao') chaves = chaves.filter(function(k){ return an[k].re > 0; });
   else if (AN_SO === 'agend') chaves = chaves.filter(function(k){ return an[k].ag > 0; });
@@ -6922,7 +6933,7 @@ function renderAnuncios() {
     + '</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">'
     + '<input class="search-input" id="an-busca" value="' + String(AN_BUSCA || '').replace(/"/g, '&quot;') + '" placeholder="🔍 achar post ou anúncio…" style="margin-bottom:0;flex:1;min-width:160px;max-width:280px;padding:7px 11px;font-size:.75rem;" oninput="AN_BUSCA=this.value;clearTimeout(window._anBt);window._anBt=setTimeout(function(){renderAnuncios();document.getElementById(\'an-busca\').focus();},400);">'
-    + [['todos','Todos'],['pago','💰 Tráfego pago'],['organico','🌱 Orgânico']].map(function(o){
+    + [['todos','Todos'],['pago','💰 Tráfego pago'],['organico','🌱 Orgânico'],['sem','🔗 Sem imagem' + (_semImagem.length ? ' (' + _semImagem.length + ')' : '')]].map(function(o){
         return '<span class="chart-chip' + (AN_TIPO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_TIPO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '<span style="width:10px;"></span>'
     + [['','Tudo'],['agend','📅 só com agendamento'],['reuniao','✅ só com reunião'],['venda','💰 só com venda']].map(function(o){
@@ -6989,6 +7000,10 @@ function renderAnuncios() {
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(185,138,255,.1);"><b style="color:#b98aff;font-size:.95rem;display:block;">' + a.re + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">REUNIÕES</span></div>'
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(61,220,151,.1);"><b style="color:#3ddc97;font-size:.95rem;display:block;">' + a.vd + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">VENDAS</span></div>'
       +   '</div>'
+      +   (a.fat ? '<div style="margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);text-align:center;">'
+              + '<b style="color:#3ddc97;font-size:.92rem;">' + rs(a.fat) + '</b>'
+              + '<div style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">FATURAMENTO'
+              + (m.gasto ? ' · ' + (a.fat / m.gasto).toFixed(1) + 'x o investido' : '') + '</div></div>' : '')
       +   (cpl ? '<div class="hint" style="margin-top:7px;">' + rs(cpl) + ' por lead' + (a.vd ? ' · ' + rs(m.gasto/a.vd) + ' por venda' : '') + '</div>' : '')
       +   (foraDoPeriodo[k]
             ? '<div class="hint" style="margin-top:7px;color:#f6a350;cursor:pointer;" onclick="event.stopPropagation();AN_PER=\'tudo\';renderAnuncios();" title="clique para ver todos os períodos">'
