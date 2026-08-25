@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-2351';
+var VERSAO_DASH = '2026-08-24-2354';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6734,7 +6734,7 @@ function tipoDoAnuncio(nome, tipoDoLead) {
 // =====================================================================
 // 📣 ABA ANÚNCIOS E ORIGENS — de onde vem cada reunião e cada venda
 // =====================================================================
-var AN_PER = 'mes', AN_ORD = 'vendas', AN_TIPO = 'todos';
+var AN_PER = 'mes', AN_ORD = 'auto', AN_TIPO = 'todos';   // 'auto' = Vendas nos pagos, Pedidos no orgânico
 function anPeriodo() {
   var hoje = new Date(); hoje.setHours(0,0,0,0);
   var ini, fim = null, label;
@@ -6749,8 +6749,10 @@ function anPeriodo() {
 // no Orgânico o padrão passa a ser ordenar por Pedidos (é o número que interessa lá)
 var AN_QUANTOS = 40;   // quantos cards a tela mostra de uma vez (botão "mostrar mais")
 var AN_BUSCA = '';     // achar um post/anúncio pelo texto ou pelo link
+// 'auto' só vale enquanto o Bruno não escolhe: se ele clicar em Vendas, é Vendas.
 function AN_ORD_EFETIVA() {
-  return (AN_TIPO === 'organico' && AN_ORD === 'vendas') ? 'ped' : AN_ORD;
+  if (AN_ORD && AN_ORD !== 'auto') return AN_ORD;
+  return AN_TIPO === 'organico' ? 'ped' : 'vendas';
 }
 function renderAnuncios() {
   var el = document.getElementById('an-corpo');
@@ -8533,6 +8535,25 @@ function abrirFichaLead(i) {
             + (aa.post.link ? '<a class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;text-decoration:none;" href="' + aa.post.link + '" target="_blank">abrir o post ↗</a>' : '')
             + '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">' + (fo ? 'trocar' : '📷 colar o print') + '</span>'
             + '</div></div></div>';
+        }
+        // 📷 já sabemos qual post foi: ele comentou pedindo diagnóstico ali
+        var _ped = null;
+        try { _ped = igPedidoDoLead(l); } catch (ePe) {}
+        if (!aa.tem && _ped) {
+          var _mm = String(_ped.post).match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
+          var _qd = _ped.quando ? new Date(_ped.quando) : null;
+          return '<div style="display:flex;flex-direction:column;gap:7px;align-items:flex-end;">'
+            + (_mm ? '<iframe src="https://www.instagram.com/' + _mm[1] + '/' + _mm[2] + '/embed/captioned/" loading="lazy" scrolling="no" frameborder="0"'
+                     + ' style="width:100%;max-width:330px;height:420px;border:1px solid rgba(61,220,151,.35);border-radius:12px;background:#000;"></iframe>' : '')
+            + '<div style="text-align:right;">'
+            +   '<b style="color:#3ddc97;">📷 pediu diagnóstico neste post</b>'
+            +   ((_qd && !isNaN(_qd)) ? '<div class="hint" style="margin-top:2px;">' + _qd.toLocaleDateString('pt-BR') + (_ped.vezes > 1 ? ' · pediu ' + _ped.vezes + ' vezes' : '') + '</div>' : '')
+            +   (_ped.texto ? '<div class="hint" style="margin-top:3px;font-style:italic;">"' + _ped.texto.replace(/</g, '&lt;') + '"</div>' : '')
+            +   (_ped.seg != null ? '<div class="hint" style="margin-top:2px;">👥 ' + _ped.seg.toLocaleString('pt-BR') + ' seguidores</div>' : '')
+            +   '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:5px;flex-wrap:wrap;">'
+            +     '<a class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;text-decoration:none;" href="' + _ped.post + '" target="_blank">abrir o post ↗</a>'
+            +     '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">foi outro post</span>'
+            +   '</div></div></div>';
         }
         if (!aa.tem) {
           var _br = String(l.origem || '') + ' ' + String(l.fonte || '') + ' ' + String(l.utm || '');
