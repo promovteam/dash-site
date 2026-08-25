@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0047';
+var VERSAO_DASH = '2026-08-25-0052';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -7985,6 +7985,17 @@ function crmQuadro(lista) {
         + '</div>'
         + '<div class="crm-chips">'
         +   (lead ? '<span class="crm-chip ok">✅ preencheu</span>' : '<span class="crm-chip pend">só comentou</span>')
+        +   (function(){   // 📷 de qual post veio (Bruno 25/08/2026)
+              var pd = null;
+              try { pd = igPedidoDoLead({ insta: x.insta }); } catch (e) {}
+              if (!pd) return '';
+              var q = pd.quando ? new Date(pd.quando) : null;
+              return '<span class="crm-chip" style="background:rgba(61,220,151,.16);color:#3ddc97;cursor:pointer;"'
+                + ' title="' + (pd.texto ? 'comentou: "' + pd.texto.replace(/"/g, "'") + '" — ' : '') + 'clique para abrir o post"'
+                + ' onclick="event.stopPropagation();window.open(' + JSON.stringify(pd.post) + ',\'_blank\')">📷 post'
+                + ((q && !isNaN(q)) ? ' ' + q.toLocaleDateString('pt-BR').slice(0, 5) : '')
+                + (pd.vezes > 1 ? ' · ' + pd.vezes + 'x' : '') + '</span>';
+            })()
         +   faixa
         +   (function(){
               var cl = lead ? classeDoLead(lead) : null;
