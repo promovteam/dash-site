@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0108';
+var VERSAO_DASH = '2026-08-25-0844';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3094,7 +3094,8 @@ function carregarIGOrganico() {
       var c = lc[j];
       if (!c || !c[0] || !c[1]) continue;
       var u = String(c[0]).replace(/^@/, '').toLowerCase(), lk = String(c[1]).trim();
-      (IGO.porLink[lk] || (IGO.porLink[lk] = [])).push(u);
+      var _dq = c[2] ? new Date(c[2]) : null;
+      (IGO.porLink[lk] || (IGO.porLink[lk] = [])).push({ u: u, t: (_dq && !isNaN(_dq)) ? _dq.getTime() : null });
       var jaU = IGO.porUser[u];
       if (!jaU) IGO.porUser[u] = { vezes: 1, post: lk, quando: c[2] || '', texto: String(c[3] || '').slice(0, 140) };
       else { jaU.vezes++; if ((c[2] || '') > (jaU.quando || '')) { jaU.post = lk; jaU.quando = c[2] || ''; jaU.texto = String(c[3] || '').slice(0, 140); } }
@@ -3169,14 +3170,17 @@ function igResumo(per) {
             quem: { com: [], pre: [], mql: [], ag: [], re: [], vd: [] } };
   var vistos = {};
   IGO.posts.forEach(function(p) {
-    if (per && p.date) {
-      var t = p.date.getTime();
-      if ((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)) return;
-    }
+    var noPeriodo = (IGO.porLink[p.link] || []).filter(function(x) {
+      if (!per || (per.ini === null && per.fim === null)) return true;
+      if (x.t === null) return true;
+      return !((per.ini !== null && x.t < per.ini) || (per.fim !== null && x.t >= per.fim));
+    });
+    if (!noPeriodo.length) return;
     r.posts++;
     r.comentarios += (p.coment || 0);
-    r.pedidos += (p.pedidos || 0);
-    (IGO.porLink[p.link] || []).forEach(function(u) {
+    r.pedidos += noPeriodo.length;
+    noPeriodo.forEach(function(x) {
+      var u = x.u;
       if (vistos[u]) return;
       vistos[u] = 1;
       r.pessoas++;
@@ -3264,17 +3268,21 @@ function igCardsOrganicos(per) {
   if (!IGO.carregado) return [];
   var out = [];
   IGO.posts.forEach(function(p) {
-    if (per && p.date) {
-      var t = p.date.getTime();
-      if ((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)) return;
-    }
-    var users = IGO.porLink[p.link] || [];
-    if (!users.length && !p.pedidos) return;
+    // o período corta pela data do COMENTÁRIO, não pela data da publicação:
+    // post de novembro que segue recebendo pedido em agosto continua valendo
+    // (Bruno 25/08/2026)
+    var users = (IGO.porLink[p.link] || []).filter(function(x) {
+      if (!per || (per.ini === null && per.fim === null)) return true;
+      if (x.t === null) return true;   // sem data no comentário: não some da lista
+      return !((per.ini !== null && x.t < per.ini) || (per.fim !== null && x.t >= per.fim));
+    });
+    if (!users.length) return;
     var d = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp:'', tipo:'organico', _tipoFixo:true,
               ig: { pedidos:0, novos:0, seguidores:0, grandes:0, quemPediu:[], quemNovo:[] },
               quem: { n:[], q:[], mql:[], ag:[], re:[], vd:[] } };
     var vistos = {};
-    users.forEach(function(u) {
+    users.forEach(function(x) {
+      var u = x.u;
       if (vistos[u]) return;
       vistos[u] = 1;
       d.ig.pedidos++;
