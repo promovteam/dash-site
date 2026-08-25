@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-2234';
+var VERSAO_DASH = '2026-08-24-2244';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3041,7 +3041,7 @@ function _lerPost(bruto) {
 // (uma linha por comentario pedindo diagnostico/analise). Aqui os posts entram na
 // aba Criativos como orgânicos, com o mesmo funil dos pagos: quem pediu, quem
 // preencheu a pesquisa, quem agendou, quem fez a reuniao e quem comprou.
-var IGO = { posts: [], porLink: {}, seg: {}, texto: {}, carregado: false, buscando: false, erro: '' };
+var IGO = { posts: [], porLink: {}, seg: {}, texto: {}, perfil: {}, carregado: false, buscando: false, erro: '' };
 function carregarIGOrganico() {
   if (IGO.carregado || IGO.buscando) return;
   IGO.buscando = true;
@@ -3052,8 +3052,8 @@ function carregarIGOrganico() {
       .then(function(t){ return ldCSV(t || ''); })
       .catch(function(){ return []; });
   }
-  Promise.all([baixa('IG Posts'), baixa('IG Pedidos')]).then(function(res) {
-    var lp = res[0] || [], lc = res[1] || [];
+  Promise.all([baixa('IG Posts'), baixa('IG Pedidos'), baixa('IG Perfis')]).then(function(res) {
+    var lp = res[0] || [], lc = res[1] || [], lf = res[2] || [];
     IGO.posts = [];
     for (var i = 1; i < lp.length; i++) {
       var r = lp[i];
@@ -3071,6 +3071,16 @@ function carregarIGOrganico() {
       if (c[4] !== '' && c[4] != null && !IGO.seg[u]) IGO.seg[u] = c[4];
       if (!IGO.texto[u]) IGO.texto[u] = String(c[3] || '').slice(0, 120);
     }
+    IGO.perfil = {};
+    for (var f = 1; f < lf.length; f++) {
+      var pf = lf[f];
+      if (!pf || !pf[0]) continue;
+      var uu = String(pf[0]).replace(/^@/, '').toLowerCase();
+      var sg = parseInt(pf[2], 10);
+      IGO.perfil[uu] = { nome: (pf[1] === '-' ? '' : (pf[1] || '')), seg: isNaN(sg) ? null : sg };
+      if (!isNaN(sg)) IGO.seg[uu] = sg;
+    }
+    _igNomeBioIdx = null;
     IGO.carregado = true; IGO.buscando = false;
     try { if (document.getElementById('an-corpo')) renderAnuncios(); } catch (e) {}
   }).catch(function(e){ IGO.buscando = false; IGO.erro = String(e && e.message || e); });
@@ -3079,7 +3089,7 @@ function carregarIGOrganico() {
 // 1º pelo @ cadastrado; 2º pelo NOME que costuma estar dentro do próprio @
 // (marceloleal.oficial -> Marcelo Leal). Só vale nome completo, com 11 letras ou
 // mais e que apareça uma única vez na base — senão junta gente diferente.
-var _igLeadIdx = null, _igNomeIdx = null;
+var _igLeadIdx = null, _igNomeIdx = null, _igNomeBioIdx = null;
 var _IG_SUFIXOS = ['oficial', 'oficiall', 'official', 'ofc', 'real', 'psi', 'psico', 'adv', 'dra', 'dr', 'pra', 'pr', 'br'];
 function _igSoLetras(v) { return v2norm(String(v || '')).replace(/[^a-z]/g, ''); }
 function igLeadPorInsta(u) {
@@ -3103,6 +3113,9 @@ function igLeadPorInsta(u) {
   }
   var direto = _igLeadIdx[idInsta(u)];
   if (direto) return direto;
+  // nome da bio do Instagram (ex.: @xyz123 cuja bio diz "Marcelo Leal")
+  var bio = (IGO.perfil[u] && IGO.perfil[u].nome) ? _igSoLetras(IGO.perfil[u].nome) : '';
+  if (bio.length >= 11 && _igNomeIdx[bio]) return _igNomeIdx[bio];
   // tenta o nome dentro do @
   var h = _igSoLetras(u);
   for (var i = 0; i < _IG_SUFIXOS.length; i++) {
@@ -3125,15 +3138,15 @@ function igCardsOrganicos(per) {
     var users = IGO.porLink[p.link] || [];
     if (!users.length && !p.pedidos) return;
     var d = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp:'', tipo:'organico', _tipoFixo:true,
-              ig: { pedidos:0, novos:0, seguidores:0, quemPediu:[], quemNovo:[] },
+              ig: { pedidos:0, novos:0, seguidores:0, grandes:0, quemPediu:[], quemNovo:[] },
               quem: { n:[], q:[], mql:[], ag:[], re:[], vd:[] } };
     var vistos = {};
     users.forEach(function(u) {
       if (vistos[u]) return;
       vistos[u] = 1;
       d.ig.pedidos++;
-      var seg = parseInt(IGO.seg[u], 10);
-      if (!isNaN(seg)) d.ig.seguidores += seg;
+      var seg = parseInt((IGO.perfil[u] && IGO.perfil[u].seg != null) ? IGO.perfil[u].seg : IGO.seg[u], 10);
+      if (!isNaN(seg)) { d.ig.seguidores += seg; if (seg >= 10000) d.ig.grandes = (d.ig.grandes || 0) + 1; }
       var l = igLeadPorInsta(u);
       d.ig.quemPediu.push(u);
       if (l) {
@@ -6824,7 +6837,7 @@ function renderAnuncios() {
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:' + (a.tipo === 'pago' ? 'rgba(255,107,107,.13);color:#ff6b6b' : 'rgba(61,220,151,.13);color:#3ddc97') + ';">' + (a.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
       +   (a.ig
             ? '<div class="hint" style="margin-top:3px;"><b style="color:#3ddc97;">' + a.ig.pedidos + ' pedidos</b> · ' + a.n + ' na base · <b style="color:#f6a350;">' + a.ig.novos + ' novos</b>'
-              + (a.ig.seguidores ? ' · ' + (a.ig.seguidores >= 1000 ? Math.round(a.ig.seguidores/1000) + 'k' : a.ig.seguidores) + ' seguidores somados' : '') + '</div>'
+              + (a.ig.grandes ? ' · <b style="color:#b98aff;">' + a.ig.grandes + ' com 10k+</b>' : '') + '</div>'
             : '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · <b style="color:#f6a350;">' + a.mql + ' MQL</b> · <b style="color:#ff6b6b;">' + a.q + ' HT</b>' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>')
       +   '<div style="display:flex;gap:5px;margin-top:9px;">'
       +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(255,209,102,.1);"><b style="color:#ffd166;font-size:.95rem;display:block;">' + a.ag + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">AGEND.</span></div>'
@@ -7333,8 +7346,10 @@ function verLeadsDoAnuncio(chave) {
     d.quem[chave] = (us || []).map(function(u) {
       var l = igLeadPorInsta(u);
       if (l) return l;
-      return { nome: '@' + u, insta: u, tel: '', telefone: '', tel8: '', email: '',
-               dataTxt: '', faixa: '', _igTexto: IGO.texto[u] || '', _igSeg: IGO.seg[u] || '' };
+      var pf = IGO.perfil[u] || {};
+      return { nome: pf.nome ? pf.nome + ' (@' + u + ')' : '@' + u, insta: u, tel: '', telefone: '', tel8: '', email: '',
+               dataTxt: '', faixa: '', _igTexto: IGO.texto[u] || '',
+               _igSeg: (pf.seg != null ? pf.seg.toLocaleString('pt-BR') + ' seguidores' : (IGO.seg[u] || '')) };
     });
   }
   if (!d.quem || !d.quem[chave]) return;
@@ -10472,20 +10487,20 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRrOydt1ZlRG7DWc9hJE8idrL3sTlrMxCjlba-lnYbM8_aofb-f3boTlzHkPiomy3c/exec';
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec (13ª implantação, v21)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEJyb4yaJj2fwCZK4exHbA2qgycgQOeaFBaqxNvpRMUwj12rIwkATIOGAu1DM2BzwB/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
