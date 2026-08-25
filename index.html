@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0851';
+var VERSAO_DASH = '2026-08-25-0901';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3167,7 +3167,7 @@ function igResumo(per) {
   if (!IGO.carregado) return null;
   var r = { posts: 0, comentarios: 0, pedidos: 0, pessoas: 0, base: 0, mql: 0, ht: 0, ag: 0, re: 0, vd: 0,
             fat: 0, grandes: 0, seguidores: 0, semDados: 0,
-            quem: { com: [], pre: [], nao: [], mql: [], ag: [], re: [], vd: [] } };
+            quem: { com: [], pre: [], nao: [], nao5k: [], nao10k: [], mql: [], ag: [], re: [], vd: [] } };
   var vistos = {};
   IGO.posts.forEach(function(p) {
     var noPeriodo = (IGO.porLink[p.link] || []).filter(function(x) {
@@ -3193,6 +3193,7 @@ function igResumo(per) {
       pessoa._igPost = p.link;
       pessoa._igTexto = IGO.texto[u] || '';
       pessoa._igSeg = (pf && pf.seg != null) ? pf.seg.toLocaleString('pt-BR') + ' seguidores' : '';
+      pessoa._igSegN = (pf && pf.seg != null) ? pf.seg : -1;
       r.quem.com.push(pessoa);
       if (l) {
         r.base++;
@@ -3202,6 +3203,9 @@ function igResumo(per) {
       } else {
         r.naoPreencheu = (r.naoPreencheu || 0) + 1;
         r.quem.nao.push(pessoa);
+        // social selling: perfil grande que pediu e nunca preencheu
+        if (pessoa._igSegN >= 5000) r.quem.nao5k.push(pessoa);
+        if (pessoa._igSegN >= 10000) r.quem.nao10k.push(pessoa);
       }
       var st = l ? ldSituacao(l) : (_ldIdxAlt ? _ldIdxAlt.insta[v2norm(u)] : null);
       if (st) {
@@ -3251,6 +3255,13 @@ function igPainelResumo(per) {
     +   igCaixa(r.re, 'COMPARECEU', '#b98aff', pc(r.re, r.ag) + ' dos agendados', 're')
     +   igCaixa(r.vd, 'VENDIDO', '#3ddc97', (r.fat ? rs(r.fat) + ' · ' : '') + pc(r.vd, r.re) + ' de quem compareceu', 'vd')
     + '</div>'
+    + ((r.quem.nao5k.length || r.quem.nao10k.length)
+        ? '<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:11px;">'
+          + '<span class="hint" style="font-weight:800;color:#ffd166;">🎯 Social selling:</span>'
+          + (r.quem.nao5k.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="igVerEtapa(\'nao5k\')">👥 ' + r.quem.nao5k.length + ' com 5 mil+ que não preencheram</span>' : '')
+          + (r.quem.nao10k.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(255,209,102,.5);color:#ffd166;" onclick="igVerEtapa(\'nao10k\')">👥 ' + r.quem.nao10k.length + ' com 10 mil+</span>' : '')
+          + '<span class="hint">a lista abre com os maiores primeiro</span>'
+        + '</div>' : '')
     + '</div>';
 }
 // Quanto essa pessoa comprou: soma as linhas "vendido" da ficha dela. Antes eu
@@ -7552,7 +7563,9 @@ function cardMini(v, l, cor, chave) {
 var _anRotulo = { n:'leads', mql:'MQL', q:'perfil HT (R$2–4mil)', ag:'agendaram', re:'fizeram a reunião', vd:'compraram',
                   igPediu:'pediram diagnóstico neste post', igNovo:'pediram e ainda NÃO estão na base',
                   com:'comentaram pedindo diagnóstico', pre:'comentaram E preencheram a pesquisa',
-                  nao:'comentaram e NÃO preencheram a pesquisa' };
+                  nao:'comentaram e NÃO preencheram a pesquisa',
+                  nao5k:'perfis de 5 mil+ que pediram e não preencheram',
+                  nao10k:'perfis de 10 mil+ que pediram e não preencheram' };
 function verLeadsDoAnuncio(chave) {
   var d = _anDados[_anAtual];
   if (!d) return;
@@ -7566,6 +7579,7 @@ function verLeadsDoAnuncio(chave) {
       var pf = IGO.perfil[u] || {};
       return { nome: pf.nome ? pf.nome + ' (@' + u + ')' : '@' + u, insta: u, tel: '', telefone: '', tel8: '', email: '',
                dataTxt: '', faixa: '', _igTexto: IGO.texto[u] || '',
+               _igSegN: (pf.seg != null ? pf.seg : -1),
                _igSeg: (pf.seg != null ? pf.seg.toLocaleString('pt-BR') + ' seguidores' : (IGO.seg[u] || '')) };
     });
   }
@@ -7587,6 +7601,11 @@ function verLeadsDoAnuncio(chave) {
     +   '<button class="btn" style="padding:6px 11px;font-size:.68rem;" onclick="baixarQuem(\'' + chave + '\')">📊 planilha</button>'
     +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;" onclick="fecharQuem()">✕</span></div>'
     + '<div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px;">'
+    + (function(){   // social selling: perfil grande primeiro (Bruno 25/08/2026)
+        var temSeg = lista.some(function(x){ return x._igSegN != null && x._igSegN >= 0; });
+        if (temSeg) lista.sort(function(a, b){ return (b._igSegN == null ? -1 : b._igSegN) - (a._igSegN == null ? -1 : a._igSegN); });
+        return '';
+      })()
     + lista.slice(0, 300).map(function(l, i) {
         var st = ldSituacao(l);
         var selo = l.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;">🔥 R$2–4mil</span>'
@@ -7595,12 +7614,14 @@ function verLeadsDoAnuncio(chave) {
               : st.re ? '<span class="ld-tag" style="background:rgba(185,138,255,.16);color:#b98aff;">fez a reunião</span>'
               : '<span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;">agendou</span>') : '';
         var lk = clintLink(l);
+        var grande = (l._igSegN != null && l._igSegN >= 5000);
         var pos = _ldReg.indexOf(l);
         return '<div class="click" onclick="verFichaDaLista(' + i + ')" title="clique para ver todos os dados"'
-          + ' style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);flex-wrap:wrap;cursor:pointer;"'
+          + ' style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:' + (grande ? 'rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.35)' : 'rgba(255,255,255,.05)') + ';flex-wrap:wrap;cursor:pointer;"'
           + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'">'
-          + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
+          + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');' + (grande ? 'box-shadow:0 0 0 2px #ffd166;' : '') + '">' + v2ini(l.nome || '?') + '</div>'
           + '<div style="flex:1;min-width:130px;"><b style="font-size:.77rem;">' + (l.nome || '(sem nome)') + '</b>'
+          +   (grande ? '<span class="ld-tag" style="margin-left:6px;background:rgba(255,209,102,.18);color:#ffd166;font-weight:800;">👥 ' + (l._igSegN >= 1000 ? Math.round(l._igSegN / 1000) + 'k' : l._igSegN) + '</span>' : '')
           +   '<div class="hint" style="margin-top:1px;">' + [l.tel, (l.dataTxt || '').slice(0, 10),
                   (l._igSeg ? '👥 ' + l._igSeg : ''), (l._igTexto ? '💬 ' + l._igTexto : '')].filter(Boolean).join(' · ') + '</div></div>'
           + selo + etapa + seloChance(l, true) + seloAnuncio(l, true) + igSeloLead(l, true)
