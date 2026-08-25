@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0052';
+var VERSAO_DASH = '2026-08-25-0105';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6069,6 +6069,13 @@ function ldVisto() {
   if (!v) { var h = new Date(); h.setHours(0,0,0,0); v = h.getTime(); } // 1ª vez: começa hoje
   return v;
 }
+// MQL = quem declarou qualquer verba (R$500–1mil ou R$2–4mil) — Bruno 25/08/2026
+function ldFiltroMQL() {
+  var tem = LD_F.faixa.indexOf('alta') !== -1 && LD_F.faixa.indexOf('media') !== -1;
+  LD_F.faixa = tem ? [] : ['alta', 'media'];
+  try { renderLeads(); } catch (e) {}
+  try { renderV2(); } catch (e2) {}
+}
 function ldNovos() {
   var v = ldVisto();
   return LD.rows.filter(function(l){ return l.date && l.date.getTime() > v; });
@@ -6429,6 +6436,8 @@ function montarFiltrosLeads() {
     + (nNovos ? '<span class="fi-label">🆕 Chegada:</span><div class="chart-chips" style="margin:0;">'
         + chip('novos', 1, '🆕 Só os novos (' + nNovos + ')', LD_F.novos) + '</div>' : '')
     + '<span class="fi-label">💰 Investimento:</span><div class="chart-chips" style="margin:0;">'
+    + '<button class="chart-chip' + ((LD_F.faixa.indexOf('alta') !== -1 && LD_F.faixa.indexOf('media') !== -1) ? ' on' : '')
+      + '" onclick="ldFiltroMQL()" title="MQL = declarou alguma verba (R$500 ou mais)">⭐ MQL</button>'
     + chip('faixa', 'alta', '🔥 R$2–4mil', LD_F.faixa.indexOf('alta') !== -1)
     + chip('faixa', 'media', '🟡 R$500–1mil', LD_F.faixa.indexOf('media') !== -1)
     + chip('faixa', 'nda', '⚪ Sem verba', LD_F.faixa.indexOf('nda') !== -1)
@@ -6923,7 +6932,8 @@ function renderAnuncios() {
   }
   var _semImagem = chaves.filter(function(k){ return !_temImagem(k); });
   chaves = (AN_TIPO === 'sem') ? _semImagem : chaves.filter(_temImagem);
-  if (AN_SO === 'venda') chaves = chaves.filter(function(k){ return an[k].vd > 0; });
+  if (AN_SO === 'mql') chaves = chaves.filter(function(k){ return an[k].mql > 0; });
+  else if (AN_SO === 'venda') chaves = chaves.filter(function(k){ return an[k].vd > 0; });
   else if (AN_SO === 'reuniao') chaves = chaves.filter(function(k){ return an[k].re > 0; });
   else if (AN_SO === 'agend') chaves = chaves.filter(function(k){ return an[k].ag > 0; });
   var ordFn = { vendas:function(a,b){return an[b].vd-an[a].vd||an[b].ag-an[a].ag},
@@ -6949,7 +6959,7 @@ function renderAnuncios() {
     + [['todos','Todos'],['pago','💰 Tráfego pago'],['organico','🌱 Orgânico'],['sem','🔗 Sem imagem' + (_semImagem.length ? ' (' + _semImagem.length + ')' : '')]].map(function(o){
         return '<span class="chart-chip' + (AN_TIPO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_TIPO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '<span style="width:10px;"></span>'
-    + [['','Tudo'],['agend','📅 só com agendamento'],['reuniao','✅ só com reunião'],['venda','💰 só com venda']].map(function(o){
+    + [['','Tudo'],['mql','⭐ só com MQL'],['agend','📅 só com agendamento'],['reuniao','✅ só com reunião'],['venda','💰 só com venda']].map(function(o){
         return '<span class="chart-chip' + (AN_SO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_SO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '</div>';
   if (!META.dados) {
