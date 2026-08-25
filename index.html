@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0024';
+var VERSAO_DASH = '2026-08-25-0047';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3200,7 +3200,7 @@ function igResumo(per) {
       if (st) {
         r.ag++; r.quem.ag.push(pessoa);
         if (st.re) { r.re++; r.quem.re.push(pessoa); }
-        if (st.vd) { r.vd++; r.quem.vd.push(pessoa); if (l && l.tel8) r.fat += (_valorDoTel(l.tel8) || 0); }
+        if (st.vd) { r.vd++; r.quem.vd.push(pessoa); r.fat += igValorVendido(st, l); }
       }
     });
   });
@@ -3245,6 +3245,19 @@ function igPainelResumo(per) {
     + '</div>'
     + '</div>';
 }
+// Quanto essa pessoa comprou: soma as linhas "vendido" da ficha dela. Antes eu
+// procurava pelo telefone e quem foi achado só pelo @ ficava com valor zero.
+function igValorVendido(st, l) {
+  var v = 0;
+  if (st && st.linhas) {
+    for (var i = 0; i < st.linhas.length; i++) {
+      var r = st.linhas[i];
+      if (r && r.sn === 'vendido') v += (r.valor || 0);
+    }
+  }
+  if (!v && l && l.tel8) v = _valorDoTel(l.tel8) || 0;
+  return v;
+}
 // monta um card por post, no mesmo formato dos anúncios pagos
 function igCardsOrganicos(per) {
   carregarIGOrganico();
@@ -3282,7 +3295,7 @@ function igCardsOrganicos(per) {
         var quemE = l || { nome: '@' + u, insta: u, telefone: '', tel8: '' };
         d.ag++; d.quem.ag.push(quemE);
         if (st.re) { d.re++; d.quem.re.push(quemE); }
-        if (st.vd) { d.vd++; d.quem.vd.push(quemE); d.fat += (l && l.tel8 ? (_valorDoTel(l.tel8) || 0) : 0); }
+        if (st.vd) { d.vd++; d.quem.vd.push(quemE); d.fat += igValorVendido(st, l); }
       }
     });
     var quando = p.date ? p.date.toLocaleDateString('pt-BR').slice(0, 5) : '';
