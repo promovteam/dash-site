@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-0105';
+var VERSAO_DASH = '2026-08-25-0108';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4580,7 +4580,7 @@ var LD = { rows: [], semData: [], carregado: false };
 var LD_PER = 'hoje', LD_BUSCA = '';
 var LD_VIS = 'dia';   // quadro "por período": dia | sem | mes | tri | ano
 // filtros da aba (listas vazias = todos)
-var LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: [], etClint: [], classe: [] };
+var LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: [], etClint: [], classe: [], veio: '' };
 
 // ===== ATENDIMENTO: dono + etapa do lead (grava na planilha via robô) =====
 // As etapas ficam na coluna "Situacao" e o responsável na coluna "Dono",
@@ -6070,6 +6070,11 @@ function ldVisto() {
   return v;
 }
 // MQL = quem declarou qualquer verba (R$500–1mil ou R$2–4mil) — Bruno 25/08/2026
+function ldFiltroVeio(v) {
+  LD_F.veio = (LD_F.veio === v) ? '' : v;
+  try { renderLeads(); } catch (e) {}
+  try { renderV2(); } catch (e2) {}
+}
 function ldFiltroMQL() {
   var tem = LD_F.faixa.indexOf('alta') !== -1 && LD_F.faixa.indexOf('media') !== -1;
   LD_F.faixa = tem ? [] : ['alta', 'media'];
@@ -6354,6 +6359,9 @@ function ldFiltrar(rows) {
       if (!bateD) return false;
     }
     if (f.origem.length && f.origem.indexOf(l.origem) === -1) return false;
+    // 📷 comentou pedindo diagnóstico no Instagram · 🆕 formulário novo (Lovable)
+    if (f.veio === 'ig') { var _p = null; try { _p = igPedidoDoLead(l); } catch (e) {} if (!_p) return false; }
+    else if (f.veio === 'form') { if (!/^diagnostico-/i.test(String(l.origem || ''))) return false; }
     if (f.faixa.length && f.faixa.indexOf(l.faixa) === -1) return false;
     // filtro pela nota de qualificação A/B/C/D (Bruno 19/08/2026)
     if (f.classe.length) {
@@ -6400,7 +6408,7 @@ function ldLimparF() {
   renderLeads();
 }
 function ldContaF() {
-  return LD_F.origem.length + LD_F.faixa.length + LD_F.seg.length + LD_F.renda.length + LD_F.etapa.length + LD_F.etClint.length + LD_F.classe.length
+  return (LD_F.veio ? 1 : 0) + LD_F.origem.length + LD_F.faixa.length + LD_F.seg.length + LD_F.renda.length + LD_F.etapa.length + LD_F.etClint.length + LD_F.classe.length
     + LD_F.dono.length + (LD_F.sit ? 1 : 0) + (LD_F.score ? 1 : 0) + (LD_F.novos ? 1 : 0);
 }
 // a barra de filtros fica escondida até o usuário pedir
@@ -6435,6 +6443,10 @@ function montarFiltrosLeads() {
   var h = '<div class="filtro-inline">'
     + (nNovos ? '<span class="fi-label">🆕 Chegada:</span><div class="chart-chips" style="margin:0;">'
         + chip('novos', 1, '🆕 Só os novos (' + nNovos + ')', LD_F.novos) + '</div>' : '')
+    + '<span class="fi-label">📍 Veio de:</span><div class="chart-chips" style="margin:0;">'
+    + '<button class="chart-chip' + (LD_F.veio === 'ig' ? ' on' : '') + '" onclick="ldFiltroVeio(\'ig\')" title="comentou pedindo diagnóstico num post do Instagram">📷 Comentou no post</button>'
+    + '<button class="chart-chip' + (LD_F.veio === 'form' ? ' on' : '') + '" onclick="ldFiltroVeio(\'form\')" title="veio pelo formulário novo (diagnostico-v2 / v3 / org)">🆕 Formulário novo</button>'
+    + '</div>'
     + '<span class="fi-label">💰 Investimento:</span><div class="chart-chips" style="margin:0;">'
     + '<button class="chart-chip' + ((LD_F.faixa.indexOf('alta') !== -1 && LD_F.faixa.indexOf('media') !== -1) ? ' on' : '')
       + '" onclick="ldFiltroMQL()" title="MQL = declarou alguma verba (R$500 ou mais)">⭐ MQL</button>'
