@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-24-2224';
+var VERSAO_DASH = '2026-08-24-2234';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6755,14 +6755,15 @@ function renderAnuncios() {
                 reuni:function(a,b){return an[b].re-an[a].re},
                 fat:function(a,b){return an[b].fat-an[a].fat},
                 leads:function(a,b){return an[b].n-an[a].n},
-                gasto:function(a,b){return ((metaPor[_chaveAnuncio(b)]||{}).gasto||0)-((metaPor[_chaveAnuncio(a)]||{}).gasto||0)} }[AN_ORD] || null;
+                ped:function(a,b){return ((an[b].ig||{}).pedidos||0)-((an[a].ig||{}).pedidos||0)},
+                gasto:function(a,b){return ((metaPor[_chaveAnuncio(b)]||{}).gasto||0)-((metaPor[_chaveAnuncio(a)]||{}).gasto||0)} }[(AN_TIPO === 'organico' && AN_ORD === 'vendas') ? 'ped' : AN_ORD] || null;
   if (ordFn) chaves.sort(ordFn);
 
   h += '<div class="panel">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Criativos</h3>'
     + '<span class="hint">o criativo que trouxe cada lead</span><span style="flex:1;"></span>'
     + '<span class="hint">ordenar:</span>'
-    + [['vendas','Vendas'],['agend','Agendamentos'],['reuni','Reuniões'],['fat','Faturamento'],['leads','Leads'],['gasto','Investimento']].map(function(o){
+    + [['vendas','Vendas'],['ped','📷 Pedidos'],['agend','Agendamentos'],['reuni','Reuniões'],['fat','Faturamento'],['leads','Leads'],['gasto','Investimento']].map(function(o){
         return '<span class="ld-selo' + (AN_ORD===o[0]?'':' morno') + '" style="cursor:pointer;" onclick="AN_ORD=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;">'
@@ -6784,7 +6785,7 @@ function renderAnuncios() {
     var ehPost = String(k).indexOf('POST:') === 0;
     var cri = ehPost ? null : criativoDe(k, m.adId);
     if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post }; }
-    _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m, quem: a.quem };
+    _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m, quem: a.quem, ig: a.ig || null };
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
     h += '<div class="click" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
       + '<div class="an-capa" data-post="' + (m.post || '') + '" data-insta="' + (ehPost ? _lerPost(k).link : '') + '"'
