@@ -2180,7 +2180,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-2109';
+var VERSAO_DASH = '2026-08-25-2120';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2919,6 +2919,13 @@ function anuncioDe(x) {
 // ===== 📷 SELO DE QUEM PEDIU DIAGNÓSTICO NO INSTAGRAM (Bruno 24/08/2026) =====
 // Aparece na linha e na ficha do lead: quantas vezes pediu, quantos seguidores
 // tem e o link do último post onde comentou.
+// o rosto da pessoa: a foto guardada no Drive pelo robô
+function igFotoDe(insta) {
+  var u = String(insta || '').trim().toLowerCase().replace(/^@+/, '');
+  if (!u) return '';
+  var pf = IGO.perfil[u];
+  return (pf && pf.foto) ? 'https://drive.google.com/thumbnail?id=' + pf.foto + '&sz=w120' : '';
+}
 function igPedidoDoLead(l) {
   if (!l || !IGO.carregado) return null;
   var u = String(l.insta || '').trim().toLowerCase().replace(/^@+/, '');
@@ -3112,7 +3119,7 @@ function carregarIGOrganico() {
       var sg = parseInt(pf[2], 10);
       IGO.perfil[uu] = { nome: (pf[1] === '-' ? '' : (pf[1] || '')), seg: isNaN(sg) ? null : sg,
                          pub: parseInt(pf[3], 10) || null, bio: pf[4] || '', site: pf[5] || '',
-                         segue: parseInt(pf[6], 10) || null };
+                         segue: parseInt(pf[6], 10) || null, foto: (pf[7] && pf[7] !== '-') ? pf[7] : '' };
       if (!isNaN(sg)) IGO.seg[uu] = sg;
     }
     _igNomeBioIdx = null;
@@ -7668,7 +7675,7 @@ function verLeadsDoAnuncio(chave) {
           + ' style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:' + (grande ? 'rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.35)' : 'rgba(255,255,255,.05)') + ';flex-wrap:wrap;cursor:pointer;"'
           + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'">'
           + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');' + (grande ? 'box-shadow:0 0 0 2px #ffd166;' : '') + '">' + v2ini(l.nome || '?')
-          +   (l.insta ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+          +   (igFotoDe(l.insta) ? '<img src="' + igFotoDe(l.insta) + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
           + '</div>'
           + '<div style="flex:1;min-width:130px;"><b style="font-size:.77rem;">' + (l.nome || '(sem nome)') + '</b>'
           +   (grande ? '<span class="ld-tag" style="margin-left:6px;background:rgba(255,209,102,.18);color:#ffd166;font-weight:800;">👥 ' + (l._igSegN >= 1000 ? Math.round(l._igSegN / 1000) + 'k' : l._igSegN) + '</span>' : '')
@@ -8085,7 +8092,7 @@ function crmQuadro(lista) {
         + ' onclick="crmAbrirPerfil(event, \'' + (x.insta || '') + '\')" data-insta="' + (x.insta || '') + '">'
         + '<div class="crm-topo">'
         +   '<div class="avatar" style="width:30px;height:30px;font-size:.62rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
-        +     (x.insta ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(x.insta) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+        +     (igFotoDe(x.insta) ? '<img src="' + igFotoDe(x.insta) + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
         +   '</div>'
         +   '<div style="flex:1;min-width:0;">'
         +     '<b class="crm-nome">' + (x.nome || '@' + x.insta) + '</b>'
@@ -9513,7 +9520,7 @@ function renderLeads() {
         var quando = x.date ? x.date.toLocaleDateString('pt-BR').slice(0,5) + ' ' + ('0'+x.date.getHours()).slice(-2) + ':' + ('0'+x.date.getMinutes()).slice(-2) : '';
         h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
           + '<div class="avatar" style="width:30px;height:30px;font-size:.66rem;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
-          + (x.insta ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(x.insta) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+          + (igFotoDe(x.insta) ? '<img src="' + igFotoDe(x.insta) + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
           + '</div>'
           + '<b style="font-size:.76rem;flex:1;min-width:110px;">' + (x.nome || (x.insta ? '@' + x.insta : 'Sem nome')) + '</b>'
           + (x.seguidores ? '<span class="ld-tag" style="background:rgba(110,168,255,.15);color:#6ea8ff;">👥 ' + x.seguidores + ' seg.</span>' : '')
@@ -12033,7 +12040,7 @@ function agProcurar(txt) {
       + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'"'
       + ' onclick="agUsarDaLista(' + i + ');fecharBuscaLead();">'
       + '<div class="avatar" style="width:38px;height:38px;font-size:.72rem;position:relative;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || l.insta || '?') + ');">' + v2ini(l.nome || l.insta || '?')
-      +   (l.insta && !/\s/.test(l.insta) ? '<img src="https://unavatar.io/instagram/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '?fallback=false" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+      +   (igFotoDe(l.insta) ? '<img src="' + igFotoDe(l.insta) + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
       + '</div>'
       + '<div style="flex:1;min-width:0;">'
       +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + seloVezes(l) + seloVoltou(l) + seloChance(l, true) + '</div>'
