@@ -2165,6 +2165,8 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     // (espera um pouco para o filtro "só os novos" ainda funcionar nesta visita)
     if (s === 'leads' && typeof marcarLeadsVistos === 'function') setTimeout(marcarLeadsVistos, 2500);
     if (s === 'anuncios' && typeof renderAnuncios === 'function') renderAnuncios();
+    // a tela que precisa dos bloqueios os busca na hora (se ainda não vieram)
+    if (typeof BLQ !== 'undefined' && !BLQ.carregado && !BLQ.buscando) { try { carregarBloqueios(); } catch (e) {} }
     if (typeof montarTelaSePreciso === 'function') montarTelaSePreciso(s);
     if (typeof fecharTodasJanelas === 'function') fecharTodasJanelas();
   });
@@ -2180,7 +2182,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-2126';
+var VERSAO_DASH = '2026-08-25-2138';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3684,12 +3686,15 @@ function abrirFormVenda(dados) {
 // ===== 🔒 QUEM DEU BLOQUEIO / ENTRADA (Bruno 21/08/2026) =====
 // O robo le a aba "Bloqueio e Entrada"; o dash mostra a lista em Pagamentos, um
 // selo na ficha, e usa os dados (CPF, e-mail, valor...) no fechamento da venda.
-var BLQ = { lista: [], carregado: false, erro: '' };
+var BLQ = { lista: [], carregado: false, buscando: false, erro: '' };
 function carregarBloqueios() {
+  if (BLQ.buscando || BLQ.carregado) return;
+  BLQ.buscando = true;
   var nome = 'blqCb' + Math.random().toString(36).slice(2, 8);
   var s = document.createElement('script');
   var fim = function(d) {
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    BLQ.buscando = false;
     if (d && d.success) { BLQ.lista = d.lista || []; BLQ.carregado = true; BLQ.erro = ''; }
     else BLQ.erro = (d && d.error) || 'sem resposta';
     renderBloqueios();
@@ -3847,7 +3852,10 @@ window.addEventListener('message', function(ev) {
     var rb = (V2.rows || []).filter(function(r){ return (t8b && ldTel8(r.telefone) === t8b) || (nomeB && v2norm(r.nome) === nomeB); })
       .sort(function(a, b){ return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); })[0];
     if (rb && rb.sn !== 'vendido') { rb.status = m.subtipo || 'Bloqueio de oferta'; rb.sn = v2norm(rb.status); try { sincronizarStatusEvento(rb); } catch (e) {} }
-    setTimeout(function() { try { carregarV2(); } catch (e) {} try { carregarPag(); } catch (e) {} try { carregarBloqueios(); } catch (e) {} }, 4000);
+    setTimeout(function() { try { carregarV2(); } catch (e) {} try { carregarPag(); } catch (e) {} }, 4000);
+    // bloqueios levavam 18s e travavam a fila do robô na abertura: agora só depois
+    // que o resto chegou, ou na hora em que alguém abre a tela — Bruno 25/08/2026
+    setTimeout(function() { try { carregarBloqueios(); } catch (e) {} }, 25000);
     avisoRapido('✓ ' + (m.subtipo || 'Bloqueio') + ' de ' + (m.nome || 'cliente') + ' registrado · a Suellen foi avisada');
     return;
   }
@@ -3864,7 +3872,8 @@ window.addEventListener('message', function(ev) {
     try { sincronizarStatusEvento(r); } catch (e) {}
     mudou = true;
   }
-  setTimeout(function() { try { carregarV2(); } catch (e) {} try { carregarPag(); } catch (e) {} try { carregarBloqueios(); } catch (e) {} try { if (LD.carregado) renderLeads(); } catch (e) {} }, 6000);
+  setTimeout(function() { try { carregarV2(); } catch (e) {} try { carregarPag(); } catch (e) {} try { if (LD.carregado) renderLeads(); } catch (e) {} }, 6000);
+  setTimeout(function() { try { carregarBloqueios(); } catch (e) {} }, 25000);
   avisoRapido('✓ Venda de ' + (m.nome || 'cliente') + ' entrou no formulário' + (mudou ? ' · reunião marcada como Vendido' : '') + ' · a entrega foi avisada');
 });
 function avisoRapido(txt) {
@@ -4666,6 +4675,22 @@ var LD_MOTIVOS = ['Sem verba', 'Não é o público', 'Já é aluno', 'Número er
 // A chave da Clint NÃO fica neste arquivo (ele é público): quem fala com a Clint
 // é o robô da planilha, que guarda a chave em lugar seguro. O dash só pergunta.
 var CLINT = {};              // telefone -> dados da conversa
+// O que a Clint respondeu fica guardado por 10 minutos neste navegador: antes,
+// cada abertura do dash refazia as mesmas 12 perguntas (27 segundos de espera).
+var CLINT_VALIDADE = 10 * 60 * 1000;
+(function _clintDoCache() {
+  try {
+    var c = JSON.parse(sessionStorage.getItem('v2ClintCache') || '{}');
+    if (c && c.quando && (Date.now() - c.quando) < CLINT_VALIDADE) CLINT = c.dados || {};
+  } catch (e) {}
+})();
+function _clintGuardar() {
+  try {
+    var limpo = {};
+    Object.keys(CLINT).forEach(function(k){ if (CLINT[k]) limpo[k] = CLINT[k]; });
+    sessionStorage.setItem('v2ClintCache', JSON.stringify({ quando: Date.now(), dados: limpo }));
+  } catch (e) {}
+}
 var _clintFila = [], _clintOcupado = false;
 // regras de mudança automática de etapa (13/08/2026)
 var CLINT_DIAS_NUTRICAO = 7; // sem resposta do lead há 7 dias → vai para Nutrição
@@ -4706,6 +4731,7 @@ function _clintProximo() {
     delete _clintEspera[item.chave];
     esperas.forEach(function(cb){ try { cb(CLINT[item.chave]); } catch (e) {} });
     clintAplicarRegra(item.l);
+    _clintGuardar();
     setTimeout(_clintProximo, 120);
   }
   window[nome] = fim;
