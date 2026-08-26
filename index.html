@@ -2182,7 +2182,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-25-2138';
+var VERSAO_DASH = '2026-08-25-2151';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2868,7 +2868,7 @@ var _ultTodas = [];
 function _ultCard(r) {
   var i = v2reg(r);
   return '<div class="cliente-row" style="margin-bottom:8px;" onclick="abrirLead(' + i + ')">'
-    + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
+    + igAvatar(r)
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b>'
     + '<span>' + [r.leadId, r.date.toLocaleDateString('pt-BR'), r.closer].filter(Boolean).join(' · ') + '</span></div>'
     + seloAnuncio(r, true) + igSeloLead(r, true)
@@ -2921,6 +2921,35 @@ function anuncioDe(x) {
 // ===== 📷 SELO DE QUEM PEDIU DIAGNÓSTICO NO INSTAGRAM (Bruno 24/08/2026) =====
 // Aparece na linha e na ficha do lead: quantas vezes pediu, quantos seguidores
 // tem e o link do último post onde comentou.
+// acha o lead pelo telefone (para o rosto aparecer também na Visão Geral,
+// onde as linhas vêm da planilha de vendas e não têm o @ do Instagram)
+var _ldTelIdx = null;
+function ldPorTel8(t8) {
+  if (!t8) return null;
+  var n = (LD.rows || []).length;
+  if (!_ldTelIdx || _ldTelIdx._n !== n) {
+    _ldTelIdx = { _n: n };
+    (LD.rows || []).forEach(function(l){ if (l.tel8 && !_ldTelIdx[l.tel8]) _ldTelIdx[l.tel8] = l; });
+  }
+  return _ldTelIdx[t8] || null;
+}
+function igFotoDoLead(r) {
+  if (!r) return '';
+  var f = igFotoDe(r.insta || '');
+  if (f) return f;
+  var l = ldPorTel8(ldTel8(r.telefone || r.tel || ''));
+  return l ? igFotoDe(l.insta) : '';
+}
+// devolve o quadradinho do avatar com a foto por cima das iniciais
+function igAvatar(r, tamanho) {
+  var foto = igFotoDoLead(r);
+  var nome = r.nome || r.insta || '?';
+  var st = 'background:linear-gradient(135deg,' + v2grad(nome) + ');position:relative;'
+    + (tamanho ? 'width:' + tamanho + 'px;height:' + tamanho + 'px;font-size:.66rem;' : '');
+  return '<div class="avatar" style="' + st + '">' + v2ini(nome)
+    + (foto ? '<img src="' + foto + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+    + '</div>';
+}
 // o rosto da pessoa: a foto guardada no Drive pelo robô
 function igFotoDe(insta) {
   var u = String(insta || '').trim().toLowerCase().replace(/^@+/, '');
@@ -7121,14 +7150,38 @@ function renderAnuncios() {
       + '<div style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
       +   '<b style="font-size:.74rem;line-height:1.3;">' + (ehPost ? '📱 ' + ldAnuncioLimpo(k) : k) + '</b>'
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:' + (a.tipo === 'pago' ? 'rgba(255,107,107,.13);color:#ff6b6b' : 'rgba(61,220,151,.13);color:#3ddc97') + ';">' + (a.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
-      +   (a.ig
-            ? '<div class="hint" style="margin-top:3px;"><b style="color:#3ddc97;">' + a.ig.pedidos + ' pedidos</b> · ' + a.n + ' na base · <b style="color:#f6a350;">' + a.ig.novos + ' novos</b>'
-              + (a.ig.grandes ? ' · <b style="color:#b98aff;">' + a.ig.grandes + ' com 10k+</b>' : '') + '</div>'
-            : '<div class="hint" style="margin-top:3px;">' + a.n + ' leads · <b style="color:#f6a350;">' + a.mql + ' MQL</b> · <b style="color:#ff6b6b;">' + a.q + ' HT</b>' + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>')
+      +   (function(){
+            var kk = JSON.stringify(k).replace(/"/g, '&quot;');
+            var cl = function(etapa, txt, cor){
+              return '<span style="cursor:pointer;text-decoration:underline dotted;' + (cor ? 'color:' + cor + ';font-weight:800;' : '') + '"'
+                + ' onclick="return verDoCard(event,' + kk + ',\'' + etapa + '\')">' + txt + '</span>';
+            };
+            if (a.ig) {
+              return '<div class="hint" style="margin-top:3px;">'
+                + cl('igPediu', a.ig.pedidos + ' pedidos', '#3ddc97') + ' · '
+                + cl('n', a.n + ' na base') + ' · '
+                + cl('igNovo', a.ig.novos + ' novos', '#f6a350')
+                + (a.ig.grandes ? ' · <b style="color:#b98aff;">' + a.ig.grandes + ' com 10k+</b>' : '') + '</div>';
+            }
+            return '<div class="hint" style="margin-top:3px;">'
+              + cl('n', a.n + ' leads') + ' · '
+              + cl('mql', a.mql + ' MQL', '#f6a350') + ' · '
+              + cl('q', a.q + ' HT', '#ff6b6b')
+              + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>';
+          })()
       +   '<div style="display:flex;gap:5px;margin-top:9px;">'
-      +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(255,209,102,.1);"><b style="color:#ffd166;font-size:.95rem;display:block;">' + a.ag + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">AGEND.</span></div>'
-      +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(185,138,255,.1);"><b style="color:#b98aff;font-size:.95rem;display:block;">' + a.re + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">REUNIÕES</span></div>'
-      +     '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(61,220,151,.1);"><b style="color:#3ddc97;font-size:.95rem;display:block;">' + a.vd + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">VENDAS</span></div>'
+      +     (function(){
+              var kk = JSON.stringify(k).replace(/"/g, '&quot;');
+              var caixa = function(etapa, valor, rot, cor, fundo, dica){
+                return '<div class="click" title="' + dica + '" onclick="return verDoCard(event,' + kk + ',\'' + etapa + '\')"'
+                  + ' style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:' + fundo + ';cursor:pointer;">'
+                  + '<b style="color:' + cor + ';font-size:.95rem;display:block;">' + valor + '</b>'
+                  + '<span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">' + rot + '</span></div>';
+              };
+              return caixa('ag', a.ag, 'AGEND.', '#ffd166', 'rgba(255,209,102,.1)', 'ver quem agendou')
+                + caixa('re', a.re, 'REUNIÕES', '#b98aff', 'rgba(185,138,255,.1)', 'ver quem fez a reunião')
+                + caixa('vd', a.vd, 'VENDAS', '#3ddc97', 'rgba(61,220,151,.1)', 'ver quem comprou');
+            })()
       +   '</div>'
       +   (a.fat ? '<div style="margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);text-align:center;">'
               + '<b style="color:#3ddc97;font-size:.92rem;">' + rs(a.fat) + '</b>'
@@ -7644,6 +7697,13 @@ var _anRotulo = { n:'leads', mql:'MQL', q:'perfil HT (R$2–4mil)', ag:'agendara
                   g100:'perfis de 100 mil+ que interagiram',
                   top:'nota A ou B que interagiram no Instagram',
                   topSem:'nota A ou B que interagiram e ainda NÃO agendaram' };
+// clicar num número do card já abre a lista de quem é (Bruno 25/08/2026)
+function verDoCard(ev, anuncio, etapa) {
+  try { ev.stopPropagation(); } catch (e) {}
+  _anAtual = anuncio;
+  verLeadsDoAnuncio(etapa);
+  return false;
+}
 function verLeadsDoAnuncio(chave) {
   var d = _anDados[_anAtual];
   if (!d) return;
