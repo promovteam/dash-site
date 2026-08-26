@@ -2182,7 +2182,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-26-0034';
+var VERSAO_DASH = '2026-08-26-1304';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3232,7 +3232,8 @@ function igResumo(per) {
       else r.semDados++;
       var l = igLeadPorInsta(u);
       var pessoa = l ? l : { nome: (pf && pf.nome ? pf.nome + ' (@' + u + ')' : '@' + u), insta: u,
-                             tel: '', telefone: '', tel8: '', email: '', dataTxt: '', faixa: '' };
+                             tel: '', telefone: '', tel8: '', email: '', dataTxt: '', faixa: 'sem',
+                             obj: '', renda: '', invest: '', seg: '', score: 0, origem: 'comentário no Instagram' };
       pessoa._igPost = p.link;
       pessoa._igTexto = IGO.texto[u] || '';
       pessoa._igSeg = (pf && pf.seg != null) ? pf.seg.toLocaleString('pt-BR') + ' seguidores' : '';
@@ -7716,7 +7717,8 @@ function verLeadsDoAnuncio(chave) {
       if (l) return l;
       var pf = IGO.perfil[u] || {};
       return { nome: pf.nome ? pf.nome + ' (@' + u + ')' : '@' + u, insta: u, tel: '', telefone: '', tel8: '', email: '',
-               dataTxt: '', faixa: '', _igTexto: IGO.texto[u] || '',
+               dataTxt: '', faixa: 'sem', obj: '', renda: '', invest: '', seg: '', score: 0,
+               origem: 'comentário no Instagram', _igTexto: IGO.texto[u] || '',
                _igSegN: (pf.seg != null ? pf.seg : -1),
                _igBio: pf.bio || '', _igSite: pf.site || '',
                _igSeg: (pf.seg != null ? pf.seg.toLocaleString('pt-BR') + ' seguidores' : (IGO.seg[u] || '')) };
@@ -8715,7 +8717,9 @@ function abrirFichaLead(i) {
   _ldFichaAberta = l;
   var st = ldSituacao(l);
   var sit = st ? (st.vd ? '💰 Virou VENDA' : st.re ? '✅ Fez a reunião' : '📅 Reunião agendada') : '⏳ Ainda não agendou reunião';
-  var FX = { alta:['🔥 Prioridade máxima','#f6a350'], media:['🟡 Prioridade menor','#6ea8ff'], nda:['⚪ Sem disponibilidade','#8b8fa3'], sem:['⚪ Não respondeu','#8b8fa3'] }[l.faixa];
+  var _FXs = { alta:['🔥 Prioridade máxima','#f6a350'], media:['🟡 Prioridade menor','#6ea8ff'], nda:['⚪ Sem disponibilidade','#8b8fa3'], sem:['⚪ Não respondeu','#8b8fa3'] };
+  // quem veio só do comentário do Instagram não tem faixa: sem isto a ficha quebrava
+  var FX = _FXs[l.faixa] || _FXs.sem;
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1) ? listaPreenchimentos(l) : '', 'html'],
