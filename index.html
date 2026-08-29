@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1157';
+var VERSAO_DASH = '2026-08-29-1200';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11648,7 +11648,7 @@ function renderContratos() {
           var aguarda = stN.indexOf('aguardando assinatura') !== -1;
           var podeC = ehContratos();
           var b = '<button class="btn" style="padding:7px 12px;font-size:.7rem;" onclick="verContratoPag(' + i + ')">👁 Ver</button>';
-          if (!concluido) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;color:var(--text-2);" onclick="gerarContratoPag(' + i + ', true)" title="Abre o contrato preenchido como Word no Google Docs — edite o que precisar e depois use ⬆️ Usar editado ou 🔁 Corrigir e reenviar.">✏️ Editar</button>';
+          if (!concluido) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;color:var(--text-2);" onclick="editarContratoPag(' + i + ')" title="Edita os dados e o texto do pagamento aqui mesmo — o robô gera o contrato corrigido na hora.">✏️ Editar</button>';
           if (!lk && !String(p.stC || '').trim()) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;" onclick="gerarContratoPag(' + i + ')">📄 Gerar contrato</button>';
           if (envM && podeC && emProd) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;color:#b98aff;border-color:rgba(185,138,255,.4);" onclick="usarEditadoPag(' + i + ', false)" title="Troca o rascunho da Clicksign pelo Word que você editou no Drive.">⬆️ Usar editado</button>';
           if (envM && podeC && emProd) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="enviarContratoPag(' + i + ')">📨 Enviar</button>';
@@ -11710,6 +11710,79 @@ function _ctrJanelaPreenche(ov, p, url, ehPrevia) {
   if (ab) ab.innerHTML = '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;" href="' + url + '" target="_blank" rel="noopener">Abrir em outra aba ↗</a>';
   var corpo = ov.querySelector('#ctr-jan-corpo');
   if (corpo) corpo.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:none;border-radius:12px;background:#fff;"></iframe>';
+}
+// ✏️ EDITAR DENTRO DO DASH: dados + texto do pagamento; o robo regenera o contrato
+function editarContratoPag(i) {
+  if (soOlhar()) return;
+  var p = (PAG.rows || [])[i];
+  if (!p) return;
+  avisoRapido('✏️ Buscando os dados do contrato…');
+  var payload = encodeURIComponent(JSON.stringify({ action: 'contratoDadosParaEditar', nome: p.nome || '', telefone: p.celular || '' }));
+  fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(resp) {
+      if (!(resp && resp.success)) { alert('Não deu para abrir a edição: ' + ((resp && resp.error) || 'erro')); return; }
+      var d = resp.dados || {};
+      var envM = String(p.contrato || '').match(/envelopes\/([0-9a-f\-]{36})/i);
+      var aguarda = v2norm(p.stC || '').indexOf('aguardando assinatura') !== -1;
+      var ov = document.createElement('div');
+      ov.className = 'modal-overlay open';
+      ov.style.zIndex = 300;
+      ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+      function cp(rot, id, v) {
+        return '<label class="hint" style="display:block;margin:10px 0 4px;">' + rot + '</label>'
+          + '<input id="' + id + '" value="' + _cxEsc(v || '').replace(/"/g, '&quot;') + '" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:9px;">';
+      }
+      ov.innerHTML = '<div class="modal" style="width:min(560px,94vw);max-height:90vh;overflow-y:auto;padding:20px;">'
+        + '<div style="display:flex;align-items:center;gap:10px;"><b style="flex:1;">✏️ Editar contrato — ' + _cxEsc(p.nome || '') + '</b>'
+        + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+        + '<div class="hint" style="margin-top:4px;">O que mudar aqui vale no contrato E fica corrigido na planilha.</div>'
+        + cp('Nome completo', 'ec-nome', d.nome) + cp('CPF ou CNPJ', 'ec-cpf', d.cpf) + cp('RG', 'ec-rg', d.rg)
+        + cp('Endereço completo', 'ec-end', d.endereco) + cp('E-mail', 'ec-email', d.email) + cp('Valor total (só números)', 'ec-valor', d.valor_total)
+        + '<label class="hint" style="display:block;margin:10px 0 4px;">Texto da forma de pagamento (sai na cláusula 3.1 do jeito que estiver aqui)</label>'
+        + '<textarea id="ec-pag" style="width:100%;min-height:110px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:9px;line-height:1.5;">' + _cxEsc(resp.pagamento || '') + '</textarea>'
+        + '<div class="hint" style="margin-top:8px;">Precisa mexer em cláusula/texto jurídico? <a style="color:#8f6bff;cursor:pointer;text-decoration:underline;" onclick="this.closest(\'.modal-overlay\').remove();gerarContratoPag(' + i + ', true)">abrir o contrato no Word</a> e depois ⬆️ Usar editado.</div>'
+        + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">'
+        + '<button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'
+        + '<button class="btn primary" id="ec-salvar" style="padding:9px 18px;">' + (aguarda ? '💾 Salvar, corrigir e reenviar' : '💾 Salvar e gerar o contrato') + '</button>'
+        + '</div></div>';
+      document.body.appendChild(ov);
+      document.getElementById('ec-salvar').onclick = function() {
+        var g = function(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+        var mudancas = { nome: g('ec-nome'), cpf: g('ec-cpf'), rg: g('ec-rg'), endereco: g('ec-end'), email: g('ec-email'), valor_total: g('ec-valor') };
+        var pagTxt = g('ec-pag');
+        if (pagTxt && pagTxt !== String(resp.pagamento || '').trim()) mudancas.pagamento_livre = pagTxt;
+        ov.remove();
+        avisoRapido(aguarda ? '🔁 Salvando, corrigindo e reenviando… (uns 30 segundos)' : '📄 Salvando e gerando o contrato… (uns 20 segundos)');
+        var p2 = encodeURIComponent(JSON.stringify({ action: 'gerarContratoDoLead', nome: p.nome || '', telefone: p.celular || '',
+          envelope: envM ? envM[1] : '', mudancas: mudancas }));
+        fetch(APPS_SCRIPT_URL + '?payload=' + p2, { redirect: 'follow' })
+          .then(function(x) { return x.json(); })
+          .then(function(r2) {
+            if (!(r2 && r2.success && r2.link)) { alert('Não consegui gerar: ' + ((r2 && r2.error) || 'erro')); return; }
+            if (mudancas.nome) p.nome = mudancas.nome;
+            p.contrato = r2.link;
+            p.stC = 'Em produção';
+            if (window._ctrVistos) window._ctrVistos = {};
+            if (aguarda) {
+              var mNovo = String(r2.link).match(/envelopes\/([0-9a-f\-]{36})/i);
+              var p3 = encodeURIComponent(JSON.stringify({ action: 'clicksignEnviar', envelope: mNovo ? mNovo[1] : '' }));
+              fetch(APPS_SCRIPT_URL + '?payload=' + p3, { redirect: 'follow' })
+                .then(function(x) { return x.json(); })
+                .then(function(r3) {
+                  p.stC = (r3 && r3.success) ? 'Aguardando assinatura' : 'Em produção';
+                  renderContratos();
+                  avisoRapido((r3 && r3.success) ? '🔁 Corrigido e reenviado — o cliente recebeu o e-mail novo' : '⚠️ Corrigi, mas não consegui reenviar: ' + ((r3 && r3.error) || 'erro'));
+                });
+            } else {
+              renderContratos();
+              avisoRapido('📄 Contrato corrigido e gerado! ' + (r2.antigo ? '(' + r2.antigo + ')' : ''));
+            }
+          })
+          .catch(function(e) { alert('Erro: ' + e); });
+      };
+    })
+    .catch(function(e) { alert('Erro: ' + e); });
 }
 // ⬆️ troca o contrato pelo Word editado (e 🔁 reenvia, se for o caso)
 function usarEditadoPag(i, reenviar) {
