@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1204';
+var VERSAO_DASH = '2026-08-29-1209';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11643,13 +11643,14 @@ function renderContratos() {
           var lk = String(p.contrato || '');
           var envM = lk.match(/envelopes\/([0-9a-f\-]{36})/i);
           var stN = v2norm(p.stC || '');
-          var concluido = stN.indexOf('conclu') !== -1;
+          // depois de assinado (concluido, aguardando PV/pagamento, dispensado...) nao se mexe mais
+          var fechado = /conclu|cancelado|dispensado|nao realizado|aguardando pv|aguardando pagamento/.test(stN);
           var emProd = stN.indexOf('em produ') !== -1 || (!stN && envM);
           var aguarda = stN.indexOf('aguardando assinatura') !== -1;
           var podeC = ehContratos();
           var b = '<button class="btn" style="padding:7px 12px;font-size:.7rem;" onclick="verContratoPag(' + i + ')">👁 Ver</button>';
-          if (!concluido) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;color:var(--text-2);" onclick="editarContratoPag(' + i + ')" title="Edita os dados e o texto do pagamento aqui mesmo — o robô gera o contrato corrigido na hora.">✏️ Editar</button>';
-          if (!lk && !String(p.stC || '').trim()) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;" onclick="gerarContratoPag(' + i + ')">📄 Gerar contrato</button>';
+          if (!fechado) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;color:var(--text-2);" onclick="editarContratoPag(' + i + ')" title="Edita os dados e o texto do pagamento aqui mesmo — o robô gera o contrato corrigido na hora.">✏️ Editar</button>';
+          if ((!lk && !String(p.stC || '').trim()) || (!envM && (emProd || aguarda))) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;" onclick="gerarContratoPag(' + i + ')" title="Gera o contrato pelo robô — a partir daí dá para enviar e acompanhar por aqui.">📄 Gerar contrato</button>';
           if (envM && podeC && emProd) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;color:#b98aff;border-color:rgba(185,138,255,.4);" onclick="usarEditadoPag(' + i + ', false)" title="Troca o rascunho da Clicksign pelo Word que você editou no Drive.">⬆️ Usar editado</button>';
           if (envM && podeC && emProd) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="enviarContratoPag(' + i + ')">📨 Enviar</button>';
           if (envM && podeC && aguarda) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;" onclick="usarEditadoPag(' + i + ', true)" title="Cancela o contrato enviado, sobe o Word editado e reenvia para o cliente assinar.">🔁 Corrigir e reenviar</button>';
