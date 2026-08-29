@@ -2182,7 +2182,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-0839';
+var VERSAO_DASH = '2026-08-29-0840';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10873,6 +10873,27 @@ function desenharFichaPag() {
       + '</button></div>';
   }
   h += '</div>';
+  // 📅 reunioes e lead desta pessoa, direto na ficha do pagamento (Bruno 28/08/2026)
+  var _t8P = (r.celular || '').replace(/\D/g, '').slice(-8);
+  var _reusP = (V2.rows || []).filter(function(x) {
+    var tx = String(x.telefone || '').replace(/\D/g, '').slice(-8);
+    return (_t8P && tx === _t8P) || (r.nome && v2norm(x.nome || '') === v2norm(r.nome));
+  }).sort(function(a, b) { return (a.date || 0) - (b.date || 0); });
+  if (_reusP.length) {
+    var CORP = { 'vendido': '#3ddc97', 'no show': '#ff6b6b', 'nao vendido': '#8d8478', 'reuniao agendada': '#6ea8ff', 'remarcada 2 reuniao': '#ff9a5a', 'bloqueio de oferta': '#b98aff', 'entrada': '#ffd166' };
+    h += '<div class="dtl-card" style="margin-top:12px;">'
+      + '<div class="g-label">📅 Reuniões desta pessoa (planilha)</div>';
+    _reusP.slice(-4).forEach(function(x) {
+      var snx = x.sn || v2norm(x.status || '');
+      var cor = CORP[snx] || 'var(--muted)';
+      h += '<div class="dtl-line"><span>' + (x.date ? x.date.toLocaleDateString('pt-BR') : 'sem data')
+        + (x.closer ? ' · ' + x.closer : '') + (x.sdr ? ' · SDR ' + x.sdr : '') + '</span>'
+        + '<b style="color:' + cor + ';">' + (x.status || '—') + '</b></div>';
+    });
+    var _iLd = v2reg(_reusP[_reusP.length - 1]);
+    h += '<div style="margin-top:8px;text-align:right;"><button class="btn-assumir" style="padding:6px 12px;font-size:.7rem;" onclick="this.closest(\'.modal-overlay\').remove();_pagFicha=null;abrirLead(' + _iLd + ')">📇 Ver ficha completa do lead</button></div>'
+      + '</div>';
+  }
   h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">'
     + (wa ? '<a class="btn primary" style="flex:1;text-align:center;text-decoration:none;" href="' + wa + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '')
     + (r.contrato ? '<a class="btn" style="flex:1;text-align:center;text-decoration:none;" href="' + r.contrato + '" target="_blank" rel="noopener">📄 Contrato</a>' : '')
