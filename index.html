@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1257';
+var VERSAO_DASH = '2026-08-29-1301';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9065,13 +9065,26 @@ function abrirFichaLead(i) {
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda</button>');
   if (_snBloqU && !_blqF)
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>');
-  var _iCtr = _rUlt ? v2reg(_rUlt) : -1;
-  if (_snU === 'vendido' && _pag && _iCtr >= 0 && !/legado/i.test(String(_pag.programa || ''))) {
-    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;font-weight:800;cursor:pointer;" onclick="gerarContratoLead(' + _iCtr + ', false)" title="Monta o contrato preenchido e deixa em rascunho na Clicksign — a Juliane confere e envia. Use depois de corrigir algum dado ou para venda antiga sem contrato.">📄 Gerar contrato</button>');
-    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="gerarContratoLead(' + _iCtr + ', true)" title="Gera o contrato preenchido como Word editável no Drive — para casos fora do padrão (cláusula ou condição diferente). Depois de ajustar, subir na Clicksign como documento avulso.">✏️ Editável</button>');
-    var _envM = String(_pag.contrato || '').match(/envelopes\/([0-9a-f\-]{36})/i);
-    if (_envM && ehContratos() && (/^\s*$/.test(_pag.stC || '') || /em produ/i.test(_pag.stC || '')))
-      _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.14);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="enviarContratoLead(\'' + _envM[1] + '\', ' + _iCtr + ')" title="Ativa o contrato na Clicksign e dispara o e-mail de assinatura para o cliente AGORA. Só a Juliane, o Bruno e o Adm veem este botão.">📨 Enviar p/ assinatura</button>');
+  // 📄 contratos na ficha: mesmo kit da aba Contratos (Bruno 29/08/2026)
+  var _iPagC = _pag ? (PAG.rows || []).indexOf(_pag) : -1;
+  if (_snU === 'vendido' && _iPagC >= 0 && !/legado/i.test(String(_pag.programa || ''))) {
+    var _lkF = String(_pag.contrato || '');
+    var _envF = _lkF.match(/envelopes\/([0-9a-f\-]{36})/i);
+    var _stF = v2norm(_pag.stC || '');
+    var _fechF = /conclu|cancelado|dispensado|nao realizado|aguardando pv|aguardando pagamento/.test(_stF);
+    var _prodF = _stF.indexOf('em produ') !== -1 || (!_stF && _envF);
+    var _aguF = _stF.indexOf('aguardando assinatura') !== -1;
+    var _eb = function(rot, cor, fn, dica) {
+      _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(' + cor + ',.14);border-color:rgba(' + cor + ',.45);font-weight:800;cursor:pointer;" onclick="' + fn + '" title="' + dica + '">' + rot + '</button>');
+    };
+    _eb('👁 Ver contrato', '110,168,255', 'verContratoPag(' + _iPagC + ')', 'Mostra o contrato na janelinha — o da Clicksign ou a prévia montada na hora.');
+    if (!_fechF) _eb('✏️ Editar', '255,255,255', 'editarContratoPag(' + _iPagC + ')', 'Edita dados e o texto do pagamento aqui mesmo — o robô gera o contrato corrigido.');
+    if ((!_lkF && !String(_pag.stC || '').trim()) || (!_envF && (_prodF || _aguF)))
+      _eb('📄 Gerar contrato', '108,71,255', 'gerarContratoPag(' + _iPagC + ')', 'Monta o contrato preenchido em rascunho na Clicksign — a Juliane confere e envia.');
+    if (_envF && ehContratos() && _prodF)
+      _eb('📨 Enviar p/ assinatura', '61,220,151', 'enviarContratoPag(' + _iPagC + ')', 'Ativa o contrato e dispara o e-mail de assinatura AGORA (com confirmação). Só Juliane, Bruno e Adm.');
+    if (_envF && ehContratos() && _aguF)
+      _eb('🔁 Corrigir e reenviar', '255,154,90', 'usarEditadoPag(' + _iPagC + ', true)', 'Cancela o enviado, sobe o Word editado e reenvia para o cliente assinar.');
   }
   if (!_rUlt) _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="ldProcurarReuniao(' + i + ')" title="A reunião existe mas não ligou com este lead (telefone diferente)? Procure e ligue aqui">🔍 já teve reunião? procurar</button>');
   if (_btH.length) h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">' + _btH.join('') + '</div>';
