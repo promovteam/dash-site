@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1154';
+var VERSAO_DASH = '2026-08-29-1157';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11667,24 +11667,49 @@ function verContratoPag(i) {
   var lk = String(p.contrato || '');
   var m = lk.match(/envelopes\/([0-9a-f\-]{36})/i);
   if (!m && /^https?:\/\//i.test(lk)) { window.open(lk, '_blank'); return; }   // link do Drive (da Juliane): abre direto
-  avisoRapido('👁 Buscando o contrato… (se ainda não tem arquivo, monto a prévia — uns 15 segundos)');
+  var chave = m ? m[1] : 'v' + ((p.celular || '').replace(/\D/g, '') || v2norm(p.nome || ''));
+  // ja vimos esse contrato? abre na hora (o arquivo da Clicksign vence em ~5 min; a previa do Drive nao)
+  var visto = window._ctrVistos && window._ctrVistos[chave];
+  if (visto && (visto.tipo === 'previa' || Date.now() - visto.em < 240000)) { _ctrJanela(p, visto.url); return; }
+  var ov = _ctrJanela(p, null);   // janela abre NA HORA, montando por dentro
   var payload = encodeURIComponent(JSON.stringify({ action: 'contratoVer', envelope: m ? m[1] : '', nome: p.nome || '', telefone: p.celular || '' }));
   fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
     .then(function(x) { return x.json(); })
     .then(function(resp) {
-      if (!(resp && resp.success && resp.url)) { alert('Não consegui buscar o contrato: ' + ((resp && resp.error) || 'erro')); return; }
-      var ov = document.createElement('div');
-      ov.className = 'modal-overlay open';
-      ov.style.zIndex = 260;
-      ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
-      ov.innerHTML = '<div class="modal" style="width:min(900px,96vw);height:88vh;display:flex;flex-direction:column;">'
-        + '<div class="modal-head"><b style="flex:1;">📄 Contrato — ' + (p.nome || '') + (resp.tipo === 'previa' ? ' <span class="hint">(prévia montada agora — o oficial está na Clicksign)</span>' : '') + '</b>'
-        + '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;" href="' + resp.url + '" target="_blank" rel="noopener">Abrir em outra aba ↗</a>'
-        + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
-        + '<iframe src="' + resp.url + '" style="flex:1;border:none;border-radius:12px;background:#fff;"></iframe></div>';
-      document.body.appendChild(ov);
+      if (!(resp && resp.success && resp.url)) {
+        ov.remove();
+        alert('Não consegui buscar o contrato: ' + ((resp && resp.error) || 'erro'));
+        return;
+      }
+      (window._ctrVistos = window._ctrVistos || {})[chave] = { url: resp.url, tipo: resp.tipo || '', em: Date.now() };
+      _ctrJanelaPreenche(ov, p, resp.url, resp.tipo === 'previa');
     })
-    .catch(function(e) { alert('Erro: ' + e); });
+    .catch(function(e) { ov.remove(); alert('Erro: ' + e); });
+}
+// a janela do contrato: abre vazia ("montando...") e recebe o PDF quando chega
+function _ctrJanela(p, urlPronta) {
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 260;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(900px,96vw);height:88vh;display:flex;flex-direction:column;">'
+    + '<div class="modal-head"><b style="flex:1;" id="ctr-jan-tit">📄 Contrato — ' + _cxEsc(p.nome || '') + '</b>'
+    + '<span id="ctr-jan-abrir"></span>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<div id="ctr-jan-corpo" style="flex:1;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(255,255,255,.04);">'
+    + '<div style="text-align:center;color:var(--text-2);font-size:.85rem;"><div style="font-size:2rem;margin-bottom:10px;">📄</div>Montando o contrato…<br><span class="hint">a primeira vez leva uns 15 segundos; depois abre na hora</span></div>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  if (urlPronta) _ctrJanelaPreenche(ov, p, urlPronta, false);
+  return ov;
+}
+function _ctrJanelaPreenche(ov, p, url, ehPrevia) {
+  var tit = ov.querySelector('#ctr-jan-tit');
+  if (tit && ehPrevia) tit.innerHTML += ' <span class="hint">(prévia montada agora — o oficial está na Clicksign)</span>';
+  var ab = ov.querySelector('#ctr-jan-abrir');
+  if (ab) ab.innerHTML = '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;" href="' + url + '" target="_blank" rel="noopener">Abrir em outra aba ↗</a>';
+  var corpo = ov.querySelector('#ctr-jan-corpo');
+  if (corpo) corpo.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:none;border-radius:12px;background:#fff;"></iframe>';
 }
 // ⬆️ troca o contrato pelo Word editado (e 🔁 reenvia, se for o caso)
 function usarEditadoPag(i, reenviar) {
