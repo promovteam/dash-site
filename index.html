@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-0901';
+var VERSAO_DASH = '2026-08-29-0919';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11641,26 +11641,27 @@ function renderContratos() {
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
       + (p.contrato ? '<a class="btn" style="padding:7px 12px;font-size:.7rem;text-decoration:none;" href="' + p.contrato + '" target="_blank" rel="noopener">📄 Abrir</a>' : '')
       + (!p.contrato && !String(p.stC || '').trim() ? '<button class="btn" style="padding:7px 12px;font-size:.7rem;" onclick="gerarContratoPag(' + i + ')">📄 Gerar contrato</button>' : '')
+      + '<button class="btn" style="padding:7px 12px;font-size:.7rem;color:var(--text-2);" onclick="gerarContratoPag(' + i + ', true)" title="Gera o contrato preenchido como Word editável no Drive — para mudar cláusula ou condição. Depois de ajustar, subir na Clicksign como documento avulso.">✏️ Editável</button>'
       + (p.contrato && ehContratos() && (v2norm(p.stC || '').indexOf('em produ') !== -1 || !String(p.stC || '').trim()) ? '<button class="btn" style="padding:7px 12px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="enviarContratoPag(' + i + ')">📨 Enviar</button>' : '')
       + '</div></div>';
   });
   if (lista.length > 120) h += '<div class="hint" style="text-align:center;">Mostrando os 120 mais recentes — use os filtros para achar os outros.</div>';
   cx.innerHTML = h;
 }
-function gerarContratoPag(i) {
+function gerarContratoPag(i, editavel) {
   if (soOlhar()) return;
   var p = (PAG.rows || [])[i];
   if (!p) return;
-  if (!confirm('Gerar o contrato de ' + (p.nome || '') + ' em rascunho na Clicksign?')) return;
+  var oq = editavel ? 'a versão EDITÁVEL (Word no Drive) do contrato' : 'o contrato em rascunho na Clicksign';
+  if (!confirm('Gerar ' + oq + ' para ' + (p.nome || '') + '?')) return;
   avisoRapido('📄 Gerando o contrato de ' + (p.nome || '') + '… (uns 15 segundos)');
-  var payload = encodeURIComponent(JSON.stringify({ action: 'gerarContratoDoLead', telefone: p.celular || '', nome: p.nome || '' }));
+  var payload = encodeURIComponent(JSON.stringify({ action: 'gerarContratoDoLead', telefone: p.celular || '', nome: p.nome || '', editavel: !!editavel }));
   fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
     .then(function(x) { return x.json(); })
     .then(function(resp) {
       if (resp && resp.success && resp.link) {
-        p.contrato = resp.link; p.stC = 'Em produção';
-        renderContratos();
-        avisoRapido('📄 Contrato pronto em rascunho!');
+        if (!editavel) { p.contrato = resp.link; p.stC = 'Em produção'; renderContratos(); }
+        avisoRapido(editavel ? '✏️ Word editável pronto!' : '📄 Contrato pronto em rascunho!');
         var w = window.open(resp.link, '_blank');
         if (!w) prompt('Link do contrato (copie):', resp.link);
       } else alert('Não consegui gerar: ' + ((resp && resp.error) || 'erro desconhecido'));
