@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1248';
+var VERSAO_DASH = '2026-08-29-1249';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11599,6 +11599,7 @@ function conferirAssinaturasAgora(bt) {
     .then(function(resp) {
       var mudados = (resp && resp.mudados) || [];
       avisoRapido(mudados.length ? ('🔄 ' + mudados.length + ' contrato' + (mudados.length === 1 ? ' mudou' : 's mudaram') + ' de situação!') : '🔄 Conferido — nada mudou desde a última olhada');
+      if (resp && resp.quando) _ctrUltimaCache = { v: resp.quando, em: Date.now() };
       try { carregarPag(); } catch (e) {}
       setTimeout(function() { try { renderContratos(); atualizarAlertaContratos(); } catch (e) {} }, 2500);
     })
@@ -11652,6 +11653,7 @@ function renderContratos() {
     h += '<button class="chart-chip' + (_ctrFiltro === c[0] ? ' on' : '') + '" onclick="_ctrFiltro=\'' + c[0] + '\';renderContratos()">' + c[1] + ' (' + c[2] + ')</button>';
   });
   h += '<button class="chart-chip" style="margin-left:auto;" onclick="conferirAssinaturasAgora(this)" title="Pergunta à Clicksign AGORA em que pé está cada contrato pendente, sem esperar a rodada automática">🔄 Conferir assinaturas agora</button>';
+  h += '<span class="hint" id="ctr-ultima" style="align-self:center;margin-left:8px;"></span>';
   h += '</div>';
   var lista = rows.filter(function(p) {
     if (!_ctrFiltro) return true;
@@ -11693,6 +11695,23 @@ function renderContratos() {
   });
   if (lista.length > 120) h += '<div class="hint" style="text-align:center;">Mostrando os 120 mais recentes — use os filtros para achar os outros.</div>';
   cx.innerHTML = h;
+  _ctrUltimaMostra();
+}
+var _ctrUltimaCache = { v: '', em: 0 };
+function _ctrUltimaMostra() {
+  var el = document.getElementById('ctr-ultima');
+  if (!el) return;
+  if (_ctrUltimaCache.v && Date.now() - _ctrUltimaCache.em < 60000) { el.textContent = '🕐 última conferência: ' + _ctrUltimaCache.v; return; }
+  fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'contratoUltimaConferencia' })), { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(r) {
+      if (r && r.quando) {
+        _ctrUltimaCache = { v: r.quando, em: Date.now() };
+        var e2 = document.getElementById('ctr-ultima');
+        if (e2) e2.textContent = '🕐 última conferência: ' + r.quando;
+      }
+    })
+    .catch(function(e) {});
 }
 // 👁 mostra o PDF do contrato numa janela em cima do dash (sem precisar de login na Clicksign)
 function verContratoPag(i) {
