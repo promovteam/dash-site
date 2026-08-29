@@ -994,6 +994,7 @@ img { max-width:100%; height:auto; }
   <div class="nav-item" data-s="anuncios"><span class="nav-icon">📣</span><span class="nav-label">Criativos</span></div>
   <div class="nav-item" data-s="pesquisa"><span class="nav-icon">🔍</span><span class="nav-label">Pesquisa</span></div>
   <div class="nav-item" data-s="pagamentos"><span class="nav-icon">💳</span><span class="nav-label">Pagamentos</span></div>
+  <div class="nav-item" data-s="contratos"><span class="nav-icon">📄</span><span class="nav-label">Contratos</span></div>
   <div class="nav-item" data-s="regras"><span class="nav-icon">📋</span><span class="nav-label">Regras</span></div>
   <div class="sidebar-foot"><div class="nav-item"><span class="nav-icon">🔔</span><span class="nav-label">Notificações</span></div></div>
 </aside>
@@ -1204,6 +1205,8 @@ img { max-width:100%; height:auto; }
   </section>
 
   <!-- ============ PAGAMENTOS ============ -->
+  <section class="screen" id="s-contratos"><div id="ctr-corpo"><div class="hint" style="padding:30px;text-align:center;">Carregando contratos…</div></div></section>
+
   <section class="screen" id="s-pagamentos">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
       <input class="search-input" style="flex:1;min-width:220px;margin-bottom:0;" placeholder="🔍  Buscar mentorado por nome, CPF ou telefone..." oninput="setFiltroPag('txt', this.value)">
@@ -1576,7 +1579,7 @@ Instagram: @pr.joaosilva</div>
 <script>
 var titulos = {
   visao:'Visão Geral', agenda:'Agenda', leads:'Leads', pendencias:'Pendências', pesquisa:'Pesquisa',
-  pagamentos:'Pagamentos', registro:'Registro', regras:'Regras', anuncios:'Criativos e Origens'
+  pagamentos:'Pagamentos', contratos:'Contratos', registro:'Registro', regras:'Regras', anuncios:'Criativos e Origens'
 };
 // ===== Gráfico com abas: métrica x período =====
 var DIAS_MES = 31, HOJE = 16;
@@ -2165,6 +2168,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     // (espera um pouco para o filtro "só os novos" ainda funcionar nesta visita)
     if (s === 'leads' && typeof marcarLeadsVistos === 'function') setTimeout(marcarLeadsVistos, 2500);
     if (s === 'anuncios' && typeof renderAnuncios === 'function') renderAnuncios();
+    if (s === 'contratos' && typeof renderContratos === 'function') renderContratos();
     // a tela que precisa dos bloqueios os busca na hora (se ainda não vieram)
     if (typeof BLQ !== 'undefined' && !BLQ.carregado && !BLQ.buscando) { try { carregarBloqueios(); } catch (e) {} }
     if (typeof montarTelaSePreciso === 'function') montarTelaSePreciso(s);
@@ -2182,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-0845';
+var VERSAO_DASH = '2026-08-29-0850';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11582,6 +11586,107 @@ function confirmarRemarcar() {
     avisoRapido('🗓 Remarcada para ' + dp[2] + '/' + dp[1] + ' às ' + nt + ' — closer e SDR avisados · a pessoa continua a mesma no dash');
   });
 }
+// ===== 📄 ABA CONTRATOS (Bruno 29/08/2026): tudo dos contratos num lugar so =====
+var _ctrFiltro = '';
+function _ctrCorSt(st) {
+  var s = v2norm(st || '');
+  if (s.indexOf('conclu') !== -1) return '#3ddc97';
+  if (s.indexOf('aguardando assinatura') !== -1) return '#6ea8ff';
+  if (s.indexOf('em produ') !== -1) return '#ffd166';
+  if (s.indexOf('cancelado') !== -1 || s.indexOf('nao realizado') !== -1) return '#ff6b6b';
+  if (s.indexOf('aguardando') !== -1) return '#ff9a5a';
+  if (s.indexOf('dispensado') !== -1) return '#8d8478';
+  return '#8b8fa3';
+}
+function renderContratos() {
+  var cx = document.getElementById('ctr-corpo');
+  if (!cx) return;
+  var rows = (PAG.rows || []).slice().sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
+  if (!rows.length) { cx.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Ainda carregando as vendas… (ou nenhuma registrada)</div>'; return; }
+  var cont = { 'Em produção': 0, 'Aguardando assinatura': 0, 'Concluído': 0, 'Sem contrato': 0, 'Outros': 0 };
+  rows.forEach(function(p) {
+    var s = String(p.stC || '').trim();
+    if (!p.contrato && !s) cont['Sem contrato']++;
+    else if (cont[s] !== undefined) cont[s]++;
+    else cont['Outros']++;
+  });
+  var h = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">';
+  [['', 'Todos', rows.length], ['Em produção', '🟡 Em produção', cont['Em produção']],
+   ['Aguardando assinatura', '🔵 Aguardando assinatura', cont['Aguardando assinatura']],
+   ['Concluído', '🟢 Assinados', cont['Concluído']], ['Sem contrato', '⚪ Sem contrato', cont['Sem contrato']],
+   ['Outros', '🟠 Outros', cont['Outros']]].forEach(function(c) {
+    h += '<button class="chart-chip' + (_ctrFiltro === c[0] ? ' on' : '') + '" onclick="_ctrFiltro=' + JSON.stringify(c[0]) + ';renderContratos()">' + c[1] + ' (' + c[2] + ')</button>';
+  });
+  h += '</div>';
+  var lista = rows.filter(function(p) {
+    if (!_ctrFiltro) return true;
+    var s = String(p.stC || '').trim();
+    if (_ctrFiltro === 'Sem contrato') return !p.contrato && !s;
+    if (_ctrFiltro === 'Outros') return (p.contrato || s) && ['Em produção', 'Aguardando assinatura', 'Concluído'].indexOf(s) === -1 && !(!p.contrato && !s);
+    return s === _ctrFiltro;
+  });
+  if (!lista.length) h += '<div class="hint" style="padding:24px;text-align:center;">Nenhum contrato neste filtro.</div>';
+  lista.slice(0, 120).forEach(function(p) {
+    var i = (PAG.rows || []).indexOf(p);
+    var st = String(p.stC || '').trim() || (p.contrato ? '—' : 'Sem contrato');
+    var cor = p.contrato || p.stC ? _ctrCorSt(p.stC) : '#8b8fa3';
+    h += '<div class="dtl-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:12px 16px;">'
+      + '<div class="avatar" style="width:38px;height:38px;font-size:.85rem;background:linear-gradient(135deg,' + v2grad(p.nome) + ');">' + v2ini(p.nome) + '</div>'
+      + '<div style="flex:1;min-width:180px;cursor:pointer;" onclick="abrirFichaPagDireto(' + i + ')">'
+      + '<b style="font-size:.85rem;">' + (p.nome || '—') + '</b><br>'
+      + '<span class="hint">' + [p.programa, p.valor > 0 ? v2moeda(p.valor) : '', p.date ? p.date.toLocaleDateString('pt-BR') : '', p.vendedor].filter(Boolean).join(' · ') + '</span></div>'
+      + '<span class="ld-tag" style="background:' + cor + '22;color:' + cor + ';font-weight:800;">' + st + '</span>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + (p.contrato ? '<a class="btn" style="padding:7px 12px;font-size:.7rem;text-decoration:none;" href="' + p.contrato + '" target="_blank" rel="noopener">📄 Abrir</a>' : '')
+      + (!p.contrato ? '<button class="btn" style="padding:7px 12px;font-size:.7rem;" onclick="gerarContratoPag(' + i + ')">📄 Gerar contrato</button>' : '')
+      + (p.contrato && ehContratos() && (v2norm(p.stC || '').indexOf('em produ') !== -1 || !String(p.stC || '').trim()) ? '<button class="btn" style="padding:7px 12px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="enviarContratoPag(' + i + ')">📨 Enviar</button>' : '')
+      + '</div></div>';
+  });
+  if (lista.length > 120) h += '<div class="hint" style="text-align:center;">Mostrando os 120 mais recentes — use os filtros para achar os outros.</div>';
+  cx.innerHTML = h;
+}
+function gerarContratoPag(i) {
+  if (soOlhar()) return;
+  var p = (PAG.rows || [])[i];
+  if (!p) return;
+  if (!confirm('Gerar o contrato de ' + (p.nome || '') + ' em rascunho na Clicksign?')) return;
+  avisoRapido('📄 Gerando o contrato de ' + (p.nome || '') + '… (uns 15 segundos)');
+  var payload = encodeURIComponent(JSON.stringify({ action: 'gerarContratoDoLead', telefone: p.celular || '', nome: p.nome || '' }));
+  fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(resp) {
+      if (resp && resp.success && resp.link) {
+        p.contrato = resp.link; p.stC = 'Em produção';
+        renderContratos();
+        avisoRapido('📄 Contrato pronto em rascunho!');
+        var w = window.open(resp.link, '_blank');
+        if (!w) prompt('Link do contrato (copie):', resp.link);
+      } else alert('Não consegui gerar: ' + ((resp && resp.error) || 'erro desconhecido'));
+    })
+    .catch(function(e) { alert('Erro: ' + e); });
+}
+function enviarContratoPag(i) {
+  if (soOlhar()) return;
+  if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem enviar contratos.'); return; }
+  var p = (PAG.rows || [])[i];
+  if (!p || !p.contrato) return;
+  var m = String(p.contrato).match(/envelopes\/([0-9a-f\-]{36})/i);
+  if (!m) { alert('Não achei o número do envelope no link do contrato.'); return; }
+  if (!confirm('Enviar o contrato de ' + (p.nome || 'este cliente') + ' para assinatura AGORA?\n\nO cliente recebe o e-mail na hora. Só envie depois de conferir o contrato na Clicksign.')) return;
+  avisoRapido('📨 Enviando o contrato…');
+  var payload = encodeURIComponent(JSON.stringify({ action: 'clicksignEnviar', envelope: m[1] }));
+  fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(resp) {
+      if (resp && resp.success) {
+        p.stC = 'Aguardando assinatura';
+        renderContratos();
+        avisoRapido('📨 Contrato enviado — o cliente recebeu o e-mail' + (resp.aviso ? ' · ⚠️ ' + resp.aviso : ''));
+      } else alert('Não consegui enviar: ' + ((resp && resp.error) || 'erro desconhecido'));
+    })
+    .catch(function(e) { alert('Erro ao enviar: ' + e); });
+}
+
 // 📨 envia o contrato para assinatura (Juliane/Bruno/Adm): o cliente recebe o e-mail na hora
 function enviarContratoLead(envId, i) {
   if (soOlhar()) return;
