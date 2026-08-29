@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1229';
+var VERSAO_DASH = '2026-08-29-1231';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11714,7 +11714,15 @@ function _ctrJanelaPreenche(ov, p, url, ehPrevia) {
     var iP = (PAG.rows || []).indexOf(p);
     var fechado = /conclu|cancelado|dispensado|nao realizado|aguardando pv|aguardando pagamento/.test(v2norm(p.stC || ''));
     var mArq = String(url).match(/\/(?:file|document)\/d\/([\w-]+)/);
+    var lk2 = String(p.contrato || '');
+    var envM2 = lk2.match(/envelopes\/([0-9a-f\-]{36})/i);
+    var stN2 = v2norm(p.stC || '');
+    var emProd2 = stN2.indexOf('em produ') !== -1 || (!stN2 && envM2);
     var h2 = '';
+    if (envM2 && emProd2 && ehContratos() && iP >= 0)
+      h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;" onclick="this.closest(\'.modal-overlay\').remove();enviarContratoPag(' + iP + ')" title="Ativa o contrato na Clicksign e dispara o e-mail de assinatura AGORA (com confirmação antes).">📨 Enviar p/ assinatura</button>';
+    if (!envM2 && !fechado && !String(p.stC || '').trim() && iP >= 0)
+      h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;" onclick="this.closest(\'.modal-overlay\').remove();gerarContratoPag(' + iP + ')" title="Gostou da prévia? Gera o contrato de verdade em rascunho na Clicksign.">📄 Gerar contrato</button>';
     if (!fechado && iP >= 0) h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;" onclick="this.closest(\'.modal-overlay\').remove();editarContratoPag(' + iP + ')" title="Corrige dados e o texto do pagamento — o robô gera o contrato novo na hora.">✏️ Editar dados</button>';
     if (!fechado && iP >= 0 && ehContratos()) h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;color:#ffd166;border-color:rgba(255,209,102,.45);" onclick="editarClausulas(this.closest(\'.modal-overlay\'), ' + iP + ')" title="Edita o texto das cláusulas aqui dentro — o robô remonta o contrato.">📑 Editar cláusulas</button>';
     if (!fechado && ehPrevia && mArq) h2 += '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;color:#8f6bff;" href="https://docs.google.com/document/d/' + mArq[1] + '/edit" target="_blank" rel="noopener" title="Abre ESTE documento no editor do Google Docs — depois use ⬆️ Usar editado na lista.">📝 Editar no Word</a>';
