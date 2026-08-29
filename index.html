@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1222';
+var VERSAO_DASH = '2026-08-29-1229';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11716,12 +11716,103 @@ function _ctrJanelaPreenche(ov, p, url, ehPrevia) {
     var mArq = String(url).match(/\/(?:file|document)\/d\/([\w-]+)/);
     var h2 = '';
     if (!fechado && iP >= 0) h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;" onclick="this.closest(\'.modal-overlay\').remove();editarContratoPag(' + iP + ')" title="Corrige dados e o texto do pagamento — o robô gera o contrato novo na hora.">✏️ Editar dados</button>';
-    if (!fechado && ehPrevia && mArq) h2 += '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;color:#8f6bff;" href="https://docs.google.com/document/d/' + mArq[1] + '/edit" target="_blank" rel="noopener" title="Abre ESTE documento no editor do Google Docs — depois use ⬆️ Usar editado na lista.">📝 Editar este Word</a>';
+    if (!fechado && iP >= 0 && ehContratos()) h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;color:#ffd166;border-color:rgba(255,209,102,.45);" onclick="editarClausulas(this.closest(\'.modal-overlay\'), ' + iP + ')" title="Edita o texto das cláusulas aqui dentro — o robô remonta o contrato.">📑 Editar cláusulas</button>';
+    if (!fechado && ehPrevia && mArq) h2 += '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;color:#8f6bff;" href="https://docs.google.com/document/d/' + mArq[1] + '/edit" target="_blank" rel="noopener" title="Abre ESTE documento no editor do Google Docs — depois use ⬆️ Usar editado na lista.">📝 Editar no Word</a>';
     h2 += '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;" href="' + url + '" target="_blank" rel="noopener">Abrir em outra aba ↗</a>';
     ab.innerHTML = h2;
   }
   var corpo = ov.querySelector('#ctr-jan-corpo');
   if (corpo) corpo.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:none;border-radius:12px;background:#fff;"></iframe>';
+}
+// 📑 EDITOR DE CLAUSULAS dentro da janela de visualizacao
+function editarClausulas(ov, iP) {
+  if (soOlhar()) return;
+  if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem mexer nos contratos.'); return; }
+  var p = (PAG.rows || [])[iP];
+  var corpo = ov && ov.querySelector('#ctr-jan-corpo');
+  if (!p || !corpo) return;
+  corpo.innerHTML = '<div style="text-align:center;color:var(--text-2);padding:40px;">📑 Buscando as cláusulas… (uns 10 segundos)</div>';
+  var payload = encodeURIComponent(JSON.stringify({ action: 'contratoClausulas', nome: p.nome || '', telefone: p.celular || '' }));
+  fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(resp) {
+      if (!(resp && resp.success)) { corpo.innerHTML = '<div class="hint" style="padding:40px;text-align:center;">Não deu: ' + _cxEsc((resp && resp.error) || 'erro') + '</div>'; return; }
+      window._clsOrig = {}; window._clsEd = {};
+      var h = '<div style="display:flex;flex-direction:column;height:100%;">'
+        + '<div class="hint" style="padding:6px 4px;">Clique numa cláusula, mude o texto e clique fora. As mudadas ficam marcadas. Negrito no meio de cláusula editada se perde.</div>'
+        + '<div id="cls-lista" style="flex:1;overflow-y:auto;padding-right:6px;">';
+      (resp.clausulas || []).forEach(function(c) {
+        window._clsOrig[c.i] = c.t;
+        h += '<div class="cls-item" data-i="' + c.i + '" style="padding:7px 10px;border-radius:9px;margin-bottom:3px;cursor:pointer;font-size:.8rem;line-height:1.5;color:var(--text-2);border:1px solid transparent;" onclick="clsEditar(this)">' + _cxEsc(c.t) + '</div>';
+      });
+      h += '</div>'
+        + '<div style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;">'
+        + '<button class="btn" onclick="clsVoltar(' + iP + ', this)">↩ Voltar à visualização</button>'
+        + '<button class="btn primary" onclick="clsSalvar(' + iP + ', this)">💾 Salvar cláusulas e gerar contrato</button>'
+        + '</div></div>';
+      corpo.innerHTML = h;
+    })
+    .catch(function(e) { corpo.innerHTML = '<div class="hint" style="padding:40px;">Erro: ' + _cxEsc(String(e)) + '</div>'; });
+}
+function clsEditar(el) {
+  if (el.querySelector('textarea')) return;
+  var i = el.getAttribute('data-i');
+  var atual = window._clsEd[i] !== undefined ? window._clsEd[i] : window._clsOrig[i];
+  el.innerHTML = '';
+  var ta = document.createElement('textarea');
+  ta.style.cssText = 'width:100%;min-height:90px;background:rgba(255,255,255,.07);border:1px solid rgba(246,163,80,.5);border-radius:8px;color:var(--text);padding:8px;line-height:1.5;font-size:.8rem;';
+  ta.value = atual;
+  ta.onclick = function(e) { e.stopPropagation(); };
+  ta.onblur = function() {
+    var v = ta.value.trim();
+    if (v && v !== window._clsOrig[i]) {
+      window._clsEd[i] = v;
+      el.style.border = '1px solid rgba(246,163,80,.6)';
+      el.style.color = 'var(--text)';
+    } else {
+      delete window._clsEd[i];
+      el.style.border = '1px solid transparent';
+      el.style.color = 'var(--text-2)';
+    }
+    el.textContent = v || window._clsOrig[i];
+  };
+  el.appendChild(ta);
+  ta.focus();
+}
+function clsVoltar(iP, bt) {
+  var ov = bt.closest('.modal-overlay');
+  if (ov) ov.remove();
+  verContratoPag(iP);
+}
+function clsSalvar(iP, bt) {
+  var p = (PAG.rows || [])[iP];
+  if (!p) return;
+  var aberta = document.querySelector('#cls-lista textarea');
+  if (aberta) aberta.blur();
+  var mudancas = Object.keys(window._clsEd || {}).map(function(k) { return { i: parseInt(k, 10), t: window._clsEd[k] }; });
+  if (!mudancas.length) { alert('Nenhuma cláusula foi mudada ainda — clique numa cláusula, mude o texto e clique fora dela.'); return; }
+  var envM = String(p.contrato || '').match(/envelopes\/([0-9a-f\-]{36})/i);
+  var aguarda = v2norm(p.stC || '').indexOf('aguardando assinatura') !== -1;
+  confirmar(mudancas.length + ' cláusula' + (mudancas.length === 1 ? '' : 's') + ' mudada' + (mudancas.length === 1 ? '' : 's') + ' em ' + (p.nome || '') + '.'
+    + (aguarda ? '\n\nO enviado atual será CANCELADO e o corrigido vai por e-mail AGORA.' : '\n\nO contrato novo fica em rascunho (sem enviar).'), function() {
+    var ov = bt.closest('.modal-overlay');
+    if (ov) ov.remove();
+    avisoRapido('📑 Aplicando as cláusulas e gerando… (uns 30 segundos)');
+    var corpoReq = JSON.stringify({ action: 'contratoAplicarClausulas', nome: p.nome || '', telefone: p.celular || '',
+      mudancas: mudancas, envelope: envM ? envM[1] : '', enviar: aguarda });
+    fetch(APPS_SCRIPT_URL, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: corpoReq })
+      .then(function(x) { return x.json(); })
+      .then(function(resp) {
+        if (resp && resp.success && resp.link) {
+          p.contrato = resp.link;
+          p.stC = (aguarda && String(resp.envio || '').indexOf('reenviado') === 0) ? 'Aguardando assinatura' : 'Em produção';
+          window._ctrVistos = {};
+          renderContratos();
+          avisoRapido('📑 Cláusulas aplicadas! ' + (resp.envio || resp.antigo || ''));
+        } else alert('Não deu: ' + ((resp && resp.error) || 'erro'));
+      })
+      .catch(function(e) { alert('Erro: ' + e); });
+  }, '📑');
 }
 // ✏️ EDITAR DENTRO DO DASH: dados + texto do pagamento; o robo regenera o contrato
 function editarContratoPag(i) {
