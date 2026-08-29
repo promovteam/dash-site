@@ -2182,7 +2182,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-28-1802';
+var VERSAO_DASH = '2026-08-29-0830';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9061,6 +9061,14 @@ function abrirFichaLead(i) {
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda</button>');
   if (_snBloqU && !_blqF)
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>');
+  var _iCtr = _rUlt ? v2reg(_rUlt) : -1;
+  if (_snU === 'vendido' && _pag && _iCtr >= 0) {
+    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;font-weight:800;cursor:pointer;" onclick="gerarContratoLead(' + _iCtr + ', false)" title="Monta o contrato preenchido e deixa em rascunho na Clicksign — a Juliane confere e envia. Use depois de corrigir algum dado ou para venda antiga sem contrato.">📄 Gerar contrato</button>');
+    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="gerarContratoLead(' + _iCtr + ', true)" title="Gera o contrato preenchido como Word editável no Drive — para casos fora do padrão (cláusula ou condição diferente). Depois de ajustar, subir na Clicksign como documento avulso.">✏️ Editável</button>');
+    var _envM = String(_pag.contrato || '').match(/envelopes\/([0-9a-f\-]{36})/i);
+    if (_envM && ehContratos() && !/enviado|assinado|cancelado/i.test(_pag.stC || ''))
+      _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.14);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="enviarContratoLead(\'' + _envM[1] + '\', ' + _iCtr + ')" title="Ativa o contrato na Clicksign e dispara o e-mail de assinatura para o cliente AGORA. Só a Juliane, o Bruno e o Adm veem este botão.">📨 Enviar p/ assinatura</button>');
+  }
   if (!_rUlt) _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="ldProcurarReuniao(' + i + ')" title="A reunião existe mas não ligou com este lead (telefone diferente)? Procure e ligue aqui">🔍 já teve reunião? procurar</button>');
   if (_btH.length) h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">' + _btH.join('') + '</div>';
   if (wa || l.insta || clintLink(l)) {
@@ -10910,20 +10918,20 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWMl6qpE0nzaGoW-7Maet8myG38XeXh88sXQUVv5-hKr394FESczOBkjxZwWftwSz7/exec';
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec (13ª implantação, v21)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz72n1427Oc3d2KFQnXWPNE269MNyBazIspQH45kguvLPjcmPAjJjQ75vJc-jqQU9eJ/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -11553,6 +11561,46 @@ function confirmarRemarcar() {
     avisoRapido('🗓 Remarcada para ' + dp[2] + '/' + dp[1] + ' às ' + nt + ' — closer e SDR avisados · a pessoa continua a mesma no dash');
   });
 }
+// 📨 envia o contrato para assinatura (Juliane/Bruno/Adm): o cliente recebe o e-mail na hora
+function enviarContratoLead(envId, i) {
+  if (soOlhar()) return;
+  if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem enviar contratos.'); return; }
+  var r = _v2reg[i] || {};
+  if (!confirm('Enviar o contrato de ' + (r.nome || 'este cliente') + ' para assinatura AGORA?\n\nO cliente recebe o e-mail na hora. Só envie depois de conferir o contrato na Clicksign.')) return;
+  avisoRapido('📨 Enviando o contrato…');
+  var payload = encodeURIComponent(JSON.stringify({ action: 'clicksignEnviar', envelope: envId }));
+  fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(resp) {
+      if (resp && resp.success) {
+        avisoRapido('📨 Contrato enviado — o cliente recebeu o e-mail para assinar' + (resp.aviso ? ' · ⚠️ ' + resp.aviso : ''));
+      } else {
+        alert('Não consegui enviar: ' + ((resp && resp.error) || 'erro desconhecido'));
+      }
+    })
+    .catch(function(e) { alert('Erro ao enviar: ' + e); });
+}
+// 📄 gera o contrato deste lead de novo (Clicksign) ou a versao editavel (Word no Drive)
+function gerarContratoLead(i, editavel) {
+  var r = _v2reg[i];
+  if (!r) return;
+  var oq = editavel ? 'a versão EDITÁVEL (Word no Drive)' : 'o contrato em rascunho na Clicksign';
+  if (!confirm('Gerar ' + oq + ' para ' + (r.nome || 'este lead') + '?\n\nO robô usa os dados do formulário de venda — confira antes se estão corrigidos.')) return;
+  avisoRapido('📄 Gerando o contrato de ' + (r.nome || '') + '… (uns 15 segundos)');
+  var payload = encodeURIComponent(JSON.stringify({ action: 'gerarContratoDoLead', telefone: r.telefone || '', nome: r.nome || '', editavel: !!editavel }));
+  fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(resp) {
+      if (resp && resp.success && resp.link) {
+        avisoRapido(editavel ? '✏️ Word editável pronto!' : '📄 Rascunho criado na Clicksign!');
+        var w = window.open(resp.link, '_blank');
+        if (!w) prompt('Link do contrato (copie):', resp.link);
+      } else {
+        alert('Não consegui gerar o contrato: ' + ((resp && resp.error) || 'erro desconhecido'));
+      }
+    })
+    .catch(function(e) { alert('Erro ao gerar o contrato: ' + e); });
+}
 var MAPA_ST_PLANILHA = {
   agendada:'Reunião agendada', vendido:'Vendido', entrada:'Entrada', bloqueio:'Bloqueio de oferta',
   remarcada:'Remarcada 2 reunião', naovendido:'Não vendido', noshow:'No-Show'
@@ -12004,6 +12052,13 @@ function agUsarDaLista(i) {
   agUsarLead(_blLista[i]);
 }
 // so Bruno e Adm trocam a pessoa ligada a uma reuniao (Bruno 23/08/2026)
+function ehContratos() {
+  if (ehAdm()) return true;
+  var login = localStorage.getItem('v2Login');
+  var ok = false;
+  if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a) { if (a.nome === login && a.contratos) ok = true; });
+  return ok;
+}
 function ehAdm() {
   var login = localStorage.getItem('v2Login');
   if (login === null) return !loginPrecisa();   // uso local (sem login) = maquina do Bruno
@@ -12529,6 +12584,7 @@ function verPendencias() {
 var ACESSOS = [
   { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
   { nome: 'Tony Londe',    pin: '9264' },
+  { nome: 'Juliane Promov', pin: '4172', contratos: true },   // envia contratos (Clicksign), sem poderes de adm
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
   { nome: 'Ismael',        pin: '6180' },
