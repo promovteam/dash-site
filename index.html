@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-0855';
+var VERSAO_DASH = '2026-08-29-0858';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9066,7 +9066,7 @@ function abrirFichaLead(i) {
   if (_snBloqU && !_blqF)
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>');
   var _iCtr = _rUlt ? v2reg(_rUlt) : -1;
-  if (_snU === 'vendido' && _pag && _iCtr >= 0) {
+  if (_snU === 'vendido' && _pag && _iCtr >= 0 && !/legado/i.test(String(_pag.programa || ''))) {
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;font-weight:800;cursor:pointer;" onclick="gerarContratoLead(' + _iCtr + ', false)" title="Monta o contrato preenchido e deixa em rascunho na Clicksign — a Juliane confere e envia. Use depois de corrigir algum dado ou para venda antiga sem contrato.">📄 Gerar contrato</button>');
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="gerarContratoLead(' + _iCtr + ', true)" title="Gera o contrato preenchido como Word editável no Drive — para casos fora do padrão (cláusula ou condição diferente). Depois de ajustar, subir na Clicksign como documento avulso.">✏️ Editável</button>');
     var _envM = String(_pag.contrato || '').match(/envelopes\/([0-9a-f\-]{36})/i);
@@ -11602,7 +11602,8 @@ function _ctrCorSt(st) {
 function renderContratos() {
   var cx = document.getElementById('ctr-corpo');
   if (!cx) return;
-  var rows = (PAG.rows || []).slice().sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
+  var rows = (PAG.rows || []).filter(function(p) { return !/legado/i.test(String(p.programa || '')); })
+    .sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
   if (!rows.length) { cx.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Ainda carregando as vendas… (ou nenhuma registrada)</div>'; return; }
   var cont = { 'Em produção': 0, 'Aguardando assinatura': 0, 'Concluído': 0, 'Sem contrato': 0, 'Outros': 0 };
   rows.forEach(function(p) {
