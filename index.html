@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1137';
+var VERSAO_DASH = '2026-08-29-1140';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10333,7 +10333,7 @@ function copiarTexto(txt, btn) {
     var ta = document.createElement('textarea');
     ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.focus(); ta.select();
-    try { document.execCommand('copy'); ok(); } catch (e) { alert('Não consegui copiar automaticamente. Copie da janela que vou mostrar.'); prompt('Copie os dados (Cmd/Ctrl+C):', txt); }
+    try { document.execCommand('copy'); ok(); } catch (e) { copiarBonito(txt, 'Dados para copiar'); }
     ta.remove();
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -11678,7 +11678,9 @@ function gerarContratoPag(i, editavel) {
   var p = (PAG.rows || [])[i];
   if (!p) return;
   var oq = editavel ? 'a versão EDITÁVEL (Word no Drive) do contrato' : 'o contrato em rascunho na Clicksign';
-  if (!confirm('Gerar ' + oq + ' para ' + (p.nome || '') + '?')) return;
+  confirmar('Gerar ' + oq + ' para ' + (p.nome || '') + '?', function() { _gerarContratoPagVai(p, editavel); }, '📄');
+}
+function _gerarContratoPagVai(p, editavel) {
   avisoRapido('📄 Gerando o contrato de ' + (p.nome || '') + '… (uns 15 segundos)');
   var payload = encodeURIComponent(JSON.stringify({ action: 'gerarContratoDoLead', telefone: p.celular || '', nome: p.nome || '', editavel: !!editavel }));
   fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
@@ -11688,7 +11690,7 @@ function gerarContratoPag(i, editavel) {
         if (!editavel) { p.contrato = resp.link; p.stC = 'Em produção'; renderContratos(); }
         avisoRapido(editavel ? '✏️ Word editável pronto!' : '📄 Contrato pronto em rascunho!');
         var w = window.open(resp.link, '_blank');
-        if (!w) prompt('Link do contrato (copie):', resp.link);
+        if (!w) copiarBonito(resp.link, 'Link do contrato');
       } else alert('Não consegui gerar: ' + ((resp && resp.error) || 'erro desconhecido'));
     })
     .catch(function(e) { alert('Erro: ' + e); });
@@ -11700,9 +11702,11 @@ function enviarContratoPag(i) {
   if (!p || !p.contrato) return;
   var m = String(p.contrato).match(/envelopes\/([0-9a-f\-]{36})/i);
   if (!m) { alert('Não achei o número do envelope no link do contrato.'); return; }
-  if (!confirm('Enviar o contrato de ' + (p.nome || 'este cliente') + ' para assinatura AGORA?\n\nO cliente recebe o e-mail na hora. Só envie depois de conferir o contrato na Clicksign.')) return;
+  confirmar('Enviar o contrato de ' + (p.nome || 'este cliente') + ' para assinatura AGORA?\n\nO cliente recebe o e-mail na hora. Só envie depois de conferir o contrato.', function() { _enviarContratoPagVai(p, m[1]); }, '📨');
+}
+function _enviarContratoPagVai(p, envId) {
   avisoRapido('📨 Enviando o contrato…');
-  var payload = encodeURIComponent(JSON.stringify({ action: 'clicksignEnviar', envelope: m[1] }));
+  var payload = encodeURIComponent(JSON.stringify({ action: 'clicksignEnviar', envelope: envId }));
   fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
     .then(function(x) { return x.json(); })
     .then(function(resp) {
@@ -11720,7 +11724,9 @@ function enviarContratoLead(envId, i) {
   if (soOlhar()) return;
   if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem enviar contratos.'); return; }
   var r = _v2reg[i] || {};
-  if (!confirm('Enviar o contrato de ' + (r.nome || 'este cliente') + ' para assinatura AGORA?\n\nO cliente recebe o e-mail na hora. Só envie depois de conferir o contrato na Clicksign.')) return;
+  confirmar('Enviar o contrato de ' + (r.nome || 'este cliente') + ' para assinatura AGORA?\n\nO cliente recebe o e-mail na hora. Só envie depois de conferir o contrato.', function() { _enviarContratoVai(envId); }, '📨');
+}
+function _enviarContratoVai(envId) {
   avisoRapido('📨 Enviando o contrato…');
   var payload = encodeURIComponent(JSON.stringify({ action: 'clicksignEnviar', envelope: envId }));
   fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
@@ -11739,7 +11745,9 @@ function gerarContratoLead(i, editavel) {
   var r = _v2reg[i];
   if (!r) return;
   var oq = editavel ? 'a versão EDITÁVEL (Word no Drive)' : 'o contrato em rascunho na Clicksign';
-  if (!confirm('Gerar ' + oq + ' para ' + (r.nome || 'este lead') + '?\n\nO robô usa os dados do formulário de venda — confira antes se estão corrigidos.')) return;
+  confirmar('Gerar ' + oq + ' para ' + (r.nome || 'este lead') + '?\n\nO robô usa os dados do formulário de venda — confira antes se estão corrigidos.', function() { _gerarContratoLeadVai(r, editavel); }, '📄');
+}
+function _gerarContratoLeadVai(r, editavel) {
   avisoRapido('📄 Gerando o contrato de ' + (r.nome || '') + '… (uns 15 segundos)');
   var payload = encodeURIComponent(JSON.stringify({ action: 'gerarContratoDoLead', telefone: r.telefone || '', nome: r.nome || '', editavel: !!editavel }));
   fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
@@ -11748,12 +11756,48 @@ function gerarContratoLead(i, editavel) {
       if (resp && resp.success && resp.link) {
         avisoRapido(editavel ? '✏️ Word editável pronto!' : '📄 Rascunho criado na Clicksign!');
         var w = window.open(resp.link, '_blank');
-        if (!w) prompt('Link do contrato (copie):', resp.link);
+        if (!w) copiarBonito(resp.link, 'Link do contrato');
       } else {
         alert('Não consegui gerar o contrato: ' + ((resp && resp.error) || 'erro desconhecido'));
       }
     })
     .catch(function(e) { alert('Erro ao gerar o contrato: ' + e); });
+}
+// ===== caixinhas NOSSAS no lugar das do navegador (Bruno 29/08/2026) =====
+function _cxEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function caixaPromov(op) {
+  op = op || {};
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 400;
+  var botoes = '';
+  (op.botoes || [{ t: 'Entendi', cls: 'primary' }]).forEach(function(b, ix) {
+    botoes += '<button class="btn ' + (b.cls || '') + '" data-bx="' + ix + '" style="padding:9px 22px;">' + _cxEsc(b.t) + '</button>';
+  });
+  ov.innerHTML = '<div class="modal" style="width:min(440px,92vw);padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span style="font-size:1.3rem;">' + (op.ico || '💬') + '</span>'
+    + '<b style="flex:1;font-size:.95rem;">' + _cxEsc(op.titulo || 'Aviso') + '</b></div>'
+    + '<div style="font-size:.85rem;color:var(--text-2);line-height:1.55;white-space:pre-wrap;margin-bottom:14px;">' + _cxEsc(op.texto || '') + '</div>'
+    + (op.copiar ? '<input id="cx-copia" readonly value="' + _cxEsc(op.copiar).replace(/"/g, '&quot;') + '" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:9px;margin-bottom:12px;">' : '')
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;">' + botoes + '</div></div>';
+  document.body.appendChild(ov);
+  ov.querySelectorAll('button[data-bx]').forEach(function(bt) {
+    bt.onclick = function() {
+      ov.remove();
+      var b = (op.botoes || [])[parseInt(bt.getAttribute('data-bx'), 10)];
+      if (b && b.ao) b.ao();
+    };
+  });
+  if (op.copiar) { var inp = ov.querySelector('#cx-copia'); if (inp) { inp.focus(); inp.select(); try { document.execCommand('copy'); } catch (e) {} } }
+}
+window.alert = function(m) { caixaPromov({ ico: '⚠️', titulo: 'Aviso', texto: String(m == null ? '' : m) }); };
+function confirmar(texto, aoSim, ico) {
+  caixaPromov({ ico: ico || '❓', titulo: 'Confirmar', texto: texto,
+    botoes: [{ t: 'Cancelar' }, { t: 'Sim, pode', cls: 'primary', ao: aoSim }] });
+}
+function copiarBonito(texto, titulo) {
+  caixaPromov({ ico: '📋', titulo: titulo || 'Copie aqui', texto: 'Já deixei selecionado e copiado — Cmd/Ctrl+C se precisar de novo:', copiar: texto,
+    botoes: [{ t: 'Fechar', cls: 'primary' }] });
 }
 var MAPA_ST_PLANILHA = {
   agendada:'Reunião agendada', vendido:'Vendido', entrada:'Entrada', bloqueio:'Bloqueio de oferta',
