@@ -1557,6 +1557,7 @@ Instagram: @pr.joaosilva</div>
         <button class="btn" id="btn-copiar" style="padding:6px 14px;font-size:.7rem;" onclick="copiarDadosLead(this)">📋 Copiar</button>
         <button class="btn" id="btn-religar" style="padding:6px 14px;font-size:.7rem;display:none;background:rgba(185,138,255,.16);color:#b98aff;border:1px solid rgba(185,138,255,.4);" onclick="religarReuniaoAbrir()" title="Só Bruno e Adm: liga esta reunião à pessoa certa da base">🔁 Trocar a pessoa</button>
         <button class="btn" id="btn-editar" style="padding:6px 14px;font-size:.7rem;" onclick="alternarEdicao()">✏️ Editar</button>
+        <button class="btn" id="btn-apagar" style="padding:6px 14px;font-size:.7rem;display:none;background:rgba(255,107,107,.12);color:#ff6b6b;border:1px solid rgba(255,107,107,.4);" onclick="apagarLeadDialogo()" title="Só Bruno e Adm: apaga este lead da planilha, da agenda ou dos dois">🗑 Apagar</button>
         <button class="btn" id="btn-desvincular" style="padding:6px 14px;font-size:.7rem;background:rgba(110,168,255,.14);border-color:rgba(110,168,255,.4);color:#6ea8ff;display:none;" onclick="vsfDesvincular()" title="Só Bruno e Adm: desfaz o vínculo manual com o formulário">🔗 Desfazer vínculo</button>
         <button class="btn" id="btn-remarcar-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;display:none;" onclick="irRemarcarNaAgenda(_fichaAtual)" title="Vai para a agenda, na semana da reunião, para remarcar">🗓 Remarcar</button>
         <button class="btn" id="btn-venda-reuniao" style="padding:6px 14px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="abrirFormVendaReuniao()" title="Abre o formulário de venda já preenchido com os dados desta reunião">💰 Registrar venda</button>
@@ -1774,7 +1775,8 @@ function abrirB(tipo){
   document.getElementById('modal-b').classList.add('open');
 }
 function abrirLead(){ document.getElementById('modal-lead').classList.add('open'); _modoEdicao=false; desenharInfo();
-  var bR = document.getElementById('btn-religar'); if (bR) bR.style.display = ehAdm() ? '' : 'none'; }
+  var bR = document.getElementById('btn-religar'); if (bR) bR.style.display = ehAdm() ? '' : 'none';
+  var bAp = document.getElementById('btn-apagar'); if (bAp) bAp.style.display = ehAdm() ? '' : 'none'; }
 function fecharLead(){
   var ml = document.getElementById('modal-lead');
   ml.classList.remove('open');
@@ -2186,7 +2188,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0926';
+var VERSAO_DASH = '2026-08-30-0931';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3764,6 +3766,43 @@ function seloVendaSemForm(l) {
   if (!pago && rV) { try { pago = pagVinculado(rV); } catch (e2) {} }
   if (pago) return '';
   return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="Está Vendido mas o formulário de venda não foi preenchido — abra e use 💰 Registrar venda">💰 sem formulário</span>';
+}
+// 🗑 apagar lead (so Bruno/Adm): escolhe se sai da planilha, da agenda ou dos dois
+function apagarLeadDialogo() {
+  if (!ehAdm()) { alert('Só o Bruno e o Adm podem apagar leads.'); return; }
+  var r = _v2reg[_fichaAtual];
+  if (!r) return;
+  caixaPromov({ ico: '🗑', titulo: 'Apagar ' + (r.nome || 'lead'),
+    texto: 'De onde apagar?\n\n• Planilha: a linha some da base e dos números do dash\n• Agenda: o evento da reunião é apagado do Calendar\n\nIsso NÃO tem desfazer.',
+    botoes: [
+      { t: 'Cancelar' },
+      { t: 'Só da agenda', ao: function() { _apagarLeadVai(r, 'agenda'); } },
+      { t: 'Só da planilha', ao: function() { _apagarLeadVai(r, 'planilha'); } },
+      { t: '🗑 Dos dois', cls: 'primary', ao: function() { _apagarLeadVai(r, 'tudo'); } }
+    ] });
+}
+function _apagarLeadVai(r, alvo) {
+  confirmar('Apagar ' + (r.nome || '') + ' — ' + (alvo === 'tudo' ? 'planilha + agenda' : 'só da ' + alvo) + ' — DE VERDADE?\n\nNão tem desfazer.', function() {
+    avisoRapido('🗑 Apagando…');
+    var payload = encodeURIComponent(JSON.stringify({ action: 'apagarLead', nome: r.nome || '', telefone: r.telefone || '',
+      id: r.id || '', dataRef: v2dataRef(r), alvo: alvo }));
+    fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+      .then(function(x) { return x.json(); })
+      .then(function(resp) {
+        if (resp && resp.success) {
+          if (alvo !== 'agenda') {
+            var ix = V2.rows.indexOf(r);
+            if (ix >= 0) V2.rows.splice(ix, 1);
+            try { renderV2(); } catch (e) {}
+            try { renderLeads(); } catch (e2) {}
+          }
+          try { document.getElementById('modal-lead').classList.remove('open'); } catch (e3) {}
+          AG.cache = {};
+          avisoRapido('🗑 ' + (resp.nome || '') + ' — ' + (resp.feito || []).join(' · '));
+        } else alert('Não consegui apagar: ' + ((resp && resp.error) || 'erro'));
+      })
+      .catch(function(e) { alert('Erro: ' + e); });
+  }, '🗑');
 }
 // 🌱 vincular manualmente um lead a post organico (quando o robo nao pegou sozinho)
 function vincularOrganico(iReg, sugestao) {
@@ -13107,6 +13146,30 @@ function agendarReuniao(btn) {
   }
   if (obsChoque) obs = obs ? obs + ' | ' + obsChoque : obsChoque;
 
+  // ⚠️ esse lead ja existe na base? avisa e mostra o que ja tem (Bruno 30/08/2026)
+  if (!window._agDupOk) {
+    var _t8d = ldTel8(tel || '');
+    var _nomeN = v2norm(nome || '');
+    var _iguais = (V2.rows || []).filter(function(rr) {
+      var tr = ldTel8(rr.telefone || '');
+      return (_t8d && tr && tr === _t8d) || (_nomeN && v2norm(rr.nome || '') === _nomeN);
+    });
+    if (_iguais.length) {
+      var _ult = _iguais[_iguais.length - 1];
+      var _resumo = _iguais.slice(-3).map(function(rr) {
+        return '• ' + (rr.nome || '') + ' — ' + (rr.date ? rr.date.toLocaleDateString('pt-BR') : 'sem data') + ' · ' + (rr.status || '?') + (rr.closer ? ' · ' + rr.closer : '');
+      }).join('\n');
+      caixaPromov({ ico: '⚠️', titulo: 'Esse lead já está no dash',
+        texto: 'Achei ' + _iguais.length + ' registro' + (_iguais.length === 1 ? '' : 's') + ' com esse ' + (_t8d ? 'telefone' : 'nome') + ':\n\n' + _resumo + '\n\nÉ um retorno/2ª reunião de verdade, ou registro repetido?',
+        botoes: [
+          { t: 'Cancelar' },
+          { t: '📇 Ver a ficha', ao: function() { abrirLead(v2reg(_ult)); } },
+          { t: 'Registrar mesmo assim', cls: 'primary', ao: function() { window._agDupOk = true; agendarReuniao(btn); } }
+        ] });
+      return;
+    }
+  }
+  window._agDupOk = false;
   var fields = [{ campo:'nome', valor: nome }];
   fields.push({ campo:'carimbo', valor: filaStampAgora() });
   if (tel) { fields.push({ campo:'telefone', valor: tel }); fields.push({ campo:'cpf', valor: tel }); }
