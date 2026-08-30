@@ -2216,7 +2216,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-1936';
+var VERSAO_DASH = '2026-08-30-1941';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -8574,7 +8574,6 @@ function crmQuadro(lista) {
       }
       var faixa = lead && lead.faixa === 'alta' ? '<span class="crm-chip quente">🔥 R$2–4mil</span>'
                 : lead && lead.faixa === 'media' ? '<span class="crm-chip morno">R$500–1mil</span>' : '';
-      var aberto = window._crmAberto === (x.insta || '');
       var fotoP = igFotoDe(x.insta);
       var nomeReal = x.nome || (pf && pf.nome) || '@' + x.insta;
       // o bloco do post de onde a pessoa veio (com a foto, quando o robô já guardou)
@@ -8597,7 +8596,7 @@ function crmQuadro(lista) {
         + (etqs.length > 4 ? '<span class="crm-etq on">+' + (etqs.length - 4) + '</span>' : '')
         + '<span class="crm-etq mais" title="pôr ou tirar etiquetas" onclick="event.stopPropagation();crmEtiquetas(\'' + (x.insta || '') + '\')">🏷️ +</span>'
         + '</div>';
-      h += '<div class="crm-card' + (aberto ? ' aberto' : '') + (pf ? ' mapeado' : '') + '" draggable="true" ondragstart="crmPegar(event)" ondragend="crmLargou(event)"'
+      h += '<div class="crm-card' + (pf ? ' mapeado' : '') + '" draggable="true" ondragstart="crmPegar(event)" ondragend="crmLargou(event)"'
         + ' onclick="crmAbrirPerfil(event, \'' + (x.insta || '') + '\')" data-insta="' + (x.insta || '') + '">'
         + '<div class="crm-topo">'
         +   '<div class="avatar" style="width:38px;height:38px;font-size:.7rem;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(nomeReal)
@@ -8624,7 +8623,8 @@ function crmQuadro(lista) {
         +   (function(){
               if (x.tag) return '<span class="crm-chip tag">' + x.tag + '</span>';
               var sg = perfilSugerido(x);
-              return sg ? '<span class="crm-chip sug" style="--c:' + sg.cor + ';" title="perfil que os dados indicam · ' + sg.porque + ' — clique no cartão para confirmar">' + sg.rot + '?</span>' : '';
+              return sg ? '<span class="crm-chip sug" style="--c:' + sg.cor + ';cursor:pointer;" title="perfil que os dados indicam · ' + sg.porque + ' — clique para confirmar"'
+                + ' onclick="event.stopPropagation();comentMarcar(\'' + (x.insta || '') + '\',\'tag\',\'' + sg.v + '\');">' + sg.rot + '?</span>' : '';
             })()
         +   (function(){
               if (!x.produto) return '';
@@ -8637,7 +8637,6 @@ function crmQuadro(lista) {
         // trocar a etapa sem arrastar (pedido do Bruno 30/08/2026 — no celular arrastar é ruim)
         + '<div class="crm-etapa" onclick="event.stopPropagation();">' + seloEtapaCrm(x) + '</div>'
         + respostas
-        + (aberto ? crmEscolhaPerfil(x) : '')
         + '<div class="crm-acoes">'
         +   (x.insta ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();crmVerPerfil(\'' + x.insta + '\');" title="ver o perfil aqui dentro do dash">📷 perfil</a>' : '')
         +   (lead ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();verFichaPendente(\'' + (lead.tel8 || '') + '\');">👤 ficha</a>'
@@ -8666,6 +8665,8 @@ function perfilSugerido(x) {
   if (lead.faixa === 'media') return { v: 'Perfil legado', rot: '🏛️ Perfil legado', cor: '#b98aff', porque: lead.invest || 'R$500–1mil' };
   return null;
 }
+// DESLIGADA em 30/08/2026 (pedido do Bruno): o painel comprido virou "tags prontas"
+// dentro da janelinha crmEtiquetas. O código fica aqui para religar fácil.
 function crmEscolhaPerfil(x) {
   var atual = String(x.tag || '').trim();
   var sug = perfilSugerido(x);
@@ -8694,11 +8695,11 @@ function crmEscolhaPerfil(x) {
       }).join('')
     + '</div></div>';
 }
-// clicar no cartão abre/fecha a escolha (o arrastar continua funcionando)
+// clicar no cartão abre a janelinha de tags (perfil + produto + etiquetas juntos —
+// pedido do Bruno 30/08/2026: o painel comprido saiu e virou tudo tag)
 function crmAbrirPerfil(e, insta) {
-  if (e && e.target && e.target.closest && e.target.closest('.crm-acoes, .crm-perfil')) return;
-  window._crmAberto = (window._crmAberto === insta) ? null : insta;
-  renderLeads();
+  if (e && e.target && e.target.closest && e.target.closest('.crm-acoes, .crm-perfil, .crm-etapa, .crm-etqs, .crm-post, select, a, .crm-chip')) return;
+  crmEtiquetas(insta);
 }
 var _crmArrastando = null;
 function crmPegar(e) {
@@ -8751,7 +8752,17 @@ function _comDe(insta) {
   for (var i = 0; i < COMENT.rows.length; i++) {
     if (String(COMENT.rows[i].insta || '').toLowerCase() === k) return COMENT.rows[i];
   }
+  // pessoa que veio SÓ da API do Instagram (ainda sem linha na planilha)
+  var todos = comentComApi();
+  for (var j = COMENT.rows.length; j < todos.length; j++) {
+    if (String(todos[j].insta || '').toLowerCase() === k) return todos[j];
+  }
   return null;
+}
+// marca de escolha única (perfil OU produto): clicar liga, clicar de novo desliga
+function etqMarcaUnica(insta, campo, valor) {
+  comentMarcar(insta, campo, valor);
+  _etqDesenha(insta);
 }
 // a janelinha de escolher/criar etiquetas de uma pessoa
 function crmEtiquetas(insta) {
@@ -8778,7 +8789,27 @@ function _etqDesenha(insta) {
   if (!cx || !x) return;
   var minhas = etqDe(x).map(v2norm);
   var todas = etiquetasDisponiveis();
-  var h = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+  var h = '';
+  // perfil e produto viraram "tags prontas" aqui dentro (Bruno 30/08/2026) —
+  // escolha única: clicar liga, clicar de novo desliga. Gravam nas colunas Tag e Produto.
+  h += '<div class="crm-perfil-tit">perfil do lead</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+  CRM_PERFIS.forEach(function(p) {
+    if (!p.v) return;
+    var on = v2norm(x.tag || '') === v2norm(p.v);
+    h += '<span class="crm-etq" style="cursor:pointer;font-size:.72rem;padding:5px 11px;background:' + p.cor + (on ? '33' : '14') + ';color:' + p.cor + ';border:1px solid ' + p.cor + (on ? '' : '44') + ';"'
+      + ' onclick="etqMarcaUnica(\'' + insta + '\',\'tag\',\'' + (on ? '' : p.v) + '\')">' + (on ? '✓ ' : '') + p.rot + '</span>';
+  });
+  h += '</div>';
+  h += '<div class="crm-perfil-tit">produto com perfil</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+  CRM_PRODUTOS.forEach(function(p) {
+    if (!p.v) return;
+    var on = v2norm(x.produto || '') === v2norm(p.v);
+    h += '<span class="crm-etq" style="cursor:pointer;font-size:.72rem;padding:5px 11px;background:' + p.cor + (on ? '33' : '14') + ';color:' + p.cor + ';border:1px solid ' + p.cor + (on ? '' : '44') + ';"'
+      + ' onclick="etqMarcaUnica(\'' + insta + '\',\'produto\',\'' + (on ? '' : p.v) + '\')">' + (on ? '✓ ' : '') + p.rot + '</span>';
+  });
+  h += '</div>';
+  h += '<div class="crm-perfil-tit">etiquetas da equipe</div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
   if (!todas.length) h += '<span class="hint">Nenhuma etiqueta criada ainda.</span>';
   todas.forEach(function(t) {
     var on = minhas.indexOf(v2norm(t)) !== -1;
@@ -9338,11 +9369,13 @@ function comentSecaoHtml() {
       }
       if (window._comQuadro) {
         // ===== filtros do quadro: etiquetas, produto e "planilha não bate" =====
-        var FQ = window._crmFiltro = window._crmFiltro || { etq: '', prod: '', nb: false, pot: false };
-        var contE = {}, contP = {}, contPot = 0;
+        var FQ = window._crmFiltro = window._crmFiltro || { etq: '', prod: '', nb: false, pot: false, perf: '' };
+        if (FQ.perf === undefined) FQ.perf = '';
+        var contE = {}, contP = {}, contPf = {}, contPot = 0;
         comLista.forEach(function(x) {
           etqDe(x).forEach(function(t){ var k = v2norm(t); if (!contE[k]) contE[k] = { n: 0, rot: t }; contE[k].n++; });
           if (x.produto) { var kp = v2norm(x.produto); if (!contP[kp]) contP[kp] = { n: 0, rot: x.produto }; contP[kp].n++; }
+          if (x.tag) { var kf = v2norm(x.tag); contPf[kf] = (contPf[kf] || 0) + 1; }
           if (crmPotencial(x)) contPot++;
         });
         var todasEtq = etiquetasDisponiveis();
@@ -9352,6 +9385,15 @@ function comentSecaoHtml() {
           + (FQ.pot ? 'background:rgba(255,107,107,.2);color:#ff6b6b;border:1px solid rgba(255,107,107,.6);' : '')
           + '" title="10 mil+ seguidores, ou comentou 2 vezes ou mais, ou nota A/B da equipe — ordenado por seguidores"'
           + ' onclick="window._crmFiltro.pot=!window._crmFiltro.pot;renderLeads();">🔥 mais potenciais · ' + contPot + '</span>';
+        CRM_PERFIS.forEach(function(p) {
+          if (!p.v) return;
+          var kf = v2norm(p.v), n = contPf[kf] || 0;
+          if (!n && v2norm(FQ.perf) !== kf) return;   // perfil sem ninguém marcado não vira chip
+          var on = v2norm(FQ.perf) === kf;
+          chipsF += '<span class="ld-selo' + (on ? '' : ' morno') + '" style="cursor:pointer;" '
+            + 'onclick="window._crmFiltro.perf=' + (on ? "''" : JSON.stringify(p.v).replace(/"/g, '&quot;')) + ';renderLeads();">'
+            + p.rot + (n ? ' · ' + n : '') + '</span>';
+        });
         todasEtq.forEach(function(t) {
           var k = v2norm(t), n = contE[k] ? contE[k].n : 0;
           var on = v2norm(FQ.etq) === k;
@@ -9377,11 +9419,12 @@ function comentSecaoHtml() {
         if (chipsF) {
           h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px;">'
             + '<span class="hint">filtrar:</span>' + chipsF
-            + ((FQ.etq || FQ.prod || FQ.nb || FQ.pot) ? '<span class="ld-selo" style="cursor:pointer;background:rgba(255,107,107,.15);color:#ff6b6b;" onclick="window._crmFiltro={etq:\'\',prod:\'\',nb:false,pot:false};renderLeads();">✕ limpar</span>' : '')
+            + ((FQ.etq || FQ.prod || FQ.nb || FQ.pot || FQ.perf) ? '<span class="ld-selo" style="cursor:pointer;background:rgba(255,107,107,.15);color:#ff6b6b;" onclick="window._crmFiltro={etq:\'\',prod:\'\',nb:false,pot:false,perf:\'\'};renderLeads();">✕ limpar</span>' : '')
             + '</div>';
         }
         var listaQuadro = comLista.filter(function(x) {
           if (FQ.pot && !crmPotencial(x)) return false;
+          if (FQ.perf && v2norm(x.tag || '') !== v2norm(FQ.perf)) return false;
           if (FQ.etq && etqDe(x).map(v2norm).indexOf(v2norm(FQ.etq)) === -1) return false;
           if (FQ.prod && v2norm(x.produto || '') !== v2norm(FQ.prod)) return false;
           if (FQ.nb && !crmNaoBate(x)) return false;
