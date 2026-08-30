@@ -624,6 +624,28 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .crm-acoes a { flex:1; text-align:center; font-size:.62rem; font-weight:800; padding:5px 4px; border-radius:8px;
   text-decoration:none; background:rgba(255,255,255,.07); color:var(--text-secondary); transition:background .15s, color .15s; }
 .crm-acoes a:hover { background:color-mix(in srgb, var(--cor) 24%, transparent); color:var(--cor); }
+/* cartão novo do social selling (Bruno 30/08/2026) */
+.crm-card.mapeado { border-color:rgba(110,168,255,.28); }
+.crm-post { display:flex; gap:8px; align-items:center; margin-top:7px; padding:6px 8px; border-radius:9px;
+  background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.07); cursor:pointer; transition:background .15s; }
+.crm-post:hover { background:rgba(110,168,255,.12); }
+.crm-post img { width:44px; height:44px; border-radius:7px; object-fit:cover; flex-shrink:0; }
+.crm-post-sem { width:44px; height:44px; border-radius:7px; background:rgba(255,255,255,.07); display:flex;
+  align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+.crm-post > div { flex:1; min-width:0; }
+.crm-post-t { display:block; font-size:.6rem; font-weight:800; color:#3ddc97; }
+.crm-post i { display:block; font-size:.62rem; color:var(--text-secondary); font-style:normal; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; margin-top:1px; }
+.crm-etqs { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+.crm-etq { font-size:.58rem; font-weight:800; padding:2px 8px; border-radius:999px;
+  background:rgba(185,138,255,.16); color:#b98aff; border:1px solid rgba(185,138,255,.3); }
+.crm-etq.on { background:rgba(185,138,255,.22); }
+.crm-etq.mais { background:rgba(255,255,255,.05); color:var(--muted); border:1px dashed rgba(255,255,255,.25); cursor:pointer; }
+.crm-etq.mais:hover { color:#b98aff; border-color:#b98aff; }
+.crm-chip.nb { background:rgba(255,107,107,.18); color:#ff6b6b; border:1px dashed rgba(255,107,107,.55); cursor:pointer; }
+.crm-mais { text-align:center; font-size:.64rem; font-weight:800; color:#6ea8ff; padding:8px 6px; margin-top:2px;
+  border-radius:9px; background:rgba(110,168,255,.1); border:1px dashed rgba(110,168,255,.4); cursor:pointer; }
+.crm-mais:hover { background:rgba(110,168,255,.18); }
 /* capa do anúncio: passando o mouse aparece o ▶ para tocar */
 .an-capa .an-play { opacity:0; transform:scale(.9); transition:opacity .15s, transform .15s; pointer-events:none; }
 .an-capa:hover .an-play { opacity:1; transform:scale(1); pointer-events:auto; }
@@ -2188,7 +2210,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0955';
+var VERSAO_DASH = '2026-08-30-1321';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3134,6 +3156,8 @@ function carregarIGOrganico() {
       IGO.posts.push({ link: String(r[0]).trim(), date: (d && !isNaN(d)) ? d : null, tipo: r[2] || '',
                        legenda: r[3] || '', curtidas: +(r[4] || 0), coment: +(r[5] || 0), pedidos: +(r[6] || 0) });
     }
+    IGO.postDe = {};   // link do post → dados dele (para o cartão do quadro mostrar de onde a pessoa veio)
+    IGO.posts.forEach(function(p){ IGO.postDe[p.link] = p; });
     IGO.porLink = {}; IGO.porUser = {}; IGO.seg = {}; IGO.texto = {}; IGO.iscas = {};
     for (var j = 1; j < lc.length; j++) {
       var c = lc[j];
@@ -3429,7 +3453,9 @@ function carregarPostsOrganicos() {
   sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'listarPostsOrganicos' }));
   document.body.appendChild(sc);
 }
-try { carregarPostsOrganicos(); } catch (e) {}
+// espera o resto do painel carregar (o endereço do robô é declarado mais abaixo no arquivo)
+setTimeout(function(){ try { carregarPostsOrganicos(); } catch (e) {} }, 1200);
+setTimeout(function(){ try { carregarEtiquetas(); } catch (e) {} }, 2500);
 // os pedidos do Instagram chegam em segundo plano (a aba é grande) — quando
 // chegam, as listas de leads são redesenhadas com o selo 📷
 setTimeout(function(){ try { carregarIGOrganico(); } catch (e) {} }, 4000);
@@ -4295,8 +4321,10 @@ function renderV2() {
   var METAS_RK = [{ k:'P', v:150000, cor:'#ff6b6b' }, { k:'M', v:250000, cor:'#f6a350' }, { k:'G', v:350000, cor:'#3ddc97' }];
   var fatorProj = pj ? (pj.uT / pj.uP) : null;
   function _rkAvatar(nome) {
+    var src = 'fotos/' + v2nomeChave(nome).replace(/\s+/g, '-') + '.jpg';
+    window._fotoNo = window._fotoNo || {};   // foto que não existe: não pedir de novo a cada redesenho
     return '<div class="avatar" style="width:48px;height:48px;font-size:.8rem;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,' + v2grad(nome) + ');">' + v2ini(nome)
-      + '<img src="fotos/' + v2nomeChave(nome).replace(/\s+/g, '-') + '.jpg" onerror="this.remove()" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;">'
+      + (window._fotoNo[src] ? '' : '<img src="' + src + '" onerror="window._fotoNo[this.getAttribute(\'src\')]=1;this.remove()" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;">')
       + '</div>';
   }
   function _rkNome(nome) {
@@ -6871,6 +6899,20 @@ function crmEtapaDe(x) {
   }
   return 'chamar';
 }
+// pede algo ao robô ESPERANDO a resposta (o caminho normal de gravação não devolve resposta)
+function gasPedir(payload, cb, tempoMs) {
+  var nome = 'gp' + Math.random().toString(36).slice(2, 9);
+  var sc = document.createElement('script');
+  var fim = function(d) {
+    try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    if (cb) { var f = cb; cb = null; f(d); }
+  };
+  window[nome] = fim;
+  sc.onerror = function(){ fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify(payload));
+  document.body.appendChild(sc);
+  setTimeout(function(){ fim(null); }, tempoMs || 30000);
+}
 function comentMarcar(insta, campo, valor) {
   if (soOlhar()) return;
   if (!insta) { alert('Esta pessoa está sem o @ do Instagram — não dá para marcar.'); return; }
@@ -6883,7 +6925,14 @@ function comentMarcar(insta, campo, valor) {
   }
   var pedido = { action: 'comentMarcar', insta: insta, quem: ldEu() || '' };
   pedido[campo] = valor;
-  sendToGAS(pedido);
+  if (campo === 'etiquetas' || campo === 'produto') {
+    // colunas novas: confere na resposta se o robô desta versão já grava (precisa do v104)
+    gasPedir(pedido, function(d) {
+      var col = campo === 'produto' ? 'Produto' : 'Etiquetas';
+      if (d && d.success && d.escritos && d.escritos.indexOf(col) !== -1) return;
+      avisoRapido('⚠️ ' + (campo === 'produto' ? 'O produto' : 'A etiqueta') + ' só fica salvo na planilha com o robô v104 — avise o Bruno para publicar.');
+    });
+  } else sendToGAS(pedido);
   renderLeads();
 }
 var _comAvisados = {};
@@ -6941,6 +6990,14 @@ function carregarComentarios() {
   fetch(url).then(function(r){ return r.text(); }).then(function(txt) {
     var linhas = ldCSV(txt);
     var rows = [];
+    // as colunas novas (Etiquetas, Produto) são achadas pelo NOME no cabeçalho —
+    // o robô cria cada uma na primeira coluna livre, então a posição varia
+    var cab = linhas[0] || [], iEtq = -1, iProd = -1;
+    for (var c0 = 0; c0 < cab.length; c0++) {
+      var hN = v2norm(cab[c0] || '');
+      if (hN === 'etiquetas') iEtq = c0;
+      if (hN === 'produto') iProd = c0;
+    }
     for (var i = 1; i < linhas.length; i++) {
       var nome = (linhas[i][0] || '').trim();
       var insta = (linhas[i][1] || '').trim().replace(/^@/, '');
@@ -6951,7 +7008,9 @@ function carregarComentarios() {
         tag: _mk.tag !== undefined ? _mk.tag : (linhas[i][4] || '').trim(),
         tipo: _mk.tipo !== undefined ? _mk.tipo : (linhas[i][5] || '').trim(),
         etapa: _mk.etapa !== undefined ? _mk.etapa : (linhas[i][7] || '').trim(),
-        nota: _mk.nota !== undefined ? _mk.nota : (linhas[i][8] || '').trim() });
+        nota: _mk.nota !== undefined ? _mk.nota : (linhas[i][8] || '').trim(),
+        etiquetas: _mk.etiquetas !== undefined ? _mk.etiquetas : (iEtq >= 0 ? (linhas[i][iEtq] || '').trim() : ''),
+        produto: _mk.produto !== undefined ? _mk.produto : (iProd >= 0 ? (linhas[i][iProd] || '').trim() : '') });
     }
     rows.sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
     var jaTinha = COMENT.carregado;
@@ -8422,6 +8481,15 @@ function crmQuadro(lista) {
   var h = '<div class="crm-board">';
   CRM_ETAPAS.forEach(function(e) {
     var itens = porEtapa[e.k];
+    // quem foi mapeado pela API do Instagram (foto, seguidores, post) vem primeiro;
+    // dentro do mesmo grupo, o mais recente em cima
+    // (a pontuação é calculada UMA vez por pessoa antes de ordenar — regra do O(1))
+    var _scs = itens.map(function(x){ return { s: crmScore(x), x: x }; });
+    _scs.sort(function(a, b) {
+      if (b.s !== a.s) return b.s - a.s;
+      return (b.x.date || 0) - (a.x.date || 0);
+    });
+    itens = _scs.map(function(p){ return p.x; });
     h += '<div class="crm-col" data-etapa="' + e.k + '" ondragover="crmSobre(event)" ondragleave="crmSai(event)" ondrop="crmSoltar(event)"'
       + ' style="--cor:' + e.cor + ';">'
       + '<div class="crm-cab">'
@@ -8431,8 +8499,15 @@ function crmQuadro(lista) {
       + '</div>'
       + '<div class="crm-fila">';
     if (!itens.length) h += '<div class="crm-vazio">solte alguém aqui</div>';
-    itens.slice(0, 60).forEach(function(x) {
+    var vis = (window._crmVis && window._crmVis[e.k]) || 30;
+    itens.slice(0, vis).forEach(function(x) {
       var lead = comentCruza(x);
+      var u = String(x.insta || '').toLowerCase();
+      var pf = (IGO.perfil || {})[u] || null;
+      var pd = null; try { pd = igPedidoDoLead({ insta: x.insta }); } catch (ePd) {}
+      var talvez = crmNaoBate(x);
+      var seg = (pf && pf.seg != null) ? pf.seg : (parseInt(String(x.seguidores || '').replace(/\D/g, ''), 10) || null);
+      var segTxt = seg != null ? (seg >= 1000 ? (Math.round(seg / 100) / 10).toLocaleString('pt-BR') + ' mil' : seg) : '';
       // o que a pessoa respondeu no formulário, quando respondeu
       var respostas = '';
       if (lead) {
@@ -8451,37 +8526,48 @@ function crmQuadro(lista) {
       var faixa = lead && lead.faixa === 'alta' ? '<span class="crm-chip quente">🔥 R$2–4mil</span>'
                 : lead && lead.faixa === 'media' ? '<span class="crm-chip morno">R$500–1mil</span>' : '';
       var aberto = window._crmAberto === (x.insta || '');
-      h += '<div class="crm-card' + (aberto ? ' aberto' : '') + '" draggable="true" ondragstart="crmPegar(event)" ondragend="crmLargou(event)"'
+      var fotoP = igFotoDe(x.insta);
+      var nomeReal = x.nome || (pf && pf.nome) || '@' + x.insta;
+      // o bloco do post de onde a pessoa veio (com a foto, quando o robô já guardou)
+      var blocoPost = '';
+      if (pd) {
+        var qd2 = pd.quando ? new Date(pd.quando) : null;
+        var fotoPost = fotoDoPost(pd.post);
+        var infoPost = (IGO.postDe || {})[pd.post];
+        blocoPost = '<div class="crm-post" title="clique para ver o post aqui dentro do dash"'
+          + ' onclick="event.stopPropagation();crmVerPost(' + JSON.stringify(pd.post).replace(/"/g, '&quot;') + ')">'
+          + (fotoPost ? '<img src="' + fotoPost + '" loading="lazy" onerror="this.outerHTML=\'<span class=crm-post-sem>📷</span>\'">' : '<span class="crm-post-sem">📷</span>')
+          + '<div><span class="crm-post-t">veio do post' + ((qd2 && !isNaN(qd2)) ? ' de ' + qd2.toLocaleDateString('pt-BR').slice(0, 5) : '')
+          + (infoPost && infoPost.pedidos ? ' · ' + infoPost.pedidos + ' pedidos' : '') + (pd.vezes > 1 ? ' · ' + pd.vezes + 'x' : '') + '</span>'
+          + (pd.texto ? '<i>"' + String(pd.texto).slice(0, 60).replace(/"/g, "'") + '"</i>' : '') + '</div></div>';
+      }
+      // etiquetas da pessoa (+ botão de pôr/tirar)
+      var etqs = etqDe(x);
+      var blocoEtq = '<div class="crm-etqs">'
+        + etqs.slice(0, 4).map(function(t){ return '<span class="crm-etq on">' + t + '</span>'; }).join('')
+        + (etqs.length > 4 ? '<span class="crm-etq on">+' + (etqs.length - 4) + '</span>' : '')
+        + '<span class="crm-etq mais" title="pôr ou tirar etiquetas" onclick="event.stopPropagation();crmEtiquetas(\'' + (x.insta || '') + '\')">🏷️ +</span>'
+        + '</div>';
+      h += '<div class="crm-card' + (aberto ? ' aberto' : '') + (pf ? ' mapeado' : '') + '" draggable="true" ondragstart="crmPegar(event)" ondragend="crmLargou(event)"'
         + ' onclick="crmAbrirPerfil(event, \'' + (x.insta || '') + '\')" data-insta="' + (x.insta || '') + '">'
         + '<div class="crm-topo">'
-        +   '<div class="avatar" style="width:30px;height:30px;font-size:.62rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
-        +     (igFotoDe(x.insta) ? '<img src="' + igFotoDe(x.insta) + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+        +   '<div class="avatar" style="width:38px;height:38px;font-size:.7rem;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(nomeReal)
+        +     (fotoP ? '<img src="' + fotoP + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
         +   '</div>'
         +   '<div style="flex:1;min-width:0;">'
-        +     '<b class="crm-nome">' + (x.nome || '@' + x.insta) + '</b>'
-        +     '<div class="crm-quando">' + (x.date ? tempoDesde(x.date) + ' · 🕐 ' + ('0' + x.date.getHours()).slice(-2) + ':' + ('0' + x.date.getMinutes()).slice(-2) : '') + (x.seguidores ? ' · 👥 ' + x.seguidores : '') + '</div>'
+        +     '<b class="crm-nome">' + nomeReal + '</b>'
+        +     '<div class="crm-quando">@' + x.insta
+        +       (segTxt ? ' · 👥 ' + segTxt : '')
+        +       (x.date ? ' · ' + tempoDesde(x.date) : '') + '</div>'
         +   '</div>'
         + '</div>'
+        + blocoPost
         + '<div class="crm-chips">'
-        +   (lead ? '<span class="crm-chip ok">✅ preencheu</span>' : '<span class="crm-chip pend">só comentou</span>')
-        +   (function() {
-              try {
-                var pf = (typeof IGO !== 'undefined' && IGO.perfil) ? IGO.perfil[String(x.insta || '').toLowerCase()] : null;
-                if (pf && pf.seg >= 10000) return '<span class="crm-chip quente" title="' + pf.seg.toLocaleString('pt-BR') + ' seguidores no Instagram — chamar primeiro!">🔥 ' + Math.round(pf.seg / 1000) + 'k seguidores</span>';
-              } catch (e) {}
-              return '';
-            })()
-        +   (function(){   // 📷 de qual post veio (Bruno 25/08/2026)
-              var pd = null;
-              try { pd = igPedidoDoLead({ insta: x.insta }); } catch (e) {}
-              if (!pd) return '';
-              var q = pd.quando ? new Date(pd.quando) : null;
-              return '<span class="crm-chip" style="background:rgba(61,220,151,.16);color:#3ddc97;cursor:pointer;"'
-                + ' title="' + (pd.texto ? 'comentou: "' + pd.texto.replace(/"/g, "'") + '" — ' : '') + 'clique para abrir o post"'
-                + ' onclick="event.stopPropagation();window.open(' + JSON.stringify(pd.post) + ',\'_blank\')">📷 post'
-                + ((q && !isNaN(q)) ? ' ' + q.toLocaleDateString('pt-BR').slice(0, 5) : '')
-                + (pd.vezes > 1 ? ' · ' + pd.vezes + 'x' : '') + '</span>';
-            })()
+        +   (talvez
+              ? '<span class="crm-chip nb" title="Na planilha existe ' + String(talvez.nome || '').replace(/"/g, '') + ' (' + (talvez.insta ? '@' + String(talvez.insta).replace(/"/g, '') : 'sem @ cadastrado') + '), que PARECE ser esta pessoa — mas o @ não bate com quem comentou. Clique para conferir a ficha."'
+                + ' onclick="event.stopPropagation();verFichaPendente(\'' + (talvez.tel8 || '') + '\')">⚠️ planilha não bate</span>'
+              : (lead ? '<span class="crm-chip ok">✅ preencheu</span>' : '<span class="crm-chip pend">só comentou</span>'))
+        +   (pf && pf.seg >= 10000 ? '<span class="crm-chip quente" title="' + pf.seg.toLocaleString('pt-BR') + ' seguidores no Instagram — chamar primeiro!">🔥 ' + Math.round(pf.seg / 1000) + 'k seguidores</span>' : '')
         +   faixa
         +   (function(){
               var cl = lead ? classeDoLead(lead) : null;
@@ -8492,16 +8578,25 @@ function crmQuadro(lista) {
               var sg = perfilSugerido(x);
               return sg ? '<span class="crm-chip sug" style="--c:' + sg.cor + ';" title="perfil que os dados indicam · ' + sg.porque + ' — clique no cartão para confirmar">' + sg.rot + '?</span>' : '';
             })()
+        +   (function(){
+              if (!x.produto) return '';
+              var pr = CRM_PRODUTOS.filter(function(p){ return v2norm(p.v) === v2norm(x.produto); })[0];
+              var cor = pr ? pr.cor : '#6ea8ff';
+              return '<span class="crm-chip" style="background:' + cor + '26;color:' + cor + ';" title="produto com perfil — escolhido pela equipe">💠 ' + x.produto + '</span>';
+            })()
         + '</div>'
+        + blocoEtq
         + respostas
         + (aberto ? crmEscolhaPerfil(x) : '')
         + '<div class="crm-acoes">'
-        +   (x.insta ? '<a href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank" onclick="event.stopPropagation();">📷 perfil</a>' : '')
+        +   (x.insta ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();crmVerPerfil(\'' + x.insta + '\');" title="ver o perfil aqui dentro do dash">📷 perfil</a>' : '')
         +   (lead ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();verFichaPendente(\'' + (lead.tel8 || '') + '\');">👤 ficha</a>'
                   : '<a href="#" onclick="event.preventDefault();event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);">➕ Clint</a>')
         + '</div></div>';
     });
-    if (itens.length > 60) h += '<div class="crm-vazio">… e mais ' + (itens.length - 60) + '</div>';
+    if (itens.length > vis) {
+      h += '<div class="crm-mais" onclick="crmMaisCartoes(\'' + e.k + '\')">⬇ mostrar mais 30 · faltam ' + (itens.length - vis) + '</div>';
+    }
     h += '</div></div>';
   });
   return h + '</div>';
@@ -8538,6 +8633,15 @@ function crmEscolhaPerfil(x) {
           + ' onclick="event.stopPropagation();comentMarcar(\'' + (x.insta || '') + '\',\'tag\',\'' + p.v + '\');">'
           + p.rot + '</span>';
       }).join('')
+    + '</div>'
+    + '<div class="crm-perfil-tit" style="margin-top:8px;">qual produto tem perfil?</div>'
+    + '<div class="crm-perfil-ops">'
+    + CRM_PRODUTOS.map(function(p) {
+        var on = v2norm(p.v) === v2norm(x.produto || '');
+        return '<span class="crm-perfil-op' + (on ? ' on' : '') + '" style="--c:' + p.cor + ';"'
+          + ' onclick="event.stopPropagation();comentMarcar(\'' + (x.insta || '') + '\',\'produto\',\'' + p.v + '\');">'
+          + p.rot + '</span>';
+      }).join('')
     + '</div></div>';
 }
 // clicar no cartão abre/fecha a escolha (o arrastar continua funcionando)
@@ -8569,6 +8673,202 @@ function crmSoltar(e) {
   if (!etapa) return;
   comentMarcar(insta, 'etapa', etapa.nome);
 }
+// ===== 🏷️ ETIQUETAS E PRODUTO DO QUADRO (Bruno 30/08/2026) =====
+// Etiquetas: várias por pessoa, guardadas na coluna "Etiquetas" da planilha dos
+// comentários (separadas por " | "). O catálogo de etiquetas fica no robô; criar
+// etiqueta nova é só Bruno, Sarah e Adm — o resto da equipe aplica as que existem.
+var ETIQ = { lista: [], carregado: false };
+function etqDe(x) {
+  return String(x && x.etiquetas || '').split('|').map(function(s){ return s.trim(); }).filter(Boolean);
+}
+function etiquetasDisponiveis() {
+  var set = {}, out = [];
+  ETIQ.lista.forEach(function(t){ var k = v2norm(t); if (k && !set[k]) { set[k] = 1; out.push(t); } });
+  (COMENT.rows || []).forEach(function(x){ etqDe(x).forEach(function(t){ var k = v2norm(t); if (k && !set[k]) { set[k] = 1; out.push(t); } }); });
+  return out;
+}
+function podeCriarEtiqueta() {
+  var lg = localStorage.getItem('v2Login');
+  return ehAdm() || lg === 'Sarah Promov';
+}
+function carregarEtiquetas() {
+  gasPedir({ action: 'etiquetasListar' }, function(d) {
+    if (d && d.success && d.lista) { ETIQ.lista = d.lista; ETIQ.carregado = true; }
+  }, 20000);
+}
+function _comDe(insta) {
+  var k = String(insta || '').toLowerCase();
+  for (var i = 0; i < COMENT.rows.length; i++) {
+    if (String(COMENT.rows[i].insta || '').toLowerCase() === k) return COMENT.rows[i];
+  }
+  return null;
+}
+// a janelinha de escolher/criar etiquetas de uma pessoa
+function crmEtiquetas(insta) {
+  if (soOlhar()) return;
+  var x = _comDe(insta);
+  if (!x) return;
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 330;
+  ov.id = 'etq-overlay';
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(400px,92vw);padding:18px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.2rem;">🏷️</span>'
+    + '<b style="flex:1;">Etiquetas de ' + (x.nome || '@' + x.insta) + '</b>'
+    + '<button class="close-x" onclick="document.getElementById(\'etq-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:10px;">Clique para pôr ou tirar — grava na hora, para todo mundo.</div>'
+    + '<div id="etq-caixa"></div></div>';
+  document.body.appendChild(ov);
+  _etqDesenha(insta);
+}
+function _etqDesenha(insta) {
+  var cx = document.getElementById('etq-caixa');
+  var x = _comDe(insta);
+  if (!cx || !x) return;
+  var minhas = etqDe(x).map(v2norm);
+  var todas = etiquetasDisponiveis();
+  var h = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+  if (!todas.length) h += '<span class="hint">Nenhuma etiqueta criada ainda.</span>';
+  todas.forEach(function(t) {
+    var on = minhas.indexOf(v2norm(t)) !== -1;
+    h += '<span class="crm-etq' + (on ? ' on' : '') + '" style="cursor:pointer;font-size:.72rem;padding:5px 11px;"'
+      + ' onclick="crmEtqToggle(\'' + insta + '\',' + JSON.stringify(t).replace(/"/g, '&quot;') + ')">'
+      + (on ? '✓ ' : '') + t + '</span>';
+  });
+  h += '</div>';
+  if (podeCriarEtiqueta()) {
+    h += '<div style="display:flex;gap:8px;margin-top:14px;">'
+      + '<input id="etq-nova" placeholder="etiqueta nova (ex.: nutri, pastor)" maxlength="30"'
+      + ' style="flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:8px;"'
+      + ' onkeydown="if(event.key===\'Enter\')crmEtqCriar(\'' + insta + '\')">'
+      + '<button class="btn primary" onclick="crmEtqCriar(\'' + insta + '\')">➕ criar</button></div>';
+  } else {
+    h += '<div class="hint" style="margin-top:10px;">Etiqueta nova: peça ao Bruno, à Sarah ou ao Adm.</div>';
+  }
+  cx.innerHTML = h;
+}
+function crmEtqToggle(insta, tag) {
+  var x = _comDe(insta);
+  if (!x) return;
+  var lista = etqDe(x);
+  var k = v2norm(tag), tinha = false;
+  lista = lista.filter(function(t){ if (v2norm(t) === k) { tinha = true; return false; } return true; });
+  if (!tinha) lista.push(tag);
+  comentMarcar(insta, 'etiquetas', lista.join(' | '));
+  _etqDesenha(insta);
+}
+function crmEtqCriar(insta) {
+  var inp = document.getElementById('etq-nova');
+  var t = inp ? String(inp.value || '').replace(/[|<>]/g, '').trim().slice(0, 30) : '';
+  if (!t) return;
+  var jaExiste = etiquetasDisponiveis().some(function(e){ return v2norm(e) === v2norm(t); });
+  if (!jaExiste) {
+    ETIQ.lista.push(t);
+    var todas = etiquetasDisponiveis();   // manda o catálogo completo (inclui as que estão em uso)
+    gasPedir({ action: 'etiquetasSalvar', lista: todas }, function(d) {
+      if (!d || !d.success) avisoRapido('⚠️ O catálogo de etiquetas só fica salvo com o robô v104 — avise o Bruno.');
+    }, 20000);
+  }
+  crmEtqToggle(insta, t);   // já aplica na pessoa (e redesenha a janelinha)
+}
+// produto com perfil: escolha no cartão aberto (coluna "Produto" na planilha)
+var CRM_PRODUTOS = [
+  { v: 'Spark',          rot: '⚡ Spark',          cor: '#3ddc97' },
+  { v: 'Growth',         rot: '🚀 Growth',         cor: '#b98aff' },
+  { v: 'Legado Digital', rot: '🏛️ Legado Digital', cor: '#f6a350' },
+  { v: '',               rot: '⚪ sem produto',     cor: '#8b8fa3' }
+];
+// a pessoa da planilha que PARECE ser este comentarista, mas com o @ diferente
+// (pedido do Bruno 30/08/2026: "mostrar quando não estiver batendo")
+function crmNaoBate(x) {
+  if (!x || !x.insta) return null;
+  try {
+    if (comentCruza(x)) return null;   // bate certinho pelo @
+    var q = igLeadPorInsta(x.insta);
+    if (q && (!q.insta || v2norm(q.insta) !== v2norm(x.insta))) return q;
+  } catch (e) {}
+  return null;
+}
+// quem tem dados do Instagram (mapeado pela API) aparece primeiro no quadro
+function crmScore(x) {
+  var u = String(x.insta || '').toLowerCase();
+  var pf = (IGO.perfil || {})[u];
+  var s = 0;
+  if (pf) s += 2;
+  if (pf && pf.foto) s += 1;
+  try { if (igPedidoDoLead({ insta: x.insta })) s += 1; } catch (e) {}
+  return s;
+}
+function crmMaisCartoes(k) {
+  window._crmVis = window._crmVis || {};
+  window._crmVis[k] = (window._crmVis[k] || 30) + 30;
+  renderLeads();
+}
+// ===== 📷 POST E PERFIL DENTRO DO DASH (Bruno 30/08/2026) =====
+// O Instagram deixa embutir o POST (página /embed); o PERFIL ele bloqueia,
+// então a ficha do perfil é montada com os dados que o robô já guardou.
+function crmVerPost(link) {
+  link = String(link || '').split('?')[0].trim();
+  if (!link) return;
+  var emb = link.replace(/\/+$/, '') + '/embed';
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 330;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(420px,94vw);padding:12px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:1.1rem;">📷</span>'
+    + '<b style="flex:1;">O post de onde a pessoa veio</b>'
+    + '<a href="' + link + '" target="_blank" class="hint" style="text-decoration:none;">abrir no Instagram ↗</a>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<iframe src="' + emb + '" style="width:100%;height:540px;border:0;border-radius:12px;background:#fff;" loading="lazy"></iframe></div>';
+  document.body.appendChild(ov);
+}
+function crmVerPerfil(insta) {
+  var u = String(insta || '').toLowerCase().replace(/^@+/, '');
+  if (!u) return;
+  var x = _comDe(u) || { insta: u, nome: '' };
+  var pf = (IGO.perfil || {})[u] || {};
+  var pd = null; try { pd = igPedidoDoLead({ insta: u }); } catch (e) {}
+  var foto = igFotoDe(u);
+  var seg = (pf.seg != null) ? pf.seg : (parseInt(String(x.seguidores || '').replace(/\D/g, ''), 10) || null);
+  var fotoPost = pd ? fotoDoPost(pd.post) : '';
+  var qd = pd && pd.quando ? new Date(pd.quando) : null;
+  var etqs = etqDe(x);
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 330;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(430px,94vw);padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:14px;">'
+    +   '<div class="avatar" style="width:64px;height:64px;font-size:1.05rem;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,' + v2grad(x.nome || u) + ');">' + v2ini(x.nome || u)
+    +     (foto ? '<img src="' + foto.replace('sz=w120', 'sz=w240') + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;">' : '')
+    +   '</div>'
+    +   '<div style="flex:1;min-width:0;">'
+    +     '<b style="font-size:1rem;">' + (x.nome || pf.nome || '@' + u) + '</b>'
+    +     '<div class="hint" style="margin-top:2px;">@' + u
+    +       (seg != null ? ' · 👥 ' + seg.toLocaleString('pt-BR') + ' seguidores' : '')
+    +       (pf.pub ? ' · ' + pf.pub + ' publicações' : '') + '</div>'
+    +   '</div>'
+    +   '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button>'
+    + '</div>'
+    + (pf.bio ? '<div style="margin-top:12px;font-size:.78rem;color:var(--text-secondary);line-height:1.45;">' + String(pf.bio).slice(0, 220) + '</div>' : '')
+    + (pf.site ? '<div class="hint" style="margin-top:6px;">🔗 <a href="' + (String(pf.site).indexOf('http') === 0 ? pf.site : 'https://' + pf.site) + '" target="_blank" style="color:#6ea8ff;">' + String(pf.site).replace(/^https?:\/\//, '').slice(0, 44) + '</a></div>' : '')
+    + (pd
+        ? '<div class="crm-post" style="margin-top:14px;cursor:pointer;" onclick="crmVerPost(' + JSON.stringify(pd.post).replace(/"/g, '&quot;') + ')">'
+          + (fotoPost ? '<img src="' + fotoPost + '" onerror="this.outerHTML=\'<span class=crm-post-sem>📷</span>\'">' : '<span class="crm-post-sem">📷</span>')
+          + '<div><span class="crm-post-t">veio do post' + ((qd && !isNaN(qd)) ? ' de ' + qd.toLocaleDateString('pt-BR').slice(0, 5) : '') + (pd.vezes > 1 ? ' · comentou ' + pd.vezes + 'x' : '') + '</span>'
+          + (pd.texto ? '<i>"' + String(pd.texto).slice(0, 90).replace(/"/g, "'") + '"</i>' : '<i>clique para ver o post aqui dentro</i>') + '</div></div>'
+        : '')
+    + (etqs.length ? '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:12px;">' + etqs.map(function(t){ return '<span class="crm-etq on" style="font-size:.68rem;padding:4px 10px;">' + t + '</span>'; }).join('') + '</div>' : '')
+    + (x.produto ? '<div class="hint" style="margin-top:8px;">💠 produto com perfil: <b style="color:#6ea8ff;">' + x.produto + '</b></div>' : '')
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">'
+    +   '<button class="btn" onclick="crmEtiquetas(\'' + u + '\');">🏷️ etiquetas</button>'
+    +   '<a class="btn" style="text-decoration:none;" href="https://instagram.com/' + encodeURIComponent(u) + '" target="_blank">📷 abrir no Instagram ↗</a>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+}
+
 function comSecaoDe(x) {
   var marcado = (x.tag || '').trim() || (x.tipo || '').trim();
   return marcado ? '✅ já marcados' : '⏳ falta marcar · ' + comGrupoDe(x.date);
@@ -8590,13 +8890,19 @@ function comSeletores(x) {
   return caixa('TAG', tag, COMENT_TAGS, 'tag', corG) + caixa('TIPO', tipo, COMENT_TIPOS, 'tipo', corT);
 }
 // cruza o comentarista com a base da pesquisa (pelo @ do Instagram)
+// Com 1.600+ cartões no quadro, procurar um a um travava a tela — agora existe um
+// índice @ → pessoa, refeito só quando a base muda de tamanho (regra do O(1)).
+var _comCruzaIdx = null;
 function comentCruza(c) {
-  if (!c.insta) return null;
-  var alvo = v2norm(c.insta);
-  for (var i = 0; i < LD.rows.length; i++) {
-    if (LD.rows[i].insta && v2norm(LD.rows[i].insta) === alvo) return LD.rows[i];
+  if (!c.insta || !LD.rows || !LD.rows.length) return null;
+  if (!_comCruzaIdx || _comCruzaIdx._n !== LD.rows.length) {
+    _comCruzaIdx = { _n: LD.rows.length, m: {} };
+    for (var i = 0; i < LD.rows.length; i++) {
+      var k = LD.rows[i].insta ? v2norm(LD.rows[i].insta) : '';
+      if (k && !_comCruzaIdx.m[k]) _comCruzaIdx.m[k] = LD.rows[i];
+    }
   }
-  return null;
+  return _comCruzaIdx.m[v2norm(c.insta)] || null;
 }
 
 function mudarPeriodoLeads(p, el) {
@@ -8941,8 +9247,47 @@ function comentSecaoHtml() {
         catch (e) { window._comQuadro = true; }
       }
       if (window._comQuadro) {
-        h += '<div class="hint" style="margin:2px;">Arraste a pessoa de uma coluna para outra — grava sozinho na planilha</div>';
-        h += crmQuadro(comLista);
+        // ===== filtros do quadro: etiquetas, produto e "planilha não bate" =====
+        var FQ = window._crmFiltro = window._crmFiltro || { etq: '', prod: '', nb: false };
+        var contE = {}, contP = {};
+        comLista.forEach(function(x) {
+          etqDe(x).forEach(function(t){ var k = v2norm(t); if (!contE[k]) contE[k] = { n: 0, rot: t }; contE[k].n++; });
+          if (x.produto) { var kp = v2norm(x.produto); if (!contP[kp]) contP[kp] = { n: 0, rot: x.produto }; contP[kp].n++; }
+        });
+        var todasEtq = etiquetasDisponiveis();
+        var chipsF = '';
+        todasEtq.forEach(function(t) {
+          var k = v2norm(t), n = contE[k] ? contE[k].n : 0;
+          var on = v2norm(FQ.etq) === k;
+          chipsF += '<span class="ld-selo' + (on ? '' : ' morno') + '" style="cursor:pointer;" '
+            + 'onclick="window._crmFiltro.etq=' + (on ? "''" : JSON.stringify(t).replace(/"/g, '&quot;')) + ';renderLeads();">'
+            + '🏷️ ' + t + (n ? ' · ' + n : '') + '</span>';
+        });
+        CRM_PRODUTOS.forEach(function(p) {
+          if (!p.v) return;
+          var kp = v2norm(p.v), n = contP[kp] ? contP[kp].n : 0;
+          if (!n && v2norm(FQ.prod) !== kp) return;   // produto sem ninguém marcado não vira chip
+          var on = v2norm(FQ.prod) === kp;
+          chipsF += '<span class="ld-selo' + (on ? '' : ' morno') + '" style="cursor:pointer;" '
+            + 'onclick="window._crmFiltro.prod=' + (on ? "''" : JSON.stringify(p.v).replace(/"/g, '&quot;')) + ';renderLeads();">'
+            + '💠 ' + p.v + (n ? ' · ' + n : '') + '</span>';
+        });
+        chipsF += '<span class="ld-selo' + (FQ.nb ? '' : ' morno') + '" style="cursor:pointer;" title="só quem tem alguém parecido na planilha com o @ diferente"'
+          + ' onclick="window._crmFiltro.nb=!window._crmFiltro.nb;renderLeads();">⚠️ planilha não bate</span>';
+        if (chipsF) {
+          h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px;">'
+            + '<span class="hint">filtrar:</span>' + chipsF
+            + ((FQ.etq || FQ.prod || FQ.nb) ? '<span class="ld-selo" style="cursor:pointer;background:rgba(255,107,107,.15);color:#ff6b6b;" onclick="window._crmFiltro={etq:\'\',prod:\'\',nb:false};renderLeads();">✕ limpar</span>' : '')
+            + '</div>';
+        }
+        var listaQuadro = comLista.filter(function(x) {
+          if (FQ.etq && etqDe(x).map(v2norm).indexOf(v2norm(FQ.etq)) === -1) return false;
+          if (FQ.prod && v2norm(x.produto || '') !== v2norm(FQ.prod)) return false;
+          if (FQ.nb && !crmNaoBate(x)) return false;
+          return true;
+        });
+        h += '<div class="hint" style="margin:2px;">Arraste a pessoa de uma coluna para outra — grava sozinho na planilha · quem tem Instagram mapeado aparece primeiro</div>';
+        h += crmQuadro(listaQuadro);
       } else {
       // quem ainda não foi marcado (sem TAG e sem TIPO) vem primeiro — pedido do Bruno
       var comFalta = comLista.filter(function(x){ return !(x.tag || '').trim() && !(x.tipo || '').trim(); });
@@ -11249,7 +11594,7 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (11ª implantação, v17)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (12ª implantação, v19)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybpL-yGyNNz2XAcRNrsSbu190OpqILHPmU6p-dp14u89P4UuZdoeECBeEZ84PGCF8W/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -13317,6 +13662,7 @@ function conferirEventoNaAgenda(agenda, dataBr, nome) {
 function posicionarLinhaAgora() {
   var box = document.getElementById('v2-sg');
   if (!box) return;
+  if (!AG || !AG.weekStart) return;   // a agenda ainda não desenhou (evita erro ao redimensionar a janela)
   // só aparece se HOJE estiver na semana exibida
   var hoje = new Date(); hoje.setHours(0,0,0,0);
   var fimSemana = new Date(AG.weekStart.getTime() + 6 * 86400000);
