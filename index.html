@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-29-1301';
+var VERSAO_DASH = '2026-08-30-0147';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3951,6 +3951,48 @@ function v2row(r) {
 }
 
 // ---------- render principal ----------
+// 💵 CASH COLLECT (Bruno 29/08/2026): quanto de cada venda JA ENTROU no caixa.
+// A vista, PIX e cartao parcelado (passou tudo) = valor total.
+// Boleto e cartao recorrente = entrada + 1a parcela (le o detalhe da observacao,
+// inclusive escrito a mao: "10x de R$ 3 mil no boleto", "10 x R$ 500"...).
+// Sem detalhe anotado = conta so o que da para provar (decisao do Bruno).
+function pagCashCollect(p) {
+  var total = p.valor || 0;
+  var obs = String(p.obs || '');
+  var texto = v2norm(obs + ' ' + (p.forma || ''));
+  var ehRec = texto.indexOf('recorrente') !== -1;
+  var ehBol = texto.indexOf('boleto') !== -1;
+  if (!ehRec && !ehBol) return total;
+  function din(s, mil) {
+    s = String(s || '').replace(/[^\d.,]/g, '');
+    if (!s) return 0;
+    if (s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+    var v = parseFloat(s) || 0;
+    return mil ? v * 1000 : v;
+  }
+  var mEnt = obs.match(/entrada[^0-9]{0,12}([\d.,]+)\s*(mil)?/i);
+  var entrada = mEnt ? din(mEnt[1], mEnt[2]) : 0;
+  var parcela = 0;
+  var re = /(\d{1,2})\s*x[^0-9]{0,20}?([\d.][\d.,]*)\s*(mil)?/gi, m;
+  while ((m = re.exec(obs)) !== null) {
+    var v = din(m[2], m[3]);
+    if (v > 10) { parcela = v; break; }
+  }
+  var cash = entrada + parcela;
+  return total ? Math.min(total, cash) : cash;
+}
+// as vendas registradas dentro do MESMO periodo filtrado do dash
+function pagPeriodo() {
+  var rows = (PAG.rows || []);
+  if (FILTRO.de && FILTRO.ate) return rows.filter(function(p) { return p.date && p.date >= FILTRO.de && p.date <= FILTRO.ate; });
+  if (FILTRO.mes === 'todos') return rows.filter(function(p) { return !!p.date; });
+  if (FILTRO.mes !== 'atual') {
+    var q = FILTRO.mes.split('-');
+    return rows.filter(function(p) { return p.date && p.date.getFullYear() === +q[0] && p.date.getMonth() === +q[1]; });
+  }
+  var hj = new Date();
+  return rows.filter(function(p) { return p.date && p.date.getFullYear() === hj.getFullYear() && p.date.getMonth() === hj.getMonth(); });
+}
 function renderV2() {
   var mesRows = v2mesAtual();
   var mc = v2calc(mesRows);
@@ -3986,6 +4028,12 @@ function renderV2() {
     + '<div class="g-label">✅ Vendido</div>'
     + '<div class="g-value money">' + v2moeda(mc.vdV) + '</div>'
     + '<div class="g-sub"><b>' + mc.vd + ' venda' + (mc.vd !== 1 ? 's' : '') + '</b> confirmada' + (mc.vd !== 1 ? 's' : '') + ' · Ticket <b>' + v2moeda0(mc.vd ? mc.vdV / mc.vd : 0) + '</b></div>'
+    + (function() {
+        var cashV = 0, nCash = 0;
+        try { pagPeriodo().forEach(function(p) { cashV += pagCashCollect(p); nCash++; }); } catch (eC) { return ''; }
+        if (!nCash) return '';
+        return '<div class="g-sub" style="margin-top:3px;" title="O que JÁ ENTROU no caixa: à vista, PIX e cartão parcelado contam o total; boleto e recorrente contam entrada + 1ª parcela (lido do detalhe da venda).">💵 Já no caixa: <b style="color:#3ddc97;">' + v2moeda(cashV) + '</b> <span class="hint">cash collect</span></div>';
+      })()
     + '<div class="hint">Clique para ver clientes</div></div>';
   h += '<div class="glass click" style="--halo:rgba(110,168,255,.18);--tint:#6ea8ff;" onclick="abrirA(\'bloq\')">'
     + '<div class="g-label">🔒 Bloqueio + Entrada</div>'
@@ -10661,6 +10709,7 @@ window.__gvizPagV2 = function(resp) {
     PAG.rows = rows;
     try { if (typeof telaVisivel === 'function' && telaVisivel('s-contratos')) renderContratos(); } catch (eCtr) {}
     try { atualizarAlertaContratos(); } catch (eAl) {}
+    try { renderV2(); } catch (eRv) {}
     PAG.carregado = true;
     montarPagamentos();
   } catch (e) { console.error('pagamentos:', e); }
