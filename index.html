@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0906';
+var VERSAO_DASH = '2026-08-30-0907';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3764,6 +3764,28 @@ function seloVendaSemForm(l) {
   if (!pago && rV) { try { pago = pagVinculado(rV); } catch (e2) {} }
   if (pago) return '';
   return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="Está Vendido mas o formulário de venda não foi preenchido — abra e use 💰 Registrar venda">💰 sem formulário</span>';
+}
+// 🌱 vincular manualmente um lead a post organico (quando o robo nao pegou sozinho)
+function vincularOrganico(iReg, sugestao) {
+  if (soOlhar()) return;
+  var r = _v2reg[iReg];
+  if (!r) return;
+  caixaPromov({ ico: '🌱', titulo: 'Vincular a post orgânico',
+    texto: 'Qual o @ do Instagram de ' + (r.nome || 'esse lead') + '?\nO vínculo fica anotado na observação e o selo 🌱 aparece nas listas e na conta do orgânico.',
+    campo: { valor: sugestao || '', placeholder: '@dapessoa' },
+    botoes: [{ t: 'Cancelar' }, { t: '🌱 Vincular', cls: 'primary', ao: function(v) {
+      v = String(v || '').trim().replace(/^@+/, '').toLowerCase().split('/').pop();
+      if (!v) { alert('Digite o @ do Instagram.'); return; }
+      var extra = '🌱 toque orgânico: @' + v + ' (vínculo manual)';
+      try {
+        var pd = (typeof IGO !== 'undefined' && IGO.porUser) ? IGO.porUser[v] : null;
+        if (pd) extra = '🌱 toque orgânico: @' + v + ' (' + (pd.isca || 'interagiu') + (pd.quando ? ' em ' + String(pd.quando).slice(0, 10) : '') + ' — vínculo manual)';
+      } catch (e) {}
+      r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '') + extra;
+      sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+      avisoRapido('🌱 Vinculado — ' + (r.nome || '') + ' agora conta como toque orgânico');
+      try { renderLeads(); } catch (e2) {}
+    } }] });
 }
 // 🌱 selo: a venda/reuniao teve toque comprovado em post organico
 function seloToqueOrganico(l) {
@@ -9205,6 +9227,12 @@ function abrirFichaLead(i) {
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVendaLead()" title="Abre o formulário de venda já preenchido com os dados deste lead">💰 Registrar venda</button>');
   if (_snBloqU && !_blqF)
     _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.5);color:#ffd166;font-weight:800;cursor:pointer;" onclick="abrirFormBloqueioLead()" title="Cliente pagou bloqueio de oferta ou entrada antes da venda completa">🔒 Bloqueio / entrada</button>');
+  // 🌱 vinculo manual ao organico (Bruno 30/08/2026): so aparece se ainda nao tem o selo
+  var _iReuF = _rUlt ? v2reg(_rUlt) : -1;
+  if (_iReuF >= 0 && !seloToqueOrganico(l)) {
+    var _sug = (l.insta || '').replace(/^@+/, '');
+    _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(61,220,151,.10);border-color:rgba(61,220,151,.35);color:#3ddc97;cursor:pointer;" onclick="vincularOrganico(' + _iReuF + ', ' + JSON.stringify(_sug).replace(/"/g, '&quot;') + ')" title="O robô não pegou sozinho? Informe o @ e este lead passa a contar como vindo de post orgânico.">🌱 Vincular a post</button>');
+  }
   // 📄 contratos na ficha: mesmo kit da aba Contratos (Bruno 29/08/2026)
   var _iPagC = _pag ? (PAG.rows || []).indexOf(_pag) : -1;
   if (_snU === 'vendido' && _iPagC >= 0 && !/legado/i.test(String(_pag.programa || ''))) {
@@ -12239,16 +12267,19 @@ function caixaPromov(op) {
     + '<b style="flex:1;font-size:.95rem;">' + _cxEsc(op.titulo || 'Aviso') + '</b></div>'
     + '<div style="font-size:.85rem;color:var(--text-2);line-height:1.55;white-space:pre-wrap;margin-bottom:14px;">' + _cxEsc(op.texto || '') + '</div>'
     + (op.copiar ? '<input id="cx-copia" readonly value="' + _cxEsc(op.copiar).replace(/"/g, '&quot;') + '" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:9px;margin-bottom:12px;">' : '')
+    + (op.campo ? '<input id="cx-campo" value="' + _cxEsc(op.campo.valor || '').replace(/"/g, '&quot;') + '" placeholder="' + _cxEsc(op.campo.placeholder || '') + '" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(246,163,80,.4);border-radius:9px;color:var(--text);padding:9px;margin-bottom:12px;">' : '')
     + '<div style="display:flex;gap:10px;justify-content:flex-end;">' + botoes + '</div></div>';
   document.body.appendChild(ov);
   ov.querySelectorAll('button[data-bx]').forEach(function(bt) {
     bt.onclick = function() {
       ov.remove();
       var b = (op.botoes || [])[parseInt(bt.getAttribute('data-bx'), 10)];
-      if (b && b.ao) b.ao();
+      var digitado = ov.querySelector('#cx-campo') ? ov.querySelector('#cx-campo').value : undefined;
+      if (b && b.ao) b.ao(digitado);
     };
   });
   if (op.copiar) { var inp = ov.querySelector('#cx-copia'); if (inp) { inp.focus(); inp.select(); try { document.execCommand('copy'); } catch (e) {} } }
+  if (op.campo) { var inp2 = ov.querySelector('#cx-campo'); if (inp2) inp2.focus(); }
 }
 window.alert = function(m) { caixaPromov({ ico: '⚠️', titulo: 'Aviso', texto: String(m == null ? '' : m) }); };
 function confirmar(texto, aoSim, ico) {
