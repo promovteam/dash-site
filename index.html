@@ -626,6 +626,10 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .crm-acoes a:hover { background:color-mix(in srgb, var(--cor) 24%, transparent); color:var(--cor); }
 /* cartão novo do social selling (Bruno 30/08/2026) */
 .crm-card.mapeado { border-color:rgba(110,168,255,.28); }
+/* as informações do Instagram em destaque (Bruno: "estão quase invisíveis") */
+.crm-nome { font-size:.78rem; }
+.crm-ig { font-size:.7rem; font-weight:700; color:#6ea8ff; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.crm-ig b { color:#ffd166; font-weight:800; }
 .crm-post { display:flex; gap:8px; align-items:center; margin-top:7px; padding:6px 8px; border-radius:9px;
   background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.07); cursor:pointer; transition:background .15s; }
 .crm-post:hover { background:rgba(110,168,255,.12); }
@@ -633,9 +637,9 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .crm-post-sem { width:44px; height:44px; border-radius:7px; background:rgba(255,255,255,.07); display:flex;
   align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
 .crm-post > div { flex:1; min-width:0; }
-.crm-post-t { display:block; font-size:.6rem; font-weight:800; color:#3ddc97; }
-.crm-post i { display:block; font-size:.62rem; color:var(--text-secondary); font-style:normal; overflow:hidden;
-  text-overflow:ellipsis; white-space:nowrap; margin-top:1px; }
+.crm-post-t { display:block; font-size:.66rem; font-weight:800; color:#3ddc97; }
+.crm-post i { display:block; font-size:.68rem; color:var(--text); font-style:normal; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
 .crm-etqs { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
 .crm-etq { font-size:.58rem; font-weight:800; padding:2px 8px; border-radius:999px;
   background:rgba(185,138,255,.16); color:#b98aff; border:1px solid rgba(185,138,255,.3); }
@@ -2210,7 +2214,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-1922';
+var VERSAO_DASH = '2026-08-30-1931';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6925,6 +6929,14 @@ function comentMarcar(insta, campo, valor) {
   }
   var pedido = { action: 'comentMarcar', insta: insta, quem: ldEu() || '' };
   pedido[campo] = valor;
+  // pessoa que veio SÓ da API (ainda não está na planilha dos comentários):
+  // o robô cria a linha na hora — assim a marcação fica salva para todo mundo
+  if (!_comDe(insta)) {
+    pedido.criar = true;
+    var pfC = (IGO.perfil || {})[k];
+    pedido.nome = (pfC && pfC.nome) || '';
+  }
+  _comApiCache = null;   // a lista juntada é refeita no próximo desenho
   if (campo === 'etiquetas' || campo === 'produto') {
     // colunas novas: confere na resposta se o robô desta versão já grava (precisa do v104)
     gasPedir(pedido, function(d) {
@@ -8441,6 +8453,36 @@ function ldAnuncioLimpo(v) {
   }
   return t.length > 52 ? t.substring(0, 52) + '…' : t;
 }
+// ===== 🛰 PLANILHA + API JUNTAS (Bruno 30/08/2026: "o foco é a API principalmente") =====
+// A planilha dos comentários (ManyChat) só tem quem passou pelo ManyChat. A API do
+// Instagram pegou TODO MUNDO que pediu diagnóstico nos posts (aba IG Pedidos). Aqui
+// as duas fontes viram uma lista só, sem repetir ninguém (pelo @).
+var _comApiCache = null;
+function comentComApi() {
+  var base = COMENT.rows || [];
+  if (!IGO.carregado || !IGO.porUser) return base;
+  var chave = base.length + '|' + IGO.carregado;
+  if (_comApiCache && _comApiCache.chave === chave) return _comApiCache.lista;
+  var vistos = {};
+  base.forEach(function(x){ if (x.insta) vistos[String(x.insta).toLowerCase()] = 1; });
+  var extras = [];
+  Object.keys(IGO.porUser).forEach(function(u) {
+    if (vistos[u]) return;
+    var p = IGO.porUser[u];
+    var pf = IGO.perfil[u] || {};
+    var mk = COMENT_MARCA[u] || {};   // marcação feita na tela antes de a planilha saber dela
+    var d = p.quando ? new Date(p.quando) : null;
+    extras.push({ nome: pf.nome || '', insta: u, date: (d && !isNaN(d)) ? d : null,
+      seguidores: pf.seg != null ? String(pf.seg) : '',
+      tag: mk.tag !== undefined ? mk.tag : '', tipo: mk.tipo !== undefined ? mk.tipo : '',
+      etapa: mk.etapa !== undefined ? mk.etapa : '', nota: mk.nota !== undefined ? mk.nota : '',
+      etiquetas: mk.etiquetas !== undefined ? mk.etiquetas : '', produto: mk.produto !== undefined ? mk.produto : '',
+      daApi: true });
+  });
+  var lista = base.concat(extras);
+  _comApiCache = { chave: chave, lista: lista };
+  return lista;
+}
 // filtro de período da lista de comentários (Hoje / Ontem / 7 dias / 30 dias / Tudo / datas à escolha)
 window._comFiltro = window._comFiltro || { t: 'tudo', de: '', ate: '' };
 function comentFiltrados() {
@@ -8455,8 +8497,9 @@ function comentFiltrados() {
     if (CF.de) { var p1 = CF.de.split('-'); ini = new Date(+p1[0], +p1[1] - 1, +p1[2]).getTime(); }
     if (CF.ate) { var p2 = CF.ate.split('-'); fim = new Date(+p2[0], +p2[1] - 1, +p2[2]).getTime() + dia; }
   }
-  if (ini === null && fim === null) return COMENT.rows;
-  return COMENT.rows.filter(function(x) {
+  var todos = comentComApi();   // planilha (ManyChat) + API do Instagram, sem repetir
+  if (ini === null && fim === null) return todos;
+  return todos.filter(function(x) {
     if (!x.date) return false;
     var t = x.date.getTime();
     return (ini === null || t >= ini) && (fim === null || t < fim);
@@ -8482,10 +8525,13 @@ function crmQuadro(lista) {
   CRM_ETAPAS.forEach(function(e) {
     var itens = porEtapa[e.k];
     // quem foi mapeado pela API do Instagram (foto, seguidores, post) vem primeiro;
-    // dentro do mesmo grupo, o mais recente em cima
+    // dentro do mesmo grupo, o mais recente em cima. Com o filtro 🔥 ligado,
+    // a ordem vira POR SEGUIDORES (o maior potencial em cima).
     // (a pontuação é calculada UMA vez por pessoa antes de ordenar — regra do O(1))
-    var _scs = itens.map(function(x){ return { s: crmScore(x), x: x }; });
+    var potOn = !!(window._crmFiltro && window._crmFiltro.pot);
+    var _scs = itens.map(function(x){ return { s: crmScore(x), g: potOn ? crmSegDe(x) : 0, x: x }; });
     _scs.sort(function(a, b) {
+      if (b.g !== a.g) return b.g - a.g;
       if (b.s !== a.s) return b.s - a.s;
       return (b.x.date || 0) - (a.x.date || 0);
     });
@@ -8507,7 +8553,8 @@ function crmQuadro(lista) {
       var pd = null; try { pd = igPedidoDoLead({ insta: x.insta }); } catch (ePd) {}
       var talvez = crmNaoBate(x);
       var seg = (pf && pf.seg != null) ? pf.seg : (parseInt(String(x.seguidores || '').replace(/\D/g, ''), 10) || null);
-      var segTxt = seg != null ? (seg >= 1000 ? (Math.round(seg / 100) / 10).toLocaleString('pt-BR') + ' mil' : seg) : '';
+      var segTxt = seg != null ? (seg >= 1000000 ? (Math.round(seg / 100000) / 10).toLocaleString('pt-BR') + ' mi'
+                  : seg >= 1000 ? (Math.round(seg / 100) / 10).toLocaleString('pt-BR') + ' mil' : seg) : '';
       // o que a pessoa respondeu no formulário, quando respondeu
       var respostas = '';
       if (lead) {
@@ -8556,9 +8603,8 @@ function crmQuadro(lista) {
         +   '</div>'
         +   '<div style="flex:1;min-width:0;">'
         +     '<b class="crm-nome">' + nomeReal + '</b>'
-        +     '<div class="crm-quando">@' + x.insta
-        +       (segTxt ? ' · 👥 ' + segTxt : '')
-        +       (x.date ? ' · ' + tempoDesde(x.date) : '') + '</div>'
+        +     '<div class="crm-ig">@' + x.insta + (segTxt ? ' <b>👥 ' + segTxt + '</b>' : '') + '</div>'
+        +     (x.date ? '<div class="crm-quando">' + tempoDesde(x.date) + '</div>' : '')
         +   '</div>'
         + '</div>'
         + blocoPost
@@ -8789,6 +8835,42 @@ function crmNaoBate(x) {
     if (q && (!q.insta || v2norm(q.insta) !== v2norm(x.insta))) return q;
   } catch (e) {}
   return null;
+}
+// seguidores da pessoa, venha da API (IG Perfis) ou da planilha
+function crmSegDe(x) {
+  var u = String(x.insta || '').toLowerCase();
+  var pf = (IGO.perfil || {})[u];
+  if (pf && pf.seg != null) return pf.seg;
+  return parseInt(String(x.seguidores || '').replace(/\D/g, ''), 10) || 0;
+}
+// "mais potenciais": 10 mil+ seguidores, OU comentou 2+ vezes, OU nota A/B da equipe
+function crmPotencial(x) {
+  if (crmSegDe(x) >= 10000) return true;
+  var n = String(x.nota || '').trim().toUpperCase();
+  if (n === 'A' || n === 'B') return true;
+  var u = String(x.insta || '').toLowerCase();
+  var p = IGO.porUser && IGO.porUser[u];
+  if (p && p.vezes >= 2) return true;
+  return false;
+}
+// baixa as fotos de quem está aparecendo no quadro sem foto (robô v105; gasta cota da Meta)
+function crmBuscarFotos(bt) {
+  if (!ehAdm()) { alert('Só o Bruno e o Adm podem puxar fotos (gasta a cota diária do Instagram).'); return; }
+  var alvos = [];
+  document.querySelectorAll('.crm-card').forEach(function(c) {
+    var u = c.getAttribute('data-insta');
+    if (u && !igFotoDe(u) && alvos.indexOf(u) === -1) alvos.push(u);
+  });
+  if (!alvos.length) { avisoRapido('Todo mundo na tela já tem foto! Clique em "mostrar mais" para trazer mais gente.'); return; }
+  if (bt) { bt.textContent = '⏳ buscando ' + alvos.length + ' fotos…'; bt.style.pointerEvents = 'none'; }
+  gasPedir({ action: 'igFotos', perfis: alvos.slice(0, 100) }, function(d) {
+    if (d && d.success) {
+      avisoRapido('📸 ' + (d.fotosSalvas || 0) + ' fotos baixadas' + (d.parou ? ' · o Instagram pediu pausa, o resto entra sozinho amanhã' : '') + ' — atualizando…');
+      IGO.carregado = false; IGO.buscando = false; _comApiCache = null;
+      carregarIGOrganico();
+    } else avisoRapido('⚠️ Não consegui: ' + ((d && d.error) || 'o robô precisa da versão v105'));
+    try { renderLeads(); } catch (e) {}
+  }, 350000);
 }
 // quem tem dados do Instagram (mapeado pela API) aparece primeiro no quadro
 function crmScore(x) {
@@ -9210,7 +9292,8 @@ function comentSecaoHtml() {
   // ===== 💬 comentários no post do diagnóstico — barrinha que abre =====
   if (COMENT.carregado && COMENT.rows.length) {
     var hoje0 = ldDia(new Date()).getTime();
-    var comHoje = COMENT.rows.filter(function(x){ return x.date && x.date.getTime() >= hoje0; }).length;
+    var comTodos = comentComApi();   // planilha (ManyChat) + API do Instagram
+    var comHoje = comTodos.filter(function(x){ return x.date && x.date.getTime() >= hoje0; }).length;
     var cAberto = !!window._comAberto;
     window._comBotaoNovo = '<button class="btn-assumir" style="padding:6px 12px;font-size:.72rem;" onclick="event.stopPropagation();comentIncluirNovo()" title="A pessoa comentou/chegou por fora e o robô não pegou? Inclui à mão, já com etapa e tags.">➕ incluir novo</button>';
     var comLista = comentFiltrados();   // respeita o filtro de período escolhido
@@ -9223,8 +9306,8 @@ function comentSecaoHtml() {
     h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(110,168,255,.08);border-color:rgba(110,168,255,.5);">'
       + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._comAberto=!window._comAberto;renderLeads();">'
       + '<span style="font-size:1.2rem;">💬</span>'
-      + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#6ea8ff;">' + (CF.t === 'tudo' ? COMENT.rows.length : comLista.length + ' de ' + COMENT.rows.length) + ' comentário' + (COMENT.rows.length === 1 ? '' : 's') + ' no post do diagnóstico</b>'
-      + '<span class="hint" style="margin-left:8px;">' + (comHoje ? '<b style="color:#3ddc97;">' + comHoje + ' hoje</b> · ' : '') + 'via ManyChat · quem comenta é interesse quente</span></div>'
+      + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#6ea8ff;">' + (CF.t === 'tudo' ? comTodos.length : comLista.length + ' de ' + comTodos.length) + ' comentário' + (comTodos.length === 1 ? '' : 's') + ' no post do diagnóstico</b>'
+      + '<span class="hint" style="margin-left:8px;">' + (comHoje ? '<b style="color:#3ddc97;">' + comHoje + ' hoje</b> · ' : '') + 'ManyChat + API do Instagram · quem comenta é interesse quente</span></div>'
       + '<button class="btn-assumir" style="white-space:nowrap;" onclick="event.stopPropagation();criarComentaristasNaClint(this);">➕ criar todos na Clint (Sarah)</button>'
       + (window._comBotaoNovo || '')
       + '<span style="color:#6ea8ff;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (cAberto ? '▲ fechar' : '▼ ver lista') + '</span></div>';
@@ -9251,14 +9334,20 @@ function comentSecaoHtml() {
       }
       if (window._comQuadro) {
         // ===== filtros do quadro: etiquetas, produto e "planilha não bate" =====
-        var FQ = window._crmFiltro = window._crmFiltro || { etq: '', prod: '', nb: false };
-        var contE = {}, contP = {};
+        var FQ = window._crmFiltro = window._crmFiltro || { etq: '', prod: '', nb: false, pot: false };
+        var contE = {}, contP = {}, contPot = 0;
         comLista.forEach(function(x) {
           etqDe(x).forEach(function(t){ var k = v2norm(t); if (!contE[k]) contE[k] = { n: 0, rot: t }; contE[k].n++; });
           if (x.produto) { var kp = v2norm(x.produto); if (!contP[kp]) contP[kp] = { n: 0, rot: x.produto }; contP[kp].n++; }
+          if (crmPotencial(x)) contPot++;
         });
         var todasEtq = etiquetasDisponiveis();
         var chipsF = '';
+        // o filtro mais importante vem primeiro: os leads com mais potencial
+        chipsF += '<span class="ld-selo' + (FQ.pot ? '' : ' morno') + '" style="cursor:pointer;'
+          + (FQ.pot ? 'background:rgba(255,107,107,.2);color:#ff6b6b;border:1px solid rgba(255,107,107,.6);' : '')
+          + '" title="10 mil+ seguidores, ou comentou 2 vezes ou mais, ou nota A/B da equipe — ordenado por seguidores"'
+          + ' onclick="window._crmFiltro.pot=!window._crmFiltro.pot;renderLeads();">🔥 mais potenciais · ' + contPot + '</span>';
         todasEtq.forEach(function(t) {
           var k = v2norm(t), n = contE[k] ? contE[k].n : 0;
           var on = v2norm(FQ.etq) === k;
@@ -9277,13 +9366,18 @@ function comentSecaoHtml() {
         });
         chipsF += '<span class="ld-selo' + (FQ.nb ? '' : ' morno') + '" style="cursor:pointer;" title="só quem tem alguém parecido na planilha com o @ diferente"'
           + ' onclick="window._crmFiltro.nb=!window._crmFiltro.nb;renderLeads();">⚠️ planilha não bate</span>';
+        if (ehAdm()) {
+          chipsF += '<span class="ld-selo morno" style="cursor:pointer;" title="baixa a foto de perfil de quem está aparecendo no quadro sem foto (usa a cota diária do Instagram)"'
+            + ' onclick="crmBuscarFotos(this)">📸 buscar fotos que faltam</span>';
+        }
         if (chipsF) {
           h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px;">'
             + '<span class="hint">filtrar:</span>' + chipsF
-            + ((FQ.etq || FQ.prod || FQ.nb) ? '<span class="ld-selo" style="cursor:pointer;background:rgba(255,107,107,.15);color:#ff6b6b;" onclick="window._crmFiltro={etq:\'\',prod:\'\',nb:false};renderLeads();">✕ limpar</span>' : '')
+            + ((FQ.etq || FQ.prod || FQ.nb || FQ.pot) ? '<span class="ld-selo" style="cursor:pointer;background:rgba(255,107,107,.15);color:#ff6b6b;" onclick="window._crmFiltro={etq:\'\',prod:\'\',nb:false,pot:false};renderLeads();">✕ limpar</span>' : '')
             + '</div>';
         }
         var listaQuadro = comLista.filter(function(x) {
+          if (FQ.pot && !crmPotencial(x)) return false;
           if (FQ.etq && etqDe(x).map(v2norm).indexOf(v2norm(FQ.etq)) === -1) return false;
           if (FQ.prod && v2norm(x.produto || '') !== v2norm(FQ.prod)) return false;
           if (FQ.nb && !crmNaoBate(x)) return false;
