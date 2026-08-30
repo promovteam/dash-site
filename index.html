@@ -2210,7 +2210,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-1904';
+var VERSAO_DASH = '2026-08-30-1922';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9214,6 +9214,11 @@ function comentSecaoHtml() {
     var cAberto = !!window._comAberto;
     window._comBotaoNovo = '<button class="btn-assumir" style="padding:6px 12px;font-size:.72rem;" onclick="event.stopPropagation();comentIncluirNovo()" title="A pessoa comentou/chegou por fora e o robô não pegou? Inclui à mão, já com etapa e tags.">➕ incluir novo</button>';
     var comLista = comentFiltrados();   // respeita o filtro de período escolhido
+    // REGRA DO BRUNO (30/08/2026): aqui só fica quem AINDA NÃO preencheu o formulário —
+    // o social selling existe para levar essa pessoa até o formulário. Quem preencheu
+    // já está no funil normal da aba Leads. (Quem parece ter preenchido com OUTRO @
+    // continua aparecendo, com o aviso ⚠️ planilha não bate, para a equipe conferir.)
+    comLista = comLista.filter(function(x) { try { return !comentCruza(x); } catch (e) { return true; } });
     var CF = window._comFiltro;
     h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(110,168,255,.08);border-color:rgba(110,168,255,.5);">'
       + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._comAberto=!window._comAberto;renderLeads();">'
@@ -9278,19 +9283,13 @@ function comentSecaoHtml() {
             + ((FQ.etq || FQ.prod || FQ.nb) ? '<span class="ld-selo" style="cursor:pointer;background:rgba(255,107,107,.15);color:#ff6b6b;" onclick="window._crmFiltro={etq:\'\',prod:\'\',nb:false};renderLeads();">✕ limpar</span>' : '')
             + '</div>';
         }
-        // REGRA DO BRUNO (30/08/2026 à tarde): no quadro do social selling SÓ entra quem
-        // PREENCHEU o formulário (é quem tem telefone para chamar). Quem só comentou fica
-        // na lista ☰ e nos avisos do robô. Vale também quem preencheu com outro @ (⚠️ não bate).
         var listaQuadro = comLista.filter(function(x) {
-          var preencheu = false;
-          try { preencheu = !!comentCruza(x) || !!crmNaoBate(x); } catch (e) {}
-          if (!preencheu) return false;
           if (FQ.etq && etqDe(x).map(v2norm).indexOf(v2norm(FQ.etq)) === -1) return false;
           if (FQ.prod && v2norm(x.produto || '') !== v2norm(FQ.prod)) return false;
           if (FQ.nb && !crmNaoBate(x)) return false;
           return true;
         });
-        h += '<div class="hint" style="margin:2px;">Aqui só entra quem PREENCHEU o formulário (quem só comentou fica na lista ☰) · arraste a pessoa de uma coluna para outra — grava sozinho na planilha</div>';
+        h += '<div class="hint" style="margin:2px;">Aqui só aparece quem AINDA NÃO preencheu o formulário — a missão é levar a pessoa até ele · arraste de uma coluna para outra, grava sozinho na planilha</div>';
         h += crmQuadro(listaQuadro);
       } else {
       // quem ainda não foi marcado (sem TAG e sem TIPO) vem primeiro — pedido do Bruno
