@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0909';
+var VERSAO_DASH = '2026-08-30-0919';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -7824,6 +7824,24 @@ function abrirCriativo(nome, jaTocar) {
     +     '<div class="hint">👆 clique num número para ver quem são</div>'
     +     '<div class="hint">MQL = declarou qualquer investimento · HT = R$2 a R$4mil'
     +       (d.n ? ' · ' + Math.round(d.mql / d.n * 100) + '% dos leads deste anúncio' : '') + '</div>'
+    +     (function() {
+            var pares = [];
+            if (d.ig && d.ig.pedidos) pares.push(['Pediram → entraram na base', d.n, d.ig.pedidos, '#6ea8ff']);
+            if (d.n) pares.push(['Leads → MQL', d.mql, d.n, '#f6a350']);
+            if (d.mql) pares.push(['MQL → agendou', d.ag, d.mql, '#ffd166']);
+            if (d.ag) pares.push(['Agendou → fez a reunião', d.re, d.ag, '#b98aff']);
+            if (d.re) pares.push(['Reunião → venda', d.vd, d.re, '#3ddc97']);
+            if (!pares.length) return '';
+            var h2 = '<div class="card" style="padding:12px;border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);">'
+              + '<div class="g-label" style="font-size:.62rem;margin-bottom:5px;">📈 Conversões do funil</div>';
+            pares.forEach(function(p) {
+              var pct = p[2] ? Math.round(p[1] / p[2] * 100) : 0;
+              h2 += '<div style="display:flex;justify-content:space-between;gap:10px;font-size:.75rem;padding:3px 0;">'
+                + '<span style="color:var(--text-2);">' + p[0] + '</span>'
+                + '<b style="color:' + p[3] + ';white-space:nowrap;">' + p[1] + ' de ' + p[2] + ' · ' + pct + '%</b></div>';
+            });
+            return h2 + '</div>';
+          })()
     +     (m.gasto ? '<div class="card" style="padding:12px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.28);border-radius:13px;">'
     +       '<b style="color:#ff6b6b;font-size:1.1rem;">' + rs(m.gasto) + '</b><div class="hint">investido'
     +       (d.n ? ' · ' + rs(m.gasto/d.n) + ' por lead' : '')
