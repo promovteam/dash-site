@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0922';
+var VERSAO_DASH = '2026-08-30-0926';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -10456,13 +10456,18 @@ function mostrarFormularioDoLead(r) {
       + (cc && cc.achou ? linhaS('🟣', 'Etapa na Clint', cc.etapaClint)
                         + linhaS('🧲', 'Entrou na Clint por', cc.origemClint)
                         + linhaS('✋', 'Responsável', cc.dono) : '')
-      + (pn ? '<div class="hint" style="padding:6px 0 2px;color:#f6a350;">🟣 Achei <b>' + pn.nome + '</b> na Clint <b>pelo nome</b> (a reunião está sem telefone) — confira se é a mesma pessoa:</div>'
-            + linhaS('🟣', 'Etapa na Clint', pn.etapa)
-            + linhaS('✋', 'Responsável', pn.dono)
-            + linhaS('🧲', 'Entrou na Clint por', pn.origem)
-            + linhaS('📱', 'Telefone na Clint', pn.tel)
-            + (pn.tel ? '<div style="margin-top:8px;text-align:right;"><button class="btn-assumir" style="padding:6px 12px;font-size:.72rem;" onclick="usarTelefoneClint()">📱 usar esse número na reunião</button></div>' : '')
-          : '')
+      + (pn ? (function() {
+            var mesmoTel = pn.tel && t8 && ldTel8(pn.tel) === t8;
+            var motivo = mesmoTel ? '— <b style="color:#3ddc97;">é o mesmo número da reunião ✓</b>'
+              : t8 ? '(a busca pelo número ainda não respondeu) — confira se é a mesma pessoa:'
+              : '(a reunião está sem telefone) — confira se é a mesma pessoa:';
+            return '<div class="hint" style="padding:6px 0 2px;color:#f6a350;">🟣 Achei <b>' + pn.nome + '</b> na Clint <b>pelo nome</b> ' + motivo + '</div>'
+              + linhaS('🟣', 'Etapa na Clint', pn.etapa)
+              + linhaS('✋', 'Responsável', pn.dono)
+              + linhaS('🧲', 'Entrou na Clint por', pn.origem)
+              + linhaS('📱', 'Telefone na Clint', pn.tel)
+              + (pn.tel && !mesmoTel ? '<div style="margin-top:8px;text-align:right;"><button class="btn-assumir" style="padding:6px 12px;font-size:.72rem;" onclick="usarTelefoneClint()">📱 usar esse número na reunião</button></div>' : '');
+          })() : '')
       + (!temAlgo ? '<div class="hint">Também não achei ela na Clint nem em contratos.</div>' : '')
       + ((t8 || pn) && clintLink({ tel: r.telefone, tel8: t8, nome: r.nome })
           ? '<div style="margin-top:9px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink({ tel: r.telefone, tel8: t8, nome: r.nome }) + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a></div>'
