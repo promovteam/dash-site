@@ -2188,7 +2188,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0954';
+var VERSAO_DASH = '2026-08-30-0955';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3844,8 +3844,8 @@ function renderBloqueios() {
   var abertos = BLQ.lista.filter(function(b) { return !String(b.situacao || '').trim(); });
   var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
   var vencidos = abertos.filter(function(b) { return b.fim && new Date(b.fim + 'T00:00:00') < hoje0; }).length;
-  var pago = 0;
-  abertos.forEach(function(b) { pago += v2valor(b.valor) || 0; });
+  var pago = 0, naMesa = 0;
+  abertos.forEach(function(b) { pago += v2valor(b.valor) || 0; naMesa += v2valor(b.total) || 0; });
   var fups = (V2.rows || []).filter(function(r) { return (r.sn || v2norm(r.status || '')) === 'nao vendido' && fupDe(r); });
   var fHoje = fups.filter(function(r) { var f = fupDe(r); return f && f <= hoje0; }).length;
   if ((!BLQ.carregado || !abertos.length) && !fups.length) { el.innerHTML = ''; return; }
@@ -3853,7 +3853,9 @@ function renderBloqueios() {
   if (abertos.length) {
     h += '<div class="panel click" style="flex:1;min-width:260px;cursor:pointer;border-color:rgba(255,209,102,.4);" onclick="abrirBloqueiosJanela()">'
       + '<div class="g-label">🔒 Bloqueios e entradas em aberto</div>'
-      + '<div class="g-value" style="font-size:1.5rem;">' + abertos.length + (pago ? ' <small style="font-size:.75rem;color:#ffd166;">· ' + v2moeda0(pago) + ' pagos</small>' : '') + '</div>'
+      + '<div class="g-value" style="font-size:1.5rem;">' + abertos.length
+      + (pago ? ' <small style="font-size:.75rem;color:#ffd166;">· ' + v2moeda0(pago) + ' pagos</small>' : '')
+      + (naMesa ? ' <small style="font-size:.75rem;color:#3ddc97;">· 💰 ' + v2moeda0(naMesa) + ' na mesa</small>' : '') + '</div>'
       + '<div class="g-sub">' + (vencidos ? '<b style="color:#ff6b6b;">⏰ ' + vencidos + ' com o prazo vencido</b> · ' : '') + 'clique para abrir: fechar venda ou estornar</div></div>';
   }
   if (fups.length) {
