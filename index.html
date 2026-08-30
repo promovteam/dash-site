@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0155';
+var VERSAO_DASH = '2026-08-30-0858';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3765,34 +3765,123 @@ function seloVendaSemForm(l) {
   if (pago) return '';
   return ' <span class="ld-tag" style="background:rgba(255,107,107,.16);color:#ff6b6b;" title="Está Vendido mas o formulário de venda não foi preenchido — abra e use 💰 Registrar venda">💰 sem formulário</span>';
 }
+// 🌱 selo: a venda/reuniao teve toque comprovado em post organico
+function seloToqueOrganico(l) {
+  try {
+    var rs = (typeof ldReunioes === 'function') ? ldReunioes(l) : [];
+    for (var i = 0; i < rs.length; i++) {
+      if (/toque org[aâ]nico/i.test(String(rs[i].obs || ''))) {
+        return ' <span class="ld-tag" style="background:rgba(61,220,151,.13);color:#3ddc97;" title="Interagiu em post orgânico antes de comprar (anotado na observação)">🌱 post</span>';
+      }
+    }
+  } catch (e) {}
+  return '';
+}
 function renderBloqueios() {
   var el = document.getElementById('pag-bloqueios');
   if (!el) return;
-  var abertos = BLQ.lista.filter(function(b){ return !String(b.situacao || '').trim(); });
-  if (!BLQ.carregado || !abertos.length) { el.innerHTML = ''; return; }
-  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  abertos.sort(function(a, b){ return String(a.fim || '9999').localeCompare(String(b.fim || '9999')); });
-  var h = '<div class="panel" style="margin-bottom:16px;border-color:rgba(255,209,102,.35);">'
-    + '<h3 style="margin-bottom:10px;">🔒 Bloqueios e entradas em aberto — ' + abertos.length + '</h3>'
-    + '<div class="hint" style="margin-bottom:10px;">Quem pagou para segurar a vaga e ainda não fechou. Clique em <b>Fechar venda</b>: o formulário abre com CPF, e-mail, telefone e valores já preenchidos.</div>';
+  var abertos = BLQ.lista.filter(function(b) { return !String(b.situacao || '').trim(); });
+  var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+  var vencidos = abertos.filter(function(b) { return b.fim && new Date(b.fim + 'T00:00:00') < hoje0; }).length;
+  var pago = 0;
+  abertos.forEach(function(b) { pago += v2valor(b.valor) || 0; });
+  var fups = (V2.rows || []).filter(function(r) { return (r.sn || v2norm(r.status || '')) === 'nao vendido' && fupDe(r); });
+  var fHoje = fups.filter(function(r) { var f = fupDe(r); return f && f <= hoje0; }).length;
+  if ((!BLQ.carregado || !abertos.length) && !fups.length) { el.innerHTML = ''; return; }
+  var h = '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">';
+  if (abertos.length) {
+    h += '<div class="panel click" style="flex:1;min-width:260px;cursor:pointer;border-color:rgba(255,209,102,.4);" onclick="abrirBloqueiosJanela()">'
+      + '<div class="g-label">🔒 Bloqueios e entradas em aberto</div>'
+      + '<div class="g-value" style="font-size:1.5rem;">' + abertos.length + (pago ? ' <small style="font-size:.75rem;color:#ffd166;">· ' + v2moeda0(pago) + ' pagos</small>' : '') + '</div>'
+      + '<div class="g-sub">' + (vencidos ? '<b style="color:#ff6b6b;">⏰ ' + vencidos + ' com o prazo vencido</b> · ' : '') + 'clique para abrir: fechar venda ou estornar</div></div>';
+  }
+  if (fups.length) {
+    h += '<div class="panel click" style="flex:1;min-width:260px;cursor:pointer;border-color:rgba(255,154,90,.4);" onclick="abrirFollowupsJanela()">'
+      + '<div class="g-label">🔄 Follow-up de não vendido</div>'
+      + '<div class="g-value" style="font-size:1.5rem;">' + fups.length + '</div>'
+      + '<div class="g-sub">' + (fHoje ? '<b style="color:#ff6b6b;">' + fHoje + ' para hoje ou atrasado' + (fHoje === 1 ? '' : 's') + '</b> · ' : '') + 'datas combinadas de tentar fechar de novo</div></div>';
+  }
+  h += '</div>';
+  el.innerHTML = h;
+}
+function _janelaLista(titulo, corBorda, corpoHtml) {
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 250;
+  ov.id = 'janela-lista';
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(860px,96vw);max-height:88vh;overflow-y:auto;padding:20px;border:1px solid ' + corBorda + ';">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><b style="flex:1;font-size:1rem;">' + titulo + '</b>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + corpoHtml + '</div>';
+  var velho = document.getElementById('janela-lista');
+  if (velho) velho.remove();
+  document.body.appendChild(ov);
+}
+function abrirBloqueiosJanela() {
+  var abertos = BLQ.lista.filter(function(b) { return !String(b.situacao || '').trim(); });
+  var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+  abertos.sort(function(a, b) { return String(a.fim || '9999').localeCompare(String(b.fim || '9999')); });
+  var h = '<div class="hint" style="margin-bottom:10px;">Quem pagou para segurar a vaga e ainda não fechou. <b>💰 Fechar venda</b> abre o formulário já preenchido com os dados dele — é só completar o resto. <b>↩️ Estorno</b> marca a devolução.</div>';
   abertos.forEach(function(b) {
     var ent = /entrada/i.test(b.tipo);
     var fimD = b.fim ? new Date(b.fim + 'T00:00:00') : null;
-    var atrasado = fimD && fimD < hoje;
-    var dias = fimD ? Math.round((fimD - hoje) / 86400000) : null;
+    var atrasado = fimD && fimD < hoje0;
+    var dias = fimD ? Math.round((fimD - hoje0) / 86400000) : null;
     var wa = b.tel ? 'https://wa.me/' + String(b.tel).replace(/\D/g, '').replace(/^(?!55)/, '55') : '';
     h += '<div class="ld-row" style="' + (atrasado ? 'border-color:rgba(255,107,107,.5);' : '') + '">'
       + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(b.nome) + ');">' + v2ini(b.nome) + '</div>'
       + '<div class="ld-info"><b>' + b.nome + ' <span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;">' + (ent ? '🔑 Entrada' : '🔒 Bloqueio') + (b.valor ? ' · ' + b.valor : '') + '</span>'
       + (b.fim ? ' <span class="ld-tag" style="background:' + (atrasado ? 'rgba(255,107,107,.18);color:#ff6b6b' : 'rgba(110,168,255,.14);color:#6ea8ff') + ';">' + (atrasado ? '⏰ venceu ' + _dataBr(b.fim) : (dias === 0 ? '⏰ finaliza hoje' : '📅 finaliza em ' + dias + ' dia' + (dias === 1 ? '' : 's'))) + '</span>' : '') + '</b>'
       + '<span>' + [b.programa, b.total ? 'total ' + b.total : '', b.forma, b.vendedor ? 'vendedor ' + b.vendedor : '', b.quando ? 'registrado ' + String(b.quando).slice(0, 10) : ''].filter(Boolean).join(' · ') + '</span></div>'
-      + '<button class="ld-wa" style="background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="abrirFormVenda({ nome: ' + JSON.stringify(b.nome) + ', cel: ' + JSON.stringify(b.tel) + ' })">💰 Fechar venda</button>'
+      + '<button class="ld-wa" style="background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;font-weight:800;cursor:pointer;" onclick="this.closest(\'.modal-overlay\').remove();abrirFormVenda({ nome: ' + JSON.stringify(b.nome).replace(/"/g, '&quot;') + ', cel: ' + JSON.stringify(b.tel).replace(/"/g, '&quot;') + ' })">💰 Fechar venda</button>'
+      + '<button class="ld-wa" style="background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.4);color:#ff6b6b;cursor:pointer;" onclick="estornarBloqueio(' + JSON.stringify(b.nome).replace(/"/g, '&quot;') + ', ' + JSON.stringify(b.tel || '').replace(/"/g, '&quot;') + ')">↩️ Estorno</button>'
       + (b.clint ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + b.clint + '" target="_blank">🟣 Clint</a>' : '')
       + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank">💬 WhatsApp</a>' : '')
       + '</div>';
   });
-  h += '</div>';
-  el.innerHTML = h;
+  _janelaLista('🔒 Bloqueios e entradas em aberto — ' + abertos.length, 'rgba(255,209,102,.4)', h);
+}
+function estornarBloqueio(nome, tel) {
+  if (soOlhar()) return;
+  confirmar('Marcar o bloqueio/entrada de ' + nome + ' como ESTORNADO?\n\nEle sai da lista de abertos e o lead vira "Estorno" na planilha.', function() {
+    avisoRapido('↩️ Marcando o estorno…');
+    var payload = encodeURIComponent(JSON.stringify({ action: 'marcarBloqueio', nome: nome, telefone: tel, situacao: 'Estornado', statusLead: 'Estorno' }));
+    fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
+      .then(function(x) { return x.json(); })
+      .then(function(resp) {
+        if (resp && resp.success) {
+          BLQ.lista.forEach(function(b) { if (v2norm(b.nome) === v2norm(nome) && !String(b.situacao || '').trim()) b.situacao = 'Estornado'; });
+          renderBloqueios();
+          var j = document.getElementById('janela-lista');
+          if (j) { j.remove(); abrirBloqueiosJanela(); }
+          avisoRapido('↩️ Estorno registrado — ' + nome + ' saiu dos abertos');
+        } else alert('Não consegui marcar: ' + ((resp && resp.error) || 'erro'));
+      })
+      .catch(function(e) { alert('Erro: ' + e); });
+  }, '↩️');
+}
+function abrirFollowupsJanela() {
+  var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+  var fups = (V2.rows || []).filter(function(r) { return (r.sn || v2norm(r.status || '')) === 'nao vendido' && fupDe(r); });
+  fups.sort(function(a, b) { return fupDe(a) - fupDe(b); });
+  var h = '<div class="hint" style="margin-bottom:10px;">Não vendidos com data combinada de tentar fechar de novo — os atrasados primeiro. Clique no nome para abrir a ficha.</div>';
+  fups.forEach(function(r) {
+    var f = fupDe(r);
+    var atrasado = f <= hoje0;
+    var mot = (String(r.obs || '').match(/Não fechou: ([^|#\n]+)/) || [])[1] || '';
+    var i = v2reg(r);
+    var wa = r.telefone ? 'https://wa.me/' + String(r.telefone).replace(/\D/g, '').replace(/^(?!55)/, '55') : '';
+    h += '<div class="ld-row" style="' + (atrasado ? 'border-color:rgba(255,107,107,.5);' : '') + '">'
+      + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
+      + '<div class="ld-info"><b><span style="cursor:pointer;text-decoration:underline dotted;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + i + ')">' + (r.nome || '') + '</span> '
+      + '<span class="ld-tag" style="background:' + (atrasado ? 'rgba(255,107,107,.18);color:#ff6b6b' : 'rgba(255,209,102,.15);color:#ffd166') + ';">🔄 ' + (atrasado ? 'atrasado — era ' : 'tentar em ') + ('0' + f.getDate()).slice(-2) + '/' + ('0' + (f.getMonth() + 1)).slice(-2) + '</span></b>'
+      + '<span>' + [r.produto, mot ? 'motivo: ' + mot.trim() : '', r.closer].filter(Boolean).join(' · ') + '</span></div>'
+      + '<button class="ld-wa" style="cursor:pointer;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + i + ')">📇 Ficha</button>'
+      + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank">💬 WhatsApp</a>' : '')
+      + '</div>';
+  });
+  _janelaLista('🔄 Follow-up de não vendido — ' + fups.length, 'rgba(255,154,90,.4)', h);
 }
 function fecharFormVenda() {
   var cx = document.getElementById('modal-venda');
@@ -5636,7 +5725,7 @@ function renderFollowups() {
     var i = v2reg(r);
     var mot = (String(r.obs || '').match(/Não fechou: ([^|#]+)/) || [])[1] || '';
     h += '<div id="fup-dia-' + i + '" style="border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:12px;margin-bottom:10px;">'
-      + '<b style="font-size:.85rem;">' + (r.nome || '') + '</b> <span class="hint">' + (r.produto || '') + (mot ? ' · motivo: ' + mot.trim() : '') + '</span>'
+      + '<b style="font-size:.85rem;cursor:pointer;text-decoration:underline dotted;" title="Abrir a ficha do lead" onclick="document.getElementById(\'modal-fup-dia\').style.display=\'none\';abrirLead(' + i + ')">' + (r.nome || '') + '</b> <span class="hint">' + (r.produto || '') + (mot ? ' · motivo: ' + mot.trim() : '') + '</span>'
       + '<textarea id="fup-oq-' + i + '" style="width:100%;min-height:52px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);padding:8px;margin:8px 0;" placeholder="O que aconteceu hoje? (falei com ele, adiou, sumiu...)"></textarea>'
       + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
       + '<span class="hint">Ainda tem possibilidade?</span>'
@@ -7224,11 +7313,7 @@ function renderAnuncios() {
                 + cl('igNovo', a.ig.novos + ' novos', '#f6a350')
                 + (a.ig.grandes ? ' · <b style="color:#b98aff;">' + a.ig.grandes + ' com 10k+</b>' : '') + '</div>';
             }
-            return '<div class="hint" style="margin-top:3px;">'
-              + cl('n', a.n + ' leads') + ' · '
-              + cl('mql', a.mql + ' MQL', '#f6a350') + ' · '
-              + cl('q', a.q + ' HT', '#ff6b6b')
-              + (m.gasto ? ' · ' + rs(m.gasto) : '') + '</div>';
+            return m.gasto ? '<div class="hint" style="margin-top:3px;">' + rs(m.gasto) + ' investidos</div>' : '';
           })()
       +   '<div style="display:flex;gap:5px;margin-top:9px;">'
       +     (function(){
@@ -7239,9 +7324,11 @@ function renderAnuncios() {
                   + '<b style="color:' + cor + ';font-size:.95rem;display:block;">' + valor + '</b>'
                   + '<span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">' + rot + '</span></div>';
               };
-              return caixa('ag', a.ag, 'AGEND.', '#ffd166', 'rgba(255,209,102,.1)', 'ver quem agendou')
-                + caixa('re', a.re, 'REUNIÕES', '#b98aff', 'rgba(185,138,255,.1)', 'ver quem fez a reunião')
-                + caixa('vd', a.vd, 'VENDAS', '#3ddc97', 'rgba(61,220,151,.1)', 'ver quem comprou');
+              return caixa('n', a.n, 'LEADS', '#6ea8ff', 'rgba(110,168,255,.1)', 'ver os leads')
+                + caixa('mql', a.mql, 'MQL', '#f6a350', 'rgba(246,163,80,.1)', 'ver os MQL')
+                + caixa('q', a.q, 'HT', '#ff6b6b', 'rgba(255,107,107,.1)', 'ver os HT')
+                + caixa('ag', a.ag, 'AGEND.', '#ffd166', 'rgba(255,209,102,.1)', 'ver quem agendou')
+                + caixa('vd', a.vd, 'VENDIDO', '#3ddc97', 'rgba(61,220,151,.1)', 'ver quem comprou');
             })()
       +   '</div>'
       +   (a.fat ? '<div style="margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);text-align:center;">'
@@ -8680,7 +8767,7 @@ function ldRow(l, quente) {
   var st = ldSituacao(l);
   var tags = '';
   if (st) {
-    if (st.vd) tags = '<span class="ld-tag vd">💰 VENDIDO</span>' + seloVendaSemForm(l);
+    if (st.vd) tags = '<span class="ld-tag vd">💰 VENDIDO</span>' + seloVendaSemForm(l) + seloToqueOrganico(l);
     else if (st.re) tags = '<span class="ld-tag re">✅ Reunião feita</span>';
     else tags = '<span class="ld-tag ag">📅 Agendado</span>';
     tags += seloFup(l);
