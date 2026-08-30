@@ -2188,7 +2188,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0931';
+var VERSAO_DASH = '2026-08-30-0951';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6855,8 +6855,9 @@ var COMENT_TIPOS = ['QUALIFICADO', 'DESQUALIFICADO'];
 var CRM_ETAPAS = [
   { k: 'chamar',   nome: 'A chamar',      ico: '📞', cor: '#f6a350' },
   { k: 'chamei',   nome: 'Chamei',        ico: '💬', cor: '#6ea8ff' },
-  { k: 'respondeu',nome: 'Respondeu',     ico: '✅', cor: '#3ddc97' },
+  { k: 'respondeu',nome: 'Qualificando',  ico: '🎯', cor: '#ffd166' },
   { k: 'agendou',  nome: 'Agendou',       ico: '📅', cor: '#b98aff' },
+  { k: 'vendido',  nome: 'Vendido',       ico: '💰', cor: '#3ddc97' },
   { k: 'semint',   nome: 'Sem interesse', ico: '🚪', cor: '#8b8fa3' },
   { k: 'desq',     nome: 'Desqualificado',ico: '👎', cor: '#ff6b6b' }
 ];
@@ -6884,6 +6885,55 @@ function comentMarcar(insta, campo, valor) {
   renderLeads();
 }
 var _comAvisados = {};
+// ➕ incluir um comentarista A MAO no quadro (quando o robo nao pegou) — com etapa, tag e nota
+function comentIncluirNovo() {
+  if (soOlhar()) return;
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 320;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  var etapaOpts = CRM_ETAPAS.map(function(o) { return '<option value="' + o.nome + '">' + o.ico + ' ' + o.nome + '</option>'; }).join('');
+  var cp = 'width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:9px;margin:3px 0 10px;';
+  ov.innerHTML = '<div class="modal" style="width:min(440px,92vw);padding:20px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.3rem;">➕</span><b style="flex:1;">Incluir comentarista à mão</b>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:10px;">Para quem o robô não pegou sozinho — entra no quadro e na planilha dos comentários.</div>'
+    + '<label class="hint">@ do Instagram *</label><input id="cn-insta" placeholder="@dapessoa" style="' + cp + '">'
+    + '<label class="hint">Nome (se souber)</label><input id="cn-nome" style="' + cp + '">'
+    + '<label class="hint">Etapa</label><select id="cn-etapa" style="' + cp + '">' + etapaOpts + '</select>'
+    + '<label class="hint">Tag (livre — ex.: pastor, nutri, indicação)</label><input id="cn-tag" style="' + cp + '">'
+    + '<label class="hint">Nota</label><select id="cn-nota" style="' + cp + '"><option value="">—</option><option>A</option><option>B</option><option>C</option><option>D</option></select>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">'
+    + '<button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'
+    + '<button class="btn primary" onclick="comentIncluirNovoVai(this)">➕ Incluir</button></div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('cn-insta').focus();
+}
+function comentIncluirNovoVai(bt) {
+  var g = function(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  var insta = g('cn-insta').replace(/^@+/, '').toLowerCase();
+  if (!insta) { alert('Digite o @ do Instagram.'); return; }
+  var dados = { insta: insta, nome: g('cn-nome'), etapa: g('cn-etapa'), tag: g('cn-tag'), nota: g('cn-nota') };
+  var pedido = { action: 'comentMarcar', insta: insta, quem: ldEu() || '', criar: true, etapa: dados.etapa, nome: dados.nome };
+  if (dados.tag) pedido.tag = dados.tag;
+  if (dados.nota) pedido.nota = dados.nota;
+  var ov = bt.closest('.modal-overlay');
+  if (ov) ov.remove();
+  avisoRapido('➕ Incluindo @' + insta + '…');
+  var nomeCb = 'cnCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  window[nomeCb] = function(d) {
+    try { sc.remove(); } catch (e) {} try { delete window[nomeCb]; } catch (e) {}
+    if (d && d.success) {
+      COMENT.rows.unshift({ nome: dados.nome, insta: insta, date: new Date(), seguidores: '', tag: dados.tag, tipo: '', etapa: dados.etapa, nota: dados.nota });
+      avisoRapido('➕ @' + insta + ' está no quadro!');
+      try { renderLeads(); } catch (e2) {}
+    } else alert('Não consegui incluir: ' + ((d && d.error) || 'o robô precisa da versão v103'));
+  };
+  sc.onerror = function() { try { delete window[nomeCb]; } catch (e) {} alert('Erro de conexão ao incluir.'); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nomeCb + '&payload=' + encodeURIComponent(JSON.stringify(pedido));
+  document.body.appendChild(sc);
+}
 function carregarComentarios() {
   var url = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/export?format=csv&gid=' + COMENT_GID + '&_t=' + Date.now();
   fetch(url).then(function(r){ return r.text(); }).then(function(txt) {
@@ -8407,11 +8457,18 @@ function crmQuadro(lista) {
         +   '</div>'
         +   '<div style="flex:1;min-width:0;">'
         +     '<b class="crm-nome">' + (x.nome || '@' + x.insta) + '</b>'
-        +     '<div class="crm-quando">' + (x.date ? tempoDesde(x.date) : '') + (x.seguidores ? ' · 👥 ' + x.seguidores : '') + '</div>'
+        +     '<div class="crm-quando">' + (x.date ? tempoDesde(x.date) + ' · 🕐 ' + ('0' + x.date.getHours()).slice(-2) + ':' + ('0' + x.date.getMinutes()).slice(-2) : '') + (x.seguidores ? ' · 👥 ' + x.seguidores : '') + '</div>'
         +   '</div>'
         + '</div>'
         + '<div class="crm-chips">'
         +   (lead ? '<span class="crm-chip ok">✅ preencheu</span>' : '<span class="crm-chip pend">só comentou</span>')
+        +   (function() {
+              try {
+                var pf = (typeof IGO !== 'undefined' && IGO.perfil) ? IGO.perfil[String(x.insta || '').toLowerCase()] : null;
+                if (pf && pf.seg >= 10000) return '<span class="crm-chip quente" title="' + pf.seg.toLocaleString('pt-BR') + ' seguidores no Instagram — chamar primeiro!">🔥 ' + Math.round(pf.seg / 1000) + 'k seguidores</span>';
+              } catch (e) {}
+              return '';
+            })()
         +   (function(){   // 📷 de qual post veio (Bruno 25/08/2026)
               var pd = null;
               try { pd = igPedidoDoLead({ insta: x.insta }); } catch (e) {}
@@ -8838,6 +8895,106 @@ function ldDataTxt(l) {
   var s = l.date.toLocaleDateString('pt-BR') + ' ' + ('0'+l.date.getHours()).slice(-2) + ':' + ('0'+l.date.getMinutes()).slice(-2);
   return l.aprox ? '≈ ' + l.date.toLocaleDateString('pt-BR') + ' (estimada)' : s;
 }
+// ===== 💬 QUADRO DOS COMENTÁRIOS (agora no lugar das listas de prioridade) =====
+function comentSecaoHtml() {
+  var h = '';
+  if (window._comAberto === undefined) window._comAberto = true;   // aberto por padrão no novo lugar
+  // ===== 💬 comentários no post do diagnóstico — barrinha que abre =====
+  if (COMENT.carregado && COMENT.rows.length) {
+    var hoje0 = ldDia(new Date()).getTime();
+    var comHoje = COMENT.rows.filter(function(x){ return x.date && x.date.getTime() >= hoje0; }).length;
+    var cAberto = !!window._comAberto;
+    window._comBotaoNovo = '<button class="btn-assumir" style="padding:6px 12px;font-size:.72rem;" onclick="event.stopPropagation();comentIncluirNovo()" title="A pessoa comentou/chegou por fora e o robô não pegou? Inclui à mão, já com etapa e tags.">➕ incluir novo</button>';
+    var comLista = comentFiltrados();   // respeita o filtro de período escolhido
+    // só quem comentou e NÃO preencheu o formulário (Bruno 30/08/2026) — quem preencheu já está no funil normal
+    comLista = comLista.filter(function(x) { try { return !comentCruza(x); } catch (e) { return true; } });
+    var CF = window._comFiltro;
+    h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(110,168,255,.08);border-color:rgba(110,168,255,.5);">'
+      + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._comAberto=!window._comAberto;renderLeads();">'
+      + '<span style="font-size:1.2rem;">💬</span>'
+      + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#6ea8ff;">' + (CF.t === 'tudo' ? COMENT.rows.length : comLista.length + ' de ' + COMENT.rows.length) + ' comentário' + (COMENT.rows.length === 1 ? '' : 's') + ' no post do diagnóstico</b>'
+      + '<span class="hint" style="margin-left:8px;">' + (comHoje ? '<b style="color:#3ddc97;">' + comHoje + ' hoje</b> · ' : '') + 'via ManyChat · quem comenta é interesse quente</span></div>'
+      + '<button class="btn-assumir" style="white-space:nowrap;" onclick="event.stopPropagation();criarComentaristasNaClint(this);">➕ criar todos na Clint (Sarah)</button>'
+      + (window._comBotaoNovo || '')
+      + '<span style="color:#6ea8ff;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (cAberto ? '▲ fechar' : '▼ ver lista') + '</span></div>';
+    if (cAberto) {
+      // filtro por período: dia, semana, mês ou datas à escolha
+      var chipCF = function(t, rotulo) {
+        return '<span class="ld-selo' + (CF.t === t ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._comFiltro.t=\'' + t + '\';renderLeads();">' + rotulo + '</span>';
+      };
+      h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+        + chipCF('hoje', 'Hoje') + chipCF('ontem', 'Ontem') + chipCF('7d', '7 dias') + chipCF('30d', '30 dias') + chipCF('tudo', 'Tudo') + chipCF('esc', '📅 escolher período')
+        + '<span style="flex:1;"></span>'
+        + '<span class="ld-selo' + (window._comQuadro ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._comQuadro=true;try{localStorage.setItem(\'v2ComVista\',\'quadro\');}catch(e){};renderLeads();">🗂️ quadro</span>'
+        + '<span class="ld-selo' + (window._comQuadro ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._comQuadro=false;try{localStorage.setItem(\'v2ComVista\',\'lista\');}catch(e){};renderLeads();">☰ lista</span>'
+        + (CF.t === 'esc'
+            ? '<input type="date" value="' + (CF.de || '') + '" onchange="window._comFiltro.de=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
+              + '<span class="hint">até</span>'
+              + '<input type="date" value="' + (CF.ate || '') + '" onchange="window._comFiltro.ate=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
+            : '')
+        + '</div>';
+      if (window._comQuadro === undefined) {
+        // padrão é o quadro; se a pessoa escolher a lista, o painel lembra
+        try { window._comQuadro = localStorage.getItem('v2ComVista') !== 'lista'; }
+        catch (e) { window._comQuadro = true; }
+      }
+      if (window._comQuadro) {
+        h += '<div class="hint" style="margin:2px;">Arraste a pessoa de uma coluna para outra — grava sozinho na planilha</div>';
+        h += crmQuadro(comLista);
+      } else {
+      // quem ainda não foi marcado (sem TAG e sem TIPO) vem primeiro — pedido do Bruno
+      var comFalta = comLista.filter(function(x){ return !(x.tag || '').trim() && !(x.tipo || '').trim(); });
+      var comFeito = comLista.filter(function(x){ return (x.tag || '').trim() || (x.tipo || '').trim(); });
+      // mostra até 150 dos que faltam + os 50 já marcados mais recentes
+      // (sem isso, quem a Sarah marcasse sumia da tela por causa do corte)
+      var comOrdem = comFalta.slice(0, 150).concat(comFeito.slice(0, 50));
+      if (comFalta.length) {
+        h += '<div class="hint" style="margin:2px;"><b style="color:#f6a350;">' + comFalta.length + '</b> ainda sem TAG/TIPO — aparecem primeiro</div>';
+      }
+      h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
+      if (!comLista.length) h += '<div class="hint" style="padding:8px;">Nenhum comentário no período escolhido.</div>';
+      // divisões: primeiro "falta marcar" (por dia de chegada), depois "já marcados"
+      var comGrupos = {};
+      comOrdem.forEach(function(x){ var g = comSecaoDe(x); comGrupos[g] = (comGrupos[g] || 0) + 1; });
+      var comGrupoAtual = null;
+      comOrdem.forEach(function(x) {
+        var lead = comentCruza(x);
+        var grupo = comSecaoDe(x);
+        if (grupo !== comGrupoAtual) {
+          comGrupoAtual = grupo;
+          var corG = grupo.indexOf('marcados') !== -1 ? '#3ddc97' : '#6ea8ff';
+          h += '<div style="display:flex;align-items:center;gap:8px;margin:6px 2px 0;">'
+            + '<b style="font-size:.7rem;color:' + corG + ';text-transform:uppercase;letter-spacing:.5px;">' + grupo + '</b>'
+            + '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:' + corG + ';">' + comGrupos[grupo] + '</span>'
+            + '<span style="flex:1;height:1px;background:rgba(110,168,255,.25);"></span></div>';
+        }
+        var quando = x.date ? x.date.toLocaleDateString('pt-BR').slice(0,5) + ' ' + ('0'+x.date.getHours()).slice(-2) + ':' + ('0'+x.date.getMinutes()).slice(-2) : '';
+        h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
+          + '<div class="avatar" style="width:30px;height:30px;font-size:.66rem;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
+          + (igFotoDe(x.insta) ? '<img src="' + igFotoDe(x.insta) + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+          + '</div>'
+          + '<b style="font-size:.76rem;flex:1;min-width:110px;">' + (x.nome || (x.insta ? '@' + x.insta : 'Sem nome')) + '</b>'
+          + (x.seguidores ? '<span class="ld-tag" style="background:rgba(110,168,255,.15);color:#6ea8ff;">👥 ' + x.seguidores + ' seg.</span>' : '')
+          + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;" title="' + quando + '">⏱ ' + tempoDesde(x.date) + '</span>' : '')
+          + (quando ? '<span class="hint">' + quando + '</span>' : '')
+          + (lead
+              ? '<span class="ld-tag" style="background:rgba(61,220,151,.15);color:#3ddc97;" title="' + (lead.invest || '') + '">✅ já preencheu a pesquisa' + (lead.faixa === 'alta' ? ' · 🔥 R$2–4mil' : lead.faixa === 'media' ? ' · R$500–1mil' : '') + '</span>'
+              : '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">⏳ só comentou</span>'
+                + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);" title="Cria na Clint (nome + @), com a Sarah de dona">➕ Clint (Sarah)</button>')
+          + (x.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;padding:6px 10px;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank">📷 @' + x.insta + '</a>' : '')
+          + seloEtapaCrm(x)
+          + comSeletores(x)
+          + '</div>';
+      });
+      if (comLista.length > comOrdem.length) h += '<div class="hint">… e mais ' + (comLista.length - comOrdem.length) + '</div>';
+      h += '</div>';
+      }
+    }
+    h += '</div>';
+  }
+  return h;
+}
+
 function ldRow(l, quente) {
   var st = ldSituacao(l);
   var tags = '';
@@ -9792,95 +9949,7 @@ function renderLeads() {
     h += '</div>';
   })();
 
-  // ===== 💬 comentários no post do diagnóstico — barrinha que abre =====
-  if (COMENT.carregado && COMENT.rows.length) {
-    var hoje0 = ldDia(new Date()).getTime();
-    var comHoje = COMENT.rows.filter(function(x){ return x.date && x.date.getTime() >= hoje0; }).length;
-    var cAberto = !!window._comAberto;
-    var comLista = comentFiltrados();   // respeita o filtro de período escolhido
-    var CF = window._comFiltro;
-    h += '<div class="alerta-parado" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px;background:rgba(110,168,255,.08);border-color:rgba(110,168,255,.5);">'
-      + '<div class="click" style="display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="window._comAberto=!window._comAberto;renderLeads();">'
-      + '<span style="font-size:1.2rem;">💬</span>'
-      + '<div style="flex:1;min-width:0;"><b style="font-size:.8rem;color:#6ea8ff;">' + (CF.t === 'tudo' ? COMENT.rows.length : comLista.length + ' de ' + COMENT.rows.length) + ' comentário' + (COMENT.rows.length === 1 ? '' : 's') + ' no post do diagnóstico</b>'
-      + '<span class="hint" style="margin-left:8px;">' + (comHoje ? '<b style="color:#3ddc97;">' + comHoje + ' hoje</b> · ' : '') + 'via ManyChat · quem comenta é interesse quente</span></div>'
-      + '<button class="btn-assumir" style="white-space:nowrap;" onclick="event.stopPropagation();criarComentaristasNaClint(this);">➕ criar todos na Clint (Sarah)</button>'
-      + '<span style="color:#6ea8ff;font-weight:800;font-size:.72rem;white-space:nowrap;">' + (cAberto ? '▲ fechar' : '▼ ver lista') + '</span></div>';
-    if (cAberto) {
-      // filtro por período: dia, semana, mês ou datas à escolha
-      var chipCF = function(t, rotulo) {
-        return '<span class="ld-selo' + (CF.t === t ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._comFiltro.t=\'' + t + '\';renderLeads();">' + rotulo + '</span>';
-      };
-      h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
-        + chipCF('hoje', 'Hoje') + chipCF('ontem', 'Ontem') + chipCF('7d', '7 dias') + chipCF('30d', '30 dias') + chipCF('tudo', 'Tudo') + chipCF('esc', '📅 escolher período')
-        + '<span style="flex:1;"></span>'
-        + '<span class="ld-selo' + (window._comQuadro ? '' : ' morno') + '" style="cursor:pointer;" onclick="window._comQuadro=true;try{localStorage.setItem(\'v2ComVista\',\'quadro\');}catch(e){};renderLeads();">🗂️ quadro</span>'
-        + '<span class="ld-selo' + (window._comQuadro ? ' morno' : '') + '" style="cursor:pointer;" onclick="window._comQuadro=false;try{localStorage.setItem(\'v2ComVista\',\'lista\');}catch(e){};renderLeads();">☰ lista</span>'
-        + (CF.t === 'esc'
-            ? '<input type="date" value="' + (CF.de || '') + '" onchange="window._comFiltro.de=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
-              + '<span class="hint">até</span>'
-              + '<input type="date" value="' + (CF.ate || '') + '" onchange="window._comFiltro.ate=this.value;renderLeads();" style="background:rgba(255,255,255,.07);border:1px solid rgba(110,168,255,.4);border-radius:8px;color:var(--text);padding:4px 8px;font-size:.7rem;">'
-            : '')
-        + '</div>';
-      if (window._comQuadro === undefined) {
-        // padrão é o quadro; se a pessoa escolher a lista, o painel lembra
-        try { window._comQuadro = localStorage.getItem('v2ComVista') !== 'lista'; }
-        catch (e) { window._comQuadro = true; }
-      }
-      if (window._comQuadro) {
-        h += '<div class="hint" style="margin:2px;">Arraste a pessoa de uma coluna para outra — grava sozinho na planilha</div>';
-        h += crmQuadro(comLista);
-      } else {
-      // quem ainda não foi marcado (sem TAG e sem TIPO) vem primeiro — pedido do Bruno
-      var comFalta = comLista.filter(function(x){ return !(x.tag || '').trim() && !(x.tipo || '').trim(); });
-      var comFeito = comLista.filter(function(x){ return (x.tag || '').trim() || (x.tipo || '').trim(); });
-      // mostra até 150 dos que faltam + os 50 já marcados mais recentes
-      // (sem isso, quem a Sarah marcasse sumia da tela por causa do corte)
-      var comOrdem = comFalta.slice(0, 150).concat(comFeito.slice(0, 50));
-      if (comFalta.length) {
-        h += '<div class="hint" style="margin:2px;"><b style="color:#f6a350;">' + comFalta.length + '</b> ainda sem TAG/TIPO — aparecem primeiro</div>';
-      }
-      h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
-      if (!comLista.length) h += '<div class="hint" style="padding:8px;">Nenhum comentário no período escolhido.</div>';
-      // divisões: primeiro "falta marcar" (por dia de chegada), depois "já marcados"
-      var comGrupos = {};
-      comOrdem.forEach(function(x){ var g = comSecaoDe(x); comGrupos[g] = (comGrupos[g] || 0) + 1; });
-      var comGrupoAtual = null;
-      comOrdem.forEach(function(x) {
-        var lead = comentCruza(x);
-        var grupo = comSecaoDe(x);
-        if (grupo !== comGrupoAtual) {
-          comGrupoAtual = grupo;
-          var corG = grupo.indexOf('marcados') !== -1 ? '#3ddc97' : '#6ea8ff';
-          h += '<div style="display:flex;align-items:center;gap:8px;margin:6px 2px 0;">'
-            + '<b style="font-size:.7rem;color:' + corG + ';text-transform:uppercase;letter-spacing:.5px;">' + grupo + '</b>'
-            + '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:' + corG + ';">' + comGrupos[grupo] + '</span>'
-            + '<span style="flex:1;height:1px;background:rgba(110,168,255,.25);"></span></div>';
-        }
-        var quando = x.date ? x.date.toLocaleDateString('pt-BR').slice(0,5) + ' ' + ('0'+x.date.getHours()).slice(-2) + ':' + ('0'+x.date.getMinutes()).slice(-2) : '';
-        h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
-          + '<div class="avatar" style="width:30px;height:30px;font-size:.66rem;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
-          + (igFotoDe(x.insta) ? '<img src="' + igFotoDe(x.insta) + '" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
-          + '</div>'
-          + '<b style="font-size:.76rem;flex:1;min-width:110px;">' + (x.nome || (x.insta ? '@' + x.insta : 'Sem nome')) + '</b>'
-          + (x.seguidores ? '<span class="ld-tag" style="background:rgba(110,168,255,.15);color:#6ea8ff;">👥 ' + x.seguidores + ' seg.</span>' : '')
-          + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;" title="' + quando + '">⏱ ' + tempoDesde(x.date) + '</span>' : '')
-          + (quando ? '<span class="hint">' + quando + '</span>' : '')
-          + (lead
-              ? '<span class="ld-tag" style="background:rgba(61,220,151,.15);color:#3ddc97;" title="' + (lead.invest || '') + '">✅ já preencheu a pesquisa' + (lead.faixa === 'alta' ? ' · 🔥 R$2–4mil' : lead.faixa === 'media' ? ' · R$500–1mil' : '') + '</span>'
-              : '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">⏳ só comentou</span>'
-                + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);" title="Cria na Clint (nome + @), com a Sarah de dona">➕ Clint (Sarah)</button>')
-          + (x.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;padding:6px 10px;" href="https://instagram.com/' + encodeURIComponent(x.insta) + '" target="_blank">📷 @' + x.insta + '</a>' : '')
-          + seloEtapaCrm(x)
-          + comSeletores(x)
-          + '</div>';
-      });
-      if (comLista.length > comOrdem.length) h += '<div class="hint">… e mais ' + (comLista.length - comOrdem.length) + '</div>';
-      h += '</div>';
-      }
-    }
-    h += '</div>';
-  }
+  // (o quadro dos comentários mudou de lugar: agora fica onde eram as listas de prioridade)
   if (LD.naoSalva) {
     h += '<div class="alerta-parado" style="background:rgba(246,163,80,.1);border-color:rgba(246,163,80,.5);">'
       + '<span style="font-size:1.4rem;">⚠️</span><div style="flex:1;">'
@@ -10301,30 +10370,10 @@ function renderLeads() {
   });
   hQuadro += '<div class="hint" style="margin-top:8px;">Clique num período para filtrar o funil e as listas · mostrando os ' + vis.length + ' mais recentes</div></div>';
 
-  // listas de prioridade
-  var quentes = ldUnicos(rows.filter(function(l){ return l.faixa === 'alta'; }));
-  var mornos = ldUnicos(rows.filter(function(l){ return l.faixa === 'media'; }));
-  var frios = rows.filter(function(l){ return l.faixa === 'nda'; }).length;
-  var semResp = rows.filter(function(l){ return l.faixa === 'sem'; }).length;
-
-  h += '<div class="panel" style="margin-bottom:18px;"><h3>🔥 Prioridade máxima — R$2mil a R$4mil (' + quentes.length + ')</h3>'
-    + '<div class="hint" style="margin:6px 0 12px;">Melhor qualificação do dia: chamar no WhatsApp o quanto antes</div>';
-  if (quentes.length) {
-    quentes.slice(0, 80).forEach(function(l){ h += ldRow(l, true); });
-    if (quentes.length > 80) h += '<div class="hint">… e mais ' + (quentes.length - 80) + ' leads</div>';
-  } else h += '<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Nenhum lead nesta faixa no período.</div>';
-  h += '</div>';
-
-  h += '<div class="panel" style="margin-bottom:18px;"><h3>🟡 Prioridade menor — R$500 a R$1mil (' + mornos.length + ')</h3>'
-    + '<div class="hint" style="margin:6px 0 12px;">Qualificação menor: chamar depois dos quentes</div>';
-  if (mornos.length) {
-    mornos.slice(0, 80).forEach(function(l){ h += ldRow(l, false); });
-    if (mornos.length > 80) h += '<div class="hint">… e mais ' + (mornos.length - 80) + ' leads</div>';
-  } else h += '<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Nenhum lead nesta faixa no período.</div>';
-  h += '</div>';
+  // 💬 no lugar das listas de prioridade entra o quadro dos comentários (Bruno 30/08/2026)
+  h += comentSecaoHtml();
 
   h += hQuadro; // quadro por período fica no fim da página
-  h += '<div class="hint">⚪ Fora do funil de prioridade: ' + frios + ' sem disponibilidade de investimento · ' + semResp + ' não responderam a pergunta de investimento</div>';
   h += '<div class="hint" style="margin-top:6px;">📚 Base: <b>' + LD.total.toLocaleString('pt-BR') + '</b> leads na planilha'
     + (LD.aprox ? ' · <b>' + LD.aprox + '</b> estavam sem data e receberam data estimada pela posição na planilha (marcados com ≈)' : '')
     + (LD.semData.length ? ' · ' + LD.semData.length + ' sem data e sem vizinho para estimar' : '') + '</div>';
