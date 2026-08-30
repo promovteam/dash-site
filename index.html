@@ -2186,7 +2186,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-0147';
+var VERSAO_DASH = '2026-08-30-0155';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3956,7 +3956,7 @@ function v2row(r) {
 // Boleto e cartao recorrente = entrada + 1a parcela (le o detalhe da observacao,
 // inclusive escrito a mao: "10x de R$ 3 mil no boleto", "10 x R$ 500"...).
 // Sem detalhe anotado = conta so o que da para provar (decisao do Bruno).
-function pagCashCollect(p) {
+function pagCashCollect(p, obsVendas) {
   var total = p.valor || 0;
   var obs = String(p.obs || '');
   var texto = v2norm(obs + ' ' + (p.forma || ''));
@@ -3970,14 +3970,24 @@ function pagCashCollect(p) {
     var v = parseFloat(s) || 0;
     return mil ? v * 1000 : v;
   }
+  function achaParcela(t) {
+    var re = /(\d{1,2})\s*x[^0-9]{0,20}?([\d.][\d.,]*)\s*(mil)?/gi, m;
+    while ((m = re.exec(t)) !== null) {
+      var v = din(m[2], m[3]);
+      if (v > 10) return v;
+    }
+    return 0;
+  }
   var mEnt = obs.match(/entrada[^0-9]{0,12}([\d.,]+)\s*(mil)?/i);
   var entrada = mEnt ? din(mEnt[1], mEnt[2]) : 0;
-  var parcela = 0;
-  var re = /(\d{1,2})\s*x[^0-9]{0,20}?([\d.][\d.,]*)\s*(mil)?/gi, m;
-  while ((m = re.exec(obs)) !== null) {
-    var v = din(m[2], m[3]);
-    if (v > 10) { parcela = v; break; }
+  var parcela = achaParcela(obs);
+  // sem detalhe? olha tambem a observacao da aba Vendas (ex.: "deu 1.000,00 de bloqueio")
+  var extra = String(obsVendas || '');
+  if (!entrada && extra) {
+    var mBq = extra.match(/([\d.][\d.,]*)\s*(mil)?\s*(?:de\s*)?(?:bloqueio|sinal|entrada)/i);
+    if (mBq) entrada = din(mBq[1], mBq[2]);
   }
+  if (!parcela && extra) parcela = achaParcela(extra);
   var cash = entrada + parcela;
   return total ? Math.min(total, cash) : cash;
 }
@@ -4030,7 +4040,18 @@ function renderV2() {
     + '<div class="g-sub"><b>' + mc.vd + ' venda' + (mc.vd !== 1 ? 's' : '') + '</b> confirmada' + (mc.vd !== 1 ? 's' : '') + ' · Ticket <b>' + v2moeda0(mc.vd ? mc.vdV / mc.vd : 0) + '</b></div>'
     + (function() {
         var cashV = 0, nCash = 0;
-        try { pagPeriodo().forEach(function(p) { cashV += pagCashCollect(p); nCash++; }); } catch (eC) { return ''; }
+        try {
+          var obsPorTel = {};
+          (V2.rows || []).forEach(function(r) {
+            var t = String(r.telefone || '').replace(/\D/g, '').slice(-8);
+            if (t && r.obs) obsPorTel[t] = (obsPorTel[t] || '') + ' ' + r.obs;
+          });
+          pagPeriodo().forEach(function(p) {
+            var t = String(p.celular || '').replace(/\D/g, '').slice(-8);
+            cashV += pagCashCollect(p, obsPorTel[t] || '');
+            nCash++;
+          });
+        } catch (eC) { return ''; }
         if (!nCash) return '';
         return '<div class="g-sub" style="margin-top:3px;" title="O que JÁ ENTROU no caixa: à vista, PIX e cartão parcelado contam o total; boleto e recorrente contam entrada + 1ª parcela (lido do detalhe da venda).">💵 Já no caixa: <b style="color:#3ddc97;">' + v2moeda(cashV) + '</b> <span class="hint">cash collect</span></div>';
       })()
