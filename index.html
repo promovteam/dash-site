@@ -2216,7 +2216,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-31-0755';
+var VERSAO_DASH = '2026-08-31-0828';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -8533,6 +8533,20 @@ function seloEtapaCrm(x) {
 }
 // desenha o quadro (colunas + cartões que se arrastam)
 function crmQuadro(lista) {
+  // guarda onde cada coluna estava rolada: o redesenho (marcar etapa, "mostrar mais",
+  // dados chegando) não joga mais a pessoa de volta para o topo (Bruno 31/08/2026)
+  var rolagem = {};
+  document.querySelectorAll('.crm-col').forEach(function(col) {
+    var f = col.querySelector('.crm-fila');
+    if (f && f.scrollTop) rolagem[col.getAttribute('data-etapa')] = f.scrollTop;
+  });
+  setTimeout(function() {
+    document.querySelectorAll('.crm-col').forEach(function(col) {
+      var st = rolagem[col.getAttribute('data-etapa')];
+      var f = col.querySelector('.crm-fila');
+      if (f && st) f.scrollTop = st;
+    });
+  }, 0);
   var porEtapa = {};
   CRM_ETAPAS.forEach(function(e){ porEtapa[e.k] = []; });
   lista.forEach(function(x){ porEtapa[crmEtapaDe(x)].push(x); });
@@ -8709,11 +8723,12 @@ function crmEscolhaPerfil(x) {
       }).join('')
     + '</div></div>';
 }
-// clicar no cartão abre a janelinha de tags (perfil + produto + etiquetas juntos —
-// pedido do Bruno 30/08/2026: o painel comprido saiu e virou tudo tag)
+// clicar no cartão abre O LEAD (mini-ficha); as tags ficam no botão 🏷️ + e dentro
+// da mini-ficha (Bruno 31/08/2026: "se clicar abra o lead e não as tags").
+// Clicar e SEGURAR continua arrastando o cartão entre as colunas.
 function crmAbrirPerfil(e, insta) {
   if (e && e.target && e.target.closest && e.target.closest('.crm-acoes, .crm-perfil, .crm-etapa, .crm-etqs, .crm-post, select, a, .crm-chip')) return;
-  crmEtiquetas(insta);
+  crmVerPerfil(insta);
 }
 var _crmArrastando = null;
 function crmPegar(e) {
