@@ -2216,7 +2216,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-30-1941';
+var VERSAO_DASH = '2026-08-30-2222';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11078,7 +11078,19 @@ function mostrarFormularioDoLead(r) {
     + linha('📊', 'Campanha', l.campanha)
     + _blocoPagamento(pagDele)
     + '<div class="dtl-line"><span>📣 Anúncio que trouxe</span>'
-    +   '<span style="text-align:right;">' + (seloAnuncio(l) || '<span class="hint">—</span>') + '</span></div>'
+    +   '<span style="text-align:right;">' + (seloAnuncio(l) || igSeloLead(l) || '<span class="hint">—</span>') + '</span></div>'
+    // veio de post orgânico identificado PELO COMENTÁRIO (API): mostra a foto do post
+    + (function(){
+        if (a.tem) return '';
+        var pd = null; try { pd = igPedidoDoLead(l); } catch (e) {}
+        if (!pd) return '';
+        var fo = fotoDoPost(pd.post);
+        if (!fo) return '';
+        return '<div style="margin-top:8px;text-align:right;">'
+          + '<a href="#" onclick="event.preventDefault();crmVerPost(' + JSON.stringify(pd.post).replace(/"/g, '&quot;') + ')">'
+          + '<img src="' + fo + '" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:1px solid rgba(61,220,151,.4);"'
+          + ' title="post de onde veio (pelo comentário' + (pd.texto ? ': "' + String(pd.texto).slice(0, 40).replace(/"/g, "'") + '"' : '') + ') — clique para ver aqui dentro"></a></div>';
+      })()
     + (a.organico ? (function(){
         var fo = fotoDoPost(a.post && a.post.link);
         return '<div style="margin-top:8px;text-align:right;">'
