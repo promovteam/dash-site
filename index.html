@@ -2216,7 +2216,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-08-31-0005';
+var VERSAO_DASH = '2026-08-31-0755';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -8061,10 +8061,10 @@ function verLeadsDoAnuncio(chave) {
     var us = chave === 'igPediu' ? d.ig.quemPediu : d.ig.quemNovo;
     d.quem[chave] = (us || []).map(function(u) {
       var l = igLeadPorInsta(u);
-      if (l) return l;
+      if (l) { l._igU = u; return l; }   // guarda o @ que comentou (liga ao social selling)
       var pf = IGO.perfil[u] || {};
       return { nome: pf.nome ? pf.nome + ' (@' + u + ')' : '@' + u, insta: u, tel: '', telefone: '', tel8: '', email: '',
-               dataTxt: '', faixa: 'sem', obj: '', renda: '', invest: '', seg: '', score: 0,
+               dataTxt: '', faixa: 'sem', obj: '', renda: '', invest: '', seg: '', score: 0, _igU: u,
                origem: 'comentário no Instagram', _igTexto: IGO.texto[u] || '',
                _igSegN: (pf.seg != null ? pf.seg : -1),
                _igBio: pf.bio || '', _igSite: pf.site || '',
@@ -8106,7 +8106,8 @@ function verLeadsDoAnuncio(chave) {
         var lk = clintLink(l);
         var grande = (l._igSegN != null && l._igSegN >= 5000);
         var pos = _ldReg.indexOf(l);
-        return '<div class="click" onclick="verFichaDaLista(' + i + ')" title="clique para ver todos os dados"'
+        // quem não está na base abre a mini-ficha do social selling (dá para agir por ali)
+        return '<div class="click" onclick="' + (l._igU && !l.tel8 ? 'crmVerPerfil(\'' + l._igU + '\')' : 'verFichaDaLista(' + i + ')') + '" title="clique para ver todos os dados"'
           + ' style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:' + (grande ? 'rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.35)' : 'rgba(255,255,255,.05)') + ';flex-wrap:wrap;cursor:pointer;"'
           + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'">'
           + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');' + (grande ? 'box-shadow:0 0 0 2px #ffd166;' : '') + '">' + v2ini(l.nome || '?')
@@ -8120,6 +8121,18 @@ function verLeadsDoAnuncio(chave) {
           + '</div>'
           + (l._igSite ? '<a class="ld-tag" onclick="event.stopPropagation();" href="' + String(l._igSite).replace(/"/g, '') + '" target="_blank" title="' + String(l._igSite).replace(/"/g, '') + '" style="background:rgba(110,168,255,.14);color:#6ea8ff;text-decoration:none;">🔗 site</a>' : '')
           + selo + etapa + seloChance(l, true) + seloAnuncio(l, true) + igSeloLead(l, true)
+          + (function(){   // 🗂 etapa + etiquetas do SOCIAL SELLING nesta lista (Bruno 31/08/2026)
+              if (!l._igU) return '';
+              var com = _comDe(l._igU);
+              if (!com) return '';
+              var hs = '<span onclick="event.stopPropagation();">' + seloEtapaCrm(com) + '</span>';
+              if (com.tag) hs += '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;">' + com.tag + '</span>';
+              if (com.produto) hs += '<span class="ld-tag" style="background:rgba(61,220,151,.15);color:#3ddc97;">💠 ' + com.produto + '</span>';
+              etqDe(com).slice(0, 3).forEach(function(t){ hs += '<span class="ld-tag" style="background:rgba(185,138,255,.12);color:#b98aff;">🏷️ ' + t + '</span>'; });
+              hs += '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.07);color:var(--muted);border:1px dashed rgba(255,255,255,.3);"'
+                + ' title="pôr ou tirar etiquetas, perfil e produto" onclick="event.stopPropagation();crmEtiquetas(\'' + l._igU + '\')">🏷️ +</span>';
+              return hs;
+            })()
           + (l.insta ? '<a class="ld-wa" onclick="event.stopPropagation();" title="abrir o perfil @' + String(l.insta).replace(/^@/, '') + ' no Instagram" href="https://instagram.com/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '" target="_blank" style="background:rgba(225,48,108,.14);border-color:rgba(225,48,108,.45);color:#e1306c;">@</a>' : '')
           + (l._igPost ? '<a class="ld-wa" onclick="event.stopPropagation();" title="abrir o post onde comentou" href="' + l._igPost + '" target="_blank" style="background:rgba(61,220,151,.14);border-color:rgba(61,220,151,.45);color:#3ddc97;">📷</a>' : '')
           + (l.tel ? '<a class="ld-wa" onclick="event.stopPropagation();" href="https://wa.me/55' + String(l.tel).replace(/\D/g, '').slice(-11) + '" target="_blank">💬</a>' : '')
@@ -8972,6 +8985,8 @@ function crmVerPerfil(insta) {
     + '</div>'
     + (pf.bio ? '<div style="margin-top:12px;font-size:.78rem;color:var(--text-secondary);line-height:1.45;">' + String(pf.bio).slice(0, 220) + '</div>' : '')
     + (pf.site ? '<div class="hint" style="margin-top:6px;">🔗 <a href="' + (String(pf.site).indexOf('http') === 0 ? pf.site : 'https://' + pf.site) + '" target="_blank" style="color:#6ea8ff;">' + String(pf.site).replace(/^https?:\/\//, '').slice(0, 44) + '</a></div>' : '')
+    // etapa do social selling direto na mini-ficha (Bruno 31/08/2026)
+    + '<div style="margin-top:12px;" onclick="event.stopPropagation();">' + seloEtapaCrm(x) + '</div>'
     + (pd
         ? '<div class="crm-post" style="margin-top:14px;cursor:pointer;" onclick="crmVerPost(' + JSON.stringify(pd.post).replace(/"/g, '&quot;') + ')">'
           + (fotoPost ? '<img src="' + fotoPost + '" onerror="this.outerHTML=\'<span class=crm-post-sem>📷</span>\'">' : '<span class="crm-post-sem">📷</span>')
