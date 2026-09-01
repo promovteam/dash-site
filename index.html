@@ -2218,7 +2218,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-01-1436';
+var VERSAO_DASH = '2026-09-01-1720';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9092,8 +9092,13 @@ function _glEtapaEntrada(etapa) {
   }
   return false;
 }
+// etapas que NUNCA entram em lista de ligação/disparo: já é cliente, já pagou
+// ou já está em reunião (Customer Success, Bloqueio/Entrada, Reunião — Bruno 01/09/2026)
+function _glEtapaNunca(etapa) {
+  return /customer|bloqueio|entrada|reuni/.test(v2norm(etapa || ''));
+}
 // conta quantas pessoas da base estão em cada etapa da Clint (para a janelinha
-// do Gerar lista mostrar as etapas e deixar escolher quais saem — Bruno 01/09/2026)
+// do Gerar lista mostrar as etapas e deixar escolher quais entram — Bruno 01/09/2026)
 function _glEtapas() {
   var m = {}, vistos = {};
   (LD.rows || []).forEach(function(l) {
@@ -9101,6 +9106,7 @@ function _glEtapas() {
     vistos[l.tel8] = 1;
     var ci = null; try { ci = clintInfoDe(l); } catch (e) {}
     if (!ci || !ci.etapa) return;
+    if (_glEtapaNunca(ci.etapa)) return;   // nem aparece como opção
     var k = v2norm(ci.etapa);
     if (!m[k]) m[k] = { nome: ci.etapa, n: 0 };
     m[k].n++;
@@ -9119,10 +9125,15 @@ function glEtapasMontar() {
   }
   box.innerHTML = ets.map(function(e) {
     return '<label style="display:flex;align-items:center;gap:7px;font-size:.76rem;cursor:pointer;">'
-      + '<input type="checkbox" data-et="' + e.chave + '"' + (e.trabalhada ? ' checked' : '') + ' onchange="glConta()">'
+      + '<input type="checkbox" data-et="' + e.chave + '" onchange="glConta()">'
       + '<span style="flex:1;">' + e.nome + (e.trabalhada ? '' : ' <span class="hint" style="font-size:.62rem;">(etapa de entrada)</span>') + '</span>'
       + '<span class="hint">' + e.n + '</span></label>';
-  }).join('');
+  }).join('')
+  + '<div class="hint" style="font-size:.62rem;margin-top:3px;">Da Clint só entra quem estiver numa etapa que você marcar. Quem não está na Clint entra sempre. Customer Success, Bloqueio/Entrada e Reunião nunca entram (nem aparecem aqui).</div>';
+}
+function glEtapasTodas(marcar) {
+  document.querySelectorAll('#gl-etapas input[data-et]').forEach(function(c){ c.checked = marcar; });
+  glConta();
 }
 function _glTeste(l) {
   var j = (String(l.nome || '') + ' ' + String(l.insta || '')).toLowerCase();
@@ -9160,12 +9171,12 @@ function glFiltrar() {
   var notas = {};
   ['A', 'B', 'C', 'D'].forEach(function(k){ var el = g('gl-n' + k); if (el && el.checked) notas[k] = 1; });
   var comIncompletos = g('gl-incompletos') && g('gl-incompletos').checked;
-  var tirarReuniao = g('gl-semreuniao') && g('gl-semreuniao').checked;
-  // etapas da Clint marcadas = essas pessoas saem da lista
-  var etTirar = {}, temEtapas = false;
+  var perfil = g('gl-perfil') ? g('gl-perfil').value : 'todos';
+  // etapas da Clint: MARCADA = essas pessoas entram (pedido do Bruno 01/09/2026)
+  var etEntra = {}, temEtapas = false;
   document.querySelectorAll('#gl-etapas input[data-et]').forEach(function(c) {
     temEtapas = true;
-    if (c.checked) etTirar[c.getAttribute('data-et')] = 1;
+    if (c.checked) etEntra[c.getAttribute('data-et')] = 1;
   });
   var org = g('gl-origem') ? g('gl-origem').value : 'todas';
   var vistosT8 = {};
@@ -9178,18 +9189,21 @@ function glFiltrar() {
     if (!cl) { if (!comIncompletos) return; }          // sem pesquisa completa: só entra se a pessoa pediu
     else if (!notas[cl.classe]) return;
     if (_glTeste(l)) return;
+    // MQL = declarou qualquer verba (alta+media) · perfil HT = R$2–4mil (alta)
+    if (perfil === 'mql' && l.faixa !== 'alta' && l.faixa !== 'media') return;
+    if (perfil === 'ht' && l.faixa !== 'alta') return;
     var ehPago = /\[ads\]|\bads\b|paid/i.test(String(l.origem || '') + ' ' + String(l.fonte || ''));
     if (org === 'pago' && !ehPago) return;
     if (org === 'organico' && ehPago) return;
-    if (tirarReuniao) {
-      try { if (_ldIdx && _ldIdx[l.tel8]) return; } catch (e) {}
-    }
-    if (temEtapas) {
-      try {
-        var ci = clintInfoDe(l);
-        if (ci && ci.etapa && etTirar[v2norm(ci.etapa)]) return;   // está numa etapa marcada = sai
-      } catch (e2) {}
-    }
+    // quem já agendou reunião ou comprou NUNCA entra (regra fixa — Bruno 01/09/2026)
+    try { if (_ldIdx && _ldIdx[l.tel8]) return; } catch (e) {}
+    try {
+      var ci = clintInfoDe(l);
+      if (ci && ci.etapa) {
+        if (_glEtapaNunca(ci.etapa)) return;                    // cliente, pagou ou em reunião: nunca entra
+        if (temEtapas && !etEntra[v2norm(ci.etapa)]) return;    // etapa não clicada = fica de fora
+      }
+    } catch (e2) {}
     vistosT8[l.tel8] = 1;
     out.push({ l: l, nota: cl ? cl.classe : '—', pontos: cl ? cl.nota : 0 });
   });
@@ -9278,11 +9292,15 @@ function abrirGerarLista() {
     + '<label class="hint">Notas que entram</label>'
     + '<div style="display:flex;gap:14px;margin:4px 0 6px;flex-wrap:wrap;">' + cb('gl-nA', '🥇 A', true) + cb('gl-nB', '🥈 B', true) + cb('gl-nC', 'C', false) + cb('gl-nD', 'D', false) + '</div>'
     + '<div style="margin:0 0 10px;">' + cb('gl-incompletos', '🟠 Incluir também quem não terminou de preencher a pesquisa (fica sem nota)', false) + '</div>'
-    + '<label class="hint">Tirar da lista</label>'
-    + '<div style="display:flex;flex-direction:column;gap:6px;margin:4px 0 10px;">'
-    + cb('gl-semreuniao', 'Quem já agendou reunião ou comprou', true)
-    + '</div>'
-    + '<div class="hint" style="margin-bottom:3px;">Quem está nestas etapas da Clint sai da lista <span style="opacity:.75;">(desmarque uma etapa para deixar essas pessoas entrarem)</span>:</div>'
+    + '<label class="hint">Perfil de verba</label>'
+    + '<select id="gl-perfil" style="' + cp + 'width:100%;margin:3px 0 10px;" onchange="glConta()">'
+    + '<option value="todos">Todos</option>'
+    + '<option value="mql">⭐ Só MQL — declarou verba de R$500 ou mais</option>'
+    + '<option value="ht">🔥 Só perfil HT — declarou de R$2 mil a R$4 mil</option></select>'
+    + '<div class="hint" style="margin:0 0 10px;">🚫 <b>Nunca entram</b> na lista: quem já agendou reunião ou comprou, e quem está em Customer Success, Bloqueio/Entrada ou Reunião na Clint.</div>'
+    + '<div class="hint" style="margin-bottom:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">Etapas da Clint — <b style="color:#f6a350;">marque as que entram</b> na lista'
+    + '<span style="flex:1;"></span>'
+    + '<a href="javascript:void(0)" onclick="glEtapasTodas(true)" style="color:#6ea8ff;">todas</a>·<a href="javascript:void(0)" onclick="glEtapasTodas(false)" style="color:#6ea8ff;">nenhuma</a></div>'
     + '<div id="gl-etapas" style="display:flex;flex-direction:column;gap:4px;margin:0 0 10px;max-height:160px;overflow-y:auto;padding:7px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:9px;"></div>'
     + '<label class="hint">Origem</label>'
     + '<select id="gl-origem" style="' + cp + 'width:100%;margin:3px 0 12px;" onchange="glConta()">'
@@ -9334,6 +9352,11 @@ function abrirAjudaNotas() {
     + '<div>💰 <b>Quanto pode investir</b> — vale até <b>45</b> (é o que mais pesa)</div>'
     + '<div>📦 <b>Tem produto ou negócio rodando</b> — vale até <b>35</b></div>'
     + '<div>👥 <b>Tamanho da audiência</b> — vale até <b>20</b> (o corte que importa é passar de mil seguidores)</div>'
+    + '</div>'
+    + '<div class="hint" style="margin-bottom:8px;"><b>Outros nomes que usamos</b>:</div>'
+    + '<div style="display:flex;flex-direction:column;gap:5px;font-size:.76rem;margin-bottom:14px;">'
+    + '<div>⭐ <b>MQL</b> — declarou alguma verba na pesquisa (R$500 ou mais)</div>'
+    + '<div>🔥 <b>Perfil HT</b> — declarou de R$2 mil a R$4 mil: é para chamar primeiro, no WhatsApp</div>'
     + '</div>'
     + '<div class="hint">🟠 Quem <b>começou a pesquisa e não terminou</b> fica <b>sem nota</b> — não dá para medir o perfil. Esses aparecem no aviso laranja "para levar para a Clint" e podem entrar na lista do 📤 Gerar lista marcando a opção de incluir quem não terminou.</div>'
     + '<div class="hint" style="margin-top:8px;">A porcentagem "fecha X%" ao lado de cada nota é medida na nossa própria base: de todos os leads daquela nota que fizeram reunião, quantos compraram.</div>'
