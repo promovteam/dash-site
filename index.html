@@ -1108,6 +1108,7 @@ img { max-width:100%; height:auto; }
         <button class="chart-chip" data-p="ano" onclick="mudarPeriodoLeads('ano', this)">Ano</button>
         <button class="chart-chip" data-p="tudo" onclick="mudarPeriodoLeads('tudo', this)">Tudo</button>
         <button class="chart-chip" id="ld-chip-datas" onclick="abrirDatasLeads()" title="Escolher um período de datas">📅 Datas…</button>
+        <button class="chart-chip" id="ld-chip-gerar" onclick="abrirGerarLista()" title="Montar uma lista de leads para o discador ou para disparo, com filtros" style="border-color:rgba(246,163,80,.5);color:#f6a350;">📤 Gerar lista</button>
       </div>
       <div id="ld-datas" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.05);padding:8px 12px;border-radius:12px;">
         <span class="hint" style="margin:0;">de</span>
@@ -2216,7 +2217,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-01-0905';
+var VERSAO_DASH = '2026-09-01-1202';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9076,6 +9077,183 @@ function abrirDatasLeads() {
   }
 }
 function _ldISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+// ===== 📤 GERAR LISTA DE LEADS (Bruno 01/09/2026) =====
+// A pessoa escolhe o período (ou tudo) e quem entra ou não — e baixa a lista
+// pronta no formato do DISCADOR (number;info_1;info_2;info_3;schedule), no
+// formato de DISPARO (numero;nome;primeiro nome) ou vira planilha Google.
+var GL_ETAPAS_ENTRADA = ['base ia', 'base geral', 'base', 'em qualificacao', 'nutricao'];
+function _glEtapaEntrada(etapa) {
+  var e = v2norm(etapa || '');
+  if (!e) return true;   // na Clint sem etapa = ninguém mexeu
+  for (var i = 0; i < GL_ETAPAS_ENTRADA.length; i++) {
+    if (e.indexOf(GL_ETAPAS_ENTRADA[i]) === 0) return true;
+  }
+  return false;
+}
+function _glTeste(l) {
+  var j = (String(l.nome || '') + ' ' + String(l.insta || '')).toLowerCase();
+  if (j.indexOf('teste') !== -1) return true;
+  var d = String(l.tel || '').replace(/\D/g, '').slice(-8);
+  if (d.length < 8) return true;
+  var dif = {}; for (var i = 0; i < d.length; i++) dif[d.charAt(i)] = 1;
+  return Object.keys(dif).length <= 2;
+}
+function _glTelBR(tel) {
+  var d = String(tel || '').replace(/\D/g, '');
+  if (d.indexOf('55') === 0 && d.length >= 12) d = d.slice(2);
+  if (d.length === 10 && '6789'.indexOf(d.charAt(2)) !== -1) d = d.slice(0, 2) + '9' + d.slice(2);
+  return (d.length === 11 && d.charAt(2) === '9') ? d : '';
+}
+function _glInvCurto(inv) {
+  return String(inv || '').replace(/\s*\(.*\)/, '').replace(/De R\$/i, 'R$').replace(/ a R\$/i, '-').replace(/\/m[êe]s/i, '').trim();
+}
+function glFiltrar() {
+  var g = function(id){ var el = document.getElementById(id); return el ? el : null; };
+  var per = g('gl-per') ? g('gl-per').value : 'tudo';
+  var d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  var dia = 86400000, ini = null, fim = null;
+  if (per === 'hoje') ini = d0.getTime();
+  else if (per === '7d') ini = d0.getTime() - 6 * dia;
+  else if (per === '30d') ini = d0.getTime() - 29 * dia;
+  else if (per === 'mes') ini = new Date(d0.getFullYear(), d0.getMonth(), 1).getTime();
+  else if (per === 'mespassado') { ini = new Date(d0.getFullYear(), d0.getMonth() - 1, 1).getTime(); fim = new Date(d0.getFullYear(), d0.getMonth(), 1).getTime(); }
+  else if (per === 'esc') {
+    var de = g('gl-de') ? g('gl-de').value : '', ate = g('gl-ate') ? g('gl-ate').value : '';
+    if (de) { var p1 = de.split('-'); ini = new Date(+p1[0], +p1[1] - 1, +p1[2]).getTime(); }
+    if (ate) { var p2 = ate.split('-'); fim = new Date(+p2[0], +p2[1] - 1, +p2[2]).getTime() + dia; }
+  }
+  var notas = {};
+  ['A', 'B', 'C', 'D'].forEach(function(k){ var el = g('gl-n' + k); if (el && el.checked) notas[k] = 1; });
+  var tirarReuniao = g('gl-semreuniao') && g('gl-semreuniao').checked;
+  var tirarClint = g('gl-semclint') && g('gl-semclint').checked;
+  var org = g('gl-origem') ? g('gl-origem').value : 'todas';
+  var vistosT8 = {};
+  var out = [];
+  (LD.rows || []).forEach(function(l) {
+    if (!l.tel8 || vistosT8[l.tel8]) return;
+    if (l.date) { var t = l.date.getTime(); if (ini !== null && t < ini) return; if (fim !== null && t >= fim) return; }
+    else if (ini !== null) return;
+    var cl = classeDoLead(l);
+    if (!cl || !notas[cl.classe]) return;
+    if (_glTeste(l)) return;
+    var ehPago = /\[ads\]|\bads\b|paid/i.test(String(l.origem || '') + ' ' + String(l.fonte || ''));
+    if (org === 'pago' && !ehPago) return;
+    if (org === 'organico' && ehPago) return;
+    if (tirarReuniao) {
+      try { if (_ldIdx && _ldIdx[l.tel8]) return; } catch (e) {}
+    }
+    if (tirarClint) {
+      try {
+        var ci = clintInfoDe(l);
+        if (ci && ci.etapa && !_glEtapaEntrada(ci.etapa)) return;   // etapa trabalhada = já em atendimento
+      } catch (e2) {}
+    }
+    vistosT8[l.tel8] = 1;
+    out.push({ l: l, nota: cl.classe, pontos: cl.nota });
+  });
+  out.sort(function(a, b){ return b.pontos - a.pontos; });
+  return out;
+}
+function glConta() {
+  var el = document.getElementById('gl-conta');
+  if (!el) return;
+  el.textContent = '👥 ' + glFiltrar().length + ' pessoas entram na lista';
+}
+function _glDownload(nomeArq, conteudo) {
+  var blob = new Blob(["﻿" + conteudo], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nomeArq;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 4000);
+}
+function glBaixarDiscador() {
+  var lista = glFiltrar(), linhas = [], fora = 0;
+  lista.forEach(function(x) {
+    var d = _glTelBR(x.l.tel);
+    if (!d) { fora++; return; }
+    var insta = String(x.l.insta || '').replace(/^@+/, '');
+    linhas.push(d + ';' + String(x.l.nome || '').replace(/;/g, ' ').slice(0, 40)
+      + ';' + ('Nota ' + x.nota + ' - ' + _glInvCurto(x.l.invest)).replace(/;/g, ' ').slice(0, 40)
+      + ';' + (insta ? '@' + insta.replace(/;/g, ' ').slice(0, 38) : '') + ';');
+  });
+  if (!linhas.length) { avisoRapido('Nenhum telefone válido com esses filtros.'); return; }
+  _glDownload('lista-discador.csv', 'number;info_1;info_2;info_3;schedule\n' + linhas.join('\n') + '\n');
+  avisoRapido('📞 ' + linhas.length + ' leads no arquivo do discador' + (fora ? ' (' + fora + ' ficaram fora: telefone fora do padrão BR)' : ''));
+}
+function glBaixarDisparo() {
+  var lista = glFiltrar(), linhas = [], fora = 0;
+  lista.forEach(function(x) {
+    var d = _glTelBR(x.l.tel);
+    if (!d) { fora++; return; }
+    var nome = String(x.l.nome || '').replace(/;/g, ' ').trim();
+    linhas.push('55' + d + ';' + nome.slice(0, 50) + ';' + (nome.split(/\s+/)[0] || ''));
+  });
+  if (!linhas.length) { avisoRapido('Nenhum telefone válido com esses filtros.'); return; }
+  _glDownload('lista-disparo.csv', 'numero;nome;primeiro_nome\n' + linhas.join('\n') + '\n');
+  avisoRapido('💬 ' + linhas.length + ' leads no arquivo de disparo' + (fora ? ' (' + fora + ' fora do padrão BR)' : ''));
+}
+function glPlanilha(bt) {
+  var lista = glFiltrar();
+  if (!lista.length) { avisoRapido('Nenhum lead com esses filtros.'); return; }
+  if (bt) { bt.textContent = '⏳ criando…'; bt.style.pointerEvents = 'none'; }
+  var linhas = lista.map(function(x) {
+    var ci = null; try { ci = clintInfoDe(x.l); } catch (e) {}
+    return [x.l.nome || '', x.l.tel || '', x.l.insta ? '@' + String(x.l.insta).replace(/^@+/, '') : '',
+      x.nota, x.pontos, x.l.invest || '', x.l.seg || '', x.l.dataTxt ? String(x.l.dataTxt).slice(0, 10) : '',
+      x.l.origem || '', ci ? ((ci.etapa || 'na Clint') + (ci.dono ? ' · ' + ci.dono : '')) : 'Fora da Clint'];
+  });
+  gasPedir({ action: 'criarPlanilhaLista', titulo: 'Lista de leads do dash — ' + new Date().toLocaleDateString('pt-BR'),
+    cabecalho: ['Nome', 'WhatsApp', 'Instagram', 'Nota', 'Pontos', 'Quanto pode investir', 'Seguidores', 'Preencheu em', 'Origem', 'Situação na Clint'],
+    linhas: linhas }, function(d) {
+    if (bt) { bt.textContent = '📊 Planilha Google'; bt.style.pointerEvents = ''; }
+    if (d && d.success && d.url) { avisoRapido('📊 Planilha criada com ' + lista.length + ' leads!'); window.open(d.url, '_blank'); }
+    else avisoRapido('⚠️ Não consegui criar: ' + ((d && d.error) || 'sem resposta do robô'));
+  }, 300000);
+}
+function abrirGerarLista() {
+  if (soOlhar()) { alert('O Visitante não baixa listas.'); return; }
+  var cp = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:8px;';
+  var cb = function(id, rot, marcado) {
+    return '<label style="display:flex;align-items:center;gap:7px;font-size:.8rem;cursor:pointer;">'
+      + '<input type="checkbox" id="' + id + '"' + (marcado ? ' checked' : '') + ' onchange="glConta()">' + rot + '</label>';
+  };
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 330;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(460px,94vw);padding:20px;max-height:90vh;overflow-y:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">📤</span><b style="flex:1;">Gerar lista de leads</b>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:12px;">Escolha o período e quem entra — o arquivo sai pronto para o discador ou para disparo.</div>'
+    + '<label class="hint">Período (quando o lead preencheu)</label>'
+    + '<select id="gl-per" style="' + cp + 'width:100%;margin:3px 0 8px;" onchange="document.getElementById(\'gl-datas\').style.display=this.value===\'esc\'?\'flex\':\'none\';glConta();">'
+    + '<option value="tudo">Tudo (a base inteira)</option><option value="hoje">Hoje</option><option value="7d">Últimos 7 dias</option>'
+    + '<option value="30d">Últimos 30 dias</option><option value="mes">Este mês</option><option value="mespassado">Mês passado</option><option value="esc">Escolher datas…</option></select>'
+    + '<div id="gl-datas" style="display:none;gap:8px;align-items:center;margin-bottom:8px;">'
+    + '<input type="date" id="gl-de" style="' + cp + '" onchange="glConta()"><span class="hint">até</span><input type="date" id="gl-ate" style="' + cp + '" onchange="glConta()"></div>'
+    + '<label class="hint">Notas que entram</label>'
+    + '<div style="display:flex;gap:14px;margin:4px 0 10px;flex-wrap:wrap;">' + cb('gl-nA', '🥇 A', true) + cb('gl-nB', '🥈 B', true) + cb('gl-nC', 'C', false) + cb('gl-nD', 'D', false) + '</div>'
+    + '<label class="hint">Tirar da lista</label>'
+    + '<div style="display:flex;flex-direction:column;gap:6px;margin:4px 0 10px;">'
+    + cb('gl-semreuniao', 'Quem já agendou reunião ou comprou', true)
+    + cb('gl-semclint', 'Quem já está em atendimento na Clint (etapa trabalhada)', true)
+    + '</div>'
+    + '<label class="hint">Origem</label>'
+    + '<select id="gl-origem" style="' + cp + 'width:100%;margin:3px 0 12px;" onchange="glConta()">'
+    + '<option value="todas">Todas</option><option value="organico">Só orgânico</option><option value="pago">Só anúncio pago</option></select>'
+    + '<div id="gl-conta" style="font-weight:800;color:#f6a350;margin-bottom:12px;">…</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<button class="btn primary" style="flex:1;" onclick="glBaixarDiscador()">📞 Discador</button>'
+    + '<button class="btn primary" style="flex:1;" onclick="glBaixarDisparo()">💬 Disparo</button>'
+    + '<button class="btn" style="flex:1;" onclick="glPlanilha(this)">📊 Planilha Google</button>'
+    + '</div>'
+    + '<div class="hint" style="margin-top:10px;">Cadastros de teste e telefones repetidos saem sozinhos. Discador: DDD+número, sem o 55. Disparo: com o 55, com nome e primeiro nome para personalizar a mensagem.</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  glConta();
+}
 function _ldDeISO(s){ var p = String(s || '').split('-'); return p.length === 3 ? new Date(+p[0], +p[1]-1, +p[2]) : null; }
 function aplicarDatasLeads() {
   var a = _ldDeISO(document.getElementById('ld-dt-ini').value);
