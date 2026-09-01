@@ -1477,5 +1477,110 @@ function avisarPaiDados() {
   }
 })();
 </script>
+
+<!-- ===== 📆 CALENDÁRIO (Bruno 01/09/2026): os campos de data abrem um calendário
+     ao clicar — sem digitação — e o ANO vem antes do mês (bom para nascimento) ===== -->
+<style>
+input[type="date"] { cursor:pointer; caret-color:transparent; }
+input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
+#cal-pop { position:fixed; z-index:99999; display:none; background:#151530; border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:12px; width:262px; box-shadow:0 14px 44px rgba(0,0,0,.6); color:var(--text,#eef0ff); }
+#cal-pop .cal-top { display:flex; gap:6px; margin-bottom:8px; }
+#cal-pop select { flex:1; background:#0e0e20; color:inherit; border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:5px 4px; font-size:.8rem; font-family:inherit; }
+#cal-pop .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center; }
+#cal-pop .cal-sem { color:var(--muted,#6a6c90); font-size:.62rem; padding:2px 0; font-weight:700; }
+#cal-pop .cal-d { border:none; background:transparent; color:inherit; border-radius:8px; padding:6px 0; cursor:pointer; font-size:.78rem; font-family:inherit; }
+#cal-pop .cal-d:hover { background:rgba(108,99,255,.3); }
+#cal-pop .cal-d.cal-hoje { box-shadow:inset 0 0 0 1px rgba(108,99,255,.7); }
+#cal-pop .cal-d.cal-sel { background:var(--primary,#6C63FF); color:#fff; font-weight:800; }
+#cal-pop .cal-pe { display:flex; gap:6px; margin-top:8px; }
+#cal-pop .cal-pe button { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:inherit; border-radius:8px; padding:6px 0; cursor:pointer; font-size:.74rem; font-family:inherit; }
+#cal-pop .cal-pe button:hover { background:rgba(108,99,255,.25); }
+</style>
+<script>
+(function () {
+  var alvo = null, vAno = 0, vMes = 0, pop = null;
+  var SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  function ehData(el) { return el && el.tagName === 'INPUT' && el.type === 'date'; }
+  function valorAtual() {
+    var v = String((alvo && alvo.value) || '').trim();
+    var m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+  }
+  function desenhar() {
+    var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    var sel = valorAtual();
+    var anos = [];
+    for (var a = 1930; a <= hoje.getFullYear() + 2; a++) anos.push(a);
+    var h = '<div class="cal-top">'
+      + '<select id="cal-ano">' + anos.map(function (a) { return '<option value="' + a + '"' + (a === vAno ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select>'
+      + '<select id="cal-mes">' + MESES.map(function (m, i) { return '<option value="' + i + '"' + (i === vMes ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select>'
+      + '</div><div class="cal-grid">'
+      + SEMANA.map(function (s) { return '<span class="cal-sem">' + s + '</span>'; }).join('');
+    var prim = new Date(vAno, vMes, 1).getDay();
+    var dias = new Date(vAno, vMes + 1, 0).getDate();
+    for (var b = 0; b < prim; b++) h += '<span></span>';
+    var selT = sel ? new Date(sel.getFullYear(), sel.getMonth(), sel.getDate()).getTime() : null;
+    for (var d = 1; d <= dias; d++) {
+      var t = new Date(vAno, vMes, d).getTime();
+      var cls = 'cal-d' + (t === hoje.getTime() ? ' cal-hoje' : '') + (selT === t ? ' cal-sel' : '');
+      h += '<button type="button" class="' + cls + '" data-d="' + d + '">' + d + '</button>';
+    }
+    h += '</div><div class="cal-pe"><button type="button" id="cal-bhoje">Hoje</button><button type="button" id="cal-blimpa">Limpar</button></div>';
+    pop.innerHTML = h;
+    pop.querySelector('#cal-ano').onchange = function () { vAno = +this.value; desenhar(); };
+    pop.querySelector('#cal-mes').onchange = function () { vMes = +this.value; desenhar(); };
+    pop.querySelector('#cal-bhoje').onclick = function () { var n = new Date(); escolher(n.getFullYear(), n.getMonth(), n.getDate()); };
+    pop.querySelector('#cal-blimpa').onclick = function () { if (alvo) { alvo.value = ''; avisar(); } fechar(); };
+  }
+  function escolher(a, m, d) {
+    if (!alvo) return;
+    alvo.value = a + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + d).slice(-2);
+    avisar();
+    fechar();
+  }
+  function avisar() {
+    try { alvo.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+    try { alvo.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+  }
+  function abrir(el) {
+    alvo = el;
+    el.readOnly = true;   // trava o teclado (vale também para o celular)
+    var v = valorAtual();
+    // nascimento sem valor: começa em 1990 para a pessoa só ajustar o ano
+    if (!v && el.id === 'c-nasc') v = new Date(1990, 0, 1);
+    if (!v) v = new Date();
+    vAno = v.getFullYear(); vMes = v.getMonth();
+    if (!pop) {
+      pop = document.createElement('div'); pop.id = 'cal-pop'; document.body.appendChild(pop);
+      pop.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('[data-d]') : null;
+        if (b) escolher(vAno, vMes, +b.getAttribute('data-d'));
+      });
+    }
+    desenhar();
+    pop.style.display = 'block';
+    var r = el.getBoundingClientRect();
+    var alt = pop.offsetHeight, larg = pop.offsetWidth;
+    var x = Math.max(8, Math.min(r.left, window.innerWidth - larg - 8));
+    var y = (r.bottom + alt + 8 > window.innerHeight && r.top - alt - 8 > 0) ? r.top - alt - 6 : r.bottom + 6;
+    pop.style.left = x + 'px'; pop.style.top = Math.max(8, y) + 'px';
+  }
+  function fechar() { if (pop) pop.style.display = 'none'; }
+  document.addEventListener('mousedown', function (e) {
+    if (pop && pop.style.display === 'block' && !pop.contains(e.target) && !ehData(e.target)) fechar();
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (ehData(e.target)) { e.preventDefault(); abrir(e.target); }
+  }, true);
+  document.addEventListener('focusin', function (e) {
+    if (ehData(e.target)) { e.target.readOnly = true; abrir(e.target); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { fechar(); return; }
+    if (ehData(e.target) && e.key !== 'Tab') e.preventDefault();
+  }, true);
+})();
+</script>
 </body>
 </html>

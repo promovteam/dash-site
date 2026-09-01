@@ -1109,6 +1109,7 @@ img { max-width:100%; height:auto; }
         <button class="chart-chip" data-p="tudo" onclick="mudarPeriodoLeads('tudo', this)">Tudo</button>
         <button class="chart-chip" id="ld-chip-datas" onclick="abrirDatasLeads()" title="Escolher um período de datas">📅 Datas…</button>
         <button class="chart-chip" id="ld-chip-gerar" onclick="abrirGerarLista()" title="Montar uma lista de leads para o discador ou para disparo, com filtros" style="border-color:rgba(246,163,80,.5);color:#f6a350;">📤 Gerar lista</button>
+        <button class="chart-chip" id="ld-chip-ajuda" onclick="abrirAjudaNotas()" title="O que significa cada nota de lead">?</button>
       </div>
       <div id="ld-datas" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.05);padding:8px 12px;border-radius:12px;">
         <span class="hint" style="margin:0;">de</span>
@@ -2217,7 +2218,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-01-1202';
+var VERSAO_DASH = '2026-09-01-1436';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9091,6 +9092,38 @@ function _glEtapaEntrada(etapa) {
   }
   return false;
 }
+// conta quantas pessoas da base estão em cada etapa da Clint (para a janelinha
+// do Gerar lista mostrar as etapas e deixar escolher quais saem — Bruno 01/09/2026)
+function _glEtapas() {
+  var m = {}, vistos = {};
+  (LD.rows || []).forEach(function(l) {
+    if (!l.tel8 || vistos[l.tel8]) return;
+    vistos[l.tel8] = 1;
+    var ci = null; try { ci = clintInfoDe(l); } catch (e) {}
+    if (!ci || !ci.etapa) return;
+    var k = v2norm(ci.etapa);
+    if (!m[k]) m[k] = { nome: ci.etapa, n: 0 };
+    m[k].n++;
+  });
+  return Object.keys(m).map(function(k) {
+    return { chave: k, nome: m[k].nome, n: m[k].n, trabalhada: !_glEtapaEntrada(m[k].nome) };
+  }).sort(function(a, b){ return b.n - a.n; });
+}
+function glEtapasMontar() {
+  var box = document.getElementById('gl-etapas');
+  if (!box) return;
+  var ets = _glEtapas();
+  if (!ets.length) {
+    box.innerHTML = '<span class="hint">A Clint ainda está carregando — abra esta janelinha de novo daqui a pouco para escolher as etapas.</span>';
+    return;
+  }
+  box.innerHTML = ets.map(function(e) {
+    return '<label style="display:flex;align-items:center;gap:7px;font-size:.76rem;cursor:pointer;">'
+      + '<input type="checkbox" data-et="' + e.chave + '"' + (e.trabalhada ? ' checked' : '') + ' onchange="glConta()">'
+      + '<span style="flex:1;">' + e.nome + (e.trabalhada ? '' : ' <span class="hint" style="font-size:.62rem;">(etapa de entrada)</span>') + '</span>'
+      + '<span class="hint">' + e.n + '</span></label>';
+  }).join('');
+}
 function _glTeste(l) {
   var j = (String(l.nome || '') + ' ' + String(l.insta || '')).toLowerCase();
   if (j.indexOf('teste') !== -1) return true;
@@ -9116,6 +9149,7 @@ function glFiltrar() {
   if (per === 'hoje') ini = d0.getTime();
   else if (per === '7d') ini = d0.getTime() - 6 * dia;
   else if (per === '30d') ini = d0.getTime() - 29 * dia;
+  else if (per === '60d') ini = d0.getTime() - 59 * dia;
   else if (per === 'mes') ini = new Date(d0.getFullYear(), d0.getMonth(), 1).getTime();
   else if (per === 'mespassado') { ini = new Date(d0.getFullYear(), d0.getMonth() - 1, 1).getTime(); fim = new Date(d0.getFullYear(), d0.getMonth(), 1).getTime(); }
   else if (per === 'esc') {
@@ -9125,8 +9159,14 @@ function glFiltrar() {
   }
   var notas = {};
   ['A', 'B', 'C', 'D'].forEach(function(k){ var el = g('gl-n' + k); if (el && el.checked) notas[k] = 1; });
+  var comIncompletos = g('gl-incompletos') && g('gl-incompletos').checked;
   var tirarReuniao = g('gl-semreuniao') && g('gl-semreuniao').checked;
-  var tirarClint = g('gl-semclint') && g('gl-semclint').checked;
+  // etapas da Clint marcadas = essas pessoas saem da lista
+  var etTirar = {}, temEtapas = false;
+  document.querySelectorAll('#gl-etapas input[data-et]').forEach(function(c) {
+    temEtapas = true;
+    if (c.checked) etTirar[c.getAttribute('data-et')] = 1;
+  });
   var org = g('gl-origem') ? g('gl-origem').value : 'todas';
   var vistosT8 = {};
   var out = [];
@@ -9135,7 +9175,8 @@ function glFiltrar() {
     if (l.date) { var t = l.date.getTime(); if (ini !== null && t < ini) return; if (fim !== null && t >= fim) return; }
     else if (ini !== null) return;
     var cl = classeDoLead(l);
-    if (!cl || !notas[cl.classe]) return;
+    if (!cl) { if (!comIncompletos) return; }          // sem pesquisa completa: só entra se a pessoa pediu
+    else if (!notas[cl.classe]) return;
     if (_glTeste(l)) return;
     var ehPago = /\[ads\]|\bads\b|paid/i.test(String(l.origem || '') + ' ' + String(l.fonte || ''));
     if (org === 'pago' && !ehPago) return;
@@ -9143,14 +9184,14 @@ function glFiltrar() {
     if (tirarReuniao) {
       try { if (_ldIdx && _ldIdx[l.tel8]) return; } catch (e) {}
     }
-    if (tirarClint) {
+    if (temEtapas) {
       try {
         var ci = clintInfoDe(l);
-        if (ci && ci.etapa && !_glEtapaEntrada(ci.etapa)) return;   // etapa trabalhada = já em atendimento
+        if (ci && ci.etapa && etTirar[v2norm(ci.etapa)]) return;   // está numa etapa marcada = sai
       } catch (e2) {}
     }
     vistosT8[l.tel8] = 1;
-    out.push({ l: l, nota: cl.classe, pontos: cl.nota });
+    out.push({ l: l, nota: cl ? cl.classe : '—', pontos: cl ? cl.nota : 0 });
   });
   out.sort(function(a, b){ return b.pontos - a.pontos; });
   return out;
@@ -9174,8 +9215,9 @@ function glBaixarDiscador() {
     var d = _glTelBR(x.l.tel);
     if (!d) { fora++; return; }
     var insta = String(x.l.insta || '').replace(/^@+/, '');
+    var info2 = x.nota === '—' ? 'Nao terminou a pesquisa' : ('Nota ' + x.nota + ' - ' + _glInvCurto(x.l.invest));
     linhas.push(d + ';' + String(x.l.nome || '').replace(/;/g, ' ').slice(0, 40)
-      + ';' + ('Nota ' + x.nota + ' - ' + _glInvCurto(x.l.invest)).replace(/;/g, ' ').slice(0, 40)
+      + ';' + info2.replace(/;/g, ' ').slice(0, 40)
       + ';' + (insta ? '@' + insta.replace(/;/g, ' ').slice(0, 38) : '') + ';');
   });
   if (!linhas.length) { avisoRapido('Nenhum telefone válido com esses filtros.'); return; }
@@ -9230,16 +9272,18 @@ function abrirGerarLista() {
     + '<label class="hint">Período (quando o lead preencheu)</label>'
     + '<select id="gl-per" style="' + cp + 'width:100%;margin:3px 0 8px;" onchange="document.getElementById(\'gl-datas\').style.display=this.value===\'esc\'?\'flex\':\'none\';glConta();">'
     + '<option value="tudo">Tudo (a base inteira)</option><option value="hoje">Hoje</option><option value="7d">Últimos 7 dias</option>'
-    + '<option value="30d">Últimos 30 dias</option><option value="mes">Este mês</option><option value="mespassado">Mês passado</option><option value="esc">Escolher datas…</option></select>'
+    + '<option value="30d">Últimos 30 dias</option><option value="60d">Últimos 60 dias</option><option value="mes">Este mês</option><option value="mespassado">Mês passado</option><option value="esc">Escolher datas…</option></select>'
     + '<div id="gl-datas" style="display:none;gap:8px;align-items:center;margin-bottom:8px;">'
     + '<input type="date" id="gl-de" style="' + cp + '" onchange="glConta()"><span class="hint">até</span><input type="date" id="gl-ate" style="' + cp + '" onchange="glConta()"></div>'
     + '<label class="hint">Notas que entram</label>'
-    + '<div style="display:flex;gap:14px;margin:4px 0 10px;flex-wrap:wrap;">' + cb('gl-nA', '🥇 A', true) + cb('gl-nB', '🥈 B', true) + cb('gl-nC', 'C', false) + cb('gl-nD', 'D', false) + '</div>'
+    + '<div style="display:flex;gap:14px;margin:4px 0 6px;flex-wrap:wrap;">' + cb('gl-nA', '🥇 A', true) + cb('gl-nB', '🥈 B', true) + cb('gl-nC', 'C', false) + cb('gl-nD', 'D', false) + '</div>'
+    + '<div style="margin:0 0 10px;">' + cb('gl-incompletos', '🟠 Incluir também quem não terminou de preencher a pesquisa (fica sem nota)', false) + '</div>'
     + '<label class="hint">Tirar da lista</label>'
     + '<div style="display:flex;flex-direction:column;gap:6px;margin:4px 0 10px;">'
     + cb('gl-semreuniao', 'Quem já agendou reunião ou comprou', true)
-    + cb('gl-semclint', 'Quem já está em atendimento na Clint (etapa trabalhada)', true)
     + '</div>'
+    + '<div class="hint" style="margin-bottom:3px;">Quem está nestas etapas da Clint sai da lista <span style="opacity:.75;">(desmarque uma etapa para deixar essas pessoas entrarem)</span>:</div>'
+    + '<div id="gl-etapas" style="display:flex;flex-direction:column;gap:4px;margin:0 0 10px;max-height:160px;overflow-y:auto;padding:7px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:9px;"></div>'
     + '<label class="hint">Origem</label>'
     + '<select id="gl-origem" style="' + cp + 'width:100%;margin:3px 0 12px;" onchange="glConta()">'
     + '<option value="todas">Todas</option><option value="organico">Só orgânico</option><option value="pago">Só anúncio pago</option></select>'
@@ -9252,7 +9296,49 @@ function abrirGerarLista() {
     + '<div class="hint" style="margin-top:10px;">Cadastros de teste e telefones repetidos saem sozinhos. Discador: DDD+número, sem o 55. Disparo: com o 55, com nome e primeiro nome para personalizar a mensagem.</div>'
     + '</div>';
   document.body.appendChild(ov);
+  glEtapasMontar();
   glConta();
+}
+// ===== ？O QUE É CADA NOTA DE LEAD (Bruno 01/09/2026) =====
+function abrirAjudaNotas() {
+  // taxa de fechamento real de cada nota, medida na própria base
+  var taxas = {};
+  try {
+    var umComNota = (LD.rows || []).filter(function(l){ return classeDoLead(l); })[0];
+    if (umComNota) { fechamentoHistorico(umComNota); taxas = _fechPorClasse || {}; }
+  } catch (e) {}
+  var linha = function(k, faixa, oQue) {
+    var i = CLASSES_LEAD[k];
+    var tx = taxas[k] != null ? '<span style="white-space:nowrap;color:' + i.cor + ';font-weight:800;">fecha ' + taxas[k] + '%</span>' : '';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-radius:11px;background:' + i.cor + '14;border:1px solid ' + i.cor + '40;">'
+      + '<span style="background:' + i.cor + '26;color:' + i.cor + ';border:1px solid ' + i.cor + '55;font-weight:900;border-radius:8px;padding:3px 9px;font-size:.8rem;">' + i.rot + '</span>'
+      + '<div style="flex:1;font-size:.78rem;"><b style="color:' + i.cor + ';">' + i.txt + '</b> <span class="hint">· ' + faixa + ' pontos</span><br><span class="hint">' + oQue + '</span></div>'
+      + tx + '</div>';
+  };
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 330;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(500px,94vw);padding:20px;max-height:90vh;overflow-y:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🏅</span><b style="flex:1;">O que é cada nota de lead</b>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:12px;">Quando o lead termina a pesquisa do diagnóstico, o dash dá uma nota de 0 a 100 pelo que ele respondeu. A nota mede o PERFIL da pessoa — não é promessa de venda.</div>'
+    + '<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px;">'
+    + linha('A', '75 ou mais', 'Tem verba boa, tem produto ou negócio rodando e audiência. É o lead para chamar primeiro.')
+    + linha('B', '58 a 74', 'Perfil forte, mas falta um dos pontos (verba, produto ou audiência).')
+    + linha('C', '40 a 57', 'Perfil mediano — vale chamar quando as listas A e B acabarem.')
+    + linha('D', 'abaixo de 40', 'Pouca verba, sem produto ou sem audiência. Chance baixa.')
+    + '</div>'
+    + '<div class="hint" style="margin-bottom:8px;"><b>Como a nota é montada</b> (soma até 100):</div>'
+    + '<div style="display:flex;flex-direction:column;gap:5px;font-size:.76rem;margin-bottom:14px;">'
+    + '<div>💰 <b>Quanto pode investir</b> — vale até <b>45</b> (é o que mais pesa)</div>'
+    + '<div>📦 <b>Tem produto ou negócio rodando</b> — vale até <b>35</b></div>'
+    + '<div>👥 <b>Tamanho da audiência</b> — vale até <b>20</b> (o corte que importa é passar de mil seguidores)</div>'
+    + '</div>'
+    + '<div class="hint">🟠 Quem <b>começou a pesquisa e não terminou</b> fica <b>sem nota</b> — não dá para medir o perfil. Esses aparecem no aviso laranja "para levar para a Clint" e podem entrar na lista do 📤 Gerar lista marcando a opção de incluir quem não terminou.</div>'
+    + '<div class="hint" style="margin-top:8px;">A porcentagem "fecha X%" ao lado de cada nota é medida na nossa própria base: de todos os leads daquela nota que fizeram reunião, quantos compraram.</div>'
+    + '</div>';
+  document.body.appendChild(ov);
 }
 function _ldDeISO(s){ var p = String(s || '').split('-'); return p.length === 3 ? new Date(+p[0], +p[1]-1, +p[2]) : null; }
 function aplicarDatasLeads() {
@@ -14229,6 +14315,117 @@ setTimeout(carregarBloqueios, 2500);
 _cadaTanto(carregarBloqueios, 300000);
 // código todo carregado: tira a tela de espera (a de login aparece por cima se precisar)
 try { var _bs = document.getElementById('boot-splash'); if (_bs) _bs.remove(); } catch (e) {}
+</script>
+
+<!-- ===== 📆 CALENDÁRIO ÚNICO (Bruno 01/09/2026): todo campo de data abre este
+     calendário ao clicar — a digitação fica travada — e o ANO vem antes do mês ===== -->
+<style>
+input[type="date"], #ag-data { cursor:pointer; caret-color:transparent; }
+input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
+#cal-pop { position:fixed; z-index:99999; display:none; background:#1c212b; border:1px solid rgba(255,255,255,.16); border-radius:14px; padding:12px; width:262px; box-shadow:0 14px 44px rgba(0,0,0,.6); color:var(--text,#e8ecf3); }
+#cal-pop .cal-top { display:flex; gap:6px; margin-bottom:8px; }
+#cal-pop select { flex:1; background:#242a36; color:inherit; border:1px solid rgba(255,255,255,.16); border-radius:8px; padding:5px 4px; font-size:.76rem; font-family:inherit; }
+#cal-pop .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center; }
+#cal-pop .cal-sem { color:#8b93a7; font-size:.6rem; padding:2px 0; font-weight:700; }
+#cal-pop .cal-d { border:none; background:transparent; color:inherit; border-radius:8px; padding:6px 0; cursor:pointer; font-size:.75rem; font-family:inherit; }
+#cal-pop .cal-d:hover { background:rgba(110,168,255,.28); }
+#cal-pop .cal-d.cal-hoje { box-shadow:inset 0 0 0 1px rgba(110,168,255,.65); }
+#cal-pop .cal-d.cal-sel { background:#6ea8ff; color:#10131a; font-weight:800; }
+#cal-pop .cal-d.cal-trava { opacity:.22; cursor:default; }
+#cal-pop .cal-pe { display:flex; gap:6px; margin-top:8px; }
+#cal-pop .cal-pe button { flex:1; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:inherit; border-radius:8px; padding:6px 0; cursor:pointer; font-size:.72rem; font-family:inherit; }
+#cal-pop .cal-pe button:hover { background:rgba(110,168,255,.2); }
+</style>
+<script>
+(function () {
+  var alvo = null, vAno = 0, vMes = 0, pop = null;
+  var SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  function ehData(el) { return el && el.tagName === 'INPUT' && (el.type === 'date' || el.id === 'ag-data'); }
+  function valorAtual() {
+    var v = String((alvo && alvo.value) || '').trim(), m;
+    if ((m = v.match(/^(\d{4})-(\d{2})-(\d{2})/))) return new Date(+m[1], +m[2] - 1, +m[3]);
+    if ((m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return new Date(+m[3], +m[2] - 1, +m[1]);
+    return null;
+  }
+  function limite(qual) {   // respeita min/max se o campo tiver
+    var v = alvo && alvo.getAttribute ? (alvo.getAttribute(qual) || '') : '';
+    var m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]).getTime() : null;
+  }
+  function desenhar() {
+    var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    var sel = valorAtual();
+    var iMin = limite('min'), iMax = limite('max');
+    var anos = [];
+    var a0 = Math.min(vAno, hoje.getFullYear() - 6), a1 = Math.max(vAno, hoje.getFullYear() + 3);
+    for (var a = a0; a <= a1; a++) anos.push(a);
+    // o ANO vem primeiro, depois o mês (pedido do Bruno)
+    var h = '<div class="cal-top">'
+      + '<select id="cal-ano">' + anos.map(function (a) { return '<option value="' + a + '"' + (a === vAno ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select>'
+      + '<select id="cal-mes">' + MESES.map(function (m, i) { return '<option value="' + i + '"' + (i === vMes ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select>'
+      + '</div><div class="cal-grid">'
+      + SEMANA.map(function (s) { return '<span class="cal-sem">' + s + '</span>'; }).join('');
+    var prim = new Date(vAno, vMes, 1).getDay();
+    var dias = new Date(vAno, vMes + 1, 0).getDate();
+    for (var b = 0; b < prim; b++) h += '<span></span>';
+    var selT = sel ? new Date(sel.getFullYear(), sel.getMonth(), sel.getDate()).getTime() : null;
+    for (var d = 1; d <= dias; d++) {
+      var t = new Date(vAno, vMes, d).getTime();
+      var trava = (iMin !== null && t < iMin) || (iMax !== null && t > iMax);
+      var cls = 'cal-d' + (t === hoje.getTime() ? ' cal-hoje' : '') + (selT === t ? ' cal-sel' : '') + (trava ? ' cal-trava' : '');
+      h += '<button type="button" class="' + cls + '"' + (trava ? '' : ' data-d="' + d + '"') + '>' + d + '</button>';
+    }
+    h += '</div><div class="cal-pe"><button type="button" id="cal-bhoje">Hoje</button><button type="button" id="cal-blimpa">Limpar</button></div>';
+    pop.innerHTML = h;
+    pop.querySelector('#cal-ano').onchange = function () { vAno = +this.value; desenhar(); };
+    pop.querySelector('#cal-mes').onchange = function () { vMes = +this.value; desenhar(); };
+    pop.querySelector('#cal-bhoje').onclick = function () { var n = new Date(); escolher(n.getFullYear(), n.getMonth(), n.getDate()); };
+    pop.querySelector('#cal-blimpa').onclick = function () { if (alvo) { alvo.value = ''; avisar(); } fechar(); };
+  }
+  function escolher(a, m, d) {
+    if (!alvo) return;
+    var dd = ('0' + d).slice(-2), mm = ('0' + (m + 1)).slice(-2);
+    alvo.value = (alvo.type === 'date') ? (a + '-' + mm + '-' + dd) : (dd + '/' + mm + '/' + a);
+    avisar();
+    fechar();
+  }
+  function avisar() { try { alvo.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {} }
+  function abrir(el) {
+    alvo = el;
+    el.readOnly = true;   // trava o teclado (vale também para o celular)
+    var v = valorAtual() || new Date();
+    vAno = v.getFullYear(); vMes = v.getMonth();
+    if (!pop) {
+      pop = document.createElement('div'); pop.id = 'cal-pop'; document.body.appendChild(pop);
+      pop.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('[data-d]') : null;
+        if (b) escolher(vAno, vMes, +b.getAttribute('data-d'));
+      });
+    }
+    desenhar();
+    pop.style.display = 'block';
+    var r = el.getBoundingClientRect();
+    var alt = pop.offsetHeight, larg = pop.offsetWidth;
+    var x = Math.max(8, Math.min(r.left, window.innerWidth - larg - 8));
+    var y = (r.bottom + alt + 8 > window.innerHeight && r.top - alt - 8 > 0) ? r.top - alt - 6 : r.bottom + 6;
+    pop.style.left = x + 'px'; pop.style.top = Math.max(8, y) + 'px';
+  }
+  function fechar() { if (pop) pop.style.display = 'none'; }
+  document.addEventListener('mousedown', function (e) {
+    if (pop && pop.style.display === 'block' && !pop.contains(e.target) && !ehData(e.target)) fechar();
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (ehData(e.target)) { e.preventDefault(); abrir(e.target); }
+  }, true);
+  document.addEventListener('focusin', function (e) {
+    if (ehData(e.target)) { e.target.readOnly = true; abrir(e.target); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { fechar(); return; }
+    if (ehData(e.target) && e.key !== 'Tab') e.preventDefault();
+  }, true);
+})();
 </script>
 
 </body>
