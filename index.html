@@ -1017,6 +1017,7 @@ img { max-width:100%; height:auto; }
   <div class="brand"><div class="brand-logo">P</div><div class="brand-name">Promov</div>
     <button class="sb-fechar" onclick="fecharSidebar()" title="Fechar menu">✕</button></div>
   <div class="nav-item active" data-s="visao"><span class="nav-icon">📊</span><span class="nav-label">Visão Geral</span></div>
+  <div class="nav-item" data-s="placar"><span class="nav-icon">🏁</span><span class="nav-label">Placar</span></div>
   <div class="nav-item" data-s="agenda"><span class="nav-icon">📅</span><span class="nav-label">Agenda</span></div>
   <div class="nav-item" data-s="leads"><span class="nav-icon">📥</span><span class="nav-label">Leads</span></div>
   <div class="nav-item" data-s="anuncios"><span class="nav-icon">📣</span><span class="nav-label">Criativos</span></div>
@@ -1052,6 +1053,8 @@ img { max-width:100%; height:auto; }
   </section>
 
   <!-- ============ AGENDA (grande, no topo, com tudo do dash anterior) ============ -->
+  <!-- ============ 🏁 PLACAR DO DIA (ranking SDR x closer — Bruno 02/09/2026) ============ -->
+  <section class="screen" id="s-placar"><div id="placar-corpo"><div class="hint" style="padding:30px;text-align:center;">Carregando o placar…</div></div></section>
   <section class="screen" id="s-agenda">
     <div class="panel" style="margin-bottom:16px;padding:28px;">
       <div class="agenda-top">
@@ -1609,7 +1612,7 @@ Instagram: @pr.joaosilva</div>
 
 <script>
 var titulos = {
-  visao:'Visão Geral', agenda:'Agenda', leads:'Leads', pendencias:'Pendências', pesquisa:'Pesquisa',
+  visao:'Visão Geral', placar:'Placar do Dia', agenda:'Agenda', leads:'Leads', pendencias:'Pendências', pesquisa:'Pesquisa',
   pagamentos:'Pagamentos', contratos:'Contratos', registro:'Registro', regras:'Regras', anuncios:'Criativos e Origens'
 };
 // ===== Gráfico com abas: métrica x período =====
@@ -2199,6 +2202,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     // abriu a aba Leads = viu os novos; o aviso da tela inicial zera
     // (espera um pouco para o filtro "só os novos" ainda funcionar nesta visita)
     if (s === 'leads' && typeof marcarLeadsVistos === 'function') setTimeout(marcarLeadsVistos, 2500);
+    if (s === 'placar' && typeof renderPlacar === 'function') renderPlacar();
     if (s === 'anuncios' && typeof renderAnuncios === 'function') renderAnuncios();
     if (s === 'contratos' && typeof renderContratos === 'function') renderContratos();
     // a tela que precisa dos bloqueios os busca na hora (se ainda não vieram)
@@ -2218,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-02-1057';
+var VERSAO_DASH = '2026-09-02-1658';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2415,6 +2419,8 @@ window.__gvizV2 = function(resp) {
     V2.temCarimbo = iCar >= 0;
     V2.carregado = true;
     renderV2();
+    try { if (typeof renderPlacar === 'function' && telaVisivel('s-placar')) renderPlacar(); } catch (ePl) {}
+    try { if (typeof plDetectarNovidades === 'function') plDetectarNovidades(plCalcular(plPeriodo('hoje'))); } catch (ePf) {}   // 🎉 festa em qualquer aba
     carimbarManuais();
     // aba Leads: agora dá para casar lead ↔ venda pelo telefone
     if (typeof LD !== 'undefined' && LD.carregado) renderLeads();
@@ -2688,10 +2694,15 @@ function carimbarManuais() {
   if (!pend.length || pend.length > 25) return; // muitos de uma vez = falta o preenchimento inicial; não mexe
   var stamp = filaStampAgora();
   var agora = Date.now();
+  var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
   pend.forEach(function(r) {
-    r.carimbo = stamp;
-    r.carimboT = agora;
-    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'carimbo', valor: stamp, dataRef: v2dataRef(r), gid: V2_GID });
+    // reuniao que ja aconteceu (ou e de hoje) so ganhou carimbo agora porque foi digitada a mao:
+    // carimba com o DIA DA REUNIAO, senao ela vira "marcada hoje" no placar (caso Jose Clovis 02/09/2026)
+    var st = stamp, t = agora;
+    if (r.date && r.date.getTime() < hoje0.getTime()) { st = v2dataRef(r) + ' 00:00:00'; t = r.date.getTime(); }
+    r.carimbo = st;
+    r.carimboT = t;
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'carimbo', valor: st, dataRef: v2dataRef(r), gid: V2_GID });
   });
 }
 // mantida como apelido: outros trechos ainda chamam atualizarFila()
@@ -4214,6 +4225,8 @@ function renderV2() {
   var hc = v2calc(v2fRows(V2.rows));
   var pj = v2proj(mc.fat);
   var h = '';
+  // 🏁 mini-placar do dia no topo da Visao Geral (Bruno 02/09/2026: "coloca no topo")
+  try { if (typeof plMiniTopo === 'function') h += plMiniTopo(); } catch (eMp) {}
 
   // === HERO ROW ===
   h += '<div class="hero-row">';
@@ -13746,12 +13759,21 @@ try { _marcarPelaUrl(); } catch (e) {}
 function _modoPainelAgenda() {
   var tudo = String(location.search || '') + ' ' + String(location.hash || '');
   var eAgenda = tudo.indexOf('painel=agenda') !== -1, eLead = tudo.indexOf('painel=lead') !== -1;
-  if (!eAgenda && !eLead) return;
+  var ePlacar = tudo.indexOf('painel=placar') !== -1;   // modo TV do placar (Bruno 02/09/2026)
+  if (!eAgenda && !eLead && !ePlacar) return;
   if (!document.getElementById('painel-css')) {
     var st = document.createElement('style');
     st.id = 'painel-css';
     st.textContent = '.sidebar{display:none!important}.topbar{display:none!important}.main{padding:8px 10px!important}body{zoom:.82}.drawer{right:-110%}';
     document.head.appendChild(st);
+  }
+  if (ePlacar) {
+    window.PLACAR = window.PLACAR || {};   // o codigo do placar carrega depois deste: so marca a intencao
+    window.PLACAR.tv = true;
+    document.body.classList.add('placar-tv');
+    var vaiP = function() { var it = document.querySelector('.nav-item[data-s="placar"]'); if (it) it.click(); };
+    setTimeout(vaiP, 350); setTimeout(vaiP, 1800);
+    setInterval(function(){ try { if (V2.carregado) renderPlacar(); } catch (e) {} }, 60000);   // redesenha a cada minuto (a planilha ja e relida sozinha)
   }
   if (eAgenda) {
     var vai = function() {
@@ -14487,6 +14509,654 @@ setTimeout(carregarBloqueios, 2500);
 _cadaTanto(carregarBloqueios, 300000);
 // código todo carregado: tira a tela de espera (a de login aparece por cima se precisar)
 try { var _bs = document.getElementById('boot-splash'); if (_bs) _bs.remove(); } catch (e) {}
+</script>
+
+<!-- ===== 🏁 PLACAR DO DIA (Bruno 02/09/2026): ranking diário/semanal/mensal —
+     SDRs por reuniões marcadas (+ realizadas, vendas geradas, no-show) e closers por
+     vendas (+ realizadas, taxa de fechamento). Modo TV: #painel=placar ===== -->
+<style>
+.pl-topo { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.pl-topo h2 { font-size:1.15rem; margin:0; flex:1; letter-spacing:.5px; }
+.pl-chips { display:flex; gap:6px; flex-wrap:wrap; }
+.pl-chip { border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.05); color:var(--text); border-radius:999px; padding:6px 13px; font-size:.74rem; font-weight:700; cursor:pointer; font-family:inherit; }
+.pl-chip.on { background:#ffd166; color:#151515; border-color:#ffd166; }
+.pl-tv { border:1px solid rgba(110,168,255,.4); background:rgba(110,168,255,.1); color:#6ea8ff; border-radius:999px; padding:6px 12px; font-size:.72rem; font-weight:800; cursor:pointer; text-decoration:none; }
+.pl-resumo { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+.pl-kpi { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px 14px; }
+.pl-kpi small { display:block; font-size:.58rem; letter-spacing:1.5px; font-weight:800; color:var(--muted); margin-bottom:4px; }
+.pl-kpi b { font-size:1.5rem; line-height:1; }
+.pl-kpi i { display:block; font-style:normal; font-size:.66rem; color:var(--muted); margin-top:5px; }
+.pl-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:980px) { .pl-grid { grid-template-columns:1fr; } }
+.pl-col h3 { display:flex; align-items:center; gap:8px; font-size:.86rem; margin:0 0 10px; }
+.pl-col h3 span.pl-sub { font-weight:600; color:var(--muted); font-size:.66rem; }
+.pl-card { position:relative; display:flex; align-items:center; gap:14px; padding:12px 14px 12px 20px; margin-bottom:9px; border-radius:16px; overflow:hidden;
+  background:linear-gradient(105deg,#0d0d1e 0%,#15152e 55%,#1b1b3c 100%); border:1px solid rgba(255,255,255,.07); transition:transform .25s; }
+.pl-card::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(115deg, rgba(255,255,255,.02) 0 12px, transparent 12px 28px); pointer-events:none; }
+.pl-card.top1 { border-color:rgba(255,209,102,.5); box-shadow:inset 0 0 34px rgba(255,209,102,.08), 0 8px 26px rgba(0,0,0,.4); animation:plBrilho 2.6s ease-in-out infinite; }
+.pl-card.top2 { border-color:rgba(207,210,230,.3); }
+.pl-card.top3 { border-color:rgba(217,140,74,.35); }
+@keyframes plBrilho { 0%,100% { box-shadow:inset 0 0 34px rgba(255,209,102,.08), 0 8px 26px rgba(0,0,0,.4); } 50% { box-shadow:inset 0 0 44px rgba(255,209,102,.16), 0 8px 30px rgba(255,209,102,.18); } }
+.pl-faixa { position:absolute; left:0; top:0; bottom:0; width:8px; }
+.pl-pos { font-size:1.5rem; width:36px; text-align:center; flex-shrink:0; }
+.pl-pos.num { font-size:.9rem; font-weight:900; color:var(--muted); }
+.pl-av { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.85rem; flex-shrink:0; color:#fff; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+.pl-nome { flex:1; min-width:0; }
+.pl-nome b { display:block; font-size:1rem; letter-spacing:.3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pl-nome .pl-tubo { height:9px; border-radius:6px; background:rgba(255,255,255,.07); margin-top:7px; overflow:hidden; }
+.pl-nome .pl-tubo i { display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,#3ddc97,#a8ffd8); box-shadow:0 0 12px rgba(61,220,151,.6); transition:width .8s cubic-bezier(.4,0,.2,1); }
+.pl-nome .pl-tubo i.ouro { background:linear-gradient(90deg,#ffd166,#fff3c4); box-shadow:0 0 12px rgba(255,209,102,.6); }
+.pl-mini { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.pl-mini span { font-size:.64rem; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.06); color:var(--muted); }
+.pl-mini span.ok { color:#3ddc97; background:rgba(61,220,151,.12); }
+.pl-mini span.ruim { color:#ff6b6b; background:rgba(255,107,107,.12); }
+.pl-mini span.grana { color:#ffd166; background:rgba(255,209,102,.12); }
+.pl-num { text-align:right; flex-shrink:0; line-height:1; }
+.pl-num b { display:block; font-size:2rem; font-weight:900; }
+.pl-num small { display:block; font-size:.56rem; letter-spacing:1.5px; font-weight:800; color:var(--muted); margin-top:4px; }
+.pl-vazio { padding:18px; text-align:center; color:var(--muted); font-size:.78rem; border:1px dashed rgba(255,255,255,.12); border-radius:14px; }
+.pl-dias { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:16px; }
+.pl-dia { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); border-radius:12px; padding:8px 6px 6px; text-align:center; }
+.pl-dia.hoje { border-color:rgba(255,209,102,.5); background:rgba(255,209,102,.06); }
+.pl-dia small { display:block; font-size:.6rem; color:var(--muted); font-weight:800; margin-bottom:6px; }
+.pl-dia .pl-barras { display:flex; align-items:flex-end; justify-content:center; gap:4px; height:46px; }
+.pl-dia .pl-barras i { display:block; width:12px; border-radius:4px 4px 0 0; min-height:2px; }
+.pl-dia .pl-legs { display:flex; justify-content:center; gap:5px; margin-top:5px; font-size:.62rem; font-weight:800; }
+.pl-recordes { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+.pl-recordes div { flex:1; min-width:200px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px; font-size:.74rem; }
+.pl-recordes b { color:#ffd166; }
+/* visual de placar de estádio (Bruno 02/09/2026): fonte condensada nos números, pódio dos 3 primeiros, barras que crescem */
+.pl-h2 { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:2rem; letter-spacing:1px; text-transform:uppercase; line-height:1; }
+.pl-h2 small { display:block; font-family:Inter, sans-serif; font-weight:700; font-size:.66rem; letter-spacing:.3px; text-transform:none; color:var(--muted); margin-top:5px; }
+.pl-podio { display:grid; grid-template-columns:1fr 1.2fr 1fr; gap:10px; align-items:end; margin-bottom:12px; }
+.pl-pd { position:relative; text-align:center; border-radius:18px; padding:14px 10px 12px; background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08); }
+.pl-pd.p1 { padding-top:26px; background:linear-gradient(180deg, rgba(255,209,102,.18), rgba(255,209,102,.03)); border-color:rgba(255,209,102,.6); box-shadow:0 0 44px rgba(255,209,102,.16), inset 0 1px 0 rgba(255,255,255,.12); }
+.pl-pd.p2 { background:linear-gradient(180deg, rgba(207,210,230,.12), rgba(207,210,230,.02)); border-color:rgba(207,210,230,.38); }
+.pl-pd.p3 { background:linear-gradient(180deg, rgba(217,140,74,.15), rgba(217,140,74,.02)); border-color:rgba(217,140,74,.45); }
+.pl-pd .pl-av { width:62px; height:62px; margin:0 auto 8px; font-size:1.15rem; }
+.pl-pd.p1 .pl-av { width:80px; height:80px; font-size:1.5rem; box-shadow:0 0 0 3px #ffd166, 0 10px 30px rgba(255,209,102,.45); }
+.pl-pd .pl-coroa { position:absolute; top:-16px; left:50%; font-size:1.7rem; filter:drop-shadow(0 4px 10px rgba(255,209,102,.6)); animation:plFlutua 2.4s ease-in-out infinite; transform:translate(-50%,0); }
+@keyframes plFlutua { 0%,100% { transform:translate(-50%,0); } 50% { transform:translate(-50%,-5px); } }
+.pl-pd .med { font-size:1.25rem; line-height:1; margin-bottom:4px; }
+.pl-pd b.nome { display:block; font-size:.98rem; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pl-pd .num { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:2.7rem; line-height:1; letter-spacing:.5px; font-variant-numeric:tabular-nums; }
+.pl-pd .num, .pl-num b { white-space:nowrap; }
+.pl-pd .num.longo { font-size:2rem; }
+.pl-pd.p1 .num.longo { font-size:2.6rem; }
+.pl-num b.longo { font-size:1.7rem; }
+body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .num.longo { font-size:2.2rem; }
+.pl-pd.p1 .num { font-size:3.6rem; color:#ffd166; text-shadow:0 0 24px rgba(255,209,102,.5); }
+.pl-pd small.rot { display:block; font-size:.56rem; letter-spacing:2px; font-weight:800; color:var(--muted); margin-top:2px; }
+.pl-pd .pl-mini { justify-content:center; margin-top:9px; }
+.pl-pd .pl-tubo { height:7px; border-radius:6px; background:rgba(255,255,255,.07); margin:9px 6px 0; overflow:hidden; }
+.pl-pd .pl-tubo i { display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,#3ddc97,#a8ffd8); }
+.pl-pd.p1 .pl-tubo i { background:linear-gradient(90deg,#ffd166,#fff3c4); }
+.pl-num b, .pl-kpi b { font-family:'Barlow Condensed', Inter, sans-serif; letter-spacing:.5px; }
+.pl-num b { font-size:2.4rem; }
+.pl-kpi b { font-size:2.2rem; }
+.pl-kpi { border-top:3px solid rgba(255,255,255,.12); }
+.pl-kpi.k1 { border-top-color:#f6a350; } .pl-kpi.k2 { border-top-color:#6ea8ff; } .pl-kpi.k3 { border-top-color:#ff6b6b; } .pl-kpi.k4 { border-top-color:#3ddc97; }
+.pl-tubo i { transform-origin:left; animation:plCresce .9s cubic-bezier(.2,.8,.2,1); }
+@keyframes plCresce { from { transform:scaleX(0); } }
+.pl-alerta { display:flex; align-items:center; gap:10px; background:rgba(255,107,107,.12); border:1px solid rgba(255,107,107,.55); color:#ff6b6b; border-radius:14px; padding:10px 14px; font-weight:800; font-size:.82rem; margin-bottom:14px; animation:plPisca 1.6s ease-in-out infinite; }
+@keyframes plPisca { 0%,100% { box-shadow:0 0 0 rgba(255,107,107,0); } 50% { box-shadow:0 0 22px rgba(255,107,107,.35); } }
+.pl-alerta small { font-weight:600; color:var(--muted); font-size:.68rem; }
+.pl-mini span.alerta { color:#ff6b6b; background:rgba(255,107,107,.18); border:1px solid rgba(255,107,107,.4); }
+@media (prefers-reduced-motion: reduce) { .pl-alerta { animation:none; } }
+.pl-ord { display:inline-flex; gap:4px; align-items:center; font-size:.62rem; color:var(--muted); font-weight:700; margin-left:auto; }
+.pl-ord .pl-chip { padding:3px 9px; font-size:.64rem; }
+.pl-col h3 { flex-wrap:wrap; }
+#pl-range { position:fixed; z-index:99999; display:none; background:#1c212b; border:1px solid rgba(255,255,255,.16); border-radius:16px; padding:12px; width:min(560px, 94vw); box-shadow:0 14px 44px rgba(0,0,0,.6); color:var(--text,#e8ecf3); }
+#pl-range .rg-wrap { display:grid; grid-template-columns:150px 1fr; gap:12px; }
+@media (max-width:560px) { #pl-range .rg-wrap { grid-template-columns:1fr; } }
+#pl-range .rg-atalhos { display:flex; flex-direction:column; gap:5px; }
+#pl-range .rg-atalhos b { font-size:.58rem; letter-spacing:1.5px; color:var(--muted); font-weight:800; margin-bottom:2px; }
+#pl-range .rg-atalhos button { text-align:left; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); color:inherit; border-radius:9px; padding:7px 10px; font-size:.74rem; font-weight:700; cursor:pointer; font-family:inherit; }
+#pl-range .rg-atalhos button:hover { background:rgba(255,209,102,.18); border-color:rgba(255,209,102,.5); }
+#pl-range .rg-top { display:flex; gap:6px; align-items:center; margin-bottom:8px; }
+#pl-range .rg-top select { flex:1; background:#242a36; color:inherit; border:1px solid rgba(255,255,255,.16); border-radius:8px; padding:5px 4px; font-size:.76rem; font-family:inherit; }
+#pl-range .rg-top button { background:rgba(255,255,255,.08); border:none; color:inherit; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:.9rem; }
+#pl-range .rg-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center; }
+#pl-range .rg-sem { color:#8b93a7; font-size:.6rem; padding:2px 0; font-weight:800; }
+#pl-range .rg-d { border:none; background:transparent; color:inherit; border-radius:8px; padding:7px 0; cursor:pointer; font-size:.76rem; font-family:inherit; }
+#pl-range .rg-d:hover { background:rgba(255,209,102,.25); }
+#pl-range .rg-d.hoje { box-shadow:inset 0 0 0 1px rgba(110,168,255,.65); }
+#pl-range .rg-d.entre { background:rgba(255,209,102,.18); border-radius:0; }
+#pl-range .rg-d.ini, #pl-range .rg-d.fim { background:#ffd166; color:#151515; font-weight:900; }
+#pl-range .rg-d.ini { border-radius:8px 0 0 8px; } #pl-range .rg-d.fim { border-radius:0 8px 8px 0; } #pl-range .rg-d.ini.fim { border-radius:8px; }
+#pl-range .rg-d.futuro { opacity:.3; cursor:default; }
+#pl-range .rg-pe { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+#pl-range .rg-pe .rg-txt { flex:1; font-size:.76rem; font-weight:700; color:#ffd166; }
+#pl-range .rg-pe button { border-radius:9px; padding:7px 14px; font-size:.74rem; font-weight:800; cursor:pointer; font-family:inherit; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07); color:inherit; }
+#pl-range .rg-pe button.ok { background:#ffd166; color:#151515; border-color:#ffd166; }
+#pl-range .rg-pe button:disabled { opacity:.4; cursor:default; }
+.pl-pd.zero { opacity:.75; }
+.pl-pd.zero .num { color:var(--muted); text-shadow:none; }
+.pl-pd.p1.zero { background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); border-color:rgba(255,255,255,.1); box-shadow:none; }
+/* 🎉 festa quando alguem marca ou vende (Bruno 02/09/2026) */
+#pl-festa { position:fixed; inset:0; z-index:99990; display:none; align-items:center; justify-content:center; background:rgba(6,6,16,.72); overflow:hidden; }
+#pl-festa .fx-caixa { position:relative; z-index:2; text-align:center; padding:34px 44px; border-radius:26px; background:linear-gradient(160deg,#1b1b3c,#0d0d1e); border:2px solid rgba(255,209,102,.7); box-shadow:0 0 80px rgba(255,209,102,.35); animation:fxPula .7s cubic-bezier(.2,1.4,.4,1); max-width:92vw; }
+#pl-festa .fx-ico { font-size:4.2rem; line-height:1; animation:fxBate 1s ease-in-out infinite; }
+#pl-festa .fx-t1 { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:3rem; letter-spacing:1px; text-transform:uppercase; color:#ffd166; margin-top:8px; line-height:1; }
+#pl-festa .fx-t2 { font-size:1.05rem; font-weight:700; color:#fff; margin-top:8px; }
+#pl-festa .fx-conf { position:absolute; top:-12px; width:10px; height:16px; border-radius:2px; animation:fxCai linear forwards; }
+@keyframes fxPula { from { transform:scale(.4); opacity:0; } to { transform:scale(1); opacity:1; } }
+@keyframes fxBate { 0%,100% { transform:scale(1); } 50% { transform:scale(1.15); } }
+@keyframes fxCai { to { transform:translateY(110vh) rotate(720deg); opacity:.9; } }
+body.placar-tv #pl-festa .fx-t1 { font-size:4rem; }
+@media (prefers-reduced-motion: reduce) { #pl-festa .fx-caixa, #pl-festa .fx-ico, #pl-festa .fx-conf { animation:none; } }
+/* 🏁 mini-placar do dia no topo da Visao Geral */
+.pl-mini-topo { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; padding:12px 16px; border-radius:18px; background:linear-gradient(105deg,#0d0d1e 0%,#15152e 55%,#1b1b3c 100%); border:1px solid rgba(255,209,102,.35); box-shadow:0 8px 26px rgba(0,0,0,.35); }
+.pl-mini-topo .mt-tit { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:1.3rem; letter-spacing:1px; text-transform:uppercase; line-height:1; }
+.pl-mini-topo .mt-tit small { display:block; font-family:Inter, sans-serif; font-weight:700; font-size:.6rem; letter-spacing:.3px; text-transform:none; color:var(--muted); margin-top:3px; }
+.pl-mini-topo .mt-n { display:flex; gap:8px; flex-wrap:wrap; }
+.pl-mini-topo .mt-k { min-width:86px; padding:6px 10px; border-radius:12px; background:rgba(255,255,255,.05); border-top:3px solid rgba(255,255,255,.12); cursor:pointer; }
+.pl-mini-topo .mt-k small { display:block; font-size:.52rem; letter-spacing:1.5px; font-weight:800; color:var(--muted); }
+.pl-mini-topo .mt-k b { font-family:'Barlow Condensed', Inter, sans-serif; font-size:1.7rem; line-height:1; font-weight:900; }
+.pl-mini-topo .mt-k.k1 { border-top-color:#f6a350; } .pl-mini-topo .mt-k.k2 { border-top-color:#6ea8ff; } .pl-mini-topo .mt-k.k3 { border-top-color:#ff6b6b; } .pl-mini-topo .mt-k.k4 { border-top-color:#3ddc97; }
+.pl-mini-topo .mt-lider { display:flex; gap:8px; flex-wrap:wrap; flex:1; min-width:220px; }
+.pl-mini-topo .mt-l { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:rgba(255,209,102,.1); border:1px solid rgba(255,209,102,.4); font-size:.74rem; font-weight:700; }
+.pl-mini-topo .mt-l .pl-av { width:28px; height:28px; font-size:.62rem; }
+.pl-mini-topo .mt-l small { font-weight:600; color:var(--muted); font-size:.62rem; }
+.pl-mini-topo .mt-bt { display:flex; gap:6px; flex-wrap:wrap; }
+.pl-resto-titulo { font-size:.62rem; letter-spacing:1.5px; font-weight:800; color:var(--muted); margin:4px 0 8px; }
+@media (prefers-reduced-motion: reduce) { .pl-pd .pl-coroa, .pl-tubo i, .pl-card.top1 { animation:none; } }
+body.placar-tv { zoom:1.18; }
+body.placar-tv .pl-pd.p1 .num { font-size:4.4rem; } body.placar-tv .pl-pd .num { font-size:3.2rem; }
+body.placar-tv .pl-card { padding:16px 18px 16px 24px; }
+body.placar-tv .pl-num b { font-size:2.5rem; }
+body.placar-tv .pl-nome b { font-size:1.15rem; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&display=swap">
+<script>
+var PLACAR = { per: 'hoje', tv: !!(window.PLACAR && window.PLACAR.tv), ordSdr: 'marc', ordCl: 'vdV' };
+function plOrd(tipo, k) { if (tipo === 'sdr') PLACAR.ordSdr = k; else PLACAR.ordCl = k; renderPlacar(); }
+function plMetrica(x, tipo) { return x[tipo === 'sdr' ? PLACAR.ordSdr : PLACAR.ordCl] || 0; }
+// #painel=placar&per=mes (ou semana/ontem): modo TV ja abre no periodo pedido
+try { var _mP = (String(location.hash || '') + String(location.search || '')).match(/[#&?]per=(hoje|ontem|semana|mes)/); if (_mP) PLACAR.per = _mP[1]; } catch (ePer) {}   // modo TV pode ter sido pedido antes (#painel=placar)
+// nomes como a planilha escreve ("SS Sarah", "SDR Felippe", "Bruno Pardim") viram a pessoa
+function plPessoa(n) {
+  var s = String(n || '').replace(/^\s*(SS|SDR|CLOSER|SOCIAL SELLER)\s+/i, '').trim();
+  return s;
+}
+function plIni(n) { return v2ini(n); }
+function plPeriodo(per) {
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  var ini = hoje, fim = new Date(hoje.getTime() + 864e5), rot = 'Hoje · ' + hoje.toLocaleDateString('pt-BR');
+  if (per === 'ontem') { ini = new Date(hoje.getTime() - 864e5); fim = hoje; rot = 'Ontem · ' + ini.toLocaleDateString('pt-BR'); }
+  else if (per === 'semana') {   // semana ATUAL, de segunda a sabado (Bruno 02/09/2026)
+    ini = ldIniSemana(hoje); fim = new Date(ini.getTime() + 7 * 864e5);
+    var sab = new Date(ini.getTime() + 5 * 864e5);
+    rot = 'Semana · seg ' + ini.toLocaleDateString('pt-BR').slice(0, 5) + ' a sáb ' + sab.toLocaleDateString('pt-BR').slice(0, 5);
+  }
+  else if (per === 'mes') { ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1); rot = LD_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(); }
+  else if (per === 'datas' && PLACAR.de && PLACAR.ate) {   // periodo escolhido no calendario (de/ate, os dois dias inteiros)
+    var d1 = _ldDeISO(PLACAR.de), d2 = _ldDeISO(PLACAR.ate);
+    if (d1 && d2) { if (d1 > d2) { var tmp = d1; d1 = d2; d2 = tmp; } ini = d1; fim = new Date(d2.getTime() + 864e5); rot = d1.toLocaleDateString('pt-BR') + ' a ' + d2.toLocaleDateString('pt-BR'); }
+  }
+  return { ini: ini.getTime(), fim: fim.getTime(), rot: rot, per: per };
+}
+// ===== seletor de PERIODO do placar: um calendario, clica o primeiro dia e o ultimo (Bruno 02/09/2026) =====
+var PL_RANGE = { ini: null, fim: null, vAno: 0, vMes: 0 };
+function plAbrirDatas(btn) {
+  var pop = document.getElementById('pl-range');
+  if (!pop) {
+    pop = document.createElement('div'); pop.id = 'pl-range'; document.body.appendChild(pop);
+    document.addEventListener('mousedown', function(e) {
+      if (pop.style.display === 'block' && !pop.contains(e.target) && !(e.target.closest && e.target.closest('#pl-chip-datas'))) pop.style.display = 'none';
+    }, true);
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') pop.style.display = 'none'; });
+  }
+  if (pop.style.display === 'block') { pop.style.display = 'none'; return; }
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  PL_RANGE.ini = PLACAR.de ? _ldDeISO(PLACAR.de) : null;
+  PL_RANGE.fim = PLACAR.ate ? _ldDeISO(PLACAR.ate) : null;
+  var base = PL_RANGE.ini || hoje;
+  PL_RANGE.vAno = base.getFullYear(); PL_RANGE.vMes = base.getMonth();
+  plDesenharRange();
+  pop.style.display = 'block';
+  var r = btn ? btn.getBoundingClientRect() : { left: 20, bottom: 60, top: 30 };
+  var alt = pop.offsetHeight || 330, larg = pop.offsetWidth || 560;
+  var W = window.innerWidth || document.documentElement.clientWidth || 1200, H = window.innerHeight || document.documentElement.clientHeight || 800;
+  pop.style.left = Math.max(8, Math.min(r.left, W - larg - 8)) + 'px';
+  var topo = r.bottom + 6;                                   // embaixo do botao...
+  if (topo + alt > H - 8) topo = r.top - alt - 6;            // ...ou em cima, se nao couber
+  if (topo < 8) topo = 8;                                      // nunca fora da tela
+  pop.style.top = topo + 'px';
+}
+function plDesenharRange() {
+  var pop = document.getElementById('pl-range'); if (!pop) return;
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  var MESES = LD_MESES, SEM = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  var anos = []; for (var a = hoje.getFullYear() - 3; a <= hoje.getFullYear(); a++) anos.push(a);
+  var atalhos = [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['semana', 'Esta semana'], ['semanapassada', 'Semana passada'], ['7d', 'Últimos 7 dias'], ['30d', 'Últimos 30 dias'], ['mes', 'Este mês'], ['mespassado', 'Mês passado']];
+  var h = '<div class="rg-wrap"><div class="rg-atalhos"><b>ATALHOS</b>' + atalhos.map(function(x){ return '<button type="button" onclick="plRangePreset(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>'
+    + '<div><div class="rg-top"><button type="button" onclick="plRangeMes(-1)">‹</button>'
+    + '<select onchange="PL_RANGE.vAno=+this.value;plDesenharRange()">' + anos.map(function(a){ return '<option value="' + a + '"' + (a === PL_RANGE.vAno ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select>'
+    + '<select onchange="PL_RANGE.vMes=+this.value;plDesenharRange()">' + MESES.map(function(m, i){ return '<option value="' + i + '"' + (i === PL_RANGE.vMes ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select>'
+    + '<button type="button" onclick="plRangeMes(1)">›</button></div><div class="rg-grid">' + SEM.map(function(x){ return '<span class="rg-sem">' + x + '</span>'; }).join('');
+  var prim = new Date(PL_RANGE.vAno, PL_RANGE.vMes, 1).getDay(), dias = new Date(PL_RANGE.vAno, PL_RANGE.vMes + 1, 0).getDate();
+  for (var b = 0; b < prim; b++) h += '<span></span>';
+  var iT = PL_RANGE.ini ? PL_RANGE.ini.getTime() : null, fT = PL_RANGE.fim ? PL_RANGE.fim.getTime() : null;
+  for (var d = 1; d <= dias; d++) {
+    var t = new Date(PL_RANGE.vAno, PL_RANGE.vMes, d).getTime();
+    var cls = 'rg-d' + (t === hoje.getTime() ? ' hoje' : '') + (t > hoje.getTime() ? ' futuro' : '')
+      + (iT !== null && t === iT ? ' ini' : '') + (fT !== null && t === fT ? ' fim' : '')
+      + (iT !== null && fT !== null && t > iT && t < fT ? ' entre' : '');
+    h += '<button type="button" class="' + cls + '"' + (t > hoje.getTime() ? '' : ' onclick="plRangeClique(' + t + ')"') + '>' + d + '</button>';
+  }
+  var txt = !PL_RANGE.ini ? 'Clique no primeiro dia' : (!PL_RANGE.fim ? 'De ' + PL_RANGE.ini.toLocaleDateString('pt-BR') + ' — agora clique no último dia' : 'De ' + PL_RANGE.ini.toLocaleDateString('pt-BR') + ' até ' + PL_RANGE.fim.toLocaleDateString('pt-BR'));
+  h += '</div><div class="rg-pe"><span class="rg-txt">' + txt + '</span>'
+    + '<button type="button" onclick="PL_RANGE.ini=null;PL_RANGE.fim=null;plDesenharRange()">Limpar</button>'
+    + '<button type="button" class="ok" onclick="plRangeAplicar()"' + (PL_RANGE.ini ? '' : ' disabled') + '>Aplicar</button></div></div></div>';
+  pop.innerHTML = h;
+}
+function plRangeMes(n) { var d = new Date(PL_RANGE.vAno, PL_RANGE.vMes + n, 1); PL_RANGE.vAno = d.getFullYear(); PL_RANGE.vMes = d.getMonth(); plDesenharRange(); }
+function plRangeClique(t) {
+  var d = new Date(t);
+  if (!PL_RANGE.ini || (PL_RANGE.ini && PL_RANGE.fim)) { PL_RANGE.ini = d; PL_RANGE.fim = null; }
+  else if (d < PL_RANGE.ini) { PL_RANGE.fim = PL_RANGE.ini; PL_RANGE.ini = d; }
+  else PL_RANGE.fim = d;
+  plDesenharRange();
+}
+function plRangePreset(k) {
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0), dia = 864e5, ini = hoje, fim = hoje;
+  if (k === 'ontem') { ini = fim = new Date(hoje.getTime() - dia); }
+  else if (k === 'semana') { ini = ldIniSemana(hoje); fim = new Date(ini.getTime() + 5 * dia); if (fim > hoje) fim = hoje; }
+  else if (k === 'semanapassada') { var s0 = ldIniSemana(hoje); ini = new Date(s0.getTime() - 7 * dia); fim = new Date(s0.getTime() - dia); }
+  else if (k === '7d') { ini = new Date(hoje.getTime() - 6 * dia); }
+  else if (k === '30d') { ini = new Date(hoje.getTime() - 29 * dia); }
+  else if (k === 'mes') { ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1); }
+  else if (k === 'mespassado') { ini = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1); fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0); }
+  PL_RANGE.ini = ini; PL_RANGE.fim = fim;
+  plRangeAplicar();
+}
+function plRangeAplicar() {
+  if (!PL_RANGE.ini) return;
+  var f = PL_RANGE.fim || PL_RANGE.ini;
+  PLACAR.de = _ldISO(PL_RANGE.ini); PLACAR.ate = _ldISO(f); PLACAR.per = 'datas';
+  var pop = document.getElementById('pl-range'); if (pop) pop.style.display = 'none';
+  renderPlacar();
+}
+function plDatas() {
+  var de = document.getElementById('pl-de'), ate = document.getElementById('pl-ate');
+  PLACAR.de = de ? de.value : ''; PLACAR.ate = ate ? ate.value : '';
+  PLACAR.per = 'datas';
+  renderPlacar();
+}
+// dia em que a reuniao foi MARCADA: o carimbo; se o carimbo for depois do dia da reuniao
+// (ou nao existir), usa o proprio dia da reuniao — marcar depois de acontecer nao existe
+function plDataMarcacao(r) {
+  var dT = r.date ? r.date.getTime() : null, cT = (r.carimboT != null) ? r.carimboT : null;
+  if (cT == null) return dT;
+  if (dT != null && cT > dT + 864e5) return dT;
+  return cT;
+}
+// dia do NO-SHOW: normalmente a data da reuniao; mas se a linha foi remarcada
+// ("Remarcada para 02/09 18:00 (era 01/09)") e o status ficou No-Show, a falta foi no dia
+// de onde ela saiu — e a reuniao nova ainda vai acontecer (caso Wandemberg 02/09/2026)
+function plDataNoShow(r) {
+  var m = String(r.obs || '').match(/Remarcada para \d{1,2}\/\d{1,2}[^()]*\(era (\d{1,2})\/(\d{1,2})\)/);
+  if (m) { var ano = r.date ? r.date.getFullYear() : new Date().getFullYear(); return new Date(ano, +m[2] - 1, +m[1]).getTime(); }
+  return r.date ? r.date.getTime() : null;
+}
+// conta, para um periodo, o que cada SDR e cada closer fez
+function plCalcular(p) {
+  var S = {}, C = {}, tot = { marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, pend: 0, l: { marc: [], re: [], ns: [], vd: [], pend: [] } };
+  var novo = function(n){ return { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }; };
+  var sd = function(n){ n = plPessoa(n); if (!n) return null; var k = v2norm(n); if (!S[k]) S[k] = novo(n); return S[k]; };
+  var cd = function(n){ n = plPessoa(n); if (!n) return null; var k = v2norm(n); if (!C[k]) C[k] = novo(n); return C[k]; };
+  var no = function(t){ return t != null && t >= p.ini && t < p.fim; };
+  var ano = new Date().getFullYear();
+  (V2.rows || []).forEach(function(r) {
+    var dT = r.date ? r.date.getTime() : null;
+    var s = sd(r.sdr), c = cd(r.closer);
+    // MARCADA: pela hora em que foi marcada (carimbo). Reuniao remarcada nao conta de novo.
+    // Carimbo DEPOIS do dia da reuniao = linha antiga que so ganhou carimbo mais tarde
+    // (caso Jose Clovis 27/08 carimbado em 02/09): vale o dia da reuniao, nao o carimbo.
+    var mT = plDataMarcacao(r);
+    if (no(mT) && r.sn !== 'remarcada') { tot.marc++; tot.l.marc.push(r); if (s) { s.marc++; s.l.marc.push(r); } }
+    var ehNs = r.sn === 'no show', nsT = ehNs ? plDataNoShow(r) : null;
+    var nsRemarcado = ehNs && nsT !== dT;   // no-show antigo, reuniao nova ainda por acontecer
+    if (no(dT)) {
+      if (_fsRealizada(r.sn)) { tot.re++; tot.l.re.push(r); if (s) { s.re++; s.l.re.push(r); } if (c) { c.re++; c.l.re.push(r); } }
+      if (r.sn === 'vendido') { tot.vd++; tot.vdV += r.valor || 0; tot.l.vd.push(r); if (s) { s.vd++; s.vdV += r.valor || 0; s.l.vd.push(r); } if (c) { c.vd++; c.vdV += r.valor || 0; c.l.vd.push(r); } }
+      if (p.per === 'hoje' && (r.sn.indexOf('agendada') !== -1 || r.sn === 'remarcada' || nsRemarcado)) { tot.pend++; tot.l.pend.push(r); }
+    }
+    if (ehNs && no(nsT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
+    // no-show que depois foi remarcado: fica a marca "No-show em dd/mm" na observacao
+    var mNs = String(r.obs || '').match(/No-show em (\d{1,2})\/(\d{1,2})/g) || [];
+    mNs.forEach(function(x) {
+      var m = x.match(/(\d{1,2})\/(\d{1,2})/);
+      var t = new Date(ano, +m[2] - 1, +m[1]).getTime();
+      if (no(t)) { tot.ns++; if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
+    });
+  });
+  // quem esta ATIVO aparece em todo periodo mesmo zerado ("se tiver 0 coloca no ranking tambem" — Bruno 02/09/2026)
+  plSdrsAtivos().forEach(function(n){ var k = v2norm(n); if (!S[k]) S[k] = novo(n); S[k].ativo = true; });
+  plClosersAtivos().forEach(function(n){ var k = v2norm(n); if (!C[k]) C[k] = novo(n); C[k].ativo = true; });
+  var sdrs = Object.keys(S).map(function(k){ return S[k]; }).filter(function(x){ return x.marc || x.re || x.vd || x.ns || x.ativo; })
+    .sort(function(a, b){ return plMetrica(b, 'sdr') - plMetrica(a, 'sdr') || b.marc - a.marc || b.re - a.re || b.vd - a.vd || a.ns - b.ns; });
+  var closers = Object.keys(C).map(function(k){ return C[k]; }).filter(function(x){ return x.re || x.vd || x.ns || x.ativo; })
+    .sort(function(a, b){ return plMetrica(b, 'closer') - plMetrica(a, 'closer') || b.vdV - a.vdV || b.vd - a.vd || b.re - a.re; });
+  return { sdrs: sdrs, closers: closers, tot: tot };
+}
+// SDRs ativos = marcaram 2 ou mais reunioes nos ultimos 14 dias (o time de verdade, sem nomes soltos)
+function plSdrsAtivos() {
+  var m = {}, corte = Date.now() - 14 * 864e5;
+  (V2.rows || []).forEach(function(r) {
+    var mT = plDataMarcacao(r);
+    if (mT == null || mT < corte || r.sn === 'remarcada') return;
+    var n = plPessoa(r.sdr); if (!n) return;
+    var k = v2norm(n); if (!m[k]) m[k] = { nome: n, q: 0 }; m[k].q++;
+  });
+  return Object.keys(m).filter(function(k){ return m[k].q >= 2; }).map(function(k){ return m[k].nome; });
+}
+// closers ativos = tiveram reuniao (qualquer status) nos ultimos 30 dias
+function plClosersAtivos() {
+  var m = {}, corte = Date.now() - 30 * 864e5;
+  (V2.rows || []).forEach(function(r) {
+    if (!r.date || r.date.getTime() < corte) return;
+    var n = plPessoa(r.closer); if (!n) return;
+    m[v2norm(n)] = n;
+  });
+  return Object.keys(m).map(function(k){ return m[k]; });
+}
+// quem liderou as marcacoes em cada um dos ultimos dias (para a sequencia 🔥)
+function plSequencia(nome) {
+  var dias = 0, hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  for (var i = 0; i < 30; i++) {
+    var ini = hoje.getTime() - i * 864e5, fim = ini + 864e5, m = {};
+    (V2.rows || []).forEach(function(r) {
+      var mT = plDataMarcacao(r);
+      if (mT == null || mT < ini || mT >= fim || r.sn === 'remarcada') return;
+      var n = v2norm(plPessoa(r.sdr)); if (!n) return; m[n] = (m[n] || 0) + 1;
+    });
+    var ks = Object.keys(m);
+    if (!ks.length) { if (i === 0) continue; break; }   // hoje ainda sem marcacao nao quebra a sequencia
+    var top = ks.sort(function(a, b){ return m[b] - m[a]; })[0];
+    if (m[top] > 0 && top === v2norm(nome) && ks.filter(function(k){ return m[k] === m[top]; }).length === 1) dias++;
+    else break;
+  }
+  return dias;
+}
+// o numero grande e o rotulo de cada card (SDR: marcadas · closer: valor vendido)
+function plBig(x, tipo) {
+  var k = tipo === 'sdr' ? PLACAR.ordSdr : PLACAR.ordCl;
+  if (k === 'vdV') { var big = x.vdV >= 1000 ? 'R$ ' + Math.round(x.vdV / 1000) + ' mil' : (x.vdV ? v2moeda0(x.vdV) : '—'); return { big: big, rot: 'VENDIDO', n: null, met: 'vd' }; }
+  var rot = { marc: 'MARCADAS', re: 'COMPARECEU', vd: 'VENDAS' }[k];
+  return { big: String(x[k] || 0), rot: rot, n: x[k] || 0, met: k };
+}
+// as pastilhas pequenas (realizadas, vendas, no-show, sequencia)
+function plMinis(x, tipo) {
+  var minis = [];
+  var ver = function(met){ return ' style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'' + tipo + '\',\'' + v2norm(x.nome) + '\',\'' + met + '\')"'; };
+  if (tipo === 'sdr') {
+    if (!x.marc && (PLACAR.per === 'hoje' || PLACAR.per === 'ontem')) minis.push('<span class="alerta">⚠️ sem reunião marcada ' + (PLACAR.per === 'hoje' ? 'hoje' : 'ontem') + '</span>');
+    if (PLACAR.ordSdr !== 'marc') minis.push('<span' + ver('marc') + '>📅 ' + x.marc + ' marcada' + (x.marc === 1 ? '' : 's') + '</span>');
+    minis.push('<span class="ok"' + ver('re') + '>✅ ' + x.re + ' ' + (x.re === 1 ? 'compareceu' : 'compareceram') + '</span>');
+    if (x.vd) minis.push('<span class="grana"' + ver('vd') + '>💰 ' + x.vd + ' venda' + (x.vd === 1 ? '' : 's') + ' · ' + v2mil(x.vdV) + '</span>');
+    var base = x.re + x.ns;
+    minis.push('<span class="' + (x.ns ? 'ruim' : '') + '"' + ver('ns') + '>🤦 ' + x.ns + ' no-show' + (base ? ' · ' + Math.round(x.ns / base * 100) + '%' : '') + '</span>');
+    var seq = (PLACAR.per === 'hoje' || PLACAR.per === 'ontem') ? plSequencia(x.nome) : 0;
+    if (seq >= 2) minis.push('<span class="grana">🔥 ' + seq + ' dias seguidos em 1º</span>');
+  } else {
+    minis.push('<span class="grana"' + ver('vd') + '>💰 ' + x.vd + ' venda' + (x.vd === 1 ? '' : 's') + (PLACAR.ordCl !== 'vdV' ? ' · ' + v2mil(x.vdV) : '') + '</span>');
+    minis.push('<span class="ok"' + ver('re') + '>✅ ' + x.re + ' ' + (x.re === 1 ? 'compareceu' : 'compareceram') + '</span>');
+    if (x.re) minis.push('<span>🎯 fecha ' + Math.round(x.vd / x.re * 100) + '%</span>');
+    if (x.ns) minis.push('<span class="ruim"' + ver('ns') + '>🤦 ' + x.ns + ' no-show</span>');
+  }
+  return '<div class="pl-mini">' + minis.join('') + '</div>';
+}
+function plPontuou(x, tipo) { return plMetrica(x, tipo) > 0; }
+function plPct(x, tipo, topo) { var v = plMetrica(x, tipo); return topo ? Math.min(v / topo * 100, 100) : 0; }
+// card de lista (do 4º em diante, ou quem ainda nao pontuou)
+function plCard(x, i, tipo, topo) {
+  var bg = plBig(x, tipo), pontuou = plPontuou(x, tipo);
+  return '<div class="pl-card">'
+    + '<span class="pl-faixa rk-faixa resto"></span>'
+    + '<span class="pl-pos num">' + (i + 1) + 'º</span>'
+    + '<span class="pl-av" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span>'
+    + '<div class="pl-nome"><b>' + x.nome.replace(/</g, '&lt;') + '</b>'
+    +   '<div class="pl-tubo"><i style="width:' + plPct(x, tipo, topo).toFixed(0) + '%;"></i></div>' + plMinis(x, tipo) + '</div>'
+    + '<div class="pl-num" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'' + tipo + '\',\'' + v2norm(x.nome) + '\',\'' + bg.met + '\')"><b' + (bg.big.length >= 7 ? ' class="longo"' : '') + (bg.n !== null ? ' data-n="' + bg.n + '"' : '') + '>' + bg.big + '</b><small>' + bg.rot + '</small></div>'
+    + '</div>';
+}
+// PODIO: os 3 primeiros que pontuaram, no formato 2º · 1º · 3º (o do meio e o campeao)
+function plPodio(lista, tipo, topo) {
+  var top = lista.slice(0, 3);   // os 3 primeiros do ranking, mesmo com zero (Bruno 02/09/2026)
+  if (!top.length) return '';
+  var med = ['🥇', '🥈', '🥉'];
+  var caixa = function(x, pos) {
+    if (!x) return '<div></div>';
+    var bg = plBig(x, tipo), pontuou = plPontuou(x, tipo);
+    return '<div class="pl-pd p' + (pos + 1) + (pontuou ? '' : ' zero') + '">'
+      + (pos === 0 && pontuou ? '<span class="pl-coroa">👑</span>' : '')
+      + '<div class="med">' + (pontuou ? med[pos] : (pos + 1) + 'º') + '</div>'
+      + '<span class="pl-av" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span>'
+      + '<b class="nome">' + x.nome.replace(/</g, '&lt;') + '</b>'
+      + '<div class="num' + (bg.big.length >= 7 ? ' longo' : '') + '" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'' + tipo + '\',\'' + v2norm(x.nome) + '\',\'' + bg.met + '\')"' + (bg.n !== null ? ' data-n="' + bg.n + '"' : '') + '>' + bg.big + '</div><small class="rot">' + bg.rot + '</small>'
+      + '<div class="pl-tubo"><i style="width:' + plPct(x, tipo, topo).toFixed(0) + '%;"></i></div>'
+      + plMinis(x, tipo)
+      + '</div>';
+  };
+  return '<div class="pl-podio">' + caixa(top[1], 1) + caixa(top[0], 0) + caixa(top[2], 2) + '</div>';
+}
+function plDiaADia() {
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  var dias = [], max = 1;
+  for (var i = 6; i >= 0; i--) {
+    var ini = hoje.getTime() - i * 864e5, fim = ini + 864e5, d = { t: ini, marc: 0, re: 0, vd: 0 };
+    (V2.rows || []).forEach(function(r) {
+      var mT = plDataMarcacao(r);
+      if (mT != null && mT >= ini && mT < fim && r.sn !== 'remarcada') d.marc++;
+      var dT = r.date ? r.date.getTime() : null;
+      if (dT != null && dT >= ini && dT < fim) { if (_fsRealizada(r.sn)) d.re++; if (r.sn === 'vendido') d.vd++; }
+    });
+    max = Math.max(max, d.marc, d.re, d.vd);
+    dias.push(d);
+  }
+  var nomes = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  return '<div class="pl-dias">' + dias.map(function(d, i) {
+    var dt = new Date(d.t);
+    var h = function(v){ return Math.max(2, Math.round(v / max * 46)); };
+    return '<div class="pl-dia' + (i === 6 ? ' hoje' : '') + '"><small>' + nomes[dt.getDay()] + ' ' + dt.getDate() + '</small>'
+      + '<div class="pl-barras"><i style="height:' + h(d.marc) + 'px;background:#f6a350;" title="marcadas"></i><i style="height:' + h(d.re) + 'px;background:#6ea8ff;" title="compareceram"></i><i style="height:' + h(d.vd) + 'px;background:#3ddc97;" title="vendas"></i></div>'
+      + '<div class="pl-legs"><span style="color:#f6a350;">' + d.marc + '</span><span style="color:#6ea8ff;">' + d.re + '</span><span style="color:#3ddc97;">' + d.vd + '</span></div></div>';
+  }).join('') + '</div>'
+  + '<div class="hint" style="margin-top:6px;text-align:center;"><span style="color:#f6a350;">■ marcadas</span> &nbsp; <span style="color:#6ea8ff;">■ compareceram</span> &nbsp; <span style="color:#3ddc97;">■ vendas</span> · últimos 7 dias, time todo</div>';
+}
+function plRecordes() {
+  var hoje = new Date(), ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime();
+  var porDia = {}, maiorVenda = null;
+  (V2.rows || []).forEach(function(r) {
+    var mT = plDataMarcacao(r);
+    if (mT != null && mT >= ini && r.sn !== 'remarcada') {
+      var k = new Date(mT).toLocaleDateString('pt-BR') + '|' + plPessoa(r.sdr);
+      porDia[k] = (porDia[k] || 0) + 1;
+    }
+    if (r.sn === 'vendido' && r.date && r.date.getTime() >= ini && (!maiorVenda || r.valor > maiorVenda.valor)) maiorVenda = r;
+  });
+  var melhor = Object.keys(porDia).sort(function(a, b){ return porDia[b] - porDia[a]; })[0];
+  var h = '<div class="pl-recordes">';
+  if (melhor) { var pm = melhor.split('|'); h += '<div>🏆 <b>Recorde do mês em marcações:</b> ' + porDia[melhor] + ' num dia — ' + (pm[1] || 'time') + ' em ' + pm[0] + '</div>'; }
+  if (maiorVenda) h += '<div>💎 <b>Maior venda do mês:</b> ' + v2mil(maiorVenda.valor) + ' — ' + (maiorVenda.closer || '') + (maiorVenda.sdr ? ' · marcou ' + plPessoa(maiorVenda.sdr) : '') + '</div>';
+  return h + '</div>';
+}
+// mini-placar de HOJE para o topo da Visao Geral: 4 numeros + quem esta na frente + atalhos
+function plMiniTopo() {
+  if (!(V2.rows || []).length) return '';
+  var p = plPeriodo('hoje'), d = plCalcular(p), t = d.tot;
+  var abrir = "document.querySelector('.nav-item[data-s=\\'placar\\']').click()";
+  var k = function(cls, rot, n, cor){ return '<div class="mt-k ' + cls + '" onclick="' + abrir + '"><small>' + rot + '</small><b style="color:' + cor + ';">' + n + '</b></div>'; };
+  var lider = function(x, tipo) {
+    if (!x || !plMetrica(x, tipo)) return '<span class="mt-l" style="opacity:.6;"><small>' + (tipo === 'sdr' ? 'nenhuma marcação hoje ainda' : 'nenhuma venda hoje ainda') + '</small></span>';
+    var big = plBig(x, tipo);
+    return '<span class="mt-l" onclick="' + abrir + '" style="cursor:pointer;"><span class="pl-av" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span>👑 ' + x.nome.split(' ')[0].replace(/</g, '&lt;') + ' <small>' + (tipo === 'sdr' ? big.big + ' marcada' + (big.n === 1 ? '' : 's') : big.big + ' vendido') + '</small></span>';
+  };
+  var ordS = PLACAR.ordSdr, ordC = PLACAR.ordCl; PLACAR.ordSdr = 'marc'; PLACAR.ordCl = 'vdV';
+  var top = '<div class="pl-mini-topo">'
+    + '<div class="mt-tit">🏁 Placar de hoje<small>' + p.rot.replace('Hoje · ', '') + ' · clique para abrir o placar completo</small></div>'
+    + '<div class="mt-n">' + k('k1', '📅 MARCADAS', t.marc, '#f6a350') + k('k2', '✅ COMPARECEU', t.re, '#6ea8ff') + k('k3', '🤦 NO-SHOW', t.ns, t.ns ? '#ff6b6b' : '#3ddc97') + k('k4', '💰 VENDIDO', t.vd, '#3ddc97') + '</div>'
+    + '<div class="mt-lider">' + lider(d.sdrs[0], 'sdr') + lider(d.closers[0], 'closer') + '</div>'
+    + '<div class="mt-bt"><button class="pl-chip on" onclick="' + abrir + '">🏁 abrir placar</button><a class="pl-tv" href="' + location.pathname + '#painel=placar" target="_blank">⛶ modo TV</a></div>'
+    + '</div>';
+  PLACAR.ordSdr = ordS; PLACAR.ordCl = ordC;
+  return top;
+}
+function plPer(per) { PLACAR.per = per; renderPlacar(); }
+// ===== 🎉 FESTA: quando alguem marca ou vende, o placar avisa em grande (Bruno 02/09/2026) =====
+var PL_PREV = null, PL_FILA = [], PL_FESTANDO = false;
+function plDetectarNovidades(d) {
+  var atual = {};
+  d.sdrs.forEach(function(x){ atual['s:' + v2norm(x.nome)] = { marc: x.marc, nome: x.nome }; });
+  d.closers.forEach(function(x){ atual['c:' + v2norm(x.nome)] = { vd: x.vd, vdV: x.vdV, nome: x.nome }; });
+  if (PL_PREV) {
+    Object.keys(atual).forEach(function(k) {
+      var a = atual[k], p = PL_PREV[k]; if (!p) return;
+      if (k.charAt(0) === 's' && a.marc > p.marc) plComemorar('marcou', a.nome, a.marc - p.marc);
+      if (k.charAt(0) === 'c' && a.vd > p.vd) plComemorar('vendeu', a.nome, a.vdV - p.vdV);
+    });
+  }
+  PL_PREV = atual;
+}
+function plComemorar(tipo, nome, q) {
+  PL_FILA.push({ tipo: tipo, nome: nome, q: q });
+  if (!PL_FESTANDO) plProximaFesta();
+}
+function plProximaFesta() {
+  var f = PL_FILA.shift();
+  var el = document.getElementById('pl-festa');
+  if (!f) { PL_FESTANDO = false; if (el) el.style.display = 'none'; return; }
+  PL_FESTANDO = true;
+  if (!el) { el = document.createElement('div'); el.id = 'pl-festa'; document.body.appendChild(el); el.onclick = function(){ PL_FILA = []; plProximaFesta(); }; }
+  var cores = ['#ffd166', '#3ddc97', '#6ea8ff', '#ff6b6b', '#b98aff', '#f6a350', '#fff'];
+  var conf = '';
+  for (var i = 0; i < 90; i++) {
+    conf += '<span class="fx-conf" style="left:' + (Math.random() * 100).toFixed(1) + '%;background:' + cores[i % cores.length] + ';animation-duration:' + (2.2 + Math.random() * 2.2).toFixed(2) + 's;animation-delay:' + (Math.random() * 1.2).toFixed(2) + 's;transform:rotate(' + Math.round(Math.random() * 360) + 'deg);"></span>';
+  }
+  var ico = f.tipo === 'vendeu' ? '💰' : '📅';
+  var t1 = f.tipo === 'vendeu' ? 'VENDEU!' : (f.q > 1 ? 'MARCOU ' + f.q + '!' : 'MARCOU!');
+  var t2 = f.tipo === 'vendeu' ? (f.nome + ' fechou ' + (f.q >= 1000 ? v2mil(f.q) : 'uma venda') + ' 🎉') : (f.nome + ' acabou de marcar ' + (f.q > 1 ? f.q + ' reuniões' : 'uma reunião') + ' 🎉');
+  el.innerHTML = conf + '<div class="fx-caixa"><div class="fx-ico">' + ico + '</div><div class="fx-t1">' + f.nome.split(' ')[0].replace(/</g, '&lt;') + ' ' + t1 + '</div><div class="fx-t2">' + t2.replace(/</g, '&lt;') + '</div></div>';
+  el.style.display = 'flex';
+  try { plSomFesta(f.tipo); } catch (e) {}
+  setTimeout(plProximaFesta, 6500);
+}
+// um "tan-tan" curtinho (sem arquivo de som); silencioso se o navegador nao deixar
+function plSomFesta(tipo) {
+  var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  var ctx = plSomFesta._ctx || (plSomFesta._ctx = new AC());
+  var notas = tipo === 'vendeu' ? [523, 659, 784, 1047] : [659, 880];
+  notas.forEach(function(fq, i) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle'; o.frequency.value = fq;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.16);
+    g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + i * 0.16 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.16 + 0.32);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(ctx.currentTime + i * 0.16); o.stop(ctx.currentTime + i * 0.16 + 0.35);
+  });
+}
+function plTestarFesta() { plComemorar('marcou', 'Sarah', 1); plComemorar('vendeu', 'Tony Londe', 3596.4); }
+// quais reunioes entraram na conta de uma pessoa (100% conferivel — Bruno 02/09/2026)
+function plVer(tipo, chave, met) {
+  var d = PLACAR.ultimo; if (!d) return;
+  var lista = tipo === 'time' ? { nome: 'Time todo', l: d.tot.l } : (tipo === 'sdr' ? d.sdrs : d.closers).filter(function(x){ return v2norm(x.nome) === chave; })[0];
+  if (!lista) return;
+  var rows = (lista.l && lista.l[met]) || [];
+  var um = rows.length === 1;
+  var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', pend: um ? 'reunião de hoje AINDA SEM RESULTADO' : 'reuniões de hoje AINDA SEM RESULTADO' }[met] || met;
+  var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
+  var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + lista.nome.replace(/</g, '&lt;') + ' — ' + rows.length + ' ' + rot + '</b>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:10px;">Exatamente as linhas da aba Vendas que entraram nessa conta. Clique no nome para abrir a ficha.</div>';
+  if (!rows.length) h += '<div class="pl-vazio">Nenhuma</div>';
+  rows.forEach(function(r) {
+    var iR = v2reg(r);
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);margin-bottom:6px;font-size:.76rem;">'
+      + '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>'
+      + '<span class="hint" style="margin:0;">' + (r.leadId || '') + '</span>'
+      + '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + '</span>'
+      + '<span class="hint" style="margin:0;">marcada em ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : '') + '</span>'
+      + (met === 'ns' && plDataNoShow(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#ffd166;">no-show em ' + fmt(plDataNoShow(r)) + ' · remarcada</span>' : '')
+      + '<span class="ld-tag">' + (r.status || '') + '</span>'
+      + '<span class="hint" style="margin:0;">' + (tipo === 'sdr' ? 'closer ' + (r.closer || '—') : (tipo === 'closer' ? 'SDR ' + (plPessoa(r.sdr) || '—') : 'closer ' + (r.closer || '—') + ' · SDR ' + (plPessoa(r.sdr) || '—'))) + '</span>'
+      + (r.valor ? '<span class="ld-tag" style="color:#ffd166;">' + v2moeda0(r.valor) + '</span>' : '')
+      + '</div>';
+  });
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open'; ov.style.zIndex = 340;
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(640px,94vw);padding:20px;max-height:90vh;overflow-y:auto;">' + h + '</div>';
+  document.body.appendChild(ov);
+}
+// os numeros inteiros "contam" de 0 ate o valor quando a tela abre (visual de placar)
+function plAnimarNumeros(el) {
+  var reduz = false; try { reduz = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  var alvos = el.querySelectorAll('[data-n]');
+  if (reduz || !alvos.length) return;
+  var t0 = null;
+  function passo(t) {
+    if (!t0) t0 = t;
+    var k = Math.min((t - t0) / 700, 1), e = 1 - Math.pow(1 - k, 3);
+    for (var i = 0; i < alvos.length; i++) { var n = +alvos[i].getAttribute('data-n') || 0; alvos[i].textContent = String(Math.round(n * e)); }
+    if (k < 1) requestAnimationFrame(passo);
+  }
+  requestAnimationFrame(passo);
+}
+function renderPlacar() {
+  var el = document.getElementById('placar-corpo');
+  if (!el) return;
+  if (!(V2.rows || []).length) { el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Carregando a planilha de vendas…</div>'; return; }
+  var p = plPeriodo(PLACAR.per), d = plCalcular(p), t = d.tot;
+  PLACAR.ultimo = d;
+  if (PLACAR.per === 'hoje') { try { plDetectarNovidades(d); } catch (eN) {} }
+  var agoraTxt = new Date().toLocaleTimeString('pt-BR').slice(0, 5);
+  var chip = function(k, rot){ return '<button class="pl-chip' + (PLACAR.per === k ? ' on' : '') + '" onclick="plPer(\'' + k + '\')">' + rot + '</button>'; };
+  var h = '<div class="pl-topo"><h2 class="pl-h2">🏁 Placar <span style="color:#ffd166;">' + p.rot.replace(/</g, '&lt;') + '</span><small>atualizado às ' + agoraTxt + ' · marcadas pela hora da marcação · compareceu, no-show e vendido pela data da reunião</small></h2>'
+    + '<div class="pl-chips">' + chip('hoje', '📆 Hoje') + chip('ontem', 'Ontem') + chip('semana', 'Semana') + chip('mes', 'Mês')
+    + '<button class="pl-chip' + (PLACAR.per === 'datas' ? ' on' : '') + '" id="pl-chip-datas" onclick="plAbrirDatas(this)">📅 ' + (PLACAR.per === 'datas' && PLACAR.de && PLACAR.ate ? PLACAR.de.slice(8, 10) + '/' + PLACAR.de.slice(5, 7) + ' – ' + PLACAR.ate.slice(8, 10) + '/' + PLACAR.ate.slice(5, 7) : 'Período…') + ' ▾</button></div>'
+    + (PLACAR.tv ? '' : '<a class="pl-tv" href="' + location.pathname + '#painel=placar" target="_blank" title="Abre numa aba limpa, letra grande, atualizando sozinho — para deixar num monitor">⛶ modo TV</a>'
+        + '<a class="pl-tv" href="javascript:void(0)" onclick="plTestarFesta()" title="Mostra como fica o aviso quando alguém marca ou vende">🎉 testar festa</a>')
+    + '</div>';
+  var taxaNs = (t.re + t.ns) ? Math.round(t.ns / (t.re + t.ns) * 100) : null;
+  h += '<div class="pl-resumo">'
+    + '<div class="pl-kpi k1" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'marc\')"><small>📅 MARCADAS</small><b style="color:#f6a350;" data-n="' + t.marc + '">' + t.marc + '</b><i>reuniões marcadas no período · clique para ver</i></div>'
+    + '<div class="pl-kpi k2" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'re\')"><small>✅ COMPARECEU</small><b style="color:#6ea8ff;" data-n="' + t.re + '">' + t.re + '</b><i>' + (t.pend ? '<span style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();plVer(\'time\',\'\',\'pend\')">⏳ ' + t.pend + ' de hoje ainda sem resultado</span>' : 'compareceram à reunião no período') + '</i></div>'
+    + '<div class="pl-kpi k3" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'ns\')"><small>🤦 NO-SHOW</small><b style="color:' + (t.ns ? '#ff6b6b' : '#3ddc97') + ';" data-n="' + t.ns + '">' + t.ns + '</b><i>' + (taxaNs !== null ? taxaNs + '% das reuniões do período' : 'ninguém faltou') + '</i></div>'
+    + '<div class="pl-kpi k4" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'vd\')"><small>💰 VENDIDO</small><b style="color:#3ddc97;" data-n="' + t.vd + '">' + t.vd + '</b><i>' + (t.vdV ? v2mil(t.vdV) + ' vendidos' : 'nenhuma venda ainda') + '</i></div>'
+    + '</div>';
+  // ALERTA: SDR ativo que ainda nao marcou nenhuma reuniao hoje (pedido do Bruno 02/09/2026)
+  if (PLACAR.per === 'hoje') {
+    var semMarcar = d.sdrs.filter(function(x){ return !x.marc; }).map(function(x){ return x.nome; });
+    if (semMarcar.length) h += '<div class="pl-alerta"><span style="font-size:1.2rem;">⚠️</span><div>Ainda sem reunião marcada hoje: <u>' + semMarcar.join('</u>, <u>') + '</u><br><small>a primeira marcação tira o aviso · conta pela hora em que a reunião é marcada</small></div></div>';
+  }
+  var topS = d.sdrs.length ? plMetrica(d.sdrs[0], 'sdr') : 0, topC = d.closers.length ? plMetrica(d.closers[0], 'closer') : 0;
+  var ordChips = function(tipo) {
+    var ops = tipo === 'sdr' ? [['marc', 'Marcadas'], ['re', 'Compareceu'], ['vdV', 'Vendido']] : [['vdV', 'Vendido'], ['vd', 'Nº vendas'], ['re', 'Compareceu']];
+    var atual = tipo === 'sdr' ? PLACAR.ordSdr : PLACAR.ordCl;
+    return '<span class="pl-ord">ordem: ' + ops.map(function(o){ return '<button class="pl-chip' + (atual === o[0] ? ' on' : '') + '" onclick="plOrd(\'' + tipo + '\',\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</span>';
+  };
+  var coluna = function(titulo, sub, lista, tipo, topo, vazio) {
+    var hh = '<div class="pl-col"><h3>' + titulo + ' ' + ordChips(tipo) + '</h3>';
+    if (!lista.length) return hh + '<div class="pl-vazio">' + vazio + '</div></div>';
+    var nPodio = Math.min(lista.length, 3);
+    hh += plPodio(lista, tipo, topo);
+    var resto = lista.slice(nPodio);
+    if (resto.length) {
+      hh += (nPodio ? '<div class="pl-resto-titulo">DEMAIS</div>' : '') + resto.map(function(x, i){ return plCard(x, i + nPodio, tipo, topo); }).join('');
+    }
+    return hh + '</div>';
+  };
+  h += '<div class="pl-grid">'
+    + coluna('📞 SDRs', 'ordem: reuniões marcadas · depois realizadas', d.sdrs, 'sdr', topS, 'Nenhuma marcação neste período ainda — a primeira leva o 🥇')
+    + coluna('🏆 Closers', 'ordem: valor vendido · depois nº de vendas', d.closers, 'closer', topC, 'Nenhuma reunião realizada neste período ainda')
+    + '</div>';
+  h += plDiaADia() + plRecordes();
+  el.innerHTML = h;
+  try { plAnimarNumeros(el); } catch (eAn) {}
+}
 </script>
 
 <!-- ===== 📆 CALENDÁRIO ÚNICO (Bruno 01/09/2026): todo campo de data abre este
