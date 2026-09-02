@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-02-1658';
+var VERSAO_DASH = '2026-09-02-1733';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4225,8 +4225,9 @@ function renderV2() {
   var hc = v2calc(v2fRows(V2.rows));
   var pj = v2proj(mc.fat);
   var h = '';
-  // 🏁 mini-placar do dia no topo da Visao Geral (Bruno 02/09/2026: "coloca no topo")
-  try { if (typeof plMiniTopo === 'function') h += plMiniTopo(); } catch (eMp) {}
+  // 🏁 placar do dia no topo da Visao Geral, em versao DISCRETA (uma linha fina) — Bruno 02/09/2026:
+  // "tire da pagina inicial... ou deixe menos destacado no topo"
+  try { if (typeof plMiniTopo === 'function') h += plMiniTopo(true); } catch (eMp) {}
 
   // === HERO ROW ===
   h += '<div class="hero-row">';
@@ -14645,6 +14646,18 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 @keyframes fxCai { to { transform:translateY(110vh) rotate(720deg); opacity:.9; } }
 body.placar-tv #pl-festa .fx-t1 { font-size:4rem; }
 @media (prefers-reduced-motion: reduce) { #pl-festa .fx-caixa, #pl-festa .fx-ico, #pl-festa .fx-conf { animation:none; } }
+/* Avisos da tela inicial ESCONDIDOS a pedido do Bruno (02/09/2026, "tire esses da pagina inicial"):
+   conversas esperando resposta (v2-clint), reuniao sem origem (v2-semorigem),
+   reunioes novas na agenda (v2-avisocloser) e reuniao sem resultado (v2-statuspendente).
+   As funcoes continuam rodando (outras telas usam os mesmos dados); para religar, apague esta regra. */
+#v2-clint, #v2-semorigem, #v2-avisocloser, #v2-statuspendente { display:none !important; }
+/* 🏁 linha discreta do placar no topo da Visao Geral */
+.pl-linha { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; padding:8px 14px; border-radius:12px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); font-size:.74rem; color:var(--muted); cursor:pointer; }
+.pl-linha:hover { background:rgba(255,209,102,.07); border-color:rgba(255,209,102,.35); }
+.pl-linha b { color:var(--text); font-weight:800; }
+.pl-linha span i { font-style:normal; font-weight:900; font-size:.86rem; }
+.pl-linha .pl-linha-lid { color:var(--text2, #9aa3b2); font-weight:700; }
+.pl-linha .pl-linha-abrir { margin-left:auto; color:#6ea8ff; font-weight:800; }
 /* 🏁 mini-placar do dia no topo da Visao Geral */
 .pl-mini-topo { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; padding:12px 16px; border-radius:18px; background:linear-gradient(105deg,#0d0d1e 0%,#15152e 55%,#1b1b3c 100%); border:1px solid rgba(255,209,102,.35); box-shadow:0 8px 26px rgba(0,0,0,.35); }
 .pl-mini-topo .mt-tit { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:1.3rem; letter-spacing:1px; text-transform:uppercase; line-height:1; }
@@ -14984,10 +14997,25 @@ function plRecordes() {
   return h + '</div>';
 }
 // mini-placar de HOJE para o topo da Visao Geral: 4 numeros + quem esta na frente + atalhos
-function plMiniTopo() {
+function plMiniTopo(discreto) {
   if (!(V2.rows || []).length) return '';
   var p = plPeriodo('hoje'), d = plCalcular(p), t = d.tot;
   var abrir = "document.querySelector('.nav-item[data-s=\\'placar\\']').click()";
+  if (discreto) {   // uma linha fina, sem numeros grandes
+    var ordS0 = PLACAR.ordSdr, ordC0 = PLACAR.ordCl; PLACAR.ordSdr = 'marc'; PLACAR.ordCl = 'vdV';
+    var s0 = d.sdrs[0], c0 = d.closers[0];
+    var lS = (s0 && s0.marc) ? '👑 ' + s0.nome.split(' ')[0] + ' (' + s0.marc + ')' : '';
+    var lC = (c0 && c0.vdV) ? '👑 ' + c0.nome.split(' ')[0] + ' (' + v2mil(c0.vdV) + ')' : '';
+    PLACAR.ordSdr = ordS0; PLACAR.ordCl = ordC0;
+    return '<div class="pl-linha" onclick="' + abrir + '" title="Abrir o placar completo">'
+      + '<b>🏁 Placar de hoje</b>'
+      + '<span><i style="color:#f6a350;">' + t.marc + '</i> marcada' + (t.marc === 1 ? '' : 's') + '</span>'
+      + '<span><i style="color:#6ea8ff;">' + t.re + '</i> compareceu</span>'
+      + '<span><i style="color:' + (t.ns ? '#ff6b6b' : '#3ddc97') + ';">' + t.ns + '</i> no-show</span>'
+      + '<span><i style="color:#3ddc97;">' + t.vd + '</i> vendid' + (t.vd === 1 ? 'a' : 'as') + (t.vdV ? ' · ' + v2mil(t.vdV) : '') + '</span>'
+      + (lS || lC ? '<span class="pl-linha-lid">' + [lS, lC].filter(Boolean).join(' · ') + '</span>' : '')
+      + '<span class="pl-linha-abrir">abrir placar →</span></div>';
+  }
   var k = function(cls, rot, n, cor){ return '<div class="mt-k ' + cls + '" onclick="' + abrir + '"><small>' + rot + '</small><b style="color:' + cor + ';">' + n + '</b></div>'; };
   var lider = function(x, tipo) {
     if (!x || !plMetrica(x, tipo)) return '<span class="mt-l" style="opacity:.6;"><small>' + (tipo === 'sdr' ? 'nenhuma marcação hoje ainda' : 'nenhuma venda hoje ainda') + '</small></span>';
