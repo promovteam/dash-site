@@ -2218,7 +2218,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-01-1720';
+var VERSAO_DASH = '2026-09-02-0819';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4347,6 +4347,7 @@ function renderV2() {
     var faixas = ['ouro', 'prata', 'bronze'];
     var medalhas = ['🥇', '🥈', '🥉'];
     var topRe = Math.max.apply(null, lista.map(function(x){ return x.re; }).concat([1]));
+    var topV = Math.max.apply(null, lista.map(function(x){ return x.vdV || 0; }).concat([0]));
     lista.forEach(function(p, i) {
       var num, rotulo, pct, projTxt, linhas;
       if (tipo === 'closer') {
@@ -4359,7 +4360,7 @@ function renderV2() {
           + (projTxt ? '<span class="ps" style="color:#f6a350;">' + projTxt + '</span>' : '');
       } else {
         num = String(p.re); rotulo = 'REALIZADAS';
-        pct = Math.min(p.re / topRe * 100, 100);
+        pct = topV > 0 ? Math.min((p.vdV || 0) / topV * 100, 100) : Math.min(p.re / topRe * 100, 100);
         projTxt = fatorProj ? '📈 projeção: ' + Math.round(p.re * fatorProj) + ' realizadas' : '';
         // o que o SDR VENDEU de verdade (só status Vendido). O bloqueio e a entrada
         // continuam na linha de "possíveis" — ainda não é venda (Bruno 19/08/2026)
@@ -4408,7 +4409,7 @@ function renderV2() {
         + '</div>';
       hh += '<div class="hint" style="margin-top:8px;">💰 conta só "Vendido" · 🔒 possíveis = bloqueio de oferta + entrada · 📈 projeção segue o ritmo do mês</div>';
     } else {
-      hh += '<div class="hint" style="margin-top:8px;">👆 Clique num SDR para abrir o funil e calcular o pagamento · 💰 faturamento = fechamentos das reuniões do SDR · 📈 projeção segue o ritmo do mês</div>';
+      hh += '<div class="hint" style="margin-top:8px;">👆 Clique num SDR para abrir o funil e calcular o pagamento · 🥇 ordem pelo valor vendido · 💰 faturamento = fechamentos das reuniões do SDR · 📈 projeção segue o ritmo do mês</div>';
     }
     return hh + '</div>';
   }
@@ -4462,7 +4463,8 @@ function renderV2() {
   h += '</div>';
 
   // === RANKINGS (depois do gráfico/pizza/últimas) ===
-  var _rkSdrs = rankearPor('sdr', mesRows).sort(function(a, b){ return b.re - a.re || b.feV - a.feV; });
+  // ranking dos SDRs pelo VALOR vendido; empate desfaz por reuniões realizadas (Bruno 01/09/2026)
+  var _rkSdrs = rankearPor('sdr', mesRows).sort(function(a, b){ return b.vdV - a.vdV || b.re - a.re; });
   h += blocoRanking('Resultados — Closers', '🏆', rankearPor('closer', mesRows), 'closer');
   h += blocoRanking('Resultados — SDRs', '📞', _rkSdrs, 'sdr');
 
