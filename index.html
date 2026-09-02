@@ -2218,7 +2218,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-02-0920';
+var VERSAO_DASH = '2026-09-02-1057';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5502,6 +5502,67 @@ function _grupoAttr(nomes) {
 var _clintNomeIdx = null, _clintNomeIdxN = 0, _clintNomeCache = {};
 // "Michelly" e "Michely" são a mesma pessoa: compara sem acento e sem letra dobrada
 function _nomeChave(n) { return v2norm(n).replace(/(.)\1+/g, '$1'); }
+// quantas letras separam duas palavras (trocar/tirar/pôr) — para achar nome escrito diferente
+function _distLetras(a, b) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  var prev = [], cur, i, j;
+  for (j = 0; j <= b.length; j++) prev[j] = j;
+  for (i = 1; i <= a.length; i++) {
+    cur = [i];
+    for (j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+// acha o lead da base por NOME + UMA SEGUNDA PROVA (regra do Bruno 19/08/2026: nome sozinho
+// nunca — repete demais). As provas aceitas: (a) outra reuniao da mesma pessoa (mesmo nome)
+// que TEM telefone e esse telefone esta na base com o mesmo nome; (b) a Clint conhece esse
+// nome exato e o telefone dela esta na base com o mesmo nome. Caso Iane Denucci (L-289 sem
+// telefone; L-943 e a Clint tem o numero) — 02/09/2026
+function ldPorNomeComProva(nome, ignorarR) {
+  var ch = _nomeChave(nome || '');
+  if (ch.length < 5) return null;
+  var mesmoNome = function(x){ return x.tel8 && _nomeChave(x.nome || '') === ch; };
+  var outras = (V2.rows || []).filter(function(x){ return x !== ignorarR && _nomeChave(x.nome || '') === ch && ldTel8(x.telefone); });
+  for (var k = 0; k < outras.length; k++) {
+    var tk = ldTel8(outras[k].telefone);
+    var l1 = (LD.rows || []).filter(function(x){ return x.tel8 === tk && mesmoNome(x); })[0];
+    if (l1) return { lead: l1, como: 'nome + telefone de outra reunião dela' };
+  }
+  try {
+    var pc = clintPorNome(nome);
+    if (pc && pc.tel8) {
+      var l2 = (LD.rows || []).filter(function(x){ return x.tel8 === pc.tel8 && mesmoNome(x); })[0];
+      if (l2) return { lead: l2, como: 'nome + telefone da Clint' };
+    }
+  } catch (e) {}
+  return null;
+}
+// leads cujo nome PARECE com o que foi digitado: TODA palavra digitada (3+ letras) tem que
+// bater com alguma palavra do nome; a tolerancia cresce com o tamanho da palavra
+// (ate 4 letras: igual · 5-6 letras: 1 de diferenca · 7+: 2), letra dobrada nao conta.
+// Ordena do mais parecido para o menos. ("Iane Denicci" -> so "Iane Denucci", nao as Denises)
+function ldNomesParecidos(q, rows) {
+  var pal = _nomeChave(q).split(' ').filter(function(p){ return p.length >= 3; });
+  if (!pal.length) return [];
+  var tol = function(p){ return p.length <= 4 ? 0 : (p.length <= 6 ? 1 : 2); };
+  var out = [];
+  (rows || []).forEach(function(l) {
+    var toks = _nomeChave(l.nome || '').split(' '), soma = 0;
+    for (var i = 0; i < pal.length; i++) {
+      var melhor = 99;
+      for (var j = 0; j < toks.length; j++) { var d = toks[j].indexOf(pal[i]) === 0 ? 0 : _distLetras(pal[i], toks[j]); if (d < melhor) melhor = d; }   // comeco da palavra vale ("Ian" acha Iane)
+      if (melhor > tol(pal[i])) return;
+      soma += melhor;
+    }
+    out.push({ l: l, d: soma });
+  });
+  out.sort(function(a, b){ return a.d - b.d; });
+  return out.slice(0, 30).map(function(x){ return x.l; });
+}
 function clintPorNome(nome) {
   if (!CLINT_PAINEL || !CLINT_PAINEL.success || !nome) return null;
   var alvo = _nomeChave(nome);
@@ -10555,10 +10616,20 @@ function renderLeads() {
   montarFiltrosLeads();
   montarSeletorEu();
   var per = ldPeriodo();
-  var rows = ldFiltrar(per.rows);
+  // quem digita um nome/telefone quer ACHAR a pessoa: procura na base inteira, nao so no
+  // periodo marcado (Iane, que preencheu em fevereiro, nao aparecia com "Hoje" — 02/09/2026)
+  var rows = ldFiltrar(LD_BUSCA ? (LD.rows || []) : per.rows);
+  var _buscaParecida = '';
   if (LD_BUSCA) {
     var t = v2norm(LD_BUSCA);
-    rows = rows.filter(function(l){ return v2norm(l.nome).indexOf(t) !== -1 || String(l.tel).indexOf(t) !== -1; });
+    var _exatos = rows.filter(function(l){ return v2norm(l.nome).indexOf(t) !== -1 || String(l.tel).indexOf(t) !== -1; });
+    // nao achou nada e a pessoa digitou um NOME (nao telefone): mostra os parecidos
+    // (caso Iane "Denicci" x "Denucci" na base — Bruno 02/09/2026)
+    if (!_exatos.length && !/\d/.test(t) && t.length >= 5) {
+      _exatos = ldNomesParecidos(t, rows);
+      if (_exatos.length) _buscaParecida = t;
+    }
+    rows = _exatos;
   }
   // funil: chegaram → MQL → agendaram → realizaram → vendido
   var mql = rows.filter(function(l){ return l.faixa === 'alta' || l.faixa === 'media'; });
@@ -10581,6 +10652,12 @@ function renderLeads() {
   ];
   var topo = Math.max(rows.length, 1);
   var h = '';
+  if (_buscaParecida) {
+    h += '<div class="hint" style="margin-bottom:12px;padding:9px 12px;border-radius:10px;background:rgba(246,163,80,.1);border:1px solid rgba(246,163,80,.45);color:#f6a350;font-weight:700;">'
+      + '🔎 Não achei ninguém escrito exatamente "' + String(LD_BUSCA).replace(/</g, '&lt;') + '" — mostrando ' + rows.length + ' nome' + (rows.length === 1 ? '' : 's') + ' parecido' + (rows.length === 1 ? '' : 's') + ' (uma ou duas letras de diferença), procurando na base inteira.</div>';
+  } else if (LD_BUSCA) {
+    h += '<div class="hint" style="margin-bottom:12px;">🔎 Procurando "' + String(LD_BUSCA).replace(/</g, '&lt;') + '" na <b>base inteira</b> (não só no período marcado) · ' + rows.length + ' encontrado' + (rows.length === 1 ? '' : 's') + '</div>';
+  }
   if (LD.modoSimples) {
     h += '<div class="panel" style="margin-bottom:16px;border-color:rgba(246,163,80,.5);background:rgba(246,163,80,.06);">'
       + '<b style="font-size:.86rem;color:#f6a350;">⚠️ Modo simples — as datas recentes não são confiáveis aqui</b>'
@@ -11297,9 +11374,15 @@ function acharLeadDeTodoJeito(r, pagDele) {
       if (achou) como = 'Instagram';
     }
   }
-  // Nome fica de fora de propósito (decisão do Bruno 19/08/2026): "Patrícia",
+  // Nome SOZINHO fica de fora de propósito (decisão do Bruno 19/08/2026): "Patrícia",
   // "Juliana Souza" e outros se repetem na base e juntavam pessoas diferentes.
   // Telefone, e-mail e @ são únicos — é neles que dá para confiar.
+  // Reunião SEM telefone: vale nome + uma segunda prova (telefone de outra reunião dela
+  // ou da Clint, batendo com o mesmo nome na base) — caso Iane Denucci 02/09/2026
+  if (!achou && !t8 && r.nome) {
+    var np = ldPorNomeComProva(r.nome, r);
+    if (np) { achou = np.lead; como = np.como; }
+  }
   return achou ? { lead: achou, como: como } : null;
 }
 // a reunião está sem telefone e a Clint sabe qual é: um clique grava na planilha
@@ -11784,7 +11867,30 @@ window.__gvizPagV2 = function(resp) {
     montarPagamentos();
   } catch (e) { console.error('pagamentos:', e); }
 };
+// Le a aba do formulario de venda pelo CSV bruto (export) — o gviz trata a coluna
+// "Valor total" como numero e DEVOLVE VAZIO nas celulas escritas como texto
+// ("R$ 3.596,40": 16 vendas do Legado desde 25/08/2026 sumiram do Pagamentos).
+// O CSV traz o texto como esta; monta uma tabela no mesmo formato do gviz e usa o
+// mesmo leitor. Se o CSV falhar, cai no gviz de antes. (Bruno 02/09/2026)
 function carregarPag() {
+  var url = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/export?format=csv&gid=' + V2_GID_PAG + '&_t=' + Date.now();
+  fetch(url).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }).then(function(txt) {
+    var linhas = ldCSV(txt);
+    if (!linhas.length || linhas[0].length < 5) throw new Error('csv vazio');
+    var cols = linhas[0].map(function(h){ return { label: String(h || '').trim(), type: 'string' }; });
+    var rows = [];
+    for (var i = 1; i < linhas.length; i++) {
+      var ln = linhas[i];
+      if (!ln || !ln.join('').trim()) continue;
+      rows.push({ c: ln.map(function(v){ return { v: v === undefined ? '' : String(v) }; }) });
+    }
+    __gvizPagV2({ table: { cols: cols, rows: rows } });
+  }).catch(function(e) {
+    console.warn('pagamentos: CSV falhou (' + (e && e.message) + '), usando gviz');
+    _carregarPagGviz();
+  });
+}
+function _carregarPagGviz() {
   var old = document.getElementById('v2-gviz-pag'); if (old) old.remove();
   var s = document.createElement('script');
   s.id = 'v2-gviz-pag';
@@ -13511,10 +13617,32 @@ function ldVincularReuniao(iLead, iReu) {
 // ===== 📅 DO LEAD DIRETO PARA A AGENDA (Bruno 23/08/2026) =====
 // Na ficha do lead: "Marcar reunião" abre a AGENDA de verdade; a pessoa escolhe
 // o closer e clica num horário livre — o formulário abre já preenchido com o lead.
+// o "lead" pode ter chegado so com o nome (reuniao antiga sem telefone na planilha — caso
+// Iane Denucci L-289, 02/09/2026) ou so com o telefone (botao da Clint): completa com a
+// pessoa da base pelo telefone, senao pelo nome exato (unico), senao pelo cadastro da Clint
+function _ldCompletarPessoa(l, i) {
+  if (!l) return l;
+  if (l.tel8 && l.i !== undefined && l.invest !== undefined) return l;   // ja e um lead da base
+  var achado = null;
+  if (l.tel8) achado = (LD.rows || []).filter(function(x){ return x.tel8 === l.tel8; })[0] || null;
+  if (!achado && l.nome) {
+    var np = ldPorNomeComProva(l.nome, null);   // nome + segunda prova (nunca nome sozinho)
+    if (np) achado = np.lead;
+    if (!achado) {
+      try { var pc = clintPorNome(l.nome); if (pc && pc.tel) { l.tel = pc.tel; l.tel8 = pc.tel8; } } catch (e) {}   // pelo menos o telefone da Clint
+    }
+  }
+  if (achado && achado !== l) {
+    if (i != null) { achado._reg = i; _ldReg[i] = achado; }
+    return achado;
+  }
+  return l;
+}
 function marcarReuniaoDoLead(i) {
   if (soOlhar()) return;
   var l = _ldReg[i];
   if (!l) return;
+  try { l = _ldCompletarPessoa(l, i); } catch (eC) {}
   window._agLeadEscolhido = l;
   try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {}
   var item = document.querySelector('.nav-item[data-s="agenda"]');

@@ -749,6 +749,13 @@ function togglePagamento() {
 function parseValor(str) {
   return parseFloat((str || '').replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
+// manda o dinheiro LIMPO para a planilha ("R$ 3.596,40" -> "3596.4"); texto com R$ virava
+// texto na planilha e o dash nao enxergava o valor (02/09/2026)
+function valorLimpo(id) {
+  var el = document.getElementById(id);
+  var n = parseValor(el ? el.value : '');
+  return n > 0 ? String(Math.round(n * 100) / 100) : '';
+}
 
 function calcParcela() {
   var parcelas = document.getElementById('v-parcelas').value;
@@ -973,14 +980,14 @@ function submitVenda() {
     vendedor: document.getElementById('v-vendedor').value,
     sdr: document.getElementById('v-sdr').value,
     programa: document.getElementById('v-programa').value,
-    valor_total: document.getElementById('v-valor').value,
+    valor_total: valorLimpo('v-valor'),
     entrada: document.getElementById('v-ent-s').checked ? 'Sim' : 'Não',
-    valor_entrada: document.getElementById('v-entrada-valor').value,
+    valor_entrada: valorLimpo('v-entrada-valor'),
     forma_pagamento: pgto,
     parcelas: (pgto === 'Cartão de crédito') ? document.getElementById('v-parcelas').value : '',
-    valor_parcela: (pgto === 'Cartão de crédito') ? document.getElementById('v-parcela-valor').value : '',
+    valor_parcela: (pgto === 'Cartão de crédito') ? valorLimpo('v-parcela-valor') : '',
     recorrente_vezes: (pgto === 'Cartão recorrente') ? document.getElementById('v-recorrente-vezes').value : '',
-    valor_mensal: (pgto === 'Cartão recorrente') ? document.getElementById('v-recorrente-valor').value : '',
+    valor_mensal: (pgto === 'Cartão recorrente') ? valorLimpo('v-recorrente-valor') : '',
     link_clint: document.getElementById('v-clint').value,
     observacao: document.getElementById('v-obs').value,
     teve_bloqueio: window.__teveBloqueio || '',
@@ -1096,13 +1103,13 @@ function submitBloqueio() {
     vendedor: document.getElementById('b-vendedor').value,
     sdr: document.getElementById('b-sdr').value,
     programa: document.getElementById('b-programa').value,
-    valor_total: document.getElementById('b-valor').value,
-    valor_bloqueio: document.getElementById('b-bloqueio-valor').value,
+    valor_total: valorLimpo('b-valor'),
+    valor_bloqueio: valorLimpo('b-bloqueio-valor'),
     forma_pagamento: pgto,
     parcelas: (pgto === 'Cartão de crédito') ? document.getElementById('b-parcelas').value : '',
-    valor_parcela: (pgto === 'Cartão de crédito') ? document.getElementById('b-parcela-valor').value : '',
+    valor_parcela: (pgto === 'Cartão de crédito') ? valorLimpo('b-parcela-valor') : '',
     recorrente_vezes: (pgto === 'Cartão recorrente') ? document.getElementById('b-recorrente-vezes').value : '',
-    valor_mensal: (pgto === 'Cartão recorrente') ? document.getElementById('b-recorrente-valor').value : '',
+    valor_mensal: (pgto === 'Cartão recorrente') ? valorLimpo('b-recorrente-valor') : '',
     nome: document.getElementById('b-nome').value,
     celular: document.getElementById('b-cel').value,
     email: document.getElementById('b-email').value,
