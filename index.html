@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-02-1750';
+var VERSAO_DASH = '2026-09-02-1805';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -14825,6 +14825,15 @@ function plDataNoShow(r) {
   if (m) { var ano = r.date ? r.date.getFullYear() : new Date().getFullYear(); return new Date(ano, +m[2] - 1, +m[1]).getTime(); }
   return r.date ? r.date.getTime() : null;
 }
+// reuniao remarcada que continua "No-Show": alem da falta antiga (dia "era"), se a NOVA hora ja
+// passou e ninguem mudou o status, a pessoa faltou de novo — conta no dia novo tambem
+// (caso Bruna L-910: 25/08 -> remarcada para 02/09 10:00, seguiu No-Show — Bruno 02/09/2026)
+function plNoShowDeNovo(r) {
+  var m = String(r.obs || '').match(/Remarcada para (\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?[^()]*\(era \d{1,2}\/\d{1,2}\)/);
+  if (!m || !r.date) return false;
+  var novo = new Date(r.date.getFullYear(), +m[2] - 1, +m[1], m[3] ? +m[3] : 23, m[4] ? +m[4] : 59);
+  return novo.getTime() + 60 * 60000 < Date.now();   // a hora nova ja passou ha mais de 1h e o status ficou No-Show (nao conta reuniao em andamento)
+}
 // conta, para um periodo, o que cada SDR e cada closer fez
 function plCalcular(p) {
   var S = {}, C = {}, tot = { marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, pend: 0, l: { marc: [], re: [], ns: [], vd: [], pend: [] } };
@@ -14846,13 +14855,15 @@ function plCalcular(p) {
     var mT = plDataMarcacao(r);
     if (no(mT) && r.sn !== 'remarcada' && !plEhCloser(r.sdr)) { tot.marc++; tot.l.marc.push(r); if (s) { s.marc++; s.l.marc.push(r); } }
     var ehNs = r.sn === 'no show', nsT = ehNs ? plDataNoShow(r) : null;
-    var nsRemarcado = ehNs && nsT !== dT;   // no-show antigo, reuniao nova ainda por acontecer
+    var faltouDeNovo = ehNs && nsT !== dT && plNoShowDeNovo(r);   // remarcada, hora nova ja passou, continua No-Show
+    var nsRemarcado = ehNs && nsT !== dT && !faltouDeNovo;          // no-show antigo, reuniao nova ainda por acontecer
     if (no(dT)) {
       if (_fsRealizada(r.sn)) { tot.re++; tot.l.re.push(r); if (s) { s.re++; s.l.re.push(r); } if (c) { c.re++; c.l.re.push(r); } }
       if (r.sn === 'vendido') { tot.vd++; tot.vdV += r.valor || 0; tot.l.vd.push(r); if (s) { s.vd++; s.vdV += r.valor || 0; s.l.vd.push(r); } if (c) { c.vd++; c.vdV += r.valor || 0; c.l.vd.push(r); } }
       if (p.per === 'hoje' && (r.sn.indexOf('agendada') !== -1 || r.sn === 'remarcada' || nsRemarcado)) { tot.pend++; tot.l.pend.push(r); }
     }
     if (ehNs && no(nsT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
+    if (faltouDeNovo && no(dT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
     // no-show que depois foi remarcado: fica a marca "No-show em dd/mm" na observacao
     var mNs = String(r.obs || '').match(/No-show em (\d{1,2})\/(\d{1,2})/g) || [];
     mNs.forEach(function(x) {
