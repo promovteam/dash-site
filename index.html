@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-02-1743';
+var VERSAO_DASH = '2026-09-02-1750';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -15060,6 +15060,19 @@ function plMiniTopo(discreto) {
   return top;
 }
 function plPer(per) { PLACAR.per = per; renderPlacar(); }
+// marca No-Show direto da lista "ainda sem resultado" do placar (mesma gravacao da tela de resultados)
+function plMarcarNoShow(iR, btn) {
+  if (soOlhar()) { alert('O Visitante não altera status.'); return; }
+  var r = _v2reg[iR]; if (!r) return;
+  if (!confirm('Marcar NO-SHOW para ' + (r.nome || 'esta reunião') + ' (' + (r.date ? r.date.toLocaleDateString('pt-BR') : '') + ')?\n\nGrava na planilha e na agenda.')) return;
+  r.status = 'No-Show'; r.sn = 'no show';
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'No-Show', dataRef: v2dataRef(r), gid: V2_GID });
+  try { sincronizarStatusEvento(r); } catch (e) {}
+  if (btn) { var linha = btn.closest('div[style*="border-radius:10px"]'); if (linha) { linha.style.opacity = '.5'; linha.innerHTML = '<span style="font-size:.78rem;color:#ff6b6b;font-weight:700;">🤦 ' + (r.nome || '') + ' — No-Show · salvo na planilha</span>'; } }
+  try { avisoRapido('🤦 No-show marcado: ' + (r.nome || '')); } catch (e) {}
+  try { renderPlacar(); } catch (e) {}
+  try { renderV2(); } catch (e) {}
+}
 // ===== 🎉 FESTA: quando alguem marca ou vende, o placar avisa em grande (Bruno 02/09/2026) =====
 var PL_PREV = null, PL_FILA = [], PL_FESTANDO = false;
 function plDetectarNovidades(d) {
@@ -15138,8 +15151,12 @@ function plVer(tipo, chave, met) {
       + '<span class="ld-tag">' + (r.status || '') + '</span>'
       + '<span class="hint" style="margin:0;">' + (tipo === 'sdr' ? 'closer ' + (r.closer || '—') : (tipo === 'closer' ? 'SDR ' + (plPessoa(r.sdr) || '—') : 'closer ' + (r.closer || '—') + ' · SDR ' + (plPessoa(r.sdr) || '—'))) + '</span>'
       + (r.valor ? '<span class="ld-tag" style="color:#ffd166;">' + v2moeda0(r.valor) + '</span>' : '')
+      + (met === 'pend' ? '<span style="margin-left:auto;display:flex;gap:6px;">'
+          + '<button class="btn-assumir" style="padding:5px 10px;font-size:.7rem;background:rgba(255,107,107,.16);color:#ff6b6b;border:1px solid rgba(255,107,107,.5);" onclick="event.stopPropagation();plMarcarNoShow(' + iR + ', this)">🤦 No-show</button>'
+          + '<button class="btn-assumir" style="padding:5px 10px;font-size:.7rem;" onclick="event.stopPropagation();this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')" title="Abre a ficha para marcar vendido, não vendido, bloqueio…">✅ compareceu → ficha</button></span>' : '')
       + '</div>';
   });
+  if (met === 'pend' && rows.length) h += '<div class="hint" style="margin-top:4px;">🤦 No-show grava na planilha na hora e espelha na agenda. Se a pessoa compareceu, abra a ficha e escolha o resultado (vendido, não vendido, bloqueio…).</div>';
   var ov = document.createElement('div');
   ov.className = 'modal-overlay open'; ov.style.zIndex = 340;
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
