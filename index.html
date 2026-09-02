@@ -2218,7 +2218,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-02-0819';
+var VERSAO_DASH = '2026-09-02-0920';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2317,6 +2317,20 @@ function isRe(sn){ return RE_SET.indexOf(sn) !== -1; }
 function isFe(sn){ return FE_SET.indexOf(sn) !== -1; }
 
 // ---------- carga da planilha (gviz JSONP) ----------
+// faixa vermelha fixa quando o titulo da coluna A da aba Vendas nao e "Nome"
+function avisarCabecalhoVendas(rotuloErrado) {
+  var el = document.getElementById('aviso-cabecalho');
+  if (!rotuloErrado) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'aviso-cabecalho';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:#c0392b;color:#fff;font-weight:800;font-size:.8rem;padding:9px 16px;text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.5);';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '⚠️ Na planilha, aba <b>Vendas</b>, o título da coluna A está como "<b>' + rotuloErrado.replace(/</g, '&lt;') + '</b>" em vez de "<b>Nome</b>". '
+    + 'Enquanto isso, <u>nada que for marcado no dash é gravado</u> (status, observações, vínculos). '
+    + 'Conserto: abra a planilha, clique na célula <b>A1</b> da aba Vendas, escreva <b>Nome</b> e dê Enter.';
+}
 window.__gvizV2 = function(resp) {
   try {
     var table = resp.table;
@@ -2330,7 +2344,12 @@ window.__gvizV2 = function(resp) {
       }
       return -1;
     }
-    var iNome = idxDe('nome', 'coluna_1', 'lead', 'cliente'); if (iNome < 0) iNome = 0;
+    var iNome = idxDe('nome', 'coluna_1', 'lead', 'cliente');
+    // titulo "Nome" sumiu da linha 1 da aba Vendas (02/09/2026: alguem digitou "F" por cima).
+    // O dash le do mesmo jeito, mas o ROBO nao acha mais nenhuma linha e NADA que a
+    // equipe marca e gravado -> avisa em vermelho no topo ate alguem consertar
+    try { avisarCabecalhoVendas(iNome < 0 ? String(table.cols[0].label || '(vazio)') : ''); } catch (eCab) {}
+    if (iNome < 0) iNome = 0;
     var iTel = idxDe('telefone', 'celular', 'whatsapp');
     var iProd = idxDe('produto');
     var iSt = idxDe('status');
