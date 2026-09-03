@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-03-0920';
+var VERSAO_DASH = '2026-09-03-1215';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5097,6 +5097,11 @@ function abrirAtendimentoClint(ev, i) {
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
     if (d && d.success) CLINT[t8] = d;
     var alvo = (d && d.success && d.chatId) ? 'https://app.clint.digital/chat/' + d.chatId : (clintLink(l) || reserva);
+    if (!(d && d.success && d.chatId)) {   // nao achou a conversa: avisa antes de abrir o cadastro
+      try { win.document.body.innerHTML = '<div style="text-align:center;padding:20px;">🟣 ' + (d && d.success && !d.temConversa ? 'Essa pessoa ainda <b>não tem conversa</b> na Clint' : 'Não consegui achar a conversa agora' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '')) + '.<br><small>Abrindo o cadastro dela…</small></div>'; } catch (e) {}
+      setTimeout(function(){ try { win.location = alvo; } catch (e) {} }, 1600);
+      return;
+    }
     try { win.location = alvo; } catch (e) {}
   }
   window[nome] = fim;
@@ -5106,7 +5111,7 @@ function abrirAtendimentoClint(ev, i) {
   if (!cid) { try { var pn2 = clintPorNome(l.nome); if (pn2) cid = pn2.contatoId; } catch (e) {} }
   s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintLead', telefone: l.tel, contatoId: cid }));
   document.body.appendChild(s);
-  setTimeout(function(){ fim(null); }, 20000);
+  setTimeout(function(){ fim(null); }, 45000);   // o robo faz 3 a 4 consultas na Clint (5 a 10 s; em hora cheia mais)
   return false;
 }
 function abrirAtendimentoClintPor(ev, tel, nome) {
@@ -5151,10 +5156,33 @@ var _espAvisados = {};
 // botão "não existia". Agora o dash mostra o estado, o motivo, e tenta de novo
 // sozinho em 30s (depois 60s, 120s) em vez de esperar 5 minutos.
 var CP_STATUS = { estado: 'nunca', motivo: '', quando: 0, falhas: 0 };
+// o ultimo painel bom fica guardado no navegador (Bruno 03/09/2026: "fica em Conectando a Clint"):
+// ao abrir o dash, os botoes 🟣, etapas e donos aparecem NA HORA com esses dados, e o painel
+// novo chega por tras. Vale por ate 24h.
+var CP_GUARDADO_CHAVE = 'v2ClintPainelGuardado';
+function _cpGuardar(d) {
+  try {
+    var enx = {}; for (var k in d) if (d.hasOwnProperty(k) && k !== 'esperando' && k !== 'estourados') enx[k] = d[k];
+    localStorage.setItem(CP_GUARDADO_CHAVE, JSON.stringify({ quando: Date.now(), dados: enx }));
+  } catch (e) { try { localStorage.removeItem(CP_GUARDADO_CHAVE); } catch (e2) {} }
+}
+function _cpUsarGuardado() {
+  try {
+    var g = JSON.parse(localStorage.getItem(CP_GUARDADO_CHAVE) || 'null');
+    if (!g || !g.dados || !g.dados.success || !g.dados.mapa) return false;
+    if (Date.now() - g.quando > 24 * 3600000) return false;
+    g.dados.esperando = g.dados.esperando || []; g.dados.estourados = g.dados.estourados || [];
+    g.dados._guardadoEm = g.quando;
+    CLINT_PAINEL = g.dados;
+    CP_STATUS = { estado: 'guardado', motivo: '', quando: g.quando, falhas: 0 };
+    return true;
+  } catch (e) { return false; }
+}
 function carregarClintPainel() {
   if (_cpPedindo) return;
   _cpPedindo = true;
-  CP_STATUS.estado = 'pedindo';
+  if (CLINT_PAINEL === null) _cpUsarGuardado();
+  if (CP_STATUS.estado !== 'guardado') CP_STATUS.estado = 'pedindo';
   renderClintStatus();
   var nome = 'cpCb' + Math.random().toString(36).slice(2, 8);
   var s = document.createElement('script');
@@ -5164,8 +5192,9 @@ function carregarClintPainel() {
     try { s.remove(); } catch (e) {}
     try { delete window[nome]; } catch (e) {}
     if (d && d.success) {
-      var primeira = CLINT_PAINEL === null;
+      var primeira = CLINT_PAINEL === null || !!(CLINT_PAINEL && CLINT_PAINEL._guardadoEm);
       CLINT_PAINEL = d;
+      _cpGuardar(d);
       CP_STATUS = { estado: 'ok', motivo: '', quando: Date.now(), falhas: 0 };
       avisarEsperando(primeira);
       renderLeads();
@@ -5182,6 +5211,7 @@ function carregarClintPainel() {
       CP_STATUS.quando = Date.now();
       CP_STATUS.motivo = motivo || (d && d.error ? 'o robô respondeu com erro: ' + d.error : 'o robô não devolveu o painel');
       if (!CLINT_PAINEL) { CLINT_PAINEL = d || { success: false }; renderLeads(); }
+      if (CLINT_PAINEL && CLINT_PAINEL._guardadoEm) CP_STATUS.estado = 'guardado';   // segue com o guardado
       // tenta de novo logo: 30s, 60s, 120s (depois volta ao ritmo normal de 5 min)
       if (CP_STATUS.falhas <= 3) setTimeout(carregarClintPainel, [30000, 60000, 120000][CP_STATUS.falhas - 1]);
     }
@@ -5206,6 +5236,14 @@ function renderClintStatus() {
     el.innerHTML = '<div class="hint" style="margin:-6px 0 10px;text-align:right;">🟣 Clint conectada'
       + (n ? ' · ' + n.toLocaleString('pt-BR') + ' negócios' : '')
       + ' · atualizado às ' + new Date(CP_STATUS.quando).toLocaleTimeString('pt-BR').slice(0, 5) + '</div>';
+    return;
+  }
+  if (st === 'guardado' && CLINT_PAINEL && CLINT_PAINEL.success) {
+    var nG = Object.keys(CLINT_PAINEL.mapa || {}).length;
+    var hG = new Date(CP_STATUS.quando);
+    var quandoG = (hG.toDateString() === new Date().toDateString() ? '' : hG.toLocaleDateString('pt-BR').slice(0, 5) + ' ') + hG.toLocaleTimeString('pt-BR').slice(0, 5);
+    el.innerHTML = '<div class="hint" style="margin:-6px 0 10px;text-align:right;">🟣 Clint · ' + nG.toLocaleString('pt-BR') + ' negócios · dados de ' + quandoG
+      + (_cpPedindo ? ' · <span style="color:#b9a6ff;">⏳ atualizando…</span>' : ' · <span style="cursor:pointer;text-decoration:underline;" onclick="carregarClintPainel()">atualizar</span>') + '</div>';
     return;
   }
   if (st === 'pedindo' && !(CLINT_PAINEL && CLINT_PAINEL.success)) {
@@ -10051,6 +10089,7 @@ function abrirFichaLead(i) {
   if (lNovo !== l) { _ldReg[i] = lNovo; lNovo._reg = i; l = lNovo; }
   guardarListaModal();
   _ldFichaAberta = l;
+  try { if (l.tel && CLINT[ldTel8(l.tel)] === undefined) clintPerguntar(l, null); } catch (eCp) {}   // adianta a busca da conversa
   var st = ldSituacao(l);
   var sit = st ? (st.vd ? '💰 Virou VENDA' : st.re ? '✅ Fez a reunião' : '📅 Reunião agendada') : '⏳ Ainda não agendou reunião';
   var _FXs = { alta:['🔥 Prioridade máxima','#f6a350'], media:['🟡 Prioridade menor','#6ea8ff'], nda:['⚪ Sem disponibilidade','#8b8fa3'], sem:['⚪ Não respondeu','#8b8fa3'] };
