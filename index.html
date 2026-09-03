@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-02-1805';
+var VERSAO_DASH = '2026-09-03-0000';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2421,6 +2421,7 @@ window.__gvizV2 = function(resp) {
     renderV2();
     try { if (typeof renderPlacar === 'function' && telaVisivel('s-placar')) renderPlacar(); } catch (ePl) {}
     try { if (typeof plDetectarNovidades === 'function') plDetectarNovidades(plCalcular(plPeriodo('hoje'))); } catch (ePf) {}   // 🎉 festa em qualquer aba
+    try { if (typeof plSincronizarAgenda === 'function' && typeof APPS_SCRIPT_URL !== 'undefined') setTimeout(function(){ plSincronizarAgenda(false); }, 1500); } catch (eSa) {}   // 📆 no-shows que so estao na agenda
     carimbarManuais();
     // aba Leads: agora dá para casar lead ↔ venda pelo telefone
     if (typeof LD !== 'undefined' && LD.carregado) renderLeads();
@@ -14872,6 +14873,12 @@ function plCalcular(p) {
       if (no(t)) { tot.ns++; if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
     });
   });
+  // no-shows que so existem na AGENDA (evento cinza sem linha na planilha) entram na conta
+  (PL_AG.extras || []).forEach(function(x) {
+    var t = x.date ? x.date.getTime() : null; if (!no(t)) return;
+    var s2 = sd(x.sdr), c2 = cd(x.closer);
+    tot.ns++; tot.l.ns.push(x); if (s2) { s2.ns++; s2.l.ns.push(x); } if (c2) { c2.ns++; c2.l.ns.push(x); }
+  });
   // quem esta ATIVO aparece em todo periodo mesmo zerado ("se tiver 0 coloca no ranking tambem" — Bruno 02/09/2026)
   plSdrsAtivos().forEach(function(n){ if (ehCloser(n)) return; var k = v2norm(n); if (!S[k]) S[k] = novo(n); S[k].ativo = true; });
   closersAtivos.forEach(function(n){ var k = v2norm(n); if (!C[k]) C[k] = novo(n); C[k].ativo = true; });
@@ -15071,6 +15078,111 @@ function plMiniTopo(discreto) {
   return top;
 }
 function plPer(per) { PLACAR.per = per; renderPlacar(); }
+// ===== 📆 REGRA QUE PEGA TODOS (Bruno 02/09/2026): o placar le a agenda dos closers e trata como
+// no-show toda reuniao JA PASSADA cujo evento esta cinza (cor 8) ou marcado ##STATUS:noshow## —
+// mesmo que o closer tenha pintado direto no Google. Tres situacoes:
+//   (a) linha da planilha NA MESMA DATA ainda "agendada"/"remarcada" -> grava No-Show nela;
+//   (b) linha existe mas em OUTRA data (foi remarcada) ou ja tem outro status -> anota
+//       "🔴 No-show em dd/mm ##NOSHOW##" na observacao (o placar conta pela anotacao);
+//   (c) nao existe linha -> o placar conta o evento direto da agenda ("so na agenda").
+// Nunca escreve por cima de vendido/nao vendido/bloqueio na mesma data.
+var PL_AG = { cache: {}, buscando: {}, feitos: {}, extras: [] };
+function plAgSemanas(p) {   // segundas-feiras das semanas que o periodo cobre (no maximo 6)
+  var out = [], seg = ldIniSemana(new Date(p.ini)), fim = Math.min(p.fim, Date.now());
+  for (var i = 0; i < 6 && seg.getTime() < fim; i++) { out.push(new Date(seg.getTime())); seg = new Date(seg.getTime() + 7 * 864e5); }
+  return out;
+}
+function plAgEventos(wk, cb) {
+  var k = agDataStr(wk), c = PL_AG.cache[k];
+  if (c && Date.now() - c.t < 180000) { cb(c.data); return; }
+  if (PL_AG.buscando[k]) { cb(null); return; }   // ja tem uma busca desta semana no ar
+  PL_AG.buscando[k] = true;
+  fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + k + '&_t=' + Date.now(), { redirect: 'follow' })
+    .then(function(r){ return r.json(); })
+    .then(function(data){ PL_AG.buscando[k] = false; if (data && data.success) { PL_AG.cache[k] = { t: Date.now(), data: data }; cb(data); } else cb(null); })
+    .catch(function(){ PL_AG.buscando[k] = false; cb(null); });
+}
+function plEvDataStr(r) { return r.date ? (r.date.getFullYear() + '-' + String(r.date.getMonth() + 1).padStart(2, '0') + '-' + String(r.date.getDate()).padStart(2, '0')) : ''; }
+// SDR que aparece no titulo do evento: "... | Equipe Joao Stecca (Selina)"
+function plSdrDoEvento(ev) { var m = String(ev.title || '').match(/\(([^()]{2,30})\)\s*$/); return m ? plPessoa(m[1]) : ''; }
+// linhas candidatas do evento: pela etiqueta ##LEAD## (+nome), pelo telefone, pelo nome
+// Para a MESMA data vale nome parecido (v2mesmoLead). Para OUTRA data (anotacao) a prova tem que ser
+// forte — etiqueta ##LEAD##, telefone ou o NOME COMPLETO igual — e a linha ate 45 dias do evento
+// (senao "Aline Peclat" caia na "Dra Aline" vendida em janeiro — simulacao 02/09/2026).
+function plLinhasDoEvento(ev) {
+  var nomeEv = agNomeDoEvento(ev.title), rows = V2.rows || [], out = [];
+  var tag = String(ev.leadTag || '').match(/L-?\s?(\d{3,})/i);
+  var chaveEv = _nomeChave(nomeEv), tEv = new Date(ev.date + 'T00:00:00').getTime();
+  rows.forEach(function(r) {
+    var forte = false, mesmaData = plEvDataStr(r) === ev.date;
+    if (tag) { var rid = String(r.leadId || '').match(/^L-?(\d+)$/i); if (rid && parseInt(rid[1], 10) === parseInt(tag[1], 10) && v2mesmoLead(r.nome, nomeEv)) forte = true; }
+    if (!forte && ev.tel8 && ldTel8(r.telefone) === ev.tel8) forte = true;
+    if (!forte && chaveEv.length >= 5 && _nomeChave(r.nome || '') === chaveEv) forte = true;
+    var perto = r.date && Math.abs(r.date.getTime() - tEv) <= 45 * 864e5;
+    if ((mesmaData && (forte || v2mesmoLead(r.nome, nomeEv))) || (forte && perto)) out.push(r);
+  });
+  return out;
+}
+function plSincronizarAgenda(simular, cb) {
+  if (!(V2.rows || []).length) return;
+  var p = plPeriodo(PLACAR.per === 'datas' ? 'datas' : (PLACAR.per === 'mes' ? 'mes' : 'semana'));
+  var semanas = plAgSemanas(p), pend = semanas.length, achados = [], escritos = [], extras = [];
+  if (!pend) return;
+  var hojeStr = plEvDataStr({ date: new Date() });
+  semanas.forEach(function(wk) {
+    plAgEventos(wk, function(data) {
+      if (data) [['bruno', 'Bruno Pardim'], ['tony', 'Tony Londe']].forEach(function(par) {
+        (data[par[0]] || []).forEach(function(ev) { try {
+          var ehNs = ev.status === 'noshow' || String(ev.color || '') === '8';
+          if (!ehNs || !ev.date) return;
+          var fimEv = new Date(ev.date + 'T' + (ev.endTime || '23:59') + ':00').getTime();
+          if (!(fimEv < Date.now())) return;   // so reuniao que ja passou
+          var dm = ev.date.slice(8, 10) + '/' + ev.date.slice(5, 7);   // dd/mm
+          var cands = plLinhasDoEvento(ev);
+          var mesma = cands.filter(function(r){ return plEvDataStr(r) === ev.date; })[0];
+          if (mesma) {
+            var sn = mesma.sn || '';
+            if (sn === 'no show') return;                                                 // ja certo
+            if (sn.indexOf('agendada') === -1 && sn !== 'remarcada') return;             // vendido etc.: nao mexe
+            achados.push({ ev: ev, r: mesma, acao: 'status' });
+            if (simular) return;
+            var ch = 'st|' + mesma.leadId + '|' + ev.date; if (PL_AG.feitos[ch]) return; PL_AG.feitos[ch] = true;
+            mesma.status = 'No-Show'; mesma.sn = 'no show';
+            sendToGAS({ action: 'updateCell', cpf: '', nome: mesma.nome, campo: 'statusReuniao', valor: 'No-Show', dataRef: v2dataRef(mesma), gid: V2_GID });
+            try { sincronizarStatusEvento(mesma); } catch (e) {}
+            escritos.push(mesma.nome);
+            return;
+          }
+          if (cands.length) {   // linha em outra data (remarcada) ou com outro status: vira anotacao
+            var r2 = cands.sort(function(a, b){ return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); })[0];
+            var obs = String(r2.obs || '');
+            var jaTem = obs.indexOf('No-show em ' + dm) !== -1 || obs.indexOf('(era ' + dm + ')') !== -1
+              || (plEvDataStr(r2) === ev.date && r2.sn === 'no show');
+            if (jaTem) return;
+            achados.push({ ev: ev, r: r2, acao: 'anotacao' });
+            if (simular) return;
+            var ch2 = 'obs|' + r2.leadId + '|' + ev.date; if (PL_AG.feitos[ch2]) return; PL_AG.feitos[ch2] = true;
+            r2.obs = (obs.trim() ? obs.trim() + ' | ' : '') + '🔴 No-show em ' + dm + ' ##NOSHOW## (agenda)';
+            sendToGAS({ action: 'updateCell', cpf: '', nome: r2.nome, campo: 'observacao', valor: r2.obs, dataRef: v2dataRef(r2), gid: V2_GID });
+            escritos.push(r2.nome + ' (anotação ' + dm + ')');
+            return;
+          }
+          // sem linha nenhuma: conta direto da agenda
+          achados.push({ ev: ev, r: null, acao: 'agenda' });
+          extras.push({ nome: agNomeDoEvento(ev.title), date: new Date(ev.date + 'T00:00:00'), sdr: plSdrDoEvento(ev), closer: par[1], leadId: '(agenda)', status: 'No-Show (só na agenda)', sn: 'no show', obs: '', carimbo: '', carimboT: null, valor: 0, telefone: '', _agenda: true });
+        } catch (eEv) { try { console.warn('placar/agenda: evento ignorado', ev && ev.title, eEv); } catch (e2) {} } });
+      });
+      if (--pend === 0) {
+        if (!simular) {
+          PL_AG.extras = extras;
+          if (escritos.length) { try { avisoRapido('🤦 Da agenda para a planilha: ' + escritos.join(', ')); } catch (e) {} try { renderV2(); } catch (e) {} }
+          try { renderPlacar(); } catch (e) {}
+        }
+        if (cb) cb(achados, escritos, extras);
+      }
+    });
+  });
+}
 // marca No-Show direto da lista "ainda sem resultado" do placar (mesma gravacao da tela de resultados)
 function plMarcarNoShow(iR, btn) {
   if (soOlhar()) { alert('O Visitante não altera status.'); return; }
@@ -15152,9 +15264,9 @@ function plVer(tipo, chave, met) {
     + '<div class="hint" style="margin-bottom:10px;">Exatamente as linhas da aba Vendas que entraram nessa conta. Clique no nome para abrir a ficha.</div>';
   if (!rows.length) h += '<div class="pl-vazio">Nenhuma</div>';
   rows.forEach(function(r) {
-    var iR = v2reg(r);
+    var iR = r._agenda ? -1 : v2reg(r);
     h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);margin-bottom:6px;font-size:.76rem;">'
-      + '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>'
+      + (r._agenda ? '<b style="color:#f6a350;" title="Evento cinza na agenda sem linha na planilha">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + ' 📆</b>' : '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>')
       + '<span class="hint" style="margin:0;">' + (r.leadId || '') + '</span>'
       + '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + '</span>'
       + '<span class="hint" style="margin:0;">marcada em ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : '') + '</span>'
