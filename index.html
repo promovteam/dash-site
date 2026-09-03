@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-03-0857';
+var VERSAO_DASH = '2026-09-03-0920';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -9961,7 +9961,7 @@ function ldRow(l, quente) {
     l.origem
   ].filter(Boolean).join(' · ');
   var wa = ldWa(l);
-  var i = (l._reg != null) ? l._reg : (l._reg = _ldReg.push(l) - 1);
+  var i = (l._reg != null && _ldReg[l._reg] === l) ? l._reg : (l._reg = _ldReg.push(l) - 1);
   var ek = ldEtapaDe(l), ei = ldEtapaInfo(ek);
   var hs = ldHorasParado(l);
   // leads em atendimento consultam a conversa na Clint (o resto usaria muita chamada)
@@ -10039,9 +10039,16 @@ function voltarParaLista() {
   _mbAnterior = null;
   _ldFichaAberta = null;
 }
+function ldAtual(l) {   // versao mais nova do mesmo lead (a planilha e relida a cada 2 min)
+  if (!l || !l.tel8) return l;
+  for (var k = 0; k < (LD.rows || []).length; k++) if (LD.rows[k].tel8 === l.tel8) return LD.rows[k];
+  return l;
+}
 function abrirFichaLead(i) {
   var l = _ldReg[i];
   if (!l) return;
+  var lNovo = ldAtual(l);
+  if (lNovo !== l) { _ldReg[i] = lNovo; lNovo._reg = i; l = lNovo; }
   guardarListaModal();
   _ldFichaAberta = l;
   var st = ldSituacao(l);
@@ -10673,7 +10680,9 @@ function renderLeads() {
   var lo = document.getElementById('ld-loading');
   if (lo) lo.style.display = 'none';
   _ldMontarIdx();
-  _ldReg = [];
+  // a fila _ldReg NAO e zerada aqui: as listas/janelas ja abertas guardam o numero de cada lead
+  // nela; zerar fazia o clique "as vezes nao abrir" (Bruno 03/09/2026). So esvazia se crescer demais.
+  if (_ldReg.length > 120000) { _ldReg = []; (LD.rows || []).forEach(function(x){ x._reg = null; }); }
   montarFiltrosLeads();
   montarSeletorEu();
   var per = ldPeriodo();
@@ -13799,7 +13808,7 @@ function _marcarPelaUrl() {
   // abre a agenda NA HORA (sem esperar a base baixar); os dados entram no clique do horário
   setTimeout(function() {
     var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] || { nome: '', tel: dig, tel8: t8, insta: '', email: '' };
-    var i = (l._reg != null) ? l._reg : (l._reg = _ldReg.push(l) - 1);
+    var i = (l._reg != null && _ldReg[l._reg] === l) ? l._reg : (l._reg = _ldReg.push(l) - 1);
     marcarReuniaoDoLead(i);
     try { history.replaceState(null, '', location.pathname); } catch (e) {}   // tira o ?marcar= para o F5 nao repetir
   }, 300);
@@ -14703,7 +14712,8 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 .pl-pd.zero .num { color:var(--muted); text-shadow:none; }
 .pl-pd.p1.zero { background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); border-color:rgba(255,255,255,.1); box-shadow:none; }
 /* 🎉 festa quando alguem marca ou vende (Bruno 02/09/2026) */
-#pl-festa { position:fixed; inset:0; z-index:99990; display:none; align-items:center; justify-content:center; background:rgba(6,6,16,.72); overflow:hidden; }
+#pl-festa { position:fixed; inset:0; z-index:99990; display:none; align-items:center; justify-content:center; background:rgba(6,6,16,.72); overflow:hidden; pointer-events:none; }
+#pl-festa .fx-caixa { pointer-events:auto; }
 #pl-festa .fx-caixa { position:relative; z-index:2; text-align:center; padding:34px 44px; border-radius:26px; background:linear-gradient(160deg,#1b1b3c,#0d0d1e); border:2px solid rgba(255,209,102,.7); box-shadow:0 0 80px rgba(255,209,102,.35); animation:fxPula .7s cubic-bezier(.2,1.4,.4,1); max-width:92vw; }
 #pl-festa .fx-ico { font-size:4.2rem; line-height:1; animation:fxBate 1s ease-in-out infinite; }
 #pl-festa .fx-t1 { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:3rem; letter-spacing:1px; text-transform:uppercase; color:#ffd166; margin-top:8px; line-height:1; }
@@ -15310,11 +15320,44 @@ function plSomFesta(tipo) {
 }
 function plTestarFesta() { plComemorar('marcou', 'Sarah', 1); plComemorar('vendeu', 'Tony Londe', 3596.4); }
 // quais reunioes entraram na conta de uma pessoa (100% conferivel — Bruno 02/09/2026)
-function plVer(tipo, chave, met) {
+// HORA da reuniao: a planilha nao guarda hora, entao vem do evento da agenda (Bruno 03/09/2026).
+// Usa as semanas ja baixadas pelo placar (PL_AG) e pela Agenda (AG); se a semana ainda nao veio,
+// plVer pede e redesenha a lista quando chegar.
+function plHoraDaLinha(r) {
+  if (!r || !r.date || r._agenda) return r && r.startTime ? String(r.startTime).slice(0, 5) : '';
+  var wk = agDataStr(agSegunda(r.date)), data = null;
+  try { data = (PL_AG.cache[wk] && PL_AG.cache[wk].data) || (typeof AG !== 'undefined' && AG.cache && AG.cache[wk]) || null; } catch (e) {}
+  if (!data) return null;   // null = semana ainda nao baixada
+  var evs = (data.bruno || []).concat(data.tony || []);
+  var ev = null; try { ev = eventoDoLead(r, evs); } catch (e) {}
+  return ev && ev.startTime ? String(ev.startTime).slice(0, 5) : '';
+}
+function plVer(tipo, chave, met, _denovo) {
   var d = PLACAR.ultimo; if (!d) return;
   var lista = tipo === 'time' ? { nome: 'Time todo', l: d.tot.l } : (tipo === 'sdr' ? d.sdrs : d.closers).filter(function(x){ return v2norm(x.nome) === chave; })[0];
   if (!lista) return;
-  var rows = (lista.l && lista.l[met]) || [];
+  var rows = ((lista.l && lista.l[met]) || []).slice();
+  var horas = {}, faltam = {};
+  rows.forEach(function(r, i) { var hh = plHoraDaLinha(r); if (hh === null) { faltam[agDataStr(agSegunda(r.date))] = true; hh = ''; } horas[i] = hh; });
+  if (met !== 'marc') {   // reunioes em ordem de dia e hora (marcadas ficam na ordem da marcacao)
+    var idx = rows.map(function(r, i){ return i; });
+    idx.sort(function(a, b) {
+      var ta = rows[a].date ? rows[a].date.getTime() : 0, tb = rows[b].date ? rows[b].date.getTime() : 0;
+      return (ta - tb) || String(horas[a] || '99').localeCompare(String(horas[b] || '99'));
+    });
+    var h2 = {}; rows = idx.map(function(i, j){ h2[j] = horas[i]; return rows[i]; }); horas = h2;
+  }
+  var semanasFaltando = Object.keys(faltam);
+  if (semanasFaltando.length && !_denovo) {
+    var pend = semanasFaltando.length;
+    semanasFaltando.forEach(function(k) {
+      var p = k.split('-');
+      plAgEventos(new Date(+p[0], +p[1] - 1, +p[2]), function() {
+        if (--pend > 0) return;
+        try { var ab = document.getElementById('pl-ver-modal'); if (ab) { ab.remove(); plVer(tipo, chave, met, true); } } catch (e) {}
+      });
+    });
+  }
   var um = rows.length === 1;
   var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', todas: um ? 'REUNIÃO no período' : 'REUNIÕES no período', pend: um ? 'reunião AINDA SEM RESULTADO' : 'reuniões AINDA SEM RESULTADO' }[met] || met;
   var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
@@ -15322,12 +15365,13 @@ function plVer(tipo, chave, met) {
     + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
     + '<div class="hint" style="margin-bottom:10px;">Exatamente as linhas da aba Vendas que entraram nessa conta. Clique no nome para abrir a ficha.</div>';
   if (!rows.length) h += '<div class="pl-vazio">Nenhuma</div>';
-  rows.forEach(function(r) {
+  rows.forEach(function(r, iRow) {
     var iR = r._agenda ? -1 : v2reg(r);
+    var hora = horas[iRow] || '';
     h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);margin-bottom:6px;font-size:.76rem;">'
       + (r._agenda ? '<b style="color:#f6a350;" title="Evento cinza na agenda sem linha na planilha">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + ' 📆</b>' : '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>')
       + '<span class="hint" style="margin:0;">' + (r.leadId || '') + '</span>'
-      + '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + '</span>'
+      + '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + (hora ? ' <b style="color:#ffd166;">' + hora + '</b>' : (semanasFaltando.length && !_denovo ? ' <i style="opacity:.6;">⏳</i>' : '')) + '</span>'
       + '<span class="hint" style="margin:0;">marcada em ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : '') + '</span>'
       + ((met === 'ns' || met === 'todas') && r.sn === 'no show' && plDataNoShow(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#ffd166;">no-show em ' + fmt(plDataNoShow(r)) + ' · remarcada</span>' : '')
       + '<span class="ld-tag"' + (met === 'todas' ? ' style="color:' + (r.sn === 'no show' ? '#ff6b6b' : _fsRealizada(r.sn) ? '#6ea8ff' : '#ffd166') + ';"' : '') + '>' + (r.status || '') + '</span>'
@@ -15340,7 +15384,7 @@ function plVer(tipo, chave, met) {
   });
   if (met === 'pend' && rows.length) h += '<div class="hint" style="margin-top:4px;">🤦 No-show grava na planilha na hora e espelha na agenda. Se a pessoa compareceu, abra a ficha e escolha o resultado (vendido, não vendido, bloqueio…).</div>';
   var ov = document.createElement('div');
-  ov.className = 'modal-overlay open'; ov.style.zIndex = 340;
+  ov.className = 'modal-overlay open'; ov.style.zIndex = 340; ov.id = 'pl-ver-modal';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   ov.innerHTML = '<div class="modal" style="width:min(640px,94vw);padding:20px;max-height:90vh;overflow-y:auto;">' + h + '</div>';
   document.body.appendChild(ov);
