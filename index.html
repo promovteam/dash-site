@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-03-1215';
+var VERSAO_DASH = '2026-09-03-1301';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5462,7 +5462,7 @@ function criarNaClint(tel8, btn) {
   s.onerror = function(){ fim(null); };
   s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
     + encodeURIComponent(JSON.stringify({ action: 'clintCriarContato', nome: l.nome || '', telefone: l.tel || '',
-      email: l.email || '', insta: l.insta || '', donoNome: ldEu() || '' }));
+      email: l.email || '', insta: l.insta || '', donoNome: ldPodeTrocarDono() ? (ldEu() || '') : '' }));
   document.body.appendChild(s);
   setTimeout(function(){ fim(null); }, 60000);
 }
@@ -6467,22 +6467,83 @@ function ldSalvarAtendimento(l, campos) {
   renderLeads();
   if (document.getElementById('modal-b').classList.contains('open') && _ldFichaAberta === l) abrirFichaLead(_ldReg.indexOf(l));
 }
+// ===== RESPONSÁVEL DO LEAD =====
+function ldPessoasDoTime() {
+  // so o TIME (quem tem acesso ao dash, menos Adm/Visitante/contratos): nome da planilha = o mesmo
+  // que o "Assumir" grava; nome da Clint = o dono correspondente la (pelo primeiro nome)
+  var donosClint = [];
+  try { if (CLINT_PAINEL && CLINT_PAINEL.success) donosClint = CLINT_PAINEL.donos || []; } catch (e) {}
+  var base = [];
+  try { if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a){ if (!a.soOlha && !a.contratos && a.nome !== 'Adm') base.push(a.nome); }); } catch (e) {}
+  ['Bruno Pardim', 'Tony Londe'].forEach(function(n){ if (base.indexOf(n) === -1) base.push(n); });
+  return base.map(function(n) {
+    var p = v2norm(n).split(' ')[0];
+    var c = donosClint.filter(function(d){ return v2norm(d).split(' ')[0] === p; })[0] || '';
+    var ac = null; try { ac = ACESSOS.filter(function(a){ return a.nome === n; })[0]; } catch (e) {}
+    return { rotulo: n.replace(/ Promov$/, ''), planilha: n, clint: c, zap: (ac && ac.zap) || '' };
+  }).sort(function(a, b){ return a.rotulo.localeCompare(b.rotulo, 'pt-BR'); });
+}
+// SO O BRUNO E O ADM trocam o responsavel de um lead (Bruno 03/09/2026: "somente eu e o adm")
+function ldPodeTrocarDono() { try { return ehAdm(); } catch (e) { return false; } }
+function ldPassarPara(i, ev) {
+  if (ev) ev.stopPropagation();
+  if (soOlhar()) { alert('O Visitante não altera responsáveis.'); return; }
+  if (!ldPodeTrocarDono()) { alert('Só o Bruno e o Adm trocam o responsável de um lead.\n\nSe precisar, peça para o Bruno passar este lead para você.'); return; }
+  var l = ldAtual(_ldReg[i]);
+  if (!l) return;
+  var atual = '';
+  try { var ci = clintInfoDe(l); atual = (ci && ci.dono) || l.dono || ''; } catch (e) { atual = l.dono || ''; }
+  var nomes = ldPessoasDoTime();
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open'; ov.style.zIndex = 350;
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:min(420px,94vw);padding:20px;max-height:90vh;overflow-y:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">👤</span><b style="flex:1;">Mandar ' + String(l.nome || 'este lead').replace(/</g, '&lt;') + ' para quem?</b>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:12px;">' + (atual ? 'Hoje está com <b>' + atual.replace(/</g, '&lt;') + '</b>. ' : '') + 'Grava na planilha e troca o dono na Clint. Só Bruno e Adm fazem isso.</div>'
+    + '<div style="display:flex;flex-direction:column;gap:6px;">'
+    + nomes.map(function(p, k) {
+        var eh = atual && v2norm(atual).split(' ')[0] === v2norm(p.planilha).split(' ')[0];
+        return '<button class="btn-assumir" style="justify-content:flex-start;padding:10px 12px;font-size:.82rem;' + (eh ? 'opacity:.5;' : '') + '" onclick="ldPassarConfirma(' + i + ',' + k + ',this)"' + (eh ? ' disabled' : '') + '>👤 ' + p.rotulo + (eh ? ' · já é o responsável' : '') + (p.clint ? '' : ' <small style="opacity:.6;">(sem usuário na Clint)</small>') + '</button>';
+      }).join('')
+    + '</div>'
+    + (atual ? '<button class="btn" style="width:100%;margin-top:10px;" onclick="ldPassarConfirma(' + i + ',-1,this)">✕ Tirar o responsável</button>' : '')
+    + '</div>';
+  document.body.appendChild(ov);
+}
+function ldPassarConfirma(i, k, btn) {
+  var l = ldAtual(_ldReg[i]);
+  if (!l) return;
+  var p = k >= 0 ? ldPessoasDoTime()[k] : null;
+  if (btn) { btn.textContent = '⏳ salvando…'; btn.disabled = true; }
+  ldSalvarAtendimento(l, { dono: p ? p.planilha : '', situacao: l.situacao || (p ? 'Em qualificação' : '') });
+  var deAntes = ''; try { var ciP = clintInfoDe(l); deAntes = (ciP && ciP.dono) || l.dono || ''; } catch (e) { deAntes = l.dono || ''; }
+  if (p && p.clint) { try { clintSincronizarDono(l, p.clint, deAntes); } catch (e) {} }   // na Clint vale o nome de la
+  try { var ov = btn && btn.closest('.modal-overlay'); if (ov) ov.remove(); } catch (e) {}
+  try { avisoRapido(p ? '👤 ' + (l.nome || 'Lead') + ' agora é de ' + p.rotulo + (p.clint ? ' (planilha e Clint)' : ' (só na planilha)') : '👤 Responsável removido'); } catch (e) {}
+}
 function ldAssumir(i, ev) {
   if (soOlhar()) return;
   if (ev) ev.stopPropagation();
-  var l = _ldReg[i];
+  var l = ldAtual(_ldReg[i]);
   if (!l) return;
   var eu = ldEu();
   if (!eu) { alert('Antes de assumir, escolha seu nome em "👤 Você" no topo da tela.'); return; }
-  if (l.dono && v2norm(l.dono) !== v2norm(eu)) {
-    if (!confirm('Este lead já está com ' + l.dono + '.\n\nQuer assumir para você (' + eu + ')?')) return;
+  var donoAtual = l.dono || '';
+  try { var ciA = clintInfoDe(l); if (ciA && ciA.dono) donoAtual = ciA.dono; } catch (eD) {}
+  // Bruno 03/09/2026: "quero que eu decida quem sera o dono" — a divisao e feita pela Clint;
+  // pelo dash, so o Bruno e o Adm definem ou trocam o responsavel
+  if (!ldPodeTrocarDono()) { alert((donoAtual ? 'Este lead já está com ' + donoAtual + '.\n\n' : '') + 'Só o Bruno e o Adm definem o responsável de um lead pelo dash.\n\nA divisão dos leads é feita pela Clint.'); return; }
+  if (donoAtual && v2norm(donoAtual).split(' ')[0] !== v2norm(eu).split(' ')[0]) {
+    if (!confirm('Este lead já está com ' + donoAtual + '.\n\nQuer assumir para você (' + eu + ')?')) return;
   }
   ldSalvarAtendimento(l, { dono: eu, situacao: l.situacao || 'Em qualificação' });
-  clintSincronizarDono(l, eu);   // assumir aqui = assumir lá (troca o dono do negócio na Clint)
+  clintSincronizarDono(l, eu, donoAtual);   // assumir aqui = assumir lá (fica no histórico da Clint quem fez)
 }
 // troca o dono do negócio NA CLINT, sem atrapalhar se der errado (a planilha já guardou)
-function clintSincronizarDono(l, donoNome) {
+function clintSincronizarDono(l, donoNome, deQuem) {
   if (!l || !l.tel8 || !donoNome) return;
+  var quemFez = localStorage.getItem('v2Login') || ldEu() || 'dash';
   function mandar(negocioId) {
     if (!negocioId) return;
     var nome = 'mdCb' + Math.random().toString(36).slice(2, 8);
@@ -6504,7 +6565,8 @@ function clintSincronizarDono(l, donoNome) {
     window[nome] = fim;
     s.onerror = function(){ fim(null); };
     s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
-      + encodeURIComponent(JSON.stringify({ action: 'clintMudarDono', negocioId: negocioId, donoNome: donoNome }));
+      + encodeURIComponent(JSON.stringify({ action: 'clintMudarDono', negocioId: negocioId, donoNome: donoNome,
+          quem: quemFez, de: deQuem || '', chatId: (CLINT[l.tel8] && CLINT[l.tel8].chatId) || '', lead: l.nome || '' }));
     document.body.appendChild(s);
     setTimeout(function(){ fim(null); }, 30000);
   }
@@ -8366,7 +8428,7 @@ function criarPendenteNaClint(tel8, btn) {
   sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
     + encodeURIComponent(JSON.stringify({ action: 'clintCriarContato', nome: x.nome || '',
         telefone: x.whatsapp || '', email: x.email || '', insta: x.insta || '',
-        donoNome: eu || '', origem: 'diagnostico incompleto' }));
+        donoNome: (typeof ldPodeTrocarDono === 'function' && ldPodeTrocarDono()) ? (eu || '') : '', origem: 'diagnostico incompleto' }));
   document.body.appendChild(sc);
   setTimeout(function(){ fim(null); }, 60000);
 }
@@ -8419,7 +8481,7 @@ function criarPendentesNaClint(btn) {
     sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
       + encodeURIComponent(JSON.stringify({ action: 'clintCriarContato', nome: x.nome || '',
           telefone: x.whatsapp || '', email: x.email || '', insta: x.insta || '',
-          donoNome: eu || '', origem: 'diagnostico incompleto' }));
+          donoNome: (typeof ldPodeTrocarDono === 'function' && ldPodeTrocarDono()) ? (eu || '') : '', origem: 'diagnostico incompleto' }));
     document.body.appendChild(sc);
     setTimeout(function(){ fim(null); }, 45000);
   }
@@ -10039,7 +10101,8 @@ function ldRow(l, quente) {
     + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + seloVezes(l) + seloVoltou(l) + seloChance(l, true) + '</b>'
     + '<span>' + det + '</span></div>'
     + seloAnuncio(l, true) + igSeloLead(l, true)
-    + (donoNome ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
+    + (donoNome || !ldPodeTrocarDono() ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
+    + (ldPodeTrocarDono() ? '<button class="btn-assumir" style="background:rgba(110,168,255,.14);color:#6ea8ff;border:1px solid rgba(110,168,255,.45);" onclick="ldPassarPara(' + i + ', event)" title="Só Bruno e Adm: mandar este lead para outra pessoa">👤 ' + (donoNome ? 'Trocar' : 'Para quem') + '</button>' : '')
     + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abrir a conversa deste lead no atendimento da Clint">🟣 Clint</a>' : '')
     + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank" onclick="event.stopPropagation()">📷</a>' : '')
     + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation()">💬 WhatsApp</a>' : '')
@@ -10235,10 +10298,12 @@ function abrirFichaLead(i) {
         if (cc && cc.dono) {
           return '<span class="dono-chip" style="background:rgba(108,71,255,.18);color:#8f6bff;border-color:rgba(108,71,255,.5);">✋ ' + cc.dono + ' <span style="opacity:.7;">(Clint)</span></span>';
         }
+        var pode = ldPodeTrocarDono();   // so Bruno e Adm definem o responsavel (03/09/2026)
         return l.dono
           ? '<span class="dono-chip">✋ ' + l.dono + (l.quando ? ' · ' + l.quando : '') + '</span>'
-            + '<button class="btn-assumir" onclick="ldAssumir(' + i + ')">🔄 Passar para mim</button>'
-          : '<button class="btn-assumir" onclick="ldAssumir(' + i + ')">✋ Assumir este lead</button>';
+            + (pode ? '<button class="btn-assumir" onclick="ldAssumir(' + i + ')">🔄 Passar para mim</button>' : '')
+          : (pode ? '<button class="btn-assumir" onclick="ldAssumir(' + i + ')">✋ Assumir este lead</button>'
+                  : '<span class="hint">sem responsável · a Clint distribui; só Bruno/Adm definem pelo dash</span>');
       })()
     + '</div>'
     + (function() {
@@ -10459,6 +10524,7 @@ function abrirFichaLead(i) {
     if (_envF && ehContratos() && _aguF)
       _eb('🔁 Corrigir e reenviar', '255,154,90', 'usarEditadoPag(' + _iPagC + ', true)', 'Cancela o enviado, sobe o Word editado e reenvia para o cliente assinar.');
   }
+  if (ldPodeTrocarDono()) _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(110,168,255,.14);border-color:rgba(110,168,255,.45);color:#6ea8ff;cursor:pointer;" onclick="ldPassarPara(' + i + ', event)" title="Só Bruno e Adm: trocar o responsável deste lead">👤 Responsável: passar para…</button>');
   if (!_rUlt) _btH.push('<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="ldProcurarReuniao(' + i + ')" title="A reunião existe mas não ligou com este lead (telefone diferente)? Procure e ligue aqui">🔍 já teve reunião? procurar</button>');
   if (_btH.length) h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">' + _btH.join('') + '</div>';
   if (wa || l.insta || clintLink(l)) {
@@ -11003,7 +11069,7 @@ function renderLeads() {
         h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;cursor:pointer;" onclick="abrirFichaLead(' + idx + ')">'
           + '<b style="font-size:.76rem;flex:1;min-width:120px;">' + (l.nome || 'Sem nome') + '</b>'
           + '<span class="ld-tag" style="background:rgba(255,107,107,.15);color:#ff6b6b;">esperando há ' + horas + 'h</span>'
-          + '<button class="btn-assumir" onclick="event.stopPropagation();ldAssumir(' + idx + ', event);">✋ Assumir</button>'
+          + (ldPodeTrocarDono() ? '<button class="btn-assumir" onclick="event.stopPropagation();ldAssumir(' + idx + ', event);">✋ Assumir</button>' : '')
           + (ldWa(l) ? '<a class="ld-wa" href="' + ldWa(l) + '" target="_blank" onclick="event.stopPropagation();">💬 WhatsApp</a>' : '')
           + '</div>';
       });
