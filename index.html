@@ -2222,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-03-0049';
+var VERSAO_DASH = '2026-09-03-0857';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -11693,7 +11693,8 @@ function desenharInfo() {
         c.opcoes.forEach(function(op){ campo += '<option' + (v2norm(op) === v2norm(c.valor) ? ' selected' : '') + '>' + op + '</option>'; });
         campo += '</select>';
       } else {
-        campo = '<input class="edit-in" id="edit-' + i + '" value="' + String(c.valor).replace(/"/g, '&quot;') + '">';
+        var ehDataBr = c.campo === 'data' || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(c.valor || '').trim());
+        campo = '<input class="edit-in' + (ehDataBr ? ' data-br' : '') + '" id="edit-' + i + '"' + (ehDataBr ? ' placeholder="dd/mm/aaaa" title="clique para escolher no calendário"' : '') + ' value="' + String(c.valor === '—' && ehDataBr ? '' : c.valor).replace(/"/g, '&quot;') + '">';
       }
       html += '<div class="dtl-line"><span>' + c.ico + ' ' + c.nome + '</span>' + campo + '</div>';
     } else {
@@ -12156,7 +12157,8 @@ function desenharFichaPag() {
         c.opcoes.forEach(function(op){ inp += '<option' + (v2norm(op) === v2norm(atual) ? ' selected' : '') + '>' + op + '</option>'; });
         inp += '</select>';
       } else {
-        inp = '<input class="edit-in" id="pedit-' + i + '" value="' + String(atual).replace(/"/g, '&quot;') + '">';
+        var ehDataP = /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(atual || '').trim()) || /\bdata\b|nascimento|vencimento/i.test(String(c.nome || ''));
+        inp = '<input class="edit-in' + (ehDataP ? ' data-br' : '') + '" id="pedit-' + i + '"' + (ehDataP ? ' placeholder="dd/mm/aaaa" title="clique para escolher no calendário"' : '') + ' value="' + String(atual).replace(/"/g, '&quot;') + '">';
       }
       grupoBuf += '<div class="dtl-line"><span>' + c.ico + ' ' + c.nome + '</span>' + inp + '</div>';
     } else {
@@ -15416,10 +15418,129 @@ function renderPlacar() {
 }
 </script>
 
+<!-- ===== 💬 JANELINHAS NOSSAS (Bruno 03/09/2026: "não quero mais a aba do Chrome em nenhuma parte do dash").
+     alert / confirm / prompt do navegador viram a nossa janela, no estilo do dash.
+     Truque do confirm: ele e sincrono, a nossa janela nao — entao a 1a chamada abre a janela e
+     responde "nao"; se a pessoa clicar OK, o mesmo clique e repetido e a 2a chamada responde "sim". ===== -->
+<style>
+#dg-ov { position:fixed; inset:0; z-index:100000; background:rgba(6,6,16,.82); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; padding:20px; }
+#dg-ov .dg-cx { position:relative; overflow:hidden; background:linear-gradient(105deg,#0d0d1e 0%,#15152e 55%,#1b1b3c 100%); border:1px solid rgba(255,209,102,.55); border-radius:22px; max-width:480px; width:100%; padding:24px 26px 22px; box-shadow:0 0 0 1px rgba(255,255,255,.04), 0 24px 70px rgba(0,0,0,.65), 0 0 48px rgba(255,209,102,.12); animation:dgPula .28s cubic-bezier(.2,1.25,.4,1); font-family:Inter, system-ui, sans-serif; }
+#dg-ov .dg-cx::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0 12px, transparent 12px 28px); pointer-events:none; }
+#dg-ov .dg-cx::after { content:''; position:absolute; left:0; right:0; top:0; height:3px; background:linear-gradient(90deg,#fff3c4,#ffd166 40%,#a8770a); }
+@keyframes dgPula { from { transform:translateY(10px) scale(.94); opacity:0; } to { transform:none; opacity:1; } }
+#dg-ov .dg-tit { position:relative; display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+#dg-ov .dg-ico { width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.35rem; background:rgba(255,209,102,.12); border:1px solid rgba(255,209,102,.4); flex-shrink:0; }
+#dg-ov .dg-tit b { flex:1; font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:1.35rem; letter-spacing:.6px; text-transform:uppercase; line-height:1.1; color:#ffd166; }
+#dg-ov .dg-txt { position:relative; font-size:.86rem; line-height:1.65; color:#c9d1e0; white-space:pre-line; margin:0 0 18px; max-height:50vh; overflow-y:auto; }
+#dg-ov input { position:relative; width:100%; box-sizing:border-box; background:rgba(255,255,255,.06); color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:11px 13px; font-size:.92rem; font-family:inherit; margin-bottom:16px; }
+#dg-ov input:focus { outline:none; border-color:rgba(255,209,102,.6); box-shadow:0 0 0 3px rgba(255,209,102,.15); }
+#dg-ov .dg-bt { position:relative; display:flex; gap:10px; justify-content:flex-end; }
+#dg-ov .dg-bt button { padding:11px 20px; border-radius:999px; font-weight:800; font-size:.82rem; cursor:pointer; font-family:inherit; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:#fff; transition:transform .15s, background .15s; }
+#dg-ov .dg-bt button:hover { background:rgba(255,255,255,.12); transform:translateY(-1px); }
+#dg-ov .dg-bt button.ok { background:#ffd166; color:#151515; border-color:#ffd166; box-shadow:0 8px 22px rgba(255,209,102,.3); }
+#dg-ov .dg-bt button.ok:hover { background:#ffe08a; }
+#dg-ov .dg-bt button:focus-visible { outline:2px solid #6ea8ff; outline-offset:2px; }
+@media (prefers-reduced-motion: reduce) { #dg-ov .dg-cx { animation:none; } }
+</style>
+<script>
+(function () {
+  var nativos = { alert: window.alert, confirm: window.confirm, prompt: window.prompt };
+  var okRecente = {};   // pergunta -> { t, v } : ja respondida "sim" ha pouco (segunda rodada do clique repetido)
+  function caixa() {
+    var ov = document.getElementById('dg-ov');
+    if (!ov) { ov = document.createElement('div'); ov.id = 'dg-ov'; document.body.appendChild(ov); }
+    return ov;
+  }
+  function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  // a primeira linha da mensagem vira o titulo; o icone segue o assunto
+  function partes(msg, tituloPadrao) {
+    var t = String(msg == null ? '' : msg).trim(), i = t.indexOf('\n');
+    if (i > 0 && i <= 110) return { titulo: t.slice(0, i).trim(), corpo: t.slice(i).trim() };
+    if (t.length <= 90) return { titulo: t, corpo: '' };
+    return { titulo: tituloPadrao, corpo: t };
+  }
+  function iconeDe(msg) {
+    var m = String(msg || '').toLowerCase();
+    if (/no-show|no show|faltou/.test(m)) return '🤦';
+    if (/clint/.test(m)) return '🟣';
+    if (/vincul|ligar o lead|trocar a pessoa/.test(m)) return '🔗';
+    if (/remarc|reuni[aã]o marcada|hor[aá]rio/.test(m)) return '🗓';
+    if (/telefone|whatsapp/.test(m)) return '📱';
+    if (/criar/.test(m)) return '➕';
+    if (/apagar|excluir|desfazer|tirar/.test(m)) return '🗑';
+    if (/venda|vendid|pagamento/.test(m)) return '💰';
+    if (/assumir|respons/.test(m)) return '✋';
+    return '';
+  }
+  // abre a janela; botoes = [{txt, ok, cb}]
+  function abrir(icone, titulo, corpo, botoes, input) {
+    var ov = caixa();
+    ov.innerHTML = '<div class="dg-cx"><div class="dg-tit"><span class="dg-ico">' + icone + '</span><b>' + esc(titulo) + '</b></div>'
+      + '<div class="dg-txt">' + esc(corpo) + '</div>'
+      + (input !== undefined ? '<input id="dg-in" type="text" value="' + esc(input).replace(/"/g, '&quot;') + '">' : '')
+      + '<div class="dg-bt">' + botoes.map(function(b, i){ return '<button id="dg-b' + i + '"' + (b.ok ? ' class="ok"' : '') + '>' + esc(b.txt) + '</button>'; }).join('') + '</div></div>';
+    ov.style.display = 'flex';
+    botoes.forEach(function(b, i) { document.getElementById('dg-b' + i).onclick = function(){ ov.style.display = 'none'; if (b.cb) b.cb(); }; });
+    var foco = document.getElementById('dg-in') || document.querySelector('#dg-ov .dg-bt button.ok') || document.querySelector('#dg-ov .dg-bt button');
+    if (foco) setTimeout(function(){ try { foco.focus(); if (foco.select) foco.select(); } catch (e) {} }, 30);
+    ov.onkeydown = function(e) {
+      if (e.key === 'Escape') { ov.style.display = 'none'; var c = botoes.filter(function(b){ return !b.ok; })[0]; if (c && c.cb) c.cb(); }
+      if (e.key === 'Enter') { var o = botoes.filter(function(b){ return b.ok; })[0]; if (o) { ov.style.display = 'none'; if (o.cb) o.cb(); } }
+    };
+  }
+  // o clique (ou troca de valor) que fez a pergunta — para repetir depois do OK
+  var TIPOS = { click: 1, change: 1, submit: 1, keydown: 1, keyup: 1, keypress: 1, input: 1 };
+  function gatilho() {
+    var ev = window.event;
+    if (!ev || !ev.target || !TIPOS[ev.type]) return null;
+    return { alvo: ev.target, tipo: ev.type, key: ev.key, code: ev.code, keyCode: ev.keyCode };
+  }
+  function repetir(g) {
+    try {
+      if (g.tipo === 'click') g.alvo.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      else if (/^key/.test(g.tipo)) g.alvo.dispatchEvent(new KeyboardEvent(g.tipo, { bubbles: true, cancelable: true, key: g.key, code: g.code, keyCode: g.keyCode, which: g.keyCode }));
+      else g.alvo.dispatchEvent(new Event(g.tipo, { bubbles: true, cancelable: true }));
+    } catch (e) {}
+  }
+  function jaRespondida(msg) {
+    var r = okRecente[msg];
+    if (r && Date.now() - r.t < 4000) return r;
+    return null;
+  }
+  window.alert = function (msg) {
+    try { var p = partes(msg, 'Aviso'); abrir(iconeDe(msg) || '💬', p.titulo, p.corpo, [{ txt: 'Entendi', ok: true }]); } catch (e) { nativos.alert.call(window, msg); }
+  };
+  window.confirm = function (msg) {
+    msg = String(msg);
+    var r = jaRespondida(msg); if (r) return true;
+    var g = gatilho();
+    if (!g) return nativos.confirm.call(window, msg);   // sem clique para repetir: fica a nativa (raro)
+    var pc = partes(msg, 'Confirma?');
+    abrir(iconeDe(msg) || '❓', pc.titulo, pc.corpo, [
+      { txt: 'Cancelar', ok: false },
+      { txt: 'OK', ok: true, cb: function(){ okRecente[msg] = { t: Date.now() }; repetir(g); } }
+    ]);
+    return false;
+  };
+  window.prompt = function (msg, padrao) {
+    msg = String(msg);
+    var r = jaRespondida(msg); if (r) return r.v;
+    var g = gatilho();
+    if (!g) return nativos.prompt.call(window, msg, padrao);
+    var pp = partes(msg, 'Digite');
+    abrir('✏️', pp.titulo, pp.corpo, [
+      { txt: 'Cancelar', ok: false },
+      { txt: 'OK', ok: true, cb: function(){ var v = (document.getElementById('dg-in') || {}).value; okRecente[msg] = { t: Date.now(), v: v == null ? '' : v }; repetir(g); } }
+    ], padrao == null ? '' : padrao);
+    return null;
+  };
+})();
+</script>
+
 <!-- ===== 📆 CALENDÁRIO ÚNICO (Bruno 01/09/2026): todo campo de data abre este
      calendário ao clicar — a digitação fica travada — e o ANO vem antes do mês ===== -->
 <style>
-input[type="date"], #ag-data { cursor:pointer; caret-color:transparent; }
+input[type="date"], #ag-data, input.data-br { cursor:pointer; caret-color:transparent; }
 input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 #cal-pop { position:fixed; z-index:99999; display:none; background:#1c212b; border:1px solid rgba(255,255,255,.16); border-radius:14px; padding:12px; width:262px; box-shadow:0 14px 44px rgba(0,0,0,.6); color:var(--text,#e8ecf3); }
 #cal-pop .cal-top { display:flex; gap:6px; margin-bottom:8px; }
@@ -15440,7 +15561,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
   var alvo = null, vAno = 0, vMes = 0, pop = null;
   var SEMANA = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
   var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  function ehData(el) { return el && el.tagName === 'INPUT' && (el.type === 'date' || el.id === 'ag-data'); }
+  function ehData(el) { return el && el.tagName === 'INPUT' && (el.type === 'date' || el.id === 'ag-data' || (el.classList && el.classList.contains('data-br'))); }
   function valorAtual() {
     var v = String((alvo && alvo.value) || '').trim(), m;
     if ((m = v.match(/^(\d{4})-(\d{2})-(\d{2})/))) return new Date(+m[1], +m[2] - 1, +m[3]);
