@@ -1588,7 +1588,6 @@ Instagram: @pr.joaosilva</div>
       <div class="g-label" style="margin-bottom:0;">Informações</div>
       <div style="display:flex;gap:8px;">
         <button class="btn" id="btn-copiar" style="padding:6px 14px;font-size:.7rem;" onclick="copiarDadosLead(this)">📋 Copiar</button>
-        <button class="btn" id="btn-zap-ficha" style="padding:6px 14px;font-size:.7rem;background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.4);" onclick="mandarZapReuniao()" title="Abre o WhatsApp com os dados desta reunião prontos para mandar a alguém">📤 Mandar</button>
         <button class="btn" id="btn-religar" style="padding:6px 14px;font-size:.7rem;display:none;background:rgba(185,138,255,.16);color:#b98aff;border:1px solid rgba(185,138,255,.4);" onclick="religarReuniaoAbrir()" title="Só Bruno e Adm: liga esta reunião à pessoa certa da base">🔁 Trocar a pessoa</button>
         <button class="btn" id="btn-editar" style="padding:6px 14px;font-size:.7rem;" onclick="alternarEdicao()">✏️ Editar</button>
         <button class="btn" id="btn-apagar" style="padding:6px 14px;font-size:.7rem;display:none;background:rgba(255,107,107,.12);color:#ff6b6b;border:1px solid rgba(255,107,107,.4);" onclick="apagarLeadDialogo()" title="Só Bruno e Adm: apaga este lead da planilha, da agenda ou dos dois">🗑 Apagar</button>
@@ -2223,7 +2222,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-03-0038';
+var VERSAO_DASH = '2026-09-03-0049';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6430,182 +6429,10 @@ function ldSalvarAtendimento(l, campos) {
   renderLeads();
   if (document.getElementById('modal-b').classList.contains('open') && _ldFichaAberta === l) abrirFichaLead(_ldReg.indexOf(l));
 }
-// o lead pode ter sido recriado pela releitura da planilha: pega a versao de agora pelo telefone
-// (sem isso, clicar numa lista aberta ha alguns minutos mexia num objeto velho e "nao fazia nada")
-function ldAtual(l) {
-  if (!l || !l.tel8) return l;
-  for (var i = 0; i < (LD.rows || []).length; i++) if (LD.rows[i].tel8 === l.tel8) return LD.rows[i];
-  return l;
-}
-// manda o lead para OUTRA pessoa: janelinha com os nomes do time (Bruno 03/09/2026)
-// ===== MANDAR O LEAD NO WHATSAPP (Bruno 03/09/2026) =====
-// A ficha do lead vira um texto pronto e abre o WhatsApp: sem numero, o WhatsApp
-// pergunta "para quem?"; com o numero da pessoa (campo zap em ACESSOS) ja abre a conversa dela.
-var DASH_URL = 'https://promovteam.github.io/dash-site/';
-function _telBonito(t) {
-  var d = String(t || '').replace(/\D/g, '');
-  if (d.length > 11 && d.indexOf('55') === 0) d = d.slice(2);
-  if (d.length === 11) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
-  if (d.length === 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
-  return String(t || '');
-}
-function ldTextoZap(l, cabec, completo) {
-  if (!l) return '';
-  var L = [];
-  if (cabec) L.push(cabec, '');
-  if (!completo) {   // no WhatsApp: nome, link da Clint, instagram, investimento e nota (Bruno 03/09/2026)
-    var cb = null; try { cb = classeDoLead(l); } catch (e) {}
-    var lkC = ''; try { lkC = clintLink(l) || ''; } catch (e) {}
-    var db = String(l.tel || '').replace(/\D/g, '');
-    L.push('👤 *' + (l.nome || 'Sem nome') + '*');
-    if (l.insta) L.push('📷 @' + String(l.insta).replace(/^@/, '') + ' — https://instagram.com/' + encodeURIComponent(String(l.insta).replace(/^@/, '')));
-    if (l.invest) L.push('💰 ' + String(l.invest).replace(/\s*\(.*$/, ''));
-    if (l.seg) L.push('👥 ' + l.seg + ' seguidores');
-    if (cb) {
-      var fh = null; try { fh = fechamentoHistorico(l); } catch (e) {}
-      L.push('🏅 Nota ' + cb.info.rot + ' (' + cb.nota + '/100)' + (l.faixa === 'alta' ? ' · 🔥 Perfil HT' : '')
-        + (fh ? ' · nota ' + cb.info.rot + ' fecha ' + fh + '%' : ''));
-    }
-    // aviso curto: quem ja atende, se ja teve reuniao, ou ha quanto tempo esta esperando
-    var av = '';
-    try {
-      var iC = clintInfoDe(l), dn = (iC && iC.dono) || l.dono || '', et = (iC && iC.etapa) || '';
-      var sN = ldSituacao(l);
-      if (sN && sN.vd) av = '⚠️ Esse lead JÁ COMPROU';
-      else if (sN && sN.re) av = '⚠️ Já fez reunião com a gente';
-      else if (sN) av = '📅 Já tem reunião marcada';
-      else if (dn) av = '👤 Hoje está com ' + dn + (et ? ' · ' + et : '');
-      else { var hp = ldHorasParado(l); if (hp >= 2) av = '⏱ Esperando há ' + ldTempoTexto(hp); }
-    } catch (e) {}
-    if (av) L.push(av);
-    L.push('');
-    if (lkC) L.push('🟣 Abrir na Clint: ' + lkC);
-    else L.push('🟣 Ainda não tem conversa na Clint' + (l.tel ? ' · WhatsApp: ' + (ldWa(l) || _telBonito(l.tel)) : ''));
-    if (db.length >= 8) L.push('🔗 Ver no dash: ' + DASH_URL + '?ficha=' + db);
-    return L.join('\n');
-  }
-  var c = null; try { c = classeDoLead(l); } catch (e) {}
-  var st = null; try { st = ldSituacao(l); } catch (e) {}
-  var sit = st ? (st.vd ? 'Virou VENDA 💰' : st.re ? 'Fez a reunião ✅' : 'Reunião agendada 📅') : 'Ainda não agendou reunião';
-  var infoC = null; try { infoC = clintInfoDe(l); } catch (e) {}
-  var dono = (infoC && infoC.dono) || l.dono || '';
-  var dig = String(l.tel || '').replace(/\D/g, '');
-  L.push('👤 *' + (l.nome || 'Sem nome') + '*' + (l.leadId ? ' (' + l.leadId + ')' : ''));
-  if (l.tel) L.push('📱 WhatsApp: ' + _telBonito(l.tel) + (ldWa(l) ? ' — ' + ldWa(l) : ''));
-  if (l.insta) L.push('📷 Instagram: @' + String(l.insta).replace(/^@/, ''));
-  if (l.email) L.push('✉️ E-mail: ' + l.email);
-  if (c) L.push('🏅 Nota: *' + c.info.rot + '* (' + c.nota + '/100) — ' + c.info.txt);
-  if (l.faixa === 'alta') L.push('🔥 Perfil HT — chamar primeiro');
-  if (l.invest) L.push('💰 Pode investir: ' + l.invest);
-  if (l.seg) L.push('👥 Seguidores: ' + l.seg);
-  if (l.renda) L.push('💼 Renda hoje: ' + l.renda);
-  if (l.obj) L.push('🎯 Objetivo: ' + l.obj);
-  var orig = String(l.origemMan || '').trim() || l.origem || '';
-  orig = String(orig).replace(/\]\s*\[/g, ' · ').replace(/[\[\]]/g, '').trim();   // "[Ads][Diag]" vira "Ads · Diag"
-  if (orig) L.push('🧲 Origem: ' + orig);
-  L.push('📅 Chegou em: ' + ldDataTxt(l));
-  L.push('📊 Situação: ' + sit + (infoC && infoC.etapa ? ' · Clint: ' + infoC.etapa : '') + (dono ? ' · com ' + dono : ''));
-  if (dig.length >= 8) L.push('', '🔗 Ver no dash: ' + DASH_URL + '?ficha=' + dig);
-  return L.join('\n');
-}
-// abre o WhatsApp com o texto pronto (tel = numero de quem recebe; vazio = o WhatsApp pergunta)
-function ldAbrirZap(txt, tel) {
-  var d = String(tel || '').replace(/\D/g, '');
-  if (d && d.length <= 11) d = '55' + d;
-  var u = 'https://wa.me/' + d + '?text=' + encodeURIComponent(txt || '');
-  var w = null; try { w = window.open(u, '_blank'); } catch (e) {}
-  if (!w) location.href = u;
-}
-function ldMandarZap(i, ev) {
-  if (ev) ev.stopPropagation();
-  var l = ldAtual(_ldReg[i]);
-  if (!l) return;
-  ldAbrirZap(ldTextoZap(l, '📥 Olha esse lead 👇'));
-}
-function ldCopiarZap(i, btn, ev) {
-  if (ev) ev.stopPropagation();
-  var l = ldAtual(_ldReg[i]);
-  if (!l) return;
-  copiarTexto(ldTextoZap(l, '', true), btn);
-}
-// dash?ficha=TELEFONE — e o link que vai no WhatsApp: abre o dash normal ja na ficha da pessoa
-function _fichaPelaUrl() {
-  var m = (String(location.search || '') + ' ' + String(location.hash || '')).match(/[?&#]ficha=(\d{8,})/);
-  if (!m) return;
-  try { history.replaceState(null, '', location.pathname); } catch (e) {}
-  setTimeout(function(){ try { abrirFichaDoTelefone(m[1]); } catch (e) {} }, 400);
-}
-try { _fichaPelaUrl(); } catch (e) {}
-
-function ldPessoasDoTime() {
-  // so o TIME (quem tem acesso ao dash, menos Adm/Visitante/contratos): nome da planilha = o mesmo
-  // que o "Assumir" grava; nome da Clint = o dono correspondente la (pelo primeiro nome)
-  var donosClint = [];
-  try { if (CLINT_PAINEL && CLINT_PAINEL.success) donosClint = CLINT_PAINEL.donos || []; } catch (e) {}
-  var base = [];
-  try { if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a){ if (!a.soOlha && !a.contratos && a.nome !== 'Adm') base.push(a.nome); }); } catch (e) {}
-  ['Bruno Pardim', 'Tony Londe'].forEach(function(n){ if (base.indexOf(n) === -1) base.push(n); });
-  return base.map(function(n) {
-    var p = v2norm(n).split(' ')[0];
-    var c = donosClint.filter(function(d){ return v2norm(d).split(' ')[0] === p; })[0] || '';
-    var ac = null; try { ac = ACESSOS.filter(function(a){ return a.nome === n; })[0]; } catch (e) {}
-    return { rotulo: n.replace(/ Promov$/, ''), planilha: n, clint: c, zap: (ac && ac.zap) || '' };
-  }).sort(function(a, b){ return a.rotulo.localeCompare(b.rotulo, 'pt-BR'); });
-}
-function ldPassarPara(i, ev) {
-  if (ev) ev.stopPropagation();
-  if (soOlhar()) { alert('O Visitante não altera responsáveis.'); return; }
-  var l = ldAtual(_ldReg[i]);
-  if (!l) return;
-  var atual = '';
-  try { var ci = clintInfoDe(l); atual = (ci && ci.dono) || l.dono || ''; } catch (e) { atual = l.dono || ''; }
-  var nomes = ldPessoasDoTime();
-  var ov = document.createElement('div');
-  ov.className = 'modal-overlay open'; ov.style.zIndex = 350;
-  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
-  ov.innerHTML = '<div class="modal" style="width:min(420px,94vw);padding:20px;max-height:90vh;overflow-y:auto;">'
-    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">👤</span><b style="flex:1;">Mandar ' + String(l.nome || 'este lead').replace(/</g, '&lt;') + ' para quem?</b>'
-    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
-    + '<div class="hint" style="margin-bottom:12px;">' + (atual ? 'Hoje está com <b>' + atual.replace(/</g, '&lt;') + '</b>. ' : '') + 'Grava na planilha e troca o dono na Clint.</div>'
-    + '<div style="display:flex;flex-direction:column;gap:6px;">'
-    + nomes.map(function(p, k) {
-        var eh = atual && v2norm(atual).split(' ')[0] === v2norm(p.planilha).split(' ')[0];
-        return '<button class="btn-assumir" style="justify-content:flex-start;padding:10px 12px;font-size:.82rem;' + (eh ? 'opacity:.5;' : '') + '" onclick="ldPassarConfirma(' + i + ',' + k + ',this)"' + (eh ? ' disabled' : '') + '>👤 ' + p.rotulo + (eh ? ' · já é o responsável' : '') + (p.clint ? '' : ' <small style="opacity:.6;">(sem usuário na Clint)</small>') + '</button>';
-      }).join('')
-    + '</div>'
-    + (atual ? '<button class="btn" style="width:100%;margin-top:10px;" onclick="ldPassarConfirma(' + i + ',-1,this)">✕ Tirar o responsável</button>' : '')
-    + '<button class="ld-wa" style="width:100%;justify-content:center;padding:11px;margin-top:10px;background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.45);color:#25d366;cursor:pointer;" onclick="ldMandarZap(' + i + ', event)" title="Não troca o dono: só abre o WhatsApp com a ficha pronta">📤 Só mandar a ficha no WhatsApp</button>'
-    + '</div>';
-  document.body.appendChild(ov);
-}
-function ldPassarConfirma(i, k, btn) {
-  var l = ldAtual(_ldReg[i]);
-  if (!l) return;
-  var p = k >= 0 ? ldPessoasDoTime()[k] : null;
-  if (btn) { btn.textContent = '⏳ salvando…'; btn.disabled = true; }
-  ldSalvarAtendimento(l, { dono: p ? p.planilha : '', situacao: l.situacao || (p ? 'Em qualificação' : '') });
-  if (p && p.clint) { try { clintSincronizarDono(l, p.clint); } catch (e) {} }   // na Clint vale o nome de la
-  try {
-    var ov = btn && btn.closest('.modal-overlay');
-    if (ov && p) {
-      // troquei o dono: agora oferece mandar a ficha pra pessoa no WhatsApp (Bruno 03/09/2026)
-      var primeiro = p.rotulo.split(' ')[0];
-      var txt = ldTextoZap(l, 'Oi ' + primeiro + '! Esse lead agora é seu 👇');
-      var cx = ov.querySelector('.modal');
-      cx.innerHTML = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">✅</span><b style="flex:1;">' + String(l.nome || 'Lead').replace(/</g, '&lt;') + ' agora é de ' + p.rotulo + '</b>'
-        + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
-        + '<div class="hint" style="margin-bottom:14px;">Gravado na planilha' + (p.clint ? ' e na Clint' : ' (na Clint não tem usuário com esse nome)') + '. Quer avisar ' + primeiro + ' com a ficha pronta?</div>'
-        + '<button class="ld-wa" id="pz-zap" style="width:100%;justify-content:center;padding:12px;background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.45);color:#25d366;cursor:pointer;">💬 Mandar a ficha pra ' + primeiro + ' no WhatsApp</button>'
-        + '<button class="btn" style="width:100%;margin-top:8px;" onclick="this.closest(\'.modal-overlay\').remove()">Fechar</button>';
-      cx.querySelector('#pz-zap').onclick = function(){ ldAbrirZap(txt, p.zap); ov.remove(); };
-    } else if (ov) ov.remove();
-  } catch (e) {}
-  try { avisoRapido(p ? '👤 ' + (l.nome || 'Lead') + ' agora é de ' + p.rotulo + (p.clint ? ' (planilha e Clint)' : ' (só na planilha)') : '👤 Responsável removido'); } catch (e) {}
-}
 function ldAssumir(i, ev) {
   if (soOlhar()) return;
   if (ev) ev.stopPropagation();
-  var l = ldAtual(_ldReg[i]);
+  var l = _ldReg[i];
   if (!l) return;
   var eu = ldEu();
   if (!eu) { alert('Antes de assumir, escolha seu nome em "👤 Você" no topo da tela.'); return; }
@@ -10075,6 +9902,48 @@ function comentSecaoHtml() {
   return h;
 }
 
+function _telBonito(t) {
+  var d = String(t || '').replace(/\D/g, '');
+  if (d.length > 11 && d.indexOf('55') === 0) d = d.slice(2);
+  if (d.length === 11) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+  if (d.length === 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+  return String(t || '');
+}
+// texto da ficha do lead para colar na Clint, no WhatsApp, onde for
+function ldTextoFicha(l) {
+  if (!l) return '';
+  var L = [], c = null, st = null, iC = null;
+  try { c = classeDoLead(l); } catch (e) {}
+  try { st = ldSituacao(l); } catch (e) {}
+  try { iC = clintInfoDe(l); } catch (e) {}
+  L.push((l.nome || 'Sem nome') + (l.leadId ? ' (' + l.leadId + ')' : ''));
+  if (l.tel) L.push('WhatsApp: ' + _telBonito(l.tel) + (ldWa(l) ? ' - ' + ldWa(l) : ''));
+  if (l.insta) L.push('Instagram: @' + String(l.insta).replace(/^@/, '') + ' - https://instagram.com/' + String(l.insta).replace(/^@/, ''));
+  if (l.email) L.push('E-mail: ' + l.email);
+  if (c) L.push('Nota: ' + c.info.rot + ' (' + c.nota + '/100) - ' + c.info.txt);
+  if (l.faixa === 'alta') L.push('Perfil HT - chamar primeiro');
+  if (l.invest) L.push('Pode investir: ' + l.invest);
+  if (l.seg) L.push('Seguidores: ' + l.seg);
+  if (l.renda) L.push('Renda hoje: ' + l.renda);
+  if (l.obj) L.push('Objetivos: ' + l.obj);
+  var org = String(l.origemMan || '').trim() || l.origem || '';
+  org = String(org).replace(/\]\s*\[/g, ' - ').replace(/[\[\]]/g, '').trim();
+  if (org) L.push('Origem: ' + org);
+  L.push('Chegou em: ' + ldDataTxt(l));
+  L.push('Situação: ' + (st ? (st.vd ? 'Virou venda' : st.re ? 'Fez a reunião' : 'Reunião agendada') : 'Ainda não agendou reunião')
+    + (iC && iC.etapa ? ' - Clint: ' + iC.etapa : '') + ((iC && iC.dono) || l.dono ? ' - com ' + ((iC && iC.dono) || l.dono) : ''));
+  var lk = ''; try { lk = clintLink(l) || ''; } catch (e) {}
+  if (lk) L.push('Clint: ' + lk);
+  return L.join('\n');
+}
+function ldCopiarFicha(i, btn, ev) {
+  if (ev) ev.stopPropagation();
+  var l = _ldReg[i];
+  if (l && l.tel8) { for (var k = 0; k < (LD.rows || []).length; k++) if (LD.rows[k].tel8 === l.tel8) { l = LD.rows[k]; break; } }
+  if (!l) return;
+  copiarTexto(ldTextoFicha(l), btn);
+}
+
 function ldRow(l, quente) {
   var st = ldSituacao(l);
   var tags = '';
@@ -10133,8 +10002,6 @@ function ldRow(l, quente) {
     + '<span>' + det + '</span></div>'
     + seloAnuncio(l, true) + igSeloLead(l, true)
     + (donoNome ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
-    + '<button class="btn-assumir" style="background:rgba(110,168,255,.14);color:#6ea8ff;border:1px solid rgba(110,168,255,.45);" onclick="ldPassarPara(' + i + ', event)" title="Mandar este lead para outra pessoa">👤 ' + (donoNome ? 'Passar' : 'Para quem') + '</button>'
-    + '<button class="btn-assumir" style="background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.4);" onclick="ldMandarZap(' + i + ', event)" title="Mandar a ficha deste lead para alguém no WhatsApp">📤</button>'
     + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abrir a conversa deste lead no atendimento da Clint">🟣 Clint</a>' : '')
     + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank" onclick="event.stopPropagation()">📷</a>' : '')
     + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation()">💬 WhatsApp</a>' : '')
@@ -10555,10 +10422,9 @@ function abrirFichaLead(i) {
       + (l.insta ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank">📷 Ver Instagram</a>' : '')
       + '</div>';
   }
-  // mandar a ficha pra alguem do time (Bruno 03/09/2026)
-  h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
-    + '<button class="ld-wa" style="flex:2;justify-content:center;padding:12px;background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.45);color:#25d366;cursor:pointer;" onclick="ldMandarZap(' + i + ', event)" title="Abre o WhatsApp com a ficha deste lead pronta — você escolhe pra quem mandar">📤 Mandar o lead no WhatsApp</button>'
-    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="ldCopiarZap(' + i + ', this, event)" title="Copia a ficha em texto para colar onde quiser">📋 Copiar a ficha</button>'
+  // copiar a ficha em texto (Bruno 03/09/2026)
+  h += '<div style="display:flex;gap:10px;margin-top:10px;">'
+    + '<button class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2);color:var(--text-2);cursor:pointer;" onclick="ldCopiarFicha(' + i + ', this, event)" title="Copia os dados deste lead para colar onde quiser">📋 Copiar</button>'
     + '</div>';
   document.getElementById('mb-titulo').textContent = l.nome || 'Sem nome';
   document.getElementById('mb-ico').textContent = l.faixa === 'alta' ? '🔥' : '📥';
@@ -11751,33 +11617,8 @@ function copiarTexto(txt, btn) {
 }
 // copia os dados do lead para a área de transferência (colar no WhatsApp, Clint etc.)
 function copiarDadosLead(btn) {
-  var t = textoDadosLead(_v2reg[_fichaAtual]);
-  if (t) copiarTexto(t, btn);
-}
-// manda os dados da reuniao no WhatsApp (Bruno 03/09/2026)
-function mandarZapReuniao() {
   var r = _v2reg[_fichaAtual];
   if (!r) return;
-  var dig = String(r.telefone || '').replace(/\D/g, '');
-  var wa = dig ? 'https://wa.me/' + (dig.length <= 11 ? '55' + dig : dig) : '';
-  var lkR = ''; try { lkR = clintLink({ tel: r.telefone, nome: r.nome }) || ''; } catch (e) {}
-  var lR = null; try { lR = (LD.rows || []).filter(function(x){ return x.tel8 && x.tel8 === ldTel8(r.telefone); })[0]; } catch (e) {}
-  var cR = null; try { cR = lR ? classeDoLead(lR) : null; } catch (e) {}
-  var L = ['📥 Olha esse lead 👇', '', '👤 *' + (r.nome || 'Sem nome') + '*' + (r.leadId ? ' (' + r.leadId + ')' : '')];
-  var insR = (lR && lR.insta) || '';
-  if (insR) L.push('📷 @' + String(insR).replace(/^@/, '') + ' — https://instagram.com/' + encodeURIComponent(String(insR).replace(/^@/, '')));
-  if (lR && lR.invest) L.push('💰 ' + String(lR.invest).replace(/\s*\(.*$/, ''));
-  if (cR) L.push('🏅 Nota ' + cR.info.rot + ' (' + cR.nota + '/100)');
-  var reu = [r.date ? 'Reunião ' + r.date.toLocaleDateString('pt-BR') : '', r.status || '', r.closer ? 'Closer ' + r.closer : ''].filter(Boolean).join(' · ');
-  if (reu) L.push('📅 ' + reu);
-  L.push('');
-  if (lkR) L.push('🟣 Abrir na Clint: ' + lkR);
-  else if (wa) L.push('📱 WhatsApp: ' + wa);
-  if (dig.length >= 8) L.push('🔗 Ver no dash: ' + DASH_URL + '?ficha=' + dig);
-  ldAbrirZap(L.join('\n'));
-}
-function textoDadosLead(r) {
-  if (!r) return '';
   var linhas = [
     (r.nome || 'Sem nome') + (r.leadId ? ' (' + r.leadId + ')' : ''),
     'Telefone: ' + (r.telefone || '—'),
@@ -11791,7 +11632,7 @@ function textoDadosLead(r) {
     'Forma de pagamento: ' + (r.forma || '—'),
     'Observação: ' + (r.obs || '—')
   ];
-  return linhas.join('\n');
+  copiarTexto(linhas.join('\n'), btn);
 }
 // copia os dados do mentorado (ficha de Pagamentos) — só os campos preenchidos
 function copiarDadosPag(btn) {
@@ -14602,8 +14443,6 @@ function verPendencias() {
 // preenchido com o nome dela. A cobrança só vale quando o dash está NA INTERNET
 // (abrindo no computador do Bruno ou como arquivo, entra direto).
 // Não é cofre de banco: é uma porta com chave simples para a equipe.
-// zap: numero do WhatsApp da pessoa (so digitos, com DDD). Quando preenchido, o "Mandar a ficha
-// pra X no WhatsApp" ja abre a conversa dela; vazio, o WhatsApp pergunta pra quem.
 var ACESSOS = [
   { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
   { nome: 'Tony Londe',    pin: '9264' },
@@ -14731,6 +14570,10 @@ try { var _bs = document.getElementById('boot-splash'); if (_bs) _bs.remove(); }
 .pl-chip.on { background:#ffd166; color:#151515; border-color:#ffd166; }
 .pl-tv { border:1px solid rgba(110,168,255,.4); background:rgba(110,168,255,.1); color:#6ea8ff; border-radius:999px; padding:6px 12px; font-size:.72rem; font-weight:800; cursor:pointer; text-decoration:none; }
 .pl-resumo { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+.pl-resumo.cinco { grid-template-columns:repeat(5,1fr); }
+@media (max-width:1100px) { .pl-resumo.cinco { grid-template-columns:repeat(3,1fr); } }
+@media (max-width:700px)  { .pl-resumo.cinco { grid-template-columns:repeat(2,1fr); } }
+.pl-kpi.k0 { border-color:rgba(185,138,255,.3); background:rgba(185,138,255,.06); }
 .pl-kpi { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px 14px; }
 .pl-kpi small { display:block; font-size:.58rem; letter-spacing:1.5px; font-weight:800; color:var(--muted); margin-bottom:4px; }
 .pl-kpi b { font-size:1.5rem; line-height:1; }
@@ -14817,6 +14660,9 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 .pl-kpi b { font-size:2.2rem; }
 .pl-kpi { border-top:3px solid rgba(255,255,255,.12); }
 .pl-kpi.k1 { border-top-color:#f6a350; } .pl-kpi.k2 { border-top-color:#6ea8ff; } .pl-kpi.k3 { border-top-color:#ff6b6b; } .pl-kpi.k4 { border-top-color:#3ddc97; }
+.pl-kpi.k0 { border-top-color:#b98aff; }
+/* com 5 cartoes o numero encolhe um tico para nao quebrar a linha */
+.pl-resumo.cinco .pl-kpi b { font-size:2rem; }
 .pl-tubo i { transform-origin:left; animation:plCresce .9s cubic-bezier(.2,.8,.2,1); }
 @keyframes plCresce { from { transform:scaleX(0); } }
 .pl-alerta { display:flex; align-items:center; gap:10px; background:rgba(255,107,107,.12); border:1px solid rgba(255,107,107,.55); color:#ff6b6b; border-radius:14px; padding:10px 14px; font-weight:800; font-size:.82rem; margin-bottom:14px; animation:plPisca 1.6s ease-in-out infinite; }
@@ -14855,8 +14701,7 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 .pl-pd.zero .num { color:var(--muted); text-shadow:none; }
 .pl-pd.p1.zero { background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); border-color:rgba(255,255,255,.1); box-shadow:none; }
 /* 🎉 festa quando alguem marca ou vende (Bruno 02/09/2026) */
-#pl-festa { position:fixed; inset:0; z-index:99990; display:none; align-items:center; justify-content:center; background:rgba(6,6,16,.55); overflow:hidden; pointer-events:none; }
-#pl-festa .fx-caixa { pointer-events:auto; }
+#pl-festa { position:fixed; inset:0; z-index:99990; display:none; align-items:center; justify-content:center; background:rgba(6,6,16,.72); overflow:hidden; }
 #pl-festa .fx-caixa { position:relative; z-index:2; text-align:center; padding:34px 44px; border-radius:26px; background:linear-gradient(160deg,#1b1b3c,#0d0d1e); border:2px solid rgba(255,209,102,.7); box-shadow:0 0 80px rgba(255,209,102,.35); animation:fxPula .7s cubic-bezier(.2,1.4,.4,1); max-width:92vw; }
 #pl-festa .fx-ico { font-size:4.2rem; line-height:1; animation:fxBate 1s ease-in-out infinite; }
 #pl-festa .fx-t1 { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:3rem; letter-spacing:1px; text-transform:uppercase; color:#ffd166; margin-top:8px; line-height:1; }
@@ -15069,7 +14914,7 @@ function plCalcular(p) {
     if (no(dT)) {
       if (_fsRealizada(r.sn)) { tot.re++; tot.l.re.push(r); if (s) { s.re++; s.l.re.push(r); } if (c) { c.re++; c.l.re.push(r); } }
       if (r.sn === 'vendido') { tot.vd++; tot.vdV += r.valor || 0; tot.l.vd.push(r); if (s) { s.vd++; s.vdV += r.valor || 0; s.l.vd.push(r); } if (c) { c.vd++; c.vdV += r.valor || 0; c.l.vd.push(r); } }
-      if (p.per === 'hoje' && (r.sn.indexOf('agendada') !== -1 || r.sn === 'remarcada' || nsRemarcado)) { tot.pend++; tot.l.pend.push(r); }
+      if (r.sn.indexOf('agendada') !== -1 || r.sn === 'remarcada' || nsRemarcado) { tot.pend++; tot.l.pend.push(r); }
     }
     if (ehNs && no(nsT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
     if (faltouDeNovo && no(dT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
@@ -15078,7 +14923,7 @@ function plCalcular(p) {
     mNs.forEach(function(x) {
       var m = x.match(/(\d{1,2})\/(\d{1,2})/);
       var t = new Date(ano, +m[2] - 1, +m[1]).getTime();
-      if (no(t)) { tot.ns++; if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
+      if (no(t)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
     });
   });
   // no-shows que so existem na AGENDA (evento cinza sem linha na planilha) entram na conta
@@ -15090,6 +14935,10 @@ function plCalcular(p) {
   // quem esta ATIVO aparece em todo periodo mesmo zerado ("se tiver 0 coloca no ranking tambem" — Bruno 02/09/2026)
   plSdrsAtivos().forEach(function(n){ if (ehCloser(n)) return; var k = v2norm(n); if (!S[k]) S[k] = novo(n); S[k].ativo = true; });
   closersAtivos.forEach(function(n){ var k = v2norm(n); if (!C[k]) C[k] = novo(n); C[k].ativo = true; });
+  // REUNIOES DO PERIODO (Bruno 03/09/2026): compareceu + no-show + ainda sem resultado, sem repetir
+  // ninguem — e o total que faz a conta fechar na tela (marcadas conta por outra data, a da marcacao)
+  tot.l.todas = tot.l.re.concat(tot.l.ns, tot.l.pend);
+  tot.todas = tot.re + tot.ns + tot.pend;
   var sdrs = Object.keys(S).map(function(k){ return S[k]; }).filter(function(x){ return x.marc || x.re || x.vd || x.ns || x.ativo; })
     .sort(function(a, b){ return plMetrica(b, 'sdr') - plMetrica(a, 'sdr') || b.marc - a.marc || b.re - a.re || b.vd - a.vd || a.ns - b.ns; });
   var closers = Object.keys(C).map(function(k){ return C[k]; }).filter(function(x){ return x.re || x.vd || x.ns || x.ativo; })
@@ -15440,7 +15289,7 @@ function plProximaFesta() {
   el.innerHTML = conf + '<div class="fx-caixa"><div class="fx-ico">' + ico + '</div><div class="fx-t1">' + f.nome.split(' ')[0].replace(/</g, '&lt;') + ' ' + t1 + '</div><div class="fx-t2">' + t2.replace(/</g, '&lt;') + '</div></div>';
   el.style.display = 'flex';
   try { plSomFesta(f.tipo); } catch (e) {}
-  setTimeout(plProximaFesta, 4000);
+  setTimeout(plProximaFesta, 6500);
 }
 // um "tan-tan" curtinho (sem arquivo de som); silencioso se o navegador nao deixar
 function plSomFesta(tipo) {
@@ -15465,7 +15314,7 @@ function plVer(tipo, chave, met) {
   if (!lista) return;
   var rows = (lista.l && lista.l[met]) || [];
   var um = rows.length === 1;
-  var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', pend: um ? 'reunião de hoje AINDA SEM RESULTADO' : 'reuniões de hoje AINDA SEM RESULTADO' }[met] || met;
+  var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', todas: um ? 'REUNIÃO no período' : 'REUNIÕES no período', pend: um ? 'reunião AINDA SEM RESULTADO' : 'reuniões AINDA SEM RESULTADO' }[met] || met;
   var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + lista.nome.replace(/</g, '&lt;') + ' — ' + rows.length + ' ' + rot + '</b>'
     + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
@@ -15478,8 +15327,8 @@ function plVer(tipo, chave, met) {
       + '<span class="hint" style="margin:0;">' + (r.leadId || '') + '</span>'
       + '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + '</span>'
       + '<span class="hint" style="margin:0;">marcada em ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : '') + '</span>'
-      + (met === 'ns' && plDataNoShow(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#ffd166;">no-show em ' + fmt(plDataNoShow(r)) + ' · remarcada</span>' : '')
-      + '<span class="ld-tag">' + (r.status || '') + '</span>'
+      + ((met === 'ns' || met === 'todas') && r.sn === 'no show' && plDataNoShow(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#ffd166;">no-show em ' + fmt(plDataNoShow(r)) + ' · remarcada</span>' : '')
+      + '<span class="ld-tag"' + (met === 'todas' ? ' style="color:' + (r.sn === 'no show' ? '#ff6b6b' : _fsRealizada(r.sn) ? '#6ea8ff' : '#ffd166') + ';"' : '') + '>' + (r.status || '') + '</span>'
       + '<span class="hint" style="margin:0;">' + (tipo === 'sdr' ? 'closer ' + (r.closer || '—') : (tipo === 'closer' ? 'SDR ' + (plPessoa(r.sdr) || '—') : 'closer ' + (r.closer || '—') + ' · SDR ' + (plPessoa(r.sdr) || '—'))) + '</span>'
       + (r.valor ? '<span class="ld-tag" style="color:#ffd166;">' + v2moeda0(r.valor) + '</span>' : '')
       + (met === 'pend' ? '<span style="margin-left:auto;display:flex;gap:6px;">'
@@ -15523,11 +15372,16 @@ function renderPlacar() {
     + (PLACAR.tv ? '' : '<a class="pl-tv" href="' + location.pathname + '#painel=placar" target="_blank" title="Abre numa aba limpa, letra grande, atualizando sozinho — para deixar num monitor">⛶ modo TV</a>'
         + '<a class="pl-tv" href="javascript:void(0)" onclick="plTestarFesta()" title="Mostra como fica o aviso quando alguém marca ou vende">🎉 testar festa</a>')
     + '</div>';
+  // a taxa de no-show e sobre as que JA TEM RESULTADO (compareceu + no-show): se entrassem as
+  // pendentes, a taxa cairia sozinha durante o dia e subiria no fim, o que confunde
   var taxaNs = (t.re + t.ns) ? Math.round(t.ns / (t.re + t.ns) * 100) : null;
-  h += '<div class="pl-resumo">'
-    + '<div class="pl-kpi k1" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'marc\')"><small>📅 MARCADAS</small><b style="color:#f6a350;" data-n="' + t.marc + '">' + t.marc + '</b><i>reuniões marcadas no período · clique para ver</i></div>'
-    + '<div class="pl-kpi k2" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'re\')"><small>✅ COMPARECEU</small><b style="color:#6ea8ff;" data-n="' + t.re + '">' + t.re + '</b><i>' + (t.pend ? '<span style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();plVer(\'time\',\'\',\'pend\')">⏳ ' + t.pend + ' de hoje ainda sem resultado</span>' : 'compareceram à reunião no período') + '</i></div>'
-    + '<div class="pl-kpi k3" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'ns\')"><small>🤦 NO-SHOW</small><b style="color:' + (t.ns ? '#ff6b6b' : '#3ddc97') + ';" data-n="' + t.ns + '">' + t.ns + '</b><i>' + (taxaNs !== null ? taxaNs + '% das reuniões do período' : 'ninguém faltou') + '</i></div>'
+  var doDia = PLACAR.per === 'hoje' ? ' DO DIA' : '';
+  var noPer = PLACAR.per === 'hoje' ? 'hoje' : 'no período';
+  h += '<div class="pl-resumo cinco">'
+    + '<div class="pl-kpi k1" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'marc\')"><small>📅 MARCAÇÕES' + doDia + '</small><b style="color:#f6a350;" data-n="' + t.marc + '">' + t.marc + '</b><i>reuniões que a equipe marcou ' + noPer + ' · clique para ver</i></div>'
+    + '<div class="pl-kpi k0" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'todas\')"><small>🗓 REUNIÕES' + doDia + '</small><b style="color:#b98aff;" data-n="' + t.todas + '">' + t.todas + '</b><i>' + (t.pend ? '<span style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();plVer(\'time\',\'\',\'pend\')">⏳ ' + t.pend + ' ainda sem resultado</span>' : 'estavam na agenda ' + noPer) + '</i></div>'
+    + '<div class="pl-kpi k3" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'ns\')"><small>🤦 NO-SHOW</small><b style="color:' + (t.ns ? '#ff6b6b' : '#3ddc97') + ';" data-n="' + t.ns + '">' + t.ns + '</b><i>' + (taxaNs !== null ? taxaNs + '% das que já tiveram resultado' : 'ninguém faltou') + '</i></div>'
+    + '<div class="pl-kpi k2" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'re\')"><small>✅ COMPARECEU</small><b style="color:#6ea8ff;" data-n="' + t.re + '">' + t.re + '</b><i>compareceram à reunião ' + noPer + '</i></div>'
     + '<div class="pl-kpi k4" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'vd\')"><small>💰 VENDIDO</small><b style="color:#3ddc97;" data-n="' + t.vd + '">' + t.vd + '</b><i>' + (t.vdV ? v2mil(t.vdV) + ' vendidos' : 'nenhuma venda ainda') + '</i></div>'
     + '</div>';
   // ALERTA: SDR ativo que ainda nao marcou nenhuma reuniao hoje (pedido do Bruno 02/09/2026)
@@ -15560,123 +15414,6 @@ function renderPlacar() {
   el.innerHTML = h;
   try { plAnimarNumeros(el); } catch (eAn) {}
 }
-</script>
-
-<!-- ===== 💬 JANELINHAS NOSSAS (Bruno 03/09/2026: "não quero mais a aba do Chrome em nenhuma parte do dash").
-     alert / confirm / prompt do navegador viram a nossa janela, no estilo do dash.
-     Truque do confirm: ele e sincrono, a nossa janela nao — entao a 1a chamada abre a janela e
-     responde "nao"; se a pessoa clicar OK, o mesmo clique e repetido e a 2a chamada responde "sim". ===== -->
-<style>
-#dg-ov { position:fixed; inset:0; z-index:100000; background:rgba(6,6,16,.82); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; padding:20px; }
-#dg-ov .dg-cx { position:relative; overflow:hidden; background:linear-gradient(105deg,#0d0d1e 0%,#15152e 55%,#1b1b3c 100%); border:1px solid rgba(255,209,102,.55); border-radius:22px; max-width:480px; width:100%; padding:24px 26px 22px; box-shadow:0 0 0 1px rgba(255,255,255,.04), 0 24px 70px rgba(0,0,0,.65), 0 0 48px rgba(255,209,102,.12); animation:dgPula .28s cubic-bezier(.2,1.25,.4,1); font-family:Inter, system-ui, sans-serif; }
-#dg-ov .dg-cx::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0 12px, transparent 12px 28px); pointer-events:none; }
-#dg-ov .dg-cx::after { content:''; position:absolute; left:0; right:0; top:0; height:3px; background:linear-gradient(90deg,#fff3c4,#ffd166 40%,#a8770a); }
-@keyframes dgPula { from { transform:translateY(10px) scale(.94); opacity:0; } to { transform:none; opacity:1; } }
-#dg-ov .dg-tit { position:relative; display:flex; align-items:center; gap:12px; margin-bottom:10px; }
-#dg-ov .dg-ico { width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.35rem; background:rgba(255,209,102,.12); border:1px solid rgba(255,209,102,.4); flex-shrink:0; }
-#dg-ov .dg-tit b { flex:1; font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:1.35rem; letter-spacing:.6px; text-transform:uppercase; line-height:1.1; color:#ffd166; }
-#dg-ov .dg-txt { position:relative; font-size:.86rem; line-height:1.65; color:#c9d1e0; white-space:pre-line; margin:0 0 18px; max-height:50vh; overflow-y:auto; }
-#dg-ov input { position:relative; width:100%; box-sizing:border-box; background:rgba(255,255,255,.06); color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:11px 13px; font-size:.92rem; font-family:inherit; margin-bottom:16px; }
-#dg-ov input:focus { outline:none; border-color:rgba(255,209,102,.6); box-shadow:0 0 0 3px rgba(255,209,102,.15); }
-#dg-ov .dg-bt { position:relative; display:flex; gap:10px; justify-content:flex-end; }
-#dg-ov .dg-bt button { padding:11px 20px; border-radius:999px; font-weight:800; font-size:.82rem; cursor:pointer; font-family:inherit; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:#fff; transition:transform .15s, background .15s; }
-#dg-ov .dg-bt button:hover { background:rgba(255,255,255,.12); transform:translateY(-1px); }
-#dg-ov .dg-bt button.ok { background:#ffd166; color:#151515; border-color:#ffd166; box-shadow:0 8px 22px rgba(255,209,102,.3); }
-#dg-ov .dg-bt button.ok:hover { background:#ffe08a; }
-#dg-ov .dg-bt button:focus-visible { outline:2px solid #6ea8ff; outline-offset:2px; }
-@media (prefers-reduced-motion: reduce) { #dg-ov .dg-cx { animation:none; } }
-</style>
-<script>
-(function () {
-  var nativos = { alert: window.alert, confirm: window.confirm, prompt: window.prompt };
-  var okRecente = {};   // pergunta -> { t, v } : ja respondida "sim" ha pouco (segunda rodada do clique repetido)
-  function caixa() {
-    var ov = document.getElementById('dg-ov');
-    if (!ov) { ov = document.createElement('div'); ov.id = 'dg-ov'; document.body.appendChild(ov); }
-    return ov;
-  }
-  function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
-  // a primeira linha da mensagem vira o titulo; o icone segue o assunto
-  function partes(msg, tituloPadrao) {
-    var t = String(msg == null ? '' : msg).trim(), i = t.indexOf('\n');
-    if (i > 0 && i <= 110) return { titulo: t.slice(0, i).trim(), corpo: t.slice(i).trim() };
-    if (t.length <= 90) return { titulo: t, corpo: '' };
-    return { titulo: tituloPadrao, corpo: t };
-  }
-  function iconeDe(msg) {
-    var m = String(msg || '').toLowerCase();
-    if (/no-show|no show|faltou/.test(m)) return '🤦';
-    if (/clint/.test(m)) return '🟣';
-    if (/vincul|ligar o lead|trocar a pessoa/.test(m)) return '🔗';
-    if (/remarc|reuni[aã]o marcada|hor[aá]rio/.test(m)) return '🗓';
-    if (/telefone|whatsapp/.test(m)) return '📱';
-    if (/criar/.test(m)) return '➕';
-    if (/apagar|excluir|desfazer|tirar/.test(m)) return '🗑';
-    if (/venda|vendid|pagamento/.test(m)) return '💰';
-    if (/assumir|respons/.test(m)) return '✋';
-    return '';
-  }
-  // abre a janela; botoes = [{txt, ok, cb}]
-  function abrir(icone, titulo, corpo, botoes, input) {
-    var ov = caixa();
-    ov.innerHTML = '<div class="dg-cx"><div class="dg-tit"><span class="dg-ico">' + icone + '</span><b>' + esc(titulo) + '</b></div>'
-      + '<div class="dg-txt">' + esc(corpo) + '</div>'
-      + (input !== undefined ? '<input id="dg-in" type="text" value="' + esc(input).replace(/"/g, '&quot;') + '">' : '')
-      + '<div class="dg-bt">' + botoes.map(function(b, i){ return '<button id="dg-b' + i + '"' + (b.ok ? ' class="ok"' : '') + '>' + esc(b.txt) + '</button>'; }).join('') + '</div></div>';
-    ov.style.display = 'flex';
-    botoes.forEach(function(b, i) { document.getElementById('dg-b' + i).onclick = function(){ ov.style.display = 'none'; if (b.cb) b.cb(); }; });
-    var foco = document.getElementById('dg-in') || document.querySelector('#dg-ov .dg-bt button.ok') || document.querySelector('#dg-ov .dg-bt button');
-    if (foco) setTimeout(function(){ try { foco.focus(); if (foco.select) foco.select(); } catch (e) {} }, 30);
-    ov.onkeydown = function(e) {
-      if (e.key === 'Escape') { ov.style.display = 'none'; var c = botoes.filter(function(b){ return !b.ok; })[0]; if (c && c.cb) c.cb(); }
-      if (e.key === 'Enter') { var o = botoes.filter(function(b){ return b.ok; })[0]; if (o) { ov.style.display = 'none'; if (o.cb) o.cb(); } }
-    };
-  }
-  // o clique (ou troca de valor) que fez a pergunta — para repetir depois do OK
-  function gatilho() {
-    var ev = window.event;
-    if (!ev || !ev.target || (ev.type !== 'click' && ev.type !== 'change' && ev.type !== 'submit')) return null;
-    return { alvo: ev.target, tipo: ev.type };
-  }
-  function repetir(g) {
-    try {
-      if (g.tipo === 'click') g.alvo.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      else g.alvo.dispatchEvent(new Event(g.tipo, { bubbles: true, cancelable: true }));
-    } catch (e) {}
-  }
-  function jaRespondida(msg) {
-    var r = okRecente[msg];
-    if (r && Date.now() - r.t < 4000) return r;
-    return null;
-  }
-  window.alert = function (msg) {
-    try { var p = partes(msg, 'Aviso'); abrir(iconeDe(msg) || '💬', p.titulo, p.corpo, [{ txt: 'Entendi', ok: true }]); } catch (e) { nativos.alert.call(window, msg); }
-  };
-  window.confirm = function (msg) {
-    msg = String(msg);
-    var r = jaRespondida(msg); if (r) return true;
-    var g = gatilho();
-    if (!g) return nativos.confirm.call(window, msg);   // sem clique para repetir: fica a nativa (raro)
-    var pc = partes(msg, 'Confirma?');
-    abrir(iconeDe(msg) || '❓', pc.titulo, pc.corpo, [
-      { txt: 'Cancelar', ok: false },
-      { txt: 'OK', ok: true, cb: function(){ okRecente[msg] = { t: Date.now() }; repetir(g); } }
-    ]);
-    return false;
-  };
-  window.prompt = function (msg, padrao) {
-    msg = String(msg);
-    var r = jaRespondida(msg); if (r) return r.v;
-    var g = gatilho();
-    if (!g) return nativos.prompt.call(window, msg, padrao);
-    var pp = partes(msg, 'Digite');
-    abrir('✏️', pp.titulo, pp.corpo, [
-      { txt: 'Cancelar', ok: false },
-      { txt: 'OK', ok: true, cb: function(){ var v = (document.getElementById('dg-in') || {}).value; okRecente[msg] = { t: Date.now(), v: v == null ? '' : v }; repetir(g); } }
-    ], padrao == null ? '' : padrao);
-    return null;
-  };
-})();
 </script>
 
 <!-- ===== 📆 CALENDÁRIO ÚNICO (Bruno 01/09/2026): todo campo de data abre este
