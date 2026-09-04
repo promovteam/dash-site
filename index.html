@@ -2223,7 +2223,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-03-1719';
+var VERSAO_DASH = '2026-09-04-1751';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5236,11 +5236,16 @@ var GM_ETAPA_LONGA = { '1': 'Etapa 1 — perguntando a estrutura e o sustento do
 function gmEstadoTxt(g, l) {
   if (!g) return null;
   var et = g.etapa && GM_ETAPA_CURTA[g.etapa] ? ' · ' + GM_ETAPA_CURTA[g.etapa] : '';
-  if (g.estado === 'humano') return { txt: '👤 humano assumiu no GPT Maker' + et, cor: '#f6a350', k: 'humano' };
+  if (g.estado === 'humano') return { txt: '⏸ IA em espera' + et, cor: '#f6a350', k: 'humano' };
   var vb = g.verbaOk && g.verba ? ' · 💰 ' + String(g.verba).replace('/mês', '') : (g.etapa === '2b' ? ' · sem verba' : '');
-  if (g.estado === 'fim') return (l && !gmJaAgendou(l))
-    ? { txt: '✅ IA terminou' + vb + ' · SÓ MARCAR', cor: '#3ddc97', k: 'falta' }
-    : { txt: '✅ IA terminou' + vb, cor: '#8b8fa3', k: 'fim' };
+  var chegouNoFim = g.etapa === '4' || !!g.verbaOk;   // completou o roteiro (etapa 4 = "especialista vai chamar")
+  if (g.estado === 'fim') {
+    if (chegouNoFim) return (l && !gmJaAgendou(l))
+      ? { txt: '✅ IA terminou' + vb + ' · SÓ MARCAR', cor: '#3ddc97', k: 'falta' }
+      : { txt: '✅ IA terminou' + vb, cor: '#8b8fa3', k: 'fim' };
+    var onde = g.etapa === '2b' ? ' · sem verba' : (g.etapa && GM_ETAPA_CURTA[g.etapa] ? ' · parou na ' + GM_ETAPA_CURTA[g.etapa] : '');
+    return { txt: '⏹ IA encerrou sem completar' + onde, cor: '#8b8fa3', k: 'fim' };
+  }
   return { txt: '🤖 IA atendendo' + et + (g.ultimaDe === 'lead' ? ' · lead esperando' : ''), cor: '#8f6bff', k: 'ia' };
 }
 // o DONO do lead ja assumiu a conversa? (pela Clint: nos ja falamos com ele; ou humano no GPT Maker)
@@ -5248,8 +5253,8 @@ function gmDonoAssumiu(l, g) {
   var dono = ''; try { var ci = clintInfoDe(l); dono = (ci && ci.dono) || l.dono || ''; } catch (e) { dono = l.dono || ''; }
   var c = l.tel8 ? CLINT[l.tel8] : null;
   var falouClint = !!(c && c.success && c.temConversa && (c.respondemos || c.quem === 'nos'));
-  var humanoGm = !!(g && g.estado === 'humano');
-  var assumiu = falouClint || humanoGm;
+  var humanoGm = false;   // "humano" no GPT Maker e o modo espera do roteiro, nao prova que o dono falou
+  var assumiu = falouClint;
   var quando = c && c.success && c.temConversa && c.horas != null ? ldTempoTexto(c.horas) : '';
   return { dono: dono, assumiu: assumiu, por: falouClint ? 'pela Clint' : (humanoGm ? 'no GPT Maker' : ''), quando: quando, consultando: c === null };
 }
@@ -5297,14 +5302,14 @@ function renderGmStatus() {
   var num = function(k, ico, rot, cor){ return '<span style="cursor:pointer;margin-left:10px;" onclick="gmAbrirLista(\'' + k + '\')" title="clique para ver quais">' + ico + ' <b style="color:' + cor + ';">' + g[k].length + '</b> ' + rot + '</span>'; };
   var q = new Date(GM.quando);
   el.innerHTML = '<div class="hint" style="margin:-4px 0 10px;text-align:right;">🤖 GPT Maker · ' + (GM.painel.chats || 0).toLocaleString('pt-BR') + ' conversas'
-    + num('ia', '🤖', 'IA atendendo', '#8f6bff') + num('humano', '👤', 'com humano', '#f6a350') + num('fim', '✅', 'IA terminou', '#8b8fa3') + num('falta', '⚠️', 'terminou e falta marcar', '#3ddc97')
+    + num('ia', '🤖', 'IA atendendo', '#8f6bff') + num('humano', '⏸', 'IA em espera', '#f6a350') + num('fim', '✅', 'IA terminou', '#8b8fa3') + num('falta', '⚠️', 'terminou e falta marcar', '#3ddc97')
     + ' · ' + (GM.estado === 'guardado' ? 'dados de ' : 'atualizado às ') + q.toLocaleTimeString('pt-BR').slice(0, 5)
     + (GM.pedindo ? ' <span style="color:#b9a6ff;">⏳</span>' : '') + '</div>';
 }
 function gmAbrirLista(k) {
   var g = gmGrupos();
-  var cfg = { ia: ['🤖', 'IA atendendo agora', 'a IA do GPT Maker está conversando com estes leads'], humano: ['👤', 'Passaram para humano', 'a conversa saiu da IA e está com uma pessoa'],
-    fim: ['✅', 'IA terminou o roteiro', 'a IA chegou ao fim (“nosso especialista vai entrar em contato”)'], falta: ['⚠️', 'IA terminou e FALTA MARCAR', 'terminaram o roteiro e não têm reunião na planilha nem etapa de agendado na Clint — é aqui que o especialista precisa agir'] }[k];
+  var cfg = { ia: ['🤖', 'IA atendendo agora', 'a IA do GPT Maker está conversando com estes leads'], humano: ['⏸', 'IA em espera', 'a IA parou de responder nestas conversas (modo espera do roteiro, ou alguém assumiu no GPT Maker)'],
+    fim: ['✅', 'IA terminou', 'conversas encerradas pela IA — completas (etapa 4) ou não (o lead sumiu ou não tinha verba)'], falta: ['⚠️', 'IA terminou e FALTA MARCAR', 'terminaram o roteiro e não têm reunião na planilha nem etapa de agendado na Clint — é aqui que o especialista precisa agir'] }[k];
   var rows = g[k] || [];
   document.getElementById('mb-titulo').textContent = cfg[1] + ' — ' + rows.length;
   document.getElementById('mb-ico').textContent = cfg[0];
@@ -10302,7 +10307,7 @@ function abrirFichaLead(i) {
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['🤖', 'Agente de IA (GPT Maker)', (function(){ var g = gmInfoDe(l); var e = gmEstadoTxt(g, l); if (!e) return ''; var q = g.quando ? new Date(g.quando) : null;
         var d = gmDonoAssumiu(l, g);
-        var h = '<b style="color:' + e.cor + ';">' + (g.estado === 'humano' ? '👤 humano assumiu no GPT Maker' : g.estado === 'fim' ? e.txt : '🤖 IA atendendo') + '</b>';
+        var h = '<b style="color:' + e.cor + ';">' + (g.estado === 'humano' ? '⏸ IA em espera (a IA parou de responder; modo espera ou alguém assumiu no GPT Maker)' : g.estado === 'fim' ? e.txt : '🤖 IA atendendo') + '</b>';
         if (g.etapa && GM_ETAPA_LONGA[g.etapa]) h += '<div style="font-size:.74rem;margin-top:3px;">📍 ' + GM_ETAPA_LONGA[g.etapa] + '</div>';
         if (g.verba) h += '<div style="font-size:.74rem;margin-top:2px;">💰 ' + (g.verbaOk ? 'Verba confirmada: <b>' + String(g.verba).replace(/</g, '&lt;') + '</b>' : String(g.verba).replace(/</g, '&lt;')) + '</div>';
         if (q) h += '<div class="hint">última atividade ' + q.toLocaleDateString('pt-BR') + ' ' + q.toLocaleTimeString('pt-BR').slice(0, 5) + (g.ultimaDe === 'lead' ? ' · <b style="color:#ff6b6b;">o lead falou por último</b>' : g.ultimaDe === 'ia' ? ' · a IA falou por último' : '') + (g.agente ? ' · agente ' + g.agente : '') + '</div>';
@@ -10695,7 +10700,7 @@ function abrirFichaLead(i) {
   // 🤖 a IA terminou o roteiro: aviso no topo com a verba confirmada e o "só falta agendar" (Bruno 03/09/2026)
   try {
     var gF = gmInfoDe(l);
-    if (gF && gF.estado === 'fim') {
+    if (gF && gF.estado === 'fim' && (gF.etapa === '4' || gF.verbaOk)) {
       var jaAg = gmJaAgendou(l), dF = gmDonoAssumiu(l, gF);
       var corF = jaAg ? '61,220,151' : '255,209,102';
       h = '<div style="margin-bottom:14px;padding:14px 16px;border-radius:16px;background:rgba(' + corF + ',.1);border:1px solid rgba(' + corF + ',.5);">'
