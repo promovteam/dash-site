@@ -2224,7 +2224,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1311';
+var VERSAO_DASH = '2026-09-05-1319';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5231,6 +5231,8 @@ function carregarGptMaker() {
       try { localStorage.setItem('v2GmPainelGuardado', JSON.stringify({ quando: GM.quando, dados: d })); } catch (e) {}
       try { renderLeads(); } catch (e) {}
       try { renderAvisoGm(); } catch (e) {}
+      try { gmNovidades(); } catch (e) {}
+      try { gmBadge(); } catch (e) {}
     } else {
       GM.estado = 'erro';
       GM.motivo = (d && d.error === 'sem_chave') ? 'sem_chave'
@@ -5343,6 +5345,7 @@ function renderGmStatus() {
     + card('fim', 'fim', '✅', 'IA terminou', '#c9d1e0', 'conversas encerradas pela IA')
     + card('falta', 'falta', '⚠️', 'Só falta marcar', '#ffd166', g.falta.length ? 'confirmaram a verba e ninguém marcou' : 'ninguém esperando')
     + '</div>';
+  gmBadge();
 }
 function gmAbrirLista(k) {
   var g = gmGrupos();
@@ -10849,16 +10852,86 @@ function renderAvisoGm() {
     return '<span class="nb-pill" style="background:rgba(255,209,102,.16);color:#ffd166;border:1px solid rgba(255,209,102,.45);" onclick="abrirFichaLead(' + i + ')" title="abrir a ficha e marcar a reunião">'
       + String(l.nome || 'Sem nome').replace(/</g, '&lt;').split(' ').slice(0, 2).join(' ') + vb + (quando ? ' · ' + quando : '') + '</span>';
   }).join('') + (fila.length > 8 ? '<span class="nb-pill f" onclick="gmAbrirLista(\'falta\')">+ ' + (fila.length - 8) + '</span>' : '');
-  el.innerHTML = '<div class="novo-box" style="border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.07);' + (novos ? 'animation:plPisca 1.6s ease-in-out infinite;' : '') + '">'
-    + '<span class="nb-ico">🤖</span>'
-    + '<div class="nb-txt">'
-    + '<b>' + (fila.length === 1 ? 'A IA terminou o roteiro com 1 lead e ninguém marcou a reunião' : 'A IA terminou o roteiro com ' + fila.length + ' leads e ninguém marcou a reunião')
-    + (novos ? ' <span style="color:#ffd166;">· ' + novos + ' novo' + (novos === 1 ? '' : 's') + '</span>' : '') + '</b>'
-    + '<div class="hint" style="margin-top:2px;">O lead confirmou a verba e ouviu “nosso especialista vai entrar em contato”. É a hora de marcar.</div>'
-    + '<div class="nb-pills">' + pills + '</div></div>'
-    + '<button class="btn primary" style="padding:9px 16px;font-size:.72rem;white-space:nowrap;" onclick="gmAbrirLista(\'falta\');gmAvisoVisto()">Ver a fila →</button>'
+  var aberto = !!window._gmAvisoAberto;
+  el.innerHTML = '<div class="novo-box" style="border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.07);padding:' + (aberto ? '' : '9px 14px;') + '">'
+    + '<span class="nb-ico" style="' + (aberto ? '' : 'font-size:1.1rem;') + '">🤖</span>'
+    + '<div class="nb-txt" style="cursor:pointer;" onclick="window._gmAvisoAberto=!window._gmAvisoAberto;renderAvisoGm()" title="clique para ' + (aberto ? 'recolher' : 'ver os nomes') + '">'
+    + '<b style="font-size:.82rem;">' + fila.length + (fila.length === 1 ? ' lead terminou' : ' leads terminaram') + ' o roteiro com a IA e falta marcar'
+    + (novos ? ' <span style="color:#ffd166;">· ' + novos + ' novo' + (novos === 1 ? '' : 's') + '</span>' : '') + ' <span class="hint">' + (aberto ? '▴' : '▾ ver nomes') + '</span></b>'
+    + (aberto ? '<div class="hint" style="margin-top:2px;">Confirmaram a verba e ouviram “nosso especialista vai entrar em contato”. É a hora de marcar.</div><div class="nb-pills">' + pills + '</div>' : '')
+    + '</div>'
+    + '<button class="btn primary" style="padding:8px 14px;font-size:.7rem;white-space:nowrap;" onclick="gmAbrirLista(\'falta\');gmAvisoVisto()">Ver a fila →</button>'
     + '<button class="close-x" title="Esconder até recarregar a página" onclick="window._gmAvisoEscondido=true;gmAvisoVisto();renderAvisoGm()">✕</button>'
     + '</div>';
+  gmBadge();
+}
+// ===== 💬 MENSAGEM NO CANTO: alguem NOVO terminou o roteiro da IA (Bruno 05/09/2026) =====
+function gmSom() {
+  try {
+    if (typeof ldSomLigado === 'function' && !ldSomLigado()) return;
+    var ac = new (window.AudioContext || window.webkitAudioContext)();
+    [[660, 0], [880, 0.18]].forEach(function(n) {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = n[0];
+      g.gain.setValueAtTime(0.0001, ac.currentTime + n[1]); g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + n[1] + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + n[1] + 0.35);
+      o.connect(g); g.connect(ac.destination); o.start(ac.currentTime + n[1]); o.stop(ac.currentTime + n[1] + 0.4);
+    });
+  } catch (e) {}
+}
+function gmToast(l, texto) {
+  var box = document.getElementById('gm-toasts');
+  if (!box) { box = document.createElement('div'); box.id = 'gm-toasts'; document.body.appendChild(box); }
+  var t = document.createElement('div');
+  t.className = 'gm-toast';
+  var i = l ? ((l._reg != null && _ldReg[l._reg] === l) ? l._reg : (l._reg = _ldReg.push(l) - 1)) : -1;
+  var g = l ? (gmInfoDe(l) || {}) : {};
+  var verba = g.verbaOk && g.verba ? String(g.verba).replace('/mês', '') : '';
+  t.innerHTML = '<button class="gt-x" title="fechar">✕</button>'
+    + '<div class="gt-tit"><span class="gt-ico">🤖</span><b>' + (l ? 'A IA terminou · só falta marcar' : 'Fila do especialista') + '</b></div>'
+    + '<div class="gt-txt">' + (l ? '<b>' + String(l.nome || 'Lead').replace(/</g, '&lt;') + '</b>' + (verba ? ' confirmou <b>' + verba.replace(/</g, '&lt;') + '</b>' : ' confirmou a verba') + ' e ouviu “nosso especialista vai entrar em contato”.' : String(texto || '').replace(/</g, '&lt;')) + '</div>'
+    + '<div class="gt-bt">' + (l ? '<button class="ok" data-a="marcar">📅 Marcar reunião</button><button data-a="ficha">Ver ficha</button>' : '<button class="ok" data-a="fila">Ver a fila</button>') + '</div>';
+  t.querySelector('.gt-x').onclick = function(){ t.remove(); };
+  [].forEach.call(t.querySelectorAll('button[data-a]'), function(b) {
+    b.onclick = function() {
+      var a = b.getAttribute('data-a');
+      t.remove();
+      try { if (a === 'marcar') marcarReuniaoDoLead(i); else if (a === 'ficha') abrirFichaLead(i); else gmAbrirLista('falta'); } catch (e) {}
+      gmAvisoVisto();
+    };
+  });
+  box.appendChild(t);
+  setTimeout(function(){ try { t.style.transition = 'opacity .5s'; t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 520); } catch (e) {} }, 20000);
+}
+// compara a fila de agora com a ultima vista NESTE navegador: quem e novo ganha a mensagem no canto
+function gmNovidades() {
+  if (!GM.painel || !GM.painel.success || !LD.carregado) return;
+  var g = gmGrupos(), fila = g.falta || [];
+  var vistos = null;
+  try { vistos = JSON.parse(localStorage.getItem('v2GmFaltaIds') || 'null'); } catch (e) { vistos = null; }
+  var ids = fila.map(function(l){ return l.tel8; });
+  try { localStorage.setItem('v2GmFaltaIds', JSON.stringify(ids)); } catch (e) {}
+  if (!vistos) return;   // primeira vez neste navegador: so guarda (nao chove aviso antigo)
+  var novos = fila.filter(function(l){ return vistos.indexOf(l.tel8) === -1; });
+  if (!novos.length) return;
+  novos.slice(0, 3).forEach(function(l){ gmToast(l); });
+  if (novos.length > 3) gmToast(null, (novos.length - 3) + ' outros leads terminaram o roteiro da IA e também estão esperando alguém marcar.');
+  gmSom();
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('🤖 A IA terminou o roteiro · só falta marcar', { body: novos.slice(0, 3).map(function(l){ return l.nome || 'Lead'; }).join(', ') + (novos.length > 3 ? ' e mais ' + (novos.length - 3) : '') });
+    }
+  } catch (e) {}
+}
+// numero amarelo no menu Leads = tamanho da fila
+function gmBadge() {
+  var item = document.querySelector('.nav-item[data-s="leads"]');
+  if (!item) return;
+  var b = item.querySelector('.gm-badge');
+  var n = 0;
+  try { n = (GM.painel && GM.painel.success && LD.carregado) ? (gmGrupos().falta || []).length : 0; } catch (e) { n = 0; }
+  if (!n) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement('span'); b.className = 'gm-badge'; b.title = 'leads que terminaram com a IA e falta marcar'; item.appendChild(b); }
+  b.textContent = n;
 }
 function gmAvisoVisto() {
   try { var g = gmGrupos(); localStorage.setItem('v2GmFaltaVisto', String((g.falta || []).length)); } catch (e) {}
@@ -15042,6 +15115,22 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 .gm-card.falta { border-top-color:#ffd166; background:rgba(255,209,102,.07); border-color:rgba(255,209,102,.35); }
 .gm-card.falta.tem { animation:plPisca 1.8s ease-in-out infinite; }
 .gm-topo { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 6px; font-size:.7rem; color:var(--muted); flex-wrap:wrap; }
+/* mensagem no canto quando alguem termina o roteiro da IA (Bruno 05/09/2026) */
+#gm-toasts { position:fixed; right:18px; bottom:18px; z-index:100002; display:flex; flex-direction:column; gap:10px; max-width:min(380px,92vw); pointer-events:none; }
+.gm-toast { pointer-events:auto; background:linear-gradient(105deg,#0d0d1e 0%,#15152e 55%,#1b1b3c 100%); border:1px solid rgba(255,209,102,.55); border-radius:18px; padding:13px 14px 12px; box-shadow:0 18px 50px rgba(0,0,0,.6), 0 0 30px rgba(255,209,102,.12); animation:gmEntra .35s cubic-bezier(.2,1.2,.4,1); position:relative; overflow:hidden; }
+.gm-toast::after { content:''; position:absolute; left:0; right:0; top:0; height:3px; background:linear-gradient(90deg,#fff3c4,#ffd166 40%,#a8770a); }
+@keyframes gmEntra { from { transform:translateY(16px); opacity:0; } to { transform:none; opacity:1; } }
+.gm-toast .gt-tit { display:flex; align-items:center; gap:10px; }
+.gm-toast .gt-ico { width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; background:rgba(255,209,102,.12); border:1px solid rgba(255,209,102,.4); flex-shrink:0; }
+.gm-toast .gt-tit b { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:1.05rem; letter-spacing:.4px; text-transform:uppercase; color:#ffd166; line-height:1.1; }
+.gm-toast .gt-txt { font-size:.8rem; color:#e8ecf3; margin-top:6px; line-height:1.45; }
+.gm-toast .gt-bt { display:flex; gap:8px; margin-top:10px; }
+.gm-toast .gt-bt button { padding:8px 13px; border-radius:999px; font-weight:800; font-size:.74rem; cursor:pointer; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:#fff; }
+.gm-toast .gt-bt button.ok { background:#ffd166; color:#151515; border-color:#ffd166; }
+.gm-toast .gt-x { position:absolute; right:10px; top:9px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; }
+@media (prefers-reduced-motion: reduce) { .gm-toast { animation:none; } }
+.nav-item { position:relative; }
+.gm-badge { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:#ffd166; color:#151515; font-size:.62rem; font-weight:900; padding:2px 7px; border-radius:999px; box-shadow:0 0 12px rgba(255,209,102,.4); }
 /* com 5 cartoes o numero encolhe um tico para nao quebrar a linha */
 .pl-resumo.cinco .pl-kpi b { font-size:2rem; }
 .pl-tubo i { transform-origin:left; animation:plCresce .9s cubic-bezier(.2,.8,.2,1); }
