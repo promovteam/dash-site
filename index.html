@@ -1148,6 +1148,7 @@ img { max-width:100%; height:auto; }
       <input class="search-input" style="flex:1;min-width:200px;max-width:320px;margin-bottom:0;" placeholder="🔍  Buscar lead por nome ou telefone..." oninput="LD_BUSCA=this.value;renderLeads()">
     </div>
     <div id="ld-filtros" style="display:none;"></div>
+    <div id="ld-funil"></div>
     <div id="ld-clint-status"></div>
     <div id="ld-gm-status"></div>
     <div id="ld-tempos"></div>
@@ -2244,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1712';
+var VERSAO_DASH = '2026-09-05-1816';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5487,14 +5488,52 @@ function tcRespostaHtml() {
   h += '</table>';
   return h;
 }
+function tcAbrirSemContato() {
+  var sem = tcSemContato();
+  var agora = Date.now();
+  document.getElementById('mb-titulo').textContent = 'A/B há mais de 2 h sem contato humano — ' + sem.length;
+  document.getElementById('mb-ico').textContent = '⚠️';
+  document.getElementById('mb-sub').textContent = 'chegaram pelo formulário, ninguém da equipe falou com eles e não têm reunião · do mais antigo para o mais novo';
+  var h = '';
+  sem.forEach(function(x) {
+    var l = (LD.rows || []).filter(function(r){ return r.tel8 === x.t8; })[0];
+    var linha = 'chegou há <b>' + tcTempoTxt(agora - x.chegou) + '</b>' + (x.ia ? ' · 🤖 IA falou' + (x.respondeuIa ? ' e ele respondeu' : ' (sem resposta)') : ' · 🤖 IA não falou') + (x.dono ? ' · 👤 dono ' + String(x.dono).replace(/</g, '&lt;') : ' · 🆓 sem dono');
+    if (l) {
+      h += ldRow(l, l.faixa === 'alta').replace('<span class="ld-det">', '<span class="ld-det" style="color:#ffd166;">⏱ ' + linha + '<br></span><span class="ld-det">');
+    } else {
+      h += '<div class="ld-row"><div class="avatar">' + v2ini(x.nome || '?') + '</div><div class="ld-info"><div class="ld-nome">' + String(x.nome || 'Lead').replace(/</g, '&lt;') + (x.nota ? ' <span class="ld-tag" style="background:rgba(255,255,255,.08);">🏅 ' + x.nota + '</span>' : '') + '</div><span class="ld-det" style="color:#ffd166;">⏱ ' + linha + '</span></div>'
+        + '<div class="ld-acoes">' + (x.clint ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + x.clint + '" target="_blank">🟣 Clint</a>' : '') + (x.tel ? '<a class="ld-wa" href="https://wa.me/' + String(x.tel).replace(/\D/g, '') + '" target="_blank">💬 WhatsApp</a>' : '') + '</div></div>';
+    }
+  });
+  document.getElementById('mb-lista').innerHTML = h || '<div style="color:var(--muted);font-size:.8rem;">Nenhum. 👏</div>';
+  var bq = document.getElementById('mb-busca'); if (bq) { bq.value = ''; bq.style.display = ''; }
+  document.getElementById('modal-b').classList.add('open');
+}
+function tcAlternar() {
+  window._tcAberto = !window._tcAberto;
+  try { localStorage.setItem('v2TemposAberto', window._tcAberto ? '1' : '0'); } catch (e) {}
+  renderTempos();
+}
+(function(){ try { window._tcAberto = localStorage.getItem('v2TemposAberto') === '1'; } catch (e) { window._tcAberto = false; } })();
 function renderTempos() {
   var el = document.getElementById('ld-tempos');
   if (!el) return;
+  var aberto = !!window._tcAberto;
+  if (!aberto) {   // fechado: uma linha com o resumo e o botao de abrir
+    var L0 = (TC.dados && TC.dados.success) ? (TC.dados.leads || []) : null, resumo = '';
+    if (L0) {
+      var tI = [], tH = [], sem0 = 0;
+      L0.forEach(function(x){ if (x.ia) tI.push(x.ia - x.chegou); if (x.humano) tH.push(x.humano - x.chegou); else sem0++; });
+      resumo = '<span style="color:#8f6bff;">🤖 IA ' + tcTempoTxt(tcMediana(tI)) + '</span> · <span style="color:#3ddc97;">📞 humano ' + tcTempoTxt(tcMediana(tH)) + '</span> · <span style="color:' + (sem0 ? '#ff6b6b' : '#3ddc97') + ';">⚠️ ' + sem0 + ' sem contato</span> · <span class="hint">' + TC.dias + ' dia' + (TC.dias > 1 ? 's' : '') + '</span>';
+    } else resumo = '<span class="hint">' + (TC.pedindo ? '⏳ medindo…' : (TC.estado === 'erro' ? '⚠️ ' + String(TC.motivo).replace(/</g, '&lt;').slice(0, 90) : '')) + '</span>';
+    el.innerHTML = '<div class="tc-wrap" style="padding:9px 14px;cursor:pointer;" onclick="tcAlternar()"><div class="tc-topo" style="margin:0;"><h4>⏱ Tempo até o contato <span class="hint" style="font-weight:600;margin-left:6px;">' + resumo + '</span></h4><span class="chart-chip">abrir ▾</span></div></div>';
+    return;
+  }
   var chips = ['1 dia', '7 dias', '30 dias'].map(function(r, i) {
     var d = [1, 7, 30][i];
     return '<button class="chart-chip' + (TC.dias === d ? ' active' : '') + '" onclick="carregarTempos(' + d + ')">' + r + '</button>';
   }).join('');
-  var topo = '<div class="tc-topo"><h4>⏱ Tempo até o contato <span class="hint" style="font-weight:600;">· do formulário até a IA falar e até um humano falar (Clint)</span></h4><div style="display:flex;gap:6px;align-items:center;">' + chips
+  var topo = '<div class="tc-topo"><h4>⏱ Tempo até o contato <span class="hint" style="font-weight:600;">· do formulário até a IA falar e até um humano falar (Clint)</span></h4><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' + chips + '<span class="chart-chip" style="cursor:pointer;" onclick="tcAlternar()">recolher ▴</span>'
     + (TC.pedindo ? '<span class="hint" style="color:#b9a6ff;">⏳</span>' : (TC.quando ? '<span class="hint">' + (TC.estado === 'guardado' ? 'dados de ' : 'às ') + new Date(TC.quando).toLocaleTimeString('pt-BR').slice(0, 5) + '</span>' : '')) + '</div></div>';
   if (!TC.dados || !TC.dados.success) {
     el.innerHTML = '<div class="tc-wrap">' + topo + '<div class="hint">' + (TC.estado === 'erro' ? '⚠️ ' + String(TC.motivo).replace(/</g, '&lt;') + ' · <span style="cursor:pointer;text-decoration:underline;" onclick="carregarTempos()">tentar de novo</span>' : (TC.pedindo ? '⏳ medindo…' : '')) + '</div>'
@@ -5550,19 +5589,11 @@ function renderTempos() {
   h += '</table>';
   h += tcRespostaHtml();
   var sem = tcSemContato();
-  h += '<div class="g-label" style="margin:12px 0 6px;">⚠️ A/B há mais de 2 h sem contato humano · ' + sem.length + '</div>';
-  if (!sem.length) h += '<div class="hint">Nenhum. 👏</div>';
-  sem.slice(0, 12).forEach(function(x) {
-    var l = (LD.rows || []).filter(function(r){ return r.tel8 === x.t8; })[0];
-    var i = l ? ((l._reg != null && _ldReg[l._reg] === l) ? l._reg : (l._reg = _ldReg.push(l) - 1)) : -1;
-    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;border-radius:10px;background:rgba(255,107,107,.08);margin-bottom:5px;font-size:.74rem;">'
-      + '<b style="cursor:pointer;color:#6ea8ff;" ' + (i >= 0 ? 'onclick="abrirFichaLead(' + i + ')"' : '') + '>' + String(x.nome || 'Lead').replace(/</g, '&lt;') + '</b>'
-      + (x.nota ? '<span class="ld-tag" style="background:rgba(255,255,255,.08);">🏅 ' + x.nota + '</span>' : '') + (x.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">🔥 R$2–4 mil</span>' : '')
-      + '<span class="hint" style="margin:0;">chegou há ' + tcTempoTxt(agora - x.chegou) + (x.ia ? ' · IA falou' + (x.respondeuIa ? ' e ele respondeu' : '') : ' · IA não falou') + (x.dono ? ' · dono ' + String(x.dono).replace(/</g, '&lt;') : ' · sem dono') + '</span>'
-      + (x.clint ? '<a class="ld-wa" style="padding:4px 9px;margin-left:auto;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + x.clint + '" target="_blank">🟣 Clint</a>' : '')
-      + '</div>';
-  });
-  if (sem.length > 12) h += '<div class="hint">… e mais ' + (sem.length - 12) + '</div>';
+  // a lista abre numa janela (Bruno 05/09/2026: "que essa seja uma aba que abra") — aqui fica so o resumo
+  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 4px;padding:10px 12px;border-radius:12px;background:' + (sem.length ? 'rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.35)' : 'rgba(61,220,151,.08);border:1px solid rgba(61,220,151,.3)') + ';">'
+    + '<span style="font-size:1.1rem;">' + (sem.length ? '⚠️' : '👏') + '</span><div style="flex:1;min-width:160px;font-size:.8rem;"><b>' + (sem.length ? sem.length + (sem.length === 1 ? ' lead A/B há mais de 2 h sem contato humano' : ' leads A/B há mais de 2 h sem contato humano') : 'Nenhum lead A/B esperando contato humano') + '</b>'
+    + (sem.length ? '<div class="hint" style="margin-top:2px;">chegaram pelo formulário, ninguém da equipe falou e não têm reunião</div>' : '') + '</div>'
+    + (sem.length ? '<button class="btn primary" style="padding:8px 14px;font-size:.72rem;white-space:nowrap;" onclick="tcAbrirSemContato()">Ver a lista →</button>' : '') + '</div>';
   h += '</div></div></div>';
   el.innerHTML = h;
 }
@@ -11631,6 +11662,7 @@ function renderLeads() {
       + SB_CORTE.toLocaleDateString('pt-BR') + ' (base do site do diagnóstico, relida a cada 2 min · '
       + SB.rows.length + ' leads, inclusive quem não terminou) · antes disso, histórico da planilha</div>';
   }
+  var _fIni = h.length;   // daqui ate o fim do painel do funil vai para o TOPO da aba (#ld-funil)
   h += '<div class="panel" style="margin-bottom:18px;">'
     + '<h3>' + (modoAc ? '📆 Funil do período' : '📥 Funil de Leads') + ' — ' + per.label + (LD_RANGE ? ' <span class="ld-selo morno" style="cursor:pointer;" onclick="escolherBucketLeads(' + LD_RANGE.ini + ')">✕ limpar</span>' : '')
     + (ldContaF() ? ' <span class="ld-selo morno">🔎 ' + ldContaF() + ' filtro' + (ldContaF() === 1 ? '' : 's') + ' ativo' + (ldContaF() === 1 ? '' : 's') + '</span>' : '') + '</h3>'
@@ -11683,6 +11715,8 @@ function renderLeads() {
       + '</div><div class="hint" style="margin-top:7px;">Conta pela data da reunião na aba Vendas · clique para ver os clientes</div></div>';
   })();
   h += '</div>';
+  var _fHtml = h.slice(_fIni); h = h.slice(0, _fIni);
+  try { var _elF = document.getElementById('ld-funil'); if (_elF) _elF.innerHTML = _fHtml; } catch (eF) {}
 
   // ===== ⚡ velocidade de resposta — agora vem PRONTA do robô (centenas de conversas) =====
   var prPainel = (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.primeiraResposta && CLINT_PAINEL.primeiraResposta.length)
@@ -16297,6 +16331,91 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 #cal-pop .cal-pe { display:flex; gap:6px; margin-top:8px; }
 #cal-pop .cal-pe button { flex:1; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:inherit; border-radius:8px; padding:6px 0; cursor:pointer; font-size:.72rem; font-family:inherit; }
 #cal-pop .cal-pe button:hover { background:rgba(110,168,255,.2); }
+/* ===== 📱 CELULAR DE VERDADE (Bruno 05/09/2026: "quero uma adaptação perfeita mobile") =====
+   fica no FIM do ultimo <style> de proposito: ganha de qualquer regra anterior com o mesmo peso */
+@media (max-width:760px){
+  /* nada pode ser mais largo que a tela: grade nenhuma trava largura minima */
+  .main, .screen, .panel, .glass, .grid2 > *, .hero-row > *, .kpis > *, .pl-grid > *, .tc-grid > *, .metas-grid > *, .mp-grid > *, .ag-grid2 > * { min-width:0 !important; max-width:100%; }
+  .panel { overflow:hidden; padding:14px 12px; border-radius:16px; }
+  .panel h3 { font-size:.7rem; margin-bottom:12px; }
+  /* topo */
+  .topbar { gap:10px; margin-bottom:14px; }
+  .topbar h1 { font-size:1.02rem; line-height:1.15; }
+  .topbar h1 small { font-size:.62rem; }
+  .topbar-right { gap:6px; }
+  .topbar-right .btn { padding:7px 9px; font-size:.66rem; }
+  /* cartoes da visao geral */
+  .glass { padding:16px 14px; }
+  .g-value { font-size:1.45rem; } .g-value.money { font-size:1.3rem; }
+  .g-stats { flex-wrap:wrap; gap:6px; } .g-stat { flex:1 1 30%; padding:8px 6px; }
+  .kpis { grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px; }
+  .kpis .g-value { font-size:1.25rem; }
+  /* "chegaram X leads" e aviso da IA: icone + texto em cima, etiquetas no meio, botoes embaixo */
+  .novo-box { flex-wrap:wrap; gap:8px 10px; padding:12px 12px !important; }
+  .novo-box .nb-ico { font-size:1.25rem !important; }
+  .novo-box .nb-txt { flex:1 1 200px; }
+  .novo-box .nb-txt b { font-size:.86rem; }
+  .novo-box .close-x { order:1; }
+  .novo-box .btn { order:2; flex:1 1 40%; justify-content:center; white-space:normal !important; padding:9px 10px !important; }
+  .nb-pills { gap:6px; } .nb-pill { font-size:.62rem; padding:4px 9px; }
+  /* funil: numero + nome na linha, explicacao embaixo, % na ultima linha */
+  .fs-et { flex-wrap:wrap; gap:4px 10px; padding:9px 10px; }
+  .fs-et .fs-num { width:36px; font-size:1.02rem; }
+  .fs-et .fs-info { flex:1 1 60%; }
+  .fs-et .fs-info b { font-size:.76rem; } .fs-et .fs-info span { font-size:.62rem; }
+  .fs-et .fs-tx { white-space:normal; flex:0 0 100%; padding-left:46px; font-size:.62rem; }
+  .fs-sub2 { margin-left:12px; }
+  /* listas de reunioes/leads: valor e situacao descem para a linha de baixo */
+  .cliente-row { flex-wrap:wrap; gap:8px 10px; padding:10px 10px; }
+  .cliente-row .valor { white-space:normal; margin-left:0; flex:0 0 100%; padding-left:46px; }
+  .cliente-row .ld-tag { max-width:100% !important; }
+  .cliente-row > span[style*="margin-left:auto"] { flex:0 0 100% !important; margin-left:0 !important; padding-left:46px; flex-wrap:wrap; }
+  /* etiquetas dentro do card do lead podem quebrar linha (antes cortava "SÓ MARCAR") */
+  .ld-row .ld-chips > *, .ld-row .ld-nome > * { white-space:normal !important; max-width:100%; }
+  /* avisos amarelos (Clint desatualizada, levar para a Clint...): texto inteiro, botoes embaixo */
+  .alerta-parado, .alerta-parado .click { flex-wrap:wrap; }
+  .alerta-parado > *, .alerta-parado .click > * { min-width:0; max-width:100%; }
+  .alerta-parado .click > div { flex:1 1 190px !important; }
+  .alerta-parado .click .btn-assumir, .alerta-parado .click > button { white-space:normal !important; flex:1 1 auto; }
+  .alerta-parado .click > span:last-child { margin-left:auto; }
+  .alerta-parado span[style*="nowrap"] { white-space:normal !important; }
+  /* placar */
+  .pl-topo h2 { font-size:1rem; flex:1 1 100%; }
+  .pl-col { padding:12px 10px 8px; }
+  .pl-col h3 { gap:6px 8px; }
+  .pl-col h3 .pl-h3t { font-size:1.15rem; }
+  .pl-ord { margin-left:0; flex:0 0 100%; flex-wrap:wrap; }
+  .pl-podio { gap:6px; } .pl-podio > * { min-width:0; overflow:hidden; }
+  .pl-pd { padding:10px 5px 9px; } .pl-pd.p1 { padding-top:20px; }
+  .pl-pd .num { font-size:2rem !important; } .pl-pd.p1 .num { font-size:2.5rem !important; }
+  .pl-card { padding:10px 10px 10px 14px; gap:10px; } .pl-num b { font-size:1.6rem; } .pl-nome b { font-size:.92rem; }
+  .pl-kpi { padding:10px 10px; } .pl-kpi b { font-size:1.3rem; } .pl-kpi i { font-size:.62rem; }
+  .pl-dias { gap:4px; margin-top:12px; } .pl-dia { padding:6px 3px 5px; } .pl-dia small { font-size:.55rem; }
+  .pl-dia .pl-barras { gap:3px; height:40px; } .pl-dia .pl-barras i { width:7px; } .pl-dia .pl-legs { gap:3px; font-size:.55rem; }
+  /* tabelas largas rolam de lado dentro do painel, sem empurrar a pagina */
+  .panel table, .modal table, .screen table { display:block; overflow-x:auto; max-width:100%; -webkit-overflow-scrolling:touch; }
+  .panel table td, .panel table th, .modal table td, .modal table th { white-space:nowrap; }
+  #v2-sg, #vista-semana, .crm-board { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  /* grafico */
+  .chart-chip { font-size:.64rem; padding:5px 8px; }
+  .bars { gap:6px; } .bar-lbl { font-size:.58rem; }
+  /* janelas: ocupam a tela toda, coladas embaixo, como no app */
+  .modal-overlay { padding:0 !important; align-items:flex-end !important; }
+  .modal-overlay .modal { width:100vw !important; max-width:100vw; border-radius:18px 18px 0 0; max-height:92vh; padding:16px 14px; }
+  .modal-head h2 { font-size:.95rem; }
+  .drawer { width:100%; max-width:100%; }
+  /* ficha do lead: rotulo em cima, valor embaixo (antes o valor ficava espremido a direita) */
+  #mb-lista .fs-calc-linha { flex-direction:column; align-items:flex-start; gap:3px; padding:8px 2px; }
+  #mb-lista .fs-calc-linha > span:first-child { font-size:.6rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); }
+  #mb-lista .fs-calc-linha > b { max-width:100% !important; text-align:left !important; overflow-wrap:anywhere; word-break:break-word; }
+  .fs-calc-linha > b { min-width:0; overflow-wrap:anywhere; }
+  /* botao flutuante "venda sem dados" menor */
+  #vsf-btn { font-size:.7rem !important; padding:8px 12px !important; right:10px !important; bottom:10px !important; }
+}
+@media (max-width:420px){
+  .main { padding:12px 10px; }
+  .topbar h1 small { display:none; }
+}
 </style>
 <script>
 (function () {
