@@ -2244,7 +2244,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1650';
+var VERSAO_DASH = '2026-09-05-1703';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5466,6 +5466,25 @@ function tcSemContato() {   // A/B (ou HT) com mais de 2 h sem humano e sem reun
   return TC.dados.leads.filter(function(x){ return (x.nota === 'A' || x.nota === 'B' || x.faixa === 'alta') && !x.humano && !x.reuniao && agora - x.chegou > 2 * 3600000; })
     .sort(function(a, b){ return a.chegou - b.chegou; });
 }
+// ⚡ tempo de RESPOSTA por atendente (Bruno 05/09/2026: "tempo de resposta de cada SDR e SS e a media de todos")
+// Medido pelo robo nas conversas recentes da Clint: do primeiro "oi" do lead ate a nossa primeira resposta.
+function tcRespostaHtml() {
+  var pr = (CLINT_PAINEL && CLINT_PAINEL.success && CLINT_PAINEL.primeiraResposta) ? CLINT_PAINEL.primeiraResposta.slice() : [];
+  if (!pr.length) return '<div class="g-label" style="margin:12px 0 6px;">⚡ Tempo de resposta ao lead</div><div class="hint">O painel da Clint ainda não trouxe a medição (aparece quando há conversas recentes com resposta).</div>';
+  pr.sort(function(a, b){ return a.minutos - b.minutos; });
+  var soma = 0, n = 0;
+  pr.forEach(function(p){ if (p.dono !== '(sem dono)') { soma += p.minutos * p.qtd; n += p.qtd; } });
+  var media = n ? Math.round(soma / n) : null;
+  var cor = function(m){ return m <= 15 ? '#3ddc97' : m <= 60 ? '#6ea8ff' : m <= 240 ? '#f6a350' : '#ff6b6b'; };
+  var h = '<div class="g-label" style="margin:12px 0 6px;">⚡ Tempo de resposta ao lead <span class="hint" style="font-weight:600;">· do primeiro “oi” do lead até a primeira resposta da pessoa, nas conversas recentes da Clint</span></div>';
+  h += '<table class="tc-tab"><tr><th>Atendente</th><th>Responde em</th><th>Conversas</th></tr>';
+  pr.forEach(function(p) {
+    h += '<tr><td>' + String(p.dono).replace(/</g, '&lt;') + '</td><td><b style="color:' + cor(p.minutos) + ';">' + tcTempoTxt(p.minutos * 60000) + '</b></td><td>' + p.qtd + '</td></tr>';
+  });
+  if (media !== null) h += '<tr style="background:rgba(255,209,102,.08);"><td><b>Média de todos</b></td><td><b style="color:' + cor(media) + ';">' + tcTempoTxt(media * 60000) + '</b></td><td>' + n + '</td></tr>';
+  h += '</table>';
+  return h;
+}
 function renderTempos() {
   var el = document.getElementById('ld-tempos');
   if (!el) return;
@@ -5476,7 +5495,8 @@ function renderTempos() {
   var topo = '<div class="tc-topo"><h4>⏱ Tempo até o contato <span class="hint" style="font-weight:600;">· do formulário até a IA falar e até um humano falar (Clint)</span></h4><div style="display:flex;gap:6px;align-items:center;">' + chips
     + (TC.pedindo ? '<span class="hint" style="color:#b9a6ff;">⏳</span>' : (TC.quando ? '<span class="hint">' + (TC.estado === 'guardado' ? 'dados de ' : 'às ') + new Date(TC.quando).toLocaleTimeString('pt-BR').slice(0, 5) + '</span>' : '')) + '</div></div>';
   if (!TC.dados || !TC.dados.success) {
-    el.innerHTML = '<div class="tc-wrap">' + topo + '<div class="hint">' + (TC.estado === 'erro' ? '⚠️ ' + String(TC.motivo).replace(/</g, '&lt;') + ' · <span style="cursor:pointer;text-decoration:underline;" onclick="carregarTempos()">tentar de novo</span>' : (TC.pedindo ? '⏳ medindo…' : '')) + '</div></div>';
+    el.innerHTML = '<div class="tc-wrap">' + topo + '<div class="hint">' + (TC.estado === 'erro' ? '⚠️ ' + String(TC.motivo).replace(/</g, '&lt;') + ' · <span style="cursor:pointer;text-decoration:underline;" onclick="carregarTempos()">tentar de novo</span>' : (TC.pedindo ? '⏳ medindo…' : '')) + '</div>'
+      + '<div class="tc-grid"><div>' + tcRespostaHtml() + '</div></div></div>';
     return;
   }
   var L = TC.dados.leads || [], agora = Date.now();
@@ -5524,6 +5544,7 @@ function renderTempos() {
     h += '<tr><td>' + String(k).replace(/</g, '&lt;') + '</td><td>' + ps.n + '</td><td>' + tcTempoTxt(tcMediana(ps.t)) + '</td><td>' + pct(ps.ate1h, ps.n) + '</td><td>' + pct(ps.resp, ps.t.length) + '</td><td style="color:' + (ps.sem ? '#ff6b6b' : '#3ddc97') + ';">' + ps.sem + '</td></tr>';
   });
   h += '</table>';
+  h += tcRespostaHtml();
   var sem = tcSemContato();
   h += '<div class="g-label" style="margin:12px 0 6px;">⚠️ A/B há mais de 2 h sem contato humano · ' + sem.length + '</div>';
   if (!sem.length) h += '<div class="hint">Nenhum. 👏</div>';
@@ -12886,7 +12907,7 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (11ª implantação, v17)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (12ª implantação, v19)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxlsUVjOLNUpS42I9DblSjhthUiBeVPPOXBneyp61yi-L-UdZvSMdBt5sevv5azKykR/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdbNa0TZZ9ofrqodOwvYvQXfrFZQmaZ4V3MPENTpvebN0iKSPowyblrVAie5NPz6gP/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
