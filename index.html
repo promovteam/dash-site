@@ -1045,6 +1045,7 @@ img { max-width:100%; height:auto; }
       Carregando dados da planilha…
     </div>
     <div id="v2-novos"></div>
+    <div id="v2-gm-falta"></div>
     <div id="v2-clint"></div>
     <div id="v2-semorigem"></div>
     <div id="v2-avisocloser"></div>
@@ -2223,7 +2224,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-04-1804';
+var VERSAO_DASH = '2026-09-05-1307';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5086,24 +5087,53 @@ function abrirAtendimentoClint(ev, i) {
   var l = _ldReg[i];
   if (!l) return false;
   var t8 = ldTel8(l.tel), c = t8 ? CLINT[t8] : undefined;
+  // ja sabemos a conversa: abre direto (dentro do clique, o navegador nunca bloqueia)
   if (c && c.success && c.chatId) { window.open('https://app.clint.digital/chat/' + c.chatId, '_blank'); return false; }
   var reserva = clintLink(l) || 'https://app.clint.digital/chat';
   if (!t8 || (c && c.success && !c.chatId)) { window.open(reserva, '_blank'); return false; }   // ja sabemos que nao tem conversa
-  var win = window.open('', '_blank');
-  try { win.document.write('<body style="background:#14171d;color:#9aa3b2;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">🟣 procurando a conversa de ' + (l.nome || 'lead') + ' na Clint…</body>'); } catch (e) {}
+  // precisa perguntar ao robo (3 a 10 s). Abre a aba ja no clique (o navegador permite) e mostra o
+  // andamento nela; se o navegador BLOQUEAR a aba, mostra o andamento aqui no dash e um botao para abrir
+  // (Bruno 05/09/2026: "demora e nao abre a tela")
+  var win = null;
+  try { win = window.open('', '_blank'); } catch (e) { win = null; }
+  var nomeL = String(l.nome || 'este lead').replace(/</g, '&lt;');
+  var caixa = null, t0 = Date.now(), timer = null;
+  function pinta(html) {
+    if (win && !win.closed) { try { win.document.body.innerHTML = '<div style="text-align:center;padding:24px;">' + html + '</div>'; } catch (e) {} }
+    if (caixa) caixa.innerHTML = html;
+  }
+  if (win) {
+    try { win.document.write('<title>Clint · ' + nomeL + '</title><body style="background:#14171d;color:#e8ecf3;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"></body>'); } catch (e) {}
+  } else {
+    // aba bloqueada: caixa dentro do dash
+    caixa = document.createElement('div');
+    caixa.id = 'clint-abrindo';
+    caixa.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:100001;background:#15152e;border:1px solid rgba(108,71,255,.6);border-radius:16px;padding:14px 18px;min-width:280px;max-width:92vw;box-shadow:0 18px 50px rgba(0,0,0,.6);font-size:.82rem;text-align:center;';
+    var velho = document.getElementById('clint-abrindo'); if (velho) velho.remove();
+    document.body.appendChild(caixa);
+  }
+  pinta('🟣 Procurando a conversa de <b>' + nomeL + '</b> na Clint… <span id="clint-seg">0</span>s');
+  timer = setInterval(function(){ var e1 = (win && !win.closed) ? (function(){ try { return win.document.getElementById('clint-seg'); } catch (e) { return null; } })() : document.getElementById('clint-seg'); if (e1) e1.textContent = Math.round((Date.now() - t0) / 1000); }, 1000);
   var nome = 'clAt' + Math.random().toString(36).slice(2, 8), feito = false;
   var s = document.createElement('script');
   function fim(d) {
     if (feito) return; feito = true;
+    clearInterval(timer);
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
     if (d && d.success) CLINT[t8] = d;
-    var alvo = (d && d.success && d.chatId) ? 'https://app.clint.digital/chat/' + d.chatId : (clintLink(l) || reserva);
-    if (!(d && d.success && d.chatId)) {   // nao achou a conversa: avisa antes de abrir o cadastro
-      try { win.document.body.innerHTML = '<div style="text-align:center;padding:20px;">🟣 ' + (d && d.success && !d.temConversa ? 'Essa pessoa ainda <b>não tem conversa</b> na Clint' : 'Não consegui achar a conversa agora' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '')) + '.<br><small>Abrindo o cadastro dela…</small></div>'; } catch (e) {}
-      setTimeout(function(){ try { win.location = alvo; } catch (e) {} }, 1600);
-      return;
+    var achou = !!(d && d.success && d.chatId);
+    var alvo = achou ? 'https://app.clint.digital/chat/' + d.chatId : (clintLink(l) || reserva);
+    var aviso = achou ? '✅ Conversa encontrada.' : (d && d.success && !d.temConversa ? '🟣 Essa pessoa ainda <b>não tem conversa</b> na Clint — abrindo o cadastro.' : '⚠️ Não consegui achar a conversa agora' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '') + ' — abrindo o cadastro.');
+    if (win && !win.closed) {
+      pinta(aviso + '<br><br><a href="' + alvo + '" style="color:#b9a6ff;font-weight:800;">Se não abrir sozinho, clique aqui</a>');
+      setTimeout(function(){ try { win.location = alvo; } catch (e) {} }, achou ? 200 : 1600);
+    } else {
+      // aba bloqueada: botao (clique = o navegador deixa abrir)
+      if (caixa) caixa.innerHTML = aviso + '<div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">'
+        + '<a class="btn primary" style="text-decoration:none;padding:9px 16px;" href="' + alvo + '" target="_blank" rel="noopener" onclick="document.getElementById(\'clint-abrindo\').remove()">🟣 Abrir na Clint</a>'
+        + '<button class="btn" style="padding:9px 14px;" onclick="document.getElementById(\'clint-abrindo\').remove()">Fechar</button></div>'
+        + '<div class="hint" style="margin-top:6px;">O navegador bloqueou a aba automática. Para não pedir de novo, permita pop-ups deste site.</div>';
     }
-    try { win.location = alvo; } catch (e) {}
   }
   window[nome] = fim;
   s.onerror = function(){ fim(null); };
@@ -5200,6 +5230,7 @@ function carregarGptMaker() {
       GM.painel = d; GM.estado = 'ok'; GM.motivo = ''; GM.quando = Date.now();
       try { localStorage.setItem('v2GmPainelGuardado', JSON.stringify({ quando: GM.quando, dados: d })); } catch (e) {}
       try { renderLeads(); } catch (e) {}
+      try { renderAvisoGm(); } catch (e) {}
     } else {
       GM.estado = 'erro';
       GM.motivo = (d && d.error === 'sem_chave') ? 'sem_chave'
@@ -5265,7 +5296,7 @@ function gmChip(l) {
   var extra = '';
   if (g.estado === 'fim') { var d = gmDonoAssumiu(l, g); if (!d.consultando) extra = d.assumiu ? '<span class="et-chip" style="background:rgba(61,220,151,.12);color:#3ddc97;border-color:rgba(61,220,151,.4);" title="O dono já falou com o lead">✅ dono assumiu</span>' : '<span class="et-chip" style="background:rgba(255,107,107,.12);color:#ff6b6b;border-color:rgba(255,107,107,.4);" title="A IA terminou e o dono ainda não falou com o lead">⚠️ dono ainda não assumiu</span>'; }
   var q = g && g.quando ? new Date(g.quando) : null;
-  return '<span class="et-chip" style="background:' + e.cor + '22;color:' + e.cor + ';border-color:' + e.cor + '66;" title="Conversa do agente de IA (GPT Maker)' + (q ? ' · última atividade ' + q.toLocaleDateString('pt-BR') + ' ' + q.toLocaleTimeString('pt-BR').slice(0, 5) : '') + (g && g.agente ? ' · agente ' + g.agente : '') + '">' + e.txt + '</span>' + extra;
+  return '<span class="et-chip" style="background:' + e.cor + '22;color:' + e.cor + ';border-color:' + e.cor + '66;" title="Conversa do agente de IA (GPT Maker)' + (q ? ' · última atividade ' + q.toLocaleDateString('pt-BR') + ' ' + q.toLocaleTimeString('pt-BR').slice(0, 5) : '') + (g && g.agente ? ' · agente ' + g.agente : '') + (g && g.motivo ? '\n📝 ' + String(g.motivo).replace(/"/g, '&quot;') : '') + '">' + e.txt + '</span>' + extra;
 }
 // grupos para a faixa e para as listas (leads da NOSSA base que estao no GPT Maker)
 function gmGrupos() {
@@ -5289,7 +5320,7 @@ function renderGmStatus() {
   var el = document.getElementById('ld-gm-status');
   if (!el) return;
   if (GM.estado === 'erro' && GM.motivo === 'sem_chave' && !GM.painel) {
-    el.innerHTML = '<div class="hint" style="margin:-4px 0 10px;text-align:right;">🤖 GPT Maker: falta a chave no robô (Propriedades do script → <b>GPTMAKER_TOKEN</b>, da página "Chave de API" do GPT Maker).</div>';
+    el.innerHTML = '<div class="hint" style="margin:0 0 10px;">🤖 GPT Maker: falta a chave no robô (Propriedades do script → <b>GPTMAKER_TOKEN</b>, da página "Chave de API" do GPT Maker).</div>';
     return;
   }
   if (!GM.painel || !GM.painel.success) {
@@ -5299,12 +5330,19 @@ function renderGmStatus() {
     return;
   }
   var g = gmGrupos();
-  var num = function(k, ico, rot, cor){ return '<span style="cursor:pointer;margin-left:10px;" onclick="gmAbrirLista(\'' + k + '\')" title="clique para ver quais">' + ico + ' <b style="color:' + cor + ';">' + g[k].length + '</b> ' + rot + '</span>'; };
   var q = new Date(GM.quando);
-  el.innerHTML = '<div class="hint" style="margin:-4px 0 10px;text-align:right;">🤖 GPT Maker · ' + (GM.painel.chats || 0).toLocaleString('pt-BR') + ' conversas'
-    + num('ia', '🤖', 'IA atendendo', '#8f6bff') + num('humano', '⏸', 'IA em espera', '#f6a350') + num('fim', '✅', 'IA terminou', '#8b8fa3') + num('falta', '⚠️', 'terminou e falta marcar', '#3ddc97')
-    + ' · ' + (GM.estado === 'guardado' ? 'dados de ' : 'atualizado às ') + q.toLocaleTimeString('pt-BR').slice(0, 5)
-    + (GM.pedindo ? ' <span style="color:#b9a6ff;">⏳</span>' : '') + '</div>';
+  var card = function(k, cls, ico, rot, cor, legenda) {
+    return '<div class="gm-card ' + cls + (k === 'falta' && g.falta.length ? ' tem' : '') + '" onclick="gmAbrirLista(\'' + k + '\')" title="clique para ver quais">'
+      + '<small>' + ico + ' ' + rot + '</small><b style="color:' + cor + ';">' + g[k].length + '</b><i>' + legenda + '</i></div>';
+  };
+  el.innerHTML = '<div class="gm-topo"><span>🤖 <b>GPT Maker</b> · ' + (GM.painel.chats || 0).toLocaleString('pt-BR') + ' conversas dos últimos ' + (GM.painel.dias || 45) + ' dias · agentes de diagnóstico</span>'
+    + '<span>' + (GM.estado === 'guardado' ? 'dados de ' : 'atualizado às ') + q.toLocaleTimeString('pt-BR').slice(0, 5) + (GM.pedindo ? ' <span style="color:#b9a6ff;">⏳</span>' : '') + '</span></div>'
+    + '<div class="gm-cards">'
+    + card('ia', 'ia', '🤖', 'IA atendendo', '#8f6bff', 'a IA está conversando agora')
+    + card('humano', 'espera', '⏸', 'IA em espera', '#f6a350', 'a IA parou de responder')
+    + card('fim', 'fim', '✅', 'IA terminou', '#c9d1e0', 'conversas encerradas pela IA')
+    + card('falta', 'falta', '⚠️', 'Só falta marcar', '#ffd166', g.falta.length ? 'confirmaram a verba e ninguém marcou' : 'ninguém esperando')
+    + '</div>';
 }
 function gmAbrirLista(k) {
   var g = gmGrupos();
@@ -6803,6 +6841,7 @@ function marcarLeadsVistos() {
   localStorage.setItem('v2LeadsVisto', String(Date.now()));
   _ldAvisados = {};
   renderAvisoNovos();
+  try { renderAvisoGm(); } catch (eGm) {}
 }
 // qualificação em palavras simples (usada no aviso e no toast)
 var LD_QUALI = {
@@ -6908,6 +6947,7 @@ function ldGuardar(rows, modoSimples) {
   if (typeof ldFundirSupabase === 'function') ldFundirSupabase();
   renderLeads();
   renderAvisoNovos();
+  try { renderAvisoGm(); } catch (eGm) {}
   if (jaTinha) toastLeadNovo(ldNovos());
 }
 // PLANO B: quando o navegador bloqueia a leitura do arquivo (dash aberto direto
@@ -10310,6 +10350,9 @@ function abrirFichaLead(i) {
         var h = '<b style="color:' + e.cor + ';">' + (g.estado === 'humano' ? '⏸ IA em espera (a IA parou de responder; modo espera ou alguém assumiu no GPT Maker)' : g.estado === 'fim' ? e.txt : '🤖 IA atendendo') + '</b>';
         if (g.etapa && GM_ETAPA_LONGA[g.etapa]) h += '<div style="font-size:.74rem;margin-top:3px;">📍 ' + GM_ETAPA_LONGA[g.etapa] + '</div>';
         if (g.verba) h += '<div style="font-size:.74rem;margin-top:2px;">💰 ' + (g.verbaOk ? 'Verba confirmada: <b>' + String(g.verba).replace(/</g, '&lt;') + '</b>' : String(g.verba).replace(/</g, '&lt;')) + '</div>';
+        if (g.motivo) h += '<div style="font-size:.76rem;margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);border-left:3px solid ' + e.cor + ';">📝 <b>Por que não fechou:</b> ' + String(g.motivo).replace(/</g, '&lt;')
+          + (g.ultLead ? '<div class="hint" style="margin-top:4px;">💬 Última mensagem do lead: “' + String(g.ultLead).replace(/</g, '&lt;') + '”</div>' : '')
+          + (g.ultIa && g.ultimaDe === 'ia' ? '<div class="hint" style="margin-top:2px;">🤖 Última da IA: “' + String(g.ultIa).replace(/</g, '&lt;').slice(0, 120) + '”</div>' : '') + '</div>';
         if (q) h += '<div class="hint">última atividade ' + q.toLocaleDateString('pt-BR') + ' ' + q.toLocaleTimeString('pt-BR').slice(0, 5) + (g.ultimaDe === 'lead' ? ' · <b style="color:#ff6b6b;">o lead falou por último</b>' : g.ultimaDe === 'ia' ? ' · a IA falou por último' : '') + (g.agente ? ' · agente ' + g.agente : '') + '</div>';
         h += '<div style="margin-top:6px;font-size:.76rem;">👤 Dono: <b>' + (d.dono ? String(d.dono).replace(/</g, '&lt;') : 'sem dono') + '</b> · '
           + (d.consultando ? '<span class="hint">consultando a Clint…</span>'
@@ -10708,6 +10751,7 @@ function abrirFichaLead(i) {
         + '<div style="flex:1;min-width:200px;"><b style="font-size:.92rem;color:' + (jaAg ? '#3ddc97' : '#ffd166') + ';">' + (jaAg ? 'A IA terminou o roteiro e a reunião já está marcada' : 'A IA terminou o roteiro — SÓ FALTA MARCAR') + '</b>'
         + '<div style="font-size:.8rem;margin-top:4px;">💰 Valor confirmado pelo lead: <b>' + (gF.verbaOk && gF.verba ? String(gF.verba).replace(/</g, '&lt;') : (gF.verba ? String(gF.verba).replace(/</g, '&lt;') : 'não identificado na conversa')) + '</b></div>'
         + (dF.dono ? '<div class="hint" style="margin-top:3px;">👤 Dono: ' + String(dF.dono).replace(/</g, '&lt;') + ' · ' + (dF.assumiu ? '✅ já assumiu a conversa' : '⚠️ ainda não assumiu a conversa') + '</div>' : '')
+        + (gF.ultLead ? '<div class="hint" style="margin-top:3px;">💬 Última mensagem do lead: “' + String(gF.ultLead).replace(/</g, '&lt;') + '”</div>' : '')
         + '</div>'
         + (!jaAg ? '<button class="btn primary" style="padding:10px 16px;white-space:nowrap;" onclick="marcarReuniaoDoLead(' + i + ')">📅 Marcar reunião</button>' : '')
         + '</div></div>' + h;
@@ -10784,6 +10828,41 @@ function renderAvisoNovos() {
     + '<button class="close-x" title="Esconder até recarregar a página" onclick="window._nbEscondido=true;marcarLeadsVistos()">✕</button>'
     + '</div>';
   atualizarBtnSom();
+}
+// ===== 🤖 AVISO NA TELA INICIAL: a IA terminou o roteiro e NINGUEM marcou a reuniao (Bruno 05/09/2026) =====
+function renderAvisoGm() {
+  var el = document.getElementById('v2-gm-falta');
+  if (!el) return;
+  if (window._gmAvisoEscondido || !GM.painel || !GM.painel.success || !LD.carregado) { el.innerHTML = ''; return; }
+  var g = gmGrupos();
+  var fila = g.falta || [];
+  if (!fila.length) { el.innerHTML = ''; return; }
+  // "novo" = a fila cresceu desde a ultima vez que alguem olhou neste navegador
+  var vistos = 0; try { vistos = parseInt(localStorage.getItem('v2GmFaltaVisto') || '0', 10) || 0; } catch (e) {}
+  var novos = Math.max(fila.length - vistos, 0);
+  var pills = fila.slice(0, 8).map(function(l) {
+    var x = gmInfoDe(l) || {};
+    var i = (l._reg != null && _ldReg[l._reg] === l) ? l._reg : (l._reg = _ldReg.push(l) - 1);
+    var vb = x.verbaOk && x.verba ? ' · ' + String(x.verba).replace('/mês', '').replace('R$2 mil a R$4 mil', 'R$2–4 mil').replace('R$500 a R$1.500', 'R$500–1,5 mil') : '';
+    var q = x.quando ? new Date(x.quando) : null;
+    var quando = q ? (q.toDateString() === new Date().toDateString() ? 'hoje' : q.toLocaleDateString('pt-BR').slice(0, 5)) : '';
+    return '<span class="nb-pill" style="background:rgba(255,209,102,.16);color:#ffd166;border:1px solid rgba(255,209,102,.45);" onclick="abrirFichaLead(' + i + ')" title="abrir a ficha e marcar a reunião">'
+      + String(l.nome || 'Sem nome').replace(/</g, '&lt;').split(' ').slice(0, 2).join(' ') + vb + (quando ? ' · ' + quando : '') + '</span>';
+  }).join('') + (fila.length > 8 ? '<span class="nb-pill f" onclick="gmAbrirLista(\'falta\')">+ ' + (fila.length - 8) + '</span>' : '');
+  el.innerHTML = '<div class="novo-box" style="border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.07);' + (novos ? 'animation:plPisca 1.6s ease-in-out infinite;' : '') + '">'
+    + '<span class="nb-ico">🤖</span>'
+    + '<div class="nb-txt">'
+    + '<b>' + (fila.length === 1 ? 'A IA terminou o roteiro com 1 lead e ninguém marcou a reunião' : 'A IA terminou o roteiro com ' + fila.length + ' leads e ninguém marcou a reunião')
+    + (novos ? ' <span style="color:#ffd166;">· ' + novos + ' novo' + (novos === 1 ? '' : 's') + '</span>' : '') + '</b>'
+    + '<div class="hint" style="margin-top:2px;">O lead confirmou a verba e ouviu “nosso especialista vai entrar em contato”. É a hora de marcar.</div>'
+    + '<div class="nb-pills">' + pills + '</div></div>'
+    + '<button class="btn primary" style="padding:9px 16px;font-size:.72rem;white-space:nowrap;" onclick="gmAbrirLista(\'falta\');gmAvisoVisto()">Ver a fila →</button>'
+    + '<button class="close-x" title="Esconder até recarregar a página" onclick="window._gmAvisoEscondido=true;gmAvisoVisto();renderAvisoGm()">✕</button>'
+    + '</div>';
+}
+function gmAvisoVisto() {
+  try { var g = gmGrupos(); localStorage.setItem('v2GmFaltaVisto', String((g.falta || []).length)); } catch (e) {}
+  try { renderAvisoGm(); } catch (e) {}
 }
 // abre a aba Leads já filtrada nos que chegaram agora
 function verLeadsNovos(faixa) {
@@ -14951,6 +15030,18 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 .pl-kpi { border-top:3px solid rgba(255,255,255,.12); }
 .pl-kpi.k1 { border-top-color:#f6a350; } .pl-kpi.k2 { border-top-color:#6ea8ff; } .pl-kpi.k3 { border-top-color:#ff6b6b; } .pl-kpi.k4 { border-top-color:#3ddc97; }
 .pl-kpi.k0 { border-top-color:#b98aff; }
+/* 🤖 GPT Maker em cartoes na aba Leads (Bruno 05/09/2026: "coloque em formato de card") */
+.gm-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:2px 0 14px; }
+@media (max-width:760px) { .gm-cards { grid-template-columns:repeat(2,1fr); } }
+.gm-card { position:relative; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-top:3px solid rgba(255,255,255,.14); border-radius:14px; padding:10px 13px 9px; cursor:pointer; transition:transform .15s, background .15s; }
+.gm-card:hover { transform:translateY(-1px); background:rgba(255,255,255,.07); }
+.gm-card small { display:block; font-size:.58rem; letter-spacing:1.4px; font-weight:800; color:var(--muted); text-transform:uppercase; margin-bottom:3px; }
+.gm-card b { font-family:'Barlow Condensed', Inter, sans-serif; font-size:1.9rem; line-height:1; letter-spacing:.5px; }
+.gm-card i { display:block; font-style:normal; font-size:.64rem; color:var(--muted); margin-top:4px; }
+.gm-card.ia { border-top-color:#8f6bff; } .gm-card.espera { border-top-color:#f6a350; } .gm-card.fim { border-top-color:#8b8fa3; }
+.gm-card.falta { border-top-color:#ffd166; background:rgba(255,209,102,.07); border-color:rgba(255,209,102,.35); }
+.gm-card.falta.tem { animation:plPisca 1.8s ease-in-out infinite; }
+.gm-topo { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 6px; font-size:.7rem; color:var(--muted); flex-wrap:wrap; }
 /* com 5 cartoes o numero encolhe um tico para nao quebrar a linha */
 .pl-resumo.cinco .pl-kpi b { font-size:2rem; }
 .pl-tubo i { transform-origin:left; animation:plCresce .9s cubic-bezier(.2,.8,.2,1); }
