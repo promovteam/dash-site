@@ -2244,7 +2244,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1703';
+var VERSAO_DASH = '2026-09-05-1712';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5418,7 +5418,7 @@ function gmAbrirLista(k, manterFiltro) {
 // O robo (acao tempoContato) devolve, por lead do periodo: quando chegou (formulario), quando a IA
 // falou (GPT Maker), quando um HUMANO falou na Clint, se respondeu, se ja tem reuniao, dono e nota.
 var TC = { dados: null, dias: 7, estado: 'nunca', motivo: '', pedindo: false, quando: 0 };
-(function(){ try { var g = JSON.parse(localStorage.getItem('v2TemposGuardado') || 'null'); if (g && g.dados && g.dados.success && Date.now() - g.quando < 12 * 3600000) { TC.dados = g.dados; TC.dias = g.dados.dias || 7; TC.estado = 'guardado'; TC.quando = g.quando; } } catch (e) {} })();
+(function(){ try { var g = JSON.parse(localStorage.getItem('v2TemposGuardado') || 'null'); if (g && g.dados && g.dados.success && !g.dados.parcial && g.dados.lidos > 0 && Date.now() - g.quando < 12 * 3600000) { TC.dados = g.dados; TC.dias = g.dados.dias || 7; TC.estado = 'guardado'; TC.quando = g.quando; } } catch (e) {} })();
 function carregarTempos(dias) {
   if (dias) TC.dias = dias;
   if (TC.pedindo) return;
@@ -5430,8 +5430,10 @@ function carregarTempos(dias) {
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
     if (d && d.success && !d.leads) d = { success: false, error: 'robo_antigo' };
     if (d && d.success) {
+      d.parcial = !!d.parcial || (d.lidos === 0 && (d.leads || []).length > 0);
       TC.dados = d; TC.estado = 'ok'; TC.motivo = ''; TC.quando = Date.now();
-      try { localStorage.setItem('v2TemposGuardado', JSON.stringify({ quando: TC.quando, dados: d })); } catch (e) {}
+      if (!d.parcial) { try { localStorage.setItem('v2TemposGuardado', JSON.stringify({ quando: TC.quando, dados: d })); } catch (e) {} }
+      else setTimeout(function(){ carregarTempos(); }, 120000);   // o robo refaz sozinho; pega a medicao completa em 2 min
     } else {
       TC.estado = TC.dados ? 'guardado' : 'erro';
       TC.motivo = (d && d.error === 'robo_antigo') ? 'o robô no ar ainda não tem a medição de tempo (falta implantar a versão nova do Code.gs)' : (motivo || (d && d.error) || 'o robô não respondeu');
@@ -5500,6 +5502,8 @@ function renderTempos() {
     return;
   }
   var L = TC.dados.leads || [], agora = Date.now();
+  var parcial = !!TC.dados.parcial || (TC.dados.lidos === 0 && L.length > 0);
+  if (parcial) topo += '<div class="hint" style="margin:-4px 0 8px;color:#ffd166;">⚠️ Medição parcial: o painel da Clint estava sendo refeito na hora. A parte do contato humano vem na próxima leitura (em até 15 min).</div>';
   var tIa = [], tHum = [], semHum = 0, respIa = 0, comIa = 0, respHum = 0, comHum = 0;
   var dist = { '< 1 h': 0, '1 a 4 h': 0, '4 a 24 h': 0, '> 1 dia': 0, 'sem contato': 0 };
   var porSdr = {}, porDia = {};
@@ -5509,7 +5513,7 @@ function renderTempos() {
       var dt = x.humano - x.chegou; tHum.push(dt); comHum++; if (x.respondeuHumano) respHum++;
       dist[dt < 3600000 ? '< 1 h' : dt < 4 * 3600000 ? '1 a 4 h' : dt < 86400000 ? '4 a 24 h' : '> 1 dia']++;
     } else { semHum++; dist['sem contato']++; }
-    var k = x.dono || '(sem dono)';
+    var k = x.humanoPor || x.dono || '(sem dono)';
     var ps = porSdr[k] = porSdr[k] || { n: 0, t: [], sem: 0, resp: 0, ate1h: 0 };
     ps.n++; if (x.humano) { ps.t.push(x.humano - x.chegou); if (x.humano - x.chegou < 3600000) ps.ate1h++; if (x.respondeuHumano) ps.resp++; } else ps.sem++;
     var dia = new Date(x.chegou).toLocaleDateString('pt-BR').slice(0, 5);
@@ -5538,7 +5542,7 @@ function renderTempos() {
     dias.forEach(function(d){ var pd = porDia[d]; h += '<tr><td>' + d + '</td><td>' + pd.n + '</td><td>' + tcTempoTxt(tcMediana(pd.t)) + '</td><td style="color:' + (pd.sem ? '#ff6b6b' : '#3ddc97') + ';">' + pd.sem + '</td></tr>'; });
     h += '</table>';
   }
-  h += '</div><div><div class="g-label" style="margin-bottom:6px;">Por SDR (dono do lead na Clint)</div><table class="tc-tab"><tr><th>SDR</th><th>Leads</th><th>Falou em</th><th>&lt; 1 h</th><th>Respondeu</th><th>Sem contato</th></tr>';
+  h += '</div><div><div class="g-label" style="margin-bottom:6px;">Por SDR (quem falou; sem contato, o dono na Clint)</div><table class="tc-tab"><tr><th>SDR</th><th>Leads</th><th>Falou em</th><th>&lt; 1 h</th><th>Respondeu</th><th>Sem contato</th></tr>';
   Object.keys(porSdr).sort(function(a, b){ return porSdr[b].n - porSdr[a].n; }).forEach(function(k) {
     var ps = porSdr[k];
     h += '<tr><td>' + String(k).replace(/</g, '&lt;') + '</td><td>' + ps.n + '</td><td>' + tcTempoTxt(tcMediana(ps.t)) + '</td><td>' + pct(ps.ate1h, ps.n) + '</td><td>' + pct(ps.resp, ps.t.length) + '</td><td style="color:' + (ps.sem ? '#ff6b6b' : '#3ddc97') + ';">' + ps.sem + '</td></tr>';
@@ -10555,7 +10559,7 @@ function abrirFichaLead(i) {
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['⏱', 'Tempo até o contato', (function(){ var t = tcInfoDe(l); if (!t) return '';
         var h = (t.ia ? '🤖 IA falou <b>' + tcTempoTxt(t.ia - t.chegou) + '</b> depois de chegar' + (t.respondeuIa ? ' · ele respondeu' : ' · sem resposta') : '🤖 IA não falou')
-          + '<br>' + (t.humano ? '📞 Humano falou <b>' + tcTempoTxt(t.humano - t.chegou) + '</b> depois' + (t.dono ? ' (' + String(t.dono).replace(/</g, '&lt;') + ')' : '') + (t.respondeuHumano ? ' · ele respondeu' : ' · sem resposta') : '<span style="color:#ff6b6b;">📞 Nenhum humano falou com ele ainda</span>');
+          + '<br>' + (t.humano ? '📞 Humano falou <b>' + tcTempoTxt(t.humano - t.chegou) + '</b> depois' + ((t.humanoPor || t.dono) ? ' (' + String(t.humanoPor || t.dono).replace(/</g, '&lt;') + ')' : '') + (t.respondeuHumano ? ' · ele respondeu' : ' · sem resposta') : '<span style="color:#ff6b6b;">📞 Nenhum humano falou com ele ainda</span>');
         return h; })(), 'html'],
     ['🤖', 'Agente de IA (GPT Maker)', (function(){ var g = gmInfoDe(l); var e = gmEstadoTxt(g, l); if (!e) return ''; var q = g.quando ? new Date(g.quando) : null;
         var d = gmDonoAssumiu(l, g);
@@ -12907,7 +12911,7 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (11ª implantação, v17)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (12ª implantação, v19)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdbNa0TZZ9ofrqodOwvYvQXfrFZQmaZ4V3MPENTpvebN0iKSPowyblrVAie5NPz6gP/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9HysTL9R9CBKPc2BV6SdXH2mOTonlMVpUfI8xefG8Qf2ioqh3P1HoqcN60qq2gRnL/exec';
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
