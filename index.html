@@ -568,7 +568,26 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 
 /* ===== ABA LEADS ===== */
 .ld-row { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:14px; margin-bottom:8px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); user-select:none; -webkit-user-select:none; }
-.ld-row .ld-info { min-width:140px; }
+.ld-row .ld-info { min-width:140px; display:flex; flex-direction:column; gap:5px; }
+.ld-row .ld-nome { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.92rem; font-weight:800; line-height:1.2; }
+.ld-row .ld-chips { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.ld-row .ld-chips:empty { display:none; }
+.ld-row .ld-det { font-size:.68rem; color:var(--muted); font-weight:600; line-height:1.5; }
+.ld-row .ld-acoes { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; align-items:center; flex-shrink:0; max-width:42%; margin-left:auto; }
+.ld-row .ld-acoes .btn-assumir, .ld-row .ld-acoes .ld-wa { padding:7px 11px; font-size:.66rem; }
+@media (max-width:820px) { .ld-row { flex-wrap:wrap; } .ld-row .ld-acoes { max-width:100%; width:100%; justify-content:flex-start; padding-left:58px; } }
+/* celular: card empilhado e botoes em fileira fluida (Bruno 05/09/2026) */
+@media (max-width:600px) {
+  .ld-row { padding:10px 10px; gap:10px; }
+  .ld-row .avatar { width:36px; height:36px; min-width:36px; font-size:.78rem; }
+  .ld-row .ld-nome { font-size:.86rem; }
+  .ld-row .ld-det { font-size:.66rem; }
+  .ld-row .ld-acoes { padding-left:0; gap:6px; margin-top:2px; }
+  .ld-row .ld-acoes .btn-assumir, .ld-row .ld-acoes .ld-wa { flex:1 1 30%; justify-content:center; padding:9px 8px; font-size:.68rem; }
+  .ld-row .ld-acoes .ld-selo { flex:1 1 100%; text-align:center; }
+  .modal-overlay .modal { width:100vw !important; max-width:100vw; border-radius:18px 18px 0 0; max-height:92vh; }
+  .novo-box { flex-wrap:wrap; } .novo-box .btn { flex:1 1 auto; }
+}
 .ld-row .btn-assumir, .ld-row .ld-wa { flex-shrink:0; white-space:nowrap; }
 .ld-row.quente { border-color:rgba(246,163,80,.45); background:linear-gradient(90deg, rgba(246,163,80,.10), rgba(255,255,255,.03)); }
 .ld-info { flex:1; min-width:0; }
@@ -1131,6 +1150,7 @@ img { max-width:100%; height:auto; }
     <div id="ld-filtros" style="display:none;"></div>
     <div id="ld-clint-status"></div>
     <div id="ld-gm-status"></div>
+    <div id="ld-tempos"></div>
     <div id="ld-origens"></div>
     <div class="panel" id="ld-loading" style="text-align:center;color:var(--muted);padding:50px 20px;">
       <div style="font-size:2rem;margin-bottom:10px;">📥</div>
@@ -2224,7 +2244,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1638';
+var VERSAO_DASH = '2026-09-05-1650';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5393,6 +5413,135 @@ function gmAbrirLista(k, manterFiltro) {
   document.getElementById('modal-b').classList.add('open');
 }
 
+
+// ===== ⏱ TEMPO ATE O CONTATO (Bruno 05/09/2026: "quero que meca os dois") =====
+// O robo (acao tempoContato) devolve, por lead do periodo: quando chegou (formulario), quando a IA
+// falou (GPT Maker), quando um HUMANO falou na Clint, se respondeu, se ja tem reuniao, dono e nota.
+var TC = { dados: null, dias: 7, estado: 'nunca', motivo: '', pedindo: false, quando: 0 };
+(function(){ try { var g = JSON.parse(localStorage.getItem('v2TemposGuardado') || 'null'); if (g && g.dados && g.dados.success && Date.now() - g.quando < 12 * 3600000) { TC.dados = g.dados; TC.dias = g.dados.dias || 7; TC.estado = 'guardado'; TC.quando = g.quando; } } catch (e) {} })();
+function carregarTempos(dias) {
+  if (dias) TC.dias = dias;
+  if (TC.pedindo) return;
+  TC.pedindo = true; renderTempos();
+  var nome = 'tcCb' + Math.random().toString(36).slice(2, 8);
+  var s = document.createElement('script');
+  var fim = function(d, motivo) {
+    TC.pedindo = false;
+    try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    if (d && d.success && !d.leads) d = { success: false, error: 'robo_antigo' };
+    if (d && d.success) {
+      TC.dados = d; TC.estado = 'ok'; TC.motivo = ''; TC.quando = Date.now();
+      try { localStorage.setItem('v2TemposGuardado', JSON.stringify({ quando: TC.quando, dados: d })); } catch (e) {}
+    } else {
+      TC.estado = TC.dados ? 'guardado' : 'erro';
+      TC.motivo = (d && d.error === 'robo_antigo') ? 'o robô no ar ainda não tem a medição de tempo (falta implantar a versão nova do Code.gs)' : (motivo || (d && d.error) || 'o robô não respondeu');
+    }
+    renderTempos();
+  };
+  window[nome] = fim;
+  s.onerror = function(){ fim(null, 'o robô no ar ainda não tem a medição de tempo (falta implantar a versão nova) — ou está fora do ar'); };
+  s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'tempoContato', dias: TC.dias }));
+  document.body.appendChild(s);
+  setTimeout(function(){ if (TC.pedindo) fim(null, 'o robô demorou mais de 2 minutos (primeira leitura do período pode demorar)'); }, 150000);
+}
+function tcTempoTxt(ms) {
+  if (ms == null || ms < 0) return '—';
+  var m = Math.round(ms / 60000);
+  if (m < 60) return m + ' min';
+  var h = ms / 3600000;
+  if (h < 48) return (Math.round(h * 10) / 10).toString().replace('.', ',') + ' h';
+  return Math.round(h / 24) + ' d';
+}
+function tcMediana(arr) { if (!arr.length) return null; var a = arr.slice().sort(function(x, y){ return x - y; }); var m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; }
+function tcMedia(arr) { if (!arr.length) return null; return arr.reduce(function(a, b){ return a + b; }, 0) / arr.length; }
+function tcInfoDe(l) {   // dados de tempo de um lead (para a ficha)
+  if (!TC.dados || !TC.dados.success || !l) return null;
+  var t8 = l.tel8 || ldTel8(l.tel || l.telefone || '');
+  for (var i = 0; i < TC.dados.leads.length; i++) if (TC.dados.leads[i].t8 === t8) return TC.dados.leads[i];
+  return null;
+}
+function tcSemContato() {   // A/B (ou HT) com mais de 2 h sem humano e sem reuniao
+  if (!TC.dados || !TC.dados.success) return [];
+  var agora = Date.now();
+  return TC.dados.leads.filter(function(x){ return (x.nota === 'A' || x.nota === 'B' || x.faixa === 'alta') && !x.humano && !x.reuniao && agora - x.chegou > 2 * 3600000; })
+    .sort(function(a, b){ return a.chegou - b.chegou; });
+}
+function renderTempos() {
+  var el = document.getElementById('ld-tempos');
+  if (!el) return;
+  var chips = ['1 dia', '7 dias', '30 dias'].map(function(r, i) {
+    var d = [1, 7, 30][i];
+    return '<button class="chart-chip' + (TC.dias === d ? ' active' : '') + '" onclick="carregarTempos(' + d + ')">' + r + '</button>';
+  }).join('');
+  var topo = '<div class="tc-topo"><h4>⏱ Tempo até o contato <span class="hint" style="font-weight:600;">· do formulário até a IA falar e até um humano falar (Clint)</span></h4><div style="display:flex;gap:6px;align-items:center;">' + chips
+    + (TC.pedindo ? '<span class="hint" style="color:#b9a6ff;">⏳</span>' : (TC.quando ? '<span class="hint">' + (TC.estado === 'guardado' ? 'dados de ' : 'às ') + new Date(TC.quando).toLocaleTimeString('pt-BR').slice(0, 5) + '</span>' : '')) + '</div></div>';
+  if (!TC.dados || !TC.dados.success) {
+    el.innerHTML = '<div class="tc-wrap">' + topo + '<div class="hint">' + (TC.estado === 'erro' ? '⚠️ ' + String(TC.motivo).replace(/</g, '&lt;') + ' · <span style="cursor:pointer;text-decoration:underline;" onclick="carregarTempos()">tentar de novo</span>' : (TC.pedindo ? '⏳ medindo…' : '')) + '</div></div>';
+    return;
+  }
+  var L = TC.dados.leads || [], agora = Date.now();
+  var tIa = [], tHum = [], semHum = 0, respIa = 0, comIa = 0, respHum = 0, comHum = 0;
+  var dist = { '< 1 h': 0, '1 a 4 h': 0, '4 a 24 h': 0, '> 1 dia': 0, 'sem contato': 0 };
+  var porSdr = {}, porDia = {};
+  L.forEach(function(x) {
+    if (x.ia) { tIa.push(x.ia - x.chegou); comIa++; if (x.respondeuIa) respIa++; }
+    if (x.humano) {
+      var dt = x.humano - x.chegou; tHum.push(dt); comHum++; if (x.respondeuHumano) respHum++;
+      dist[dt < 3600000 ? '< 1 h' : dt < 4 * 3600000 ? '1 a 4 h' : dt < 86400000 ? '4 a 24 h' : '> 1 dia']++;
+    } else { semHum++; dist['sem contato']++; }
+    var k = x.dono || '(sem dono)';
+    var ps = porSdr[k] = porSdr[k] || { n: 0, t: [], sem: 0, resp: 0, ate1h: 0 };
+    ps.n++; if (x.humano) { ps.t.push(x.humano - x.chegou); if (x.humano - x.chegou < 3600000) ps.ate1h++; if (x.respondeuHumano) ps.resp++; } else ps.sem++;
+    var dia = new Date(x.chegou).toLocaleDateString('pt-BR').slice(0, 5);
+    var pd = porDia[dia] = porDia[dia] || { n: 0, t: [], sem: 0, ord: x.chegou };
+    pd.n++; if (x.humano) pd.t.push(x.humano - x.chegou); else pd.sem++;
+  });
+  var card = function(cls, rot, val, leg){ return '<div class="tc-card ' + cls + '"><small>' + rot + '</small><b>' + val + '</b><i>' + leg + '</i></div>'; };
+  var pct = function(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; };
+  var h = '<div class="tc-wrap">' + topo + '<div class="tc-cards">'
+    + card('ia', '🤖 IA falou em', tcTempoTxt(tcMediana(tIa)), 'mediana · média ' + tcTempoTxt(tcMedia(tIa)) + ' · ' + comIa + ' de ' + L.length + ' leads')
+    + card('hum', '📞 Humano falou em', tcTempoTxt(tcMediana(tHum)), 'mediana · média ' + tcTempoTxt(tcMedia(tHum)) + ' · ' + comHum + ' de ' + L.length + ' leads')
+    + card('resp', '💬 Taxa de resposta', pct(respIa, comIa) + ' <span style="font-size:1rem;color:var(--muted);">IA</span> · ' + pct(respHum, comHum) + ' <span style="font-size:1rem;color:var(--muted);">humano</span>', 'leads que responderam à IA · leads que responderam ao SDR')
+    + card('sem', '⚠️ Sem contato humano', semHum, semHum ? pct(semHum, L.length) + ' dos leads do período' : 'todos receberam contato')
+    + '</div>';
+  // distribuicao + por SDR
+  var cores = { '< 1 h': '#3ddc97', '1 a 4 h': '#6ea8ff', '4 a 24 h': '#f6a350', '> 1 dia': '#ff6b6b', 'sem contato': '#8b8fa3' };
+  h += '<div class="tc-grid"><div><div class="g-label" style="margin-bottom:6px;">Quanto tempo até o humano falar</div>';
+  Object.keys(dist).forEach(function(k) {
+    var n = dist[k], p = L.length ? Math.round(n / L.length * 100) : 0;
+    h += '<div class="tc-bar"><span>' + k + '</span><div class="tc-tubo"><i style="width:' + p + '%;background:' + cores[k] + ';"></i></div><b style="color:' + cores[k] + ';">' + n + ' · ' + p + '%</b></div>';
+  });
+  // por dia (ultimos 7 dias do periodo)
+  var dias = Object.keys(porDia).sort(function(a, b){ return porDia[b].ord - porDia[a].ord; }).slice(0, 7);
+  if (dias.length) {
+    h += '<div class="g-label" style="margin:12px 0 6px;">Por dia</div><table class="tc-tab"><tr><th>Dia</th><th>Leads</th><th>Humano falou (mediana)</th><th>Sem contato</th></tr>';
+    dias.forEach(function(d){ var pd = porDia[d]; h += '<tr><td>' + d + '</td><td>' + pd.n + '</td><td>' + tcTempoTxt(tcMediana(pd.t)) + '</td><td style="color:' + (pd.sem ? '#ff6b6b' : '#3ddc97') + ';">' + pd.sem + '</td></tr>'; });
+    h += '</table>';
+  }
+  h += '</div><div><div class="g-label" style="margin-bottom:6px;">Por SDR (dono do lead na Clint)</div><table class="tc-tab"><tr><th>SDR</th><th>Leads</th><th>Falou em</th><th>&lt; 1 h</th><th>Respondeu</th><th>Sem contato</th></tr>';
+  Object.keys(porSdr).sort(function(a, b){ return porSdr[b].n - porSdr[a].n; }).forEach(function(k) {
+    var ps = porSdr[k];
+    h += '<tr><td>' + String(k).replace(/</g, '&lt;') + '</td><td>' + ps.n + '</td><td>' + tcTempoTxt(tcMediana(ps.t)) + '</td><td>' + pct(ps.ate1h, ps.n) + '</td><td>' + pct(ps.resp, ps.t.length) + '</td><td style="color:' + (ps.sem ? '#ff6b6b' : '#3ddc97') + ';">' + ps.sem + '</td></tr>';
+  });
+  h += '</table>';
+  var sem = tcSemContato();
+  h += '<div class="g-label" style="margin:12px 0 6px;">⚠️ A/B há mais de 2 h sem contato humano · ' + sem.length + '</div>';
+  if (!sem.length) h += '<div class="hint">Nenhum. 👏</div>';
+  sem.slice(0, 12).forEach(function(x) {
+    var l = (LD.rows || []).filter(function(r){ return r.tel8 === x.t8; })[0];
+    var i = l ? ((l._reg != null && _ldReg[l._reg] === l) ? l._reg : (l._reg = _ldReg.push(l) - 1)) : -1;
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;border-radius:10px;background:rgba(255,107,107,.08);margin-bottom:5px;font-size:.74rem;">'
+      + '<b style="cursor:pointer;color:#6ea8ff;" ' + (i >= 0 ? 'onclick="abrirFichaLead(' + i + ')"' : '') + '>' + String(x.nome || 'Lead').replace(/</g, '&lt;') + '</b>'
+      + (x.nota ? '<span class="ld-tag" style="background:rgba(255,255,255,.08);">🏅 ' + x.nota + '</span>' : '') + (x.faixa === 'alta' ? '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">🔥 R$2–4 mil</span>' : '')
+      + '<span class="hint" style="margin:0;">chegou há ' + tcTempoTxt(agora - x.chegou) + (x.ia ? ' · IA falou' + (x.respondeuIa ? ' e ele respondeu' : '') : ' · IA não falou') + (x.dono ? ' · dono ' + String(x.dono).replace(/</g, '&lt;') : ' · sem dono') + '</span>'
+      + (x.clint ? '<a class="ld-wa" style="padding:4px 9px;margin-left:auto;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + x.clint + '" target="_blank">🟣 Clint</a>' : '')
+      + '</div>';
+  });
+  if (sem.length > 12) h += '<div class="hint">… e mais ' + (sem.length - 12) + '</div>';
+  h += '</div></div></div>';
+  el.innerHTML = h;
+}
+
 function carregarClintPainel() {
   if (_cpPedindo) return;
   _cpPedindo = true;
@@ -5444,6 +5593,7 @@ function carregarClintPainel() {
 }
 function renderClintStatus() {
   try { renderGmStatus(); } catch (eG) {}
+  try { renderTempos(); } catch (eT) {}
   var el = document.getElementById('ld-clint-status');
   if (!el) return;
   var st = CP_STATUS.estado;
@@ -10315,16 +10465,19 @@ function ldRow(l, quente) {
     : '';
   return '<div class="ld-row' + (quente ? ' quente' : '') + (piscando ? ' esperando' : '') + '" style="cursor:pointer;" onclick="abrirFichaLead(' + i + ')" title="Clique para ver todos os dados deste lead">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');">' + v2ini(l.nome || '?') + '</div>'
-    + '<div class="ld-info"><b>' + (l.nome || 'Sem nome')
-    + (quente ? ' <span class="ld-selo rapido">🔥 CHAMAR RÁPIDO</span>' : '')
-    + (tags ? ' ' + tags : '') + (etapa ? ' ' + etapa : '') + gmChip(l) + (espera ? ' ' + espera : '') + (dono ? ' ' + dono : '') + (foraClint ? ' ' + foraClint : '') + (divChip ? ' ' + divChip : '') + seloVezes(l) + seloVoltou(l) + seloChance(l, true) + '</b>'
-    + '<span>' + det + '</span></div>'
+    + '<div class="ld-info">'
+    +   '<div class="ld-nome">' + (l.nome || 'Sem nome') + (quente ? '<span class="ld-selo rapido">🔥 CHAMAR RÁPIDO</span>' : '') + seloChance(l, true) + '</div>'
+    +   '<div class="ld-chips">' + (tags || '') + (etapa || '') + gmChip(l) + (espera || '') + (dono || '') + (foraClint || '') + (divChip || '') + seloVezes(l) + seloVoltou(l) + '</div>'
+    +   '<span class="ld-det">' + det + '</span>'
+    + '</div>'
+    + '<div class="ld-acoes">'
     + seloAnuncio(l, true) + igSeloLead(l, true)
     + (donoNome || !ldPodeTrocarDono() ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
     + (ldPodeTrocarDono() ? '<button class="btn-assumir" style="background:rgba(110,168,255,.14);color:#6ea8ff;border:1px solid rgba(110,168,255,.45);" onclick="ldPassarPara(' + i + ', event)" title="Só Bruno e Adm: mandar este lead para outra pessoa">👤 ' + (donoNome ? 'Trocar' : 'Para quem') + '</button>' : '')
     + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abrir a conversa deste lead no atendimento da Clint">🟣 Clint</a>' : '')
     + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank" onclick="event.stopPropagation()">📷</a>' : '')
     + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation()">💬 WhatsApp</a>' : '')
+    + '</div>'
     + '</div>';
 }
 // ficha do lead: tudo que a pesquisa respondeu
@@ -10379,6 +10532,10 @@ function abrirFichaLead(i) {
   var FX = _FXs[l.faixa] || _FXs.sem;
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
+    ['⏱', 'Tempo até o contato', (function(){ var t = tcInfoDe(l); if (!t) return '';
+        var h = (t.ia ? '🤖 IA falou <b>' + tcTempoTxt(t.ia - t.chegou) + '</b> depois de chegar' + (t.respondeuIa ? ' · ele respondeu' : ' · sem resposta') : '🤖 IA não falou')
+          + '<br>' + (t.humano ? '📞 Humano falou <b>' + tcTempoTxt(t.humano - t.chegou) + '</b> depois' + (t.dono ? ' (' + String(t.dono).replace(/</g, '&lt;') + ')' : '') + (t.respondeuHumano ? ' · ele respondeu' : ' · sem resposta') : '<span style="color:#ff6b6b;">📞 Nenhum humano falou com ele ainda</span>');
+        return h; })(), 'html'],
     ['🤖', 'Agente de IA (GPT Maker)', (function(){ var g = gmInfoDe(l); var e = gmEstadoTxt(g, l); if (!e) return ''; var q = g.quando ? new Date(g.quando) : null;
         var d = gmDonoAssumiu(l, g);
         var h = '<b style="color:' + e.cor + ';">' + (g.estado === 'humano' ? '⏸ IA em espera (a IA parou de responder; modo espera ou alguém assumiu no GPT Maker)' : g.estado === 'fim' ? e.txt : '🤖 IA atendendo') + '</b>';
@@ -14995,6 +15152,7 @@ carregarV2();
 carregarLeads();
 carregarClintPainel();
 carregarGptMaker();
+carregarTempos();
 carregarComentarios();
 // ===== ⚡ SÓ ATUALIZA COM O PAINEL À VISTA (Bruno 19/08/2026) =====
 // Com o dash aberto atrás de outra janela o dia todo, cada releitura gastava
@@ -15023,6 +15181,7 @@ _cadaTanto(function(){ SB.carregado = false; LD._fundido = null; carregarSupabas
 _cadaTanto(carregarLeads, 180000);
 _cadaTanto(carregarClintPainel, 300000);
 _cadaTanto(carregarGptMaker, 300000);
+_cadaTanto(carregarTempos, 900000);
 carregarPag();
 setTimeout(carregarAgenda, 800);
 _cadaTanto(carregarV2, 120000);
@@ -15147,6 +15306,29 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 .gm-card.falta { border-top-color:#ffd166; background:rgba(255,209,102,.07); border-color:rgba(255,209,102,.35); }
 .gm-card.falta.tem { animation:plPisca 1.8s ease-in-out infinite; }
 .gm-topo { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 6px; font-size:.7rem; color:var(--muted); flex-wrap:wrap; }
+@media (max-width:600px) { .gm-cards { gap:8px; } .gm-card b { font-size:1.6rem; } .gm-card small { font-size:.54rem; letter-spacing:1px; } }
+/* ⏱ tempo ate o contato (Bruno 05/09/2026) */
+.tc-wrap { margin:0 0 14px; padding:12px 14px; border-radius:16px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08); }
+.tc-topo { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.tc-topo h4 { margin:0; font-size:.86rem; }
+.tc-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+@media (max-width:760px) { .tc-cards { grid-template-columns:repeat(2,1fr); } }
+.tc-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-top:3px solid rgba(255,255,255,.14); border-radius:14px; padding:10px 13px 9px; }
+.tc-card small { display:block; font-size:.58rem; letter-spacing:1.4px; font-weight:800; color:var(--muted); text-transform:uppercase; margin-bottom:3px; }
+.tc-card b { font-family:'Barlow Condensed', Inter, sans-serif; font-size:1.7rem; line-height:1; letter-spacing:.4px; }
+.tc-card i { display:block; font-style:normal; font-size:.64rem; color:var(--muted); margin-top:4px; }
+.tc-card.ia { border-top-color:#8f6bff; } .tc-card.hum { border-top-color:#3ddc97; } .tc-card.resp { border-top-color:#6ea8ff; } .tc-card.sem { border-top-color:#ff6b6b; }
+.tc-grid { display:grid; grid-template-columns:1.1fr 1fr; gap:14px; }
+@media (max-width:820px) { .tc-grid { grid-template-columns:1fr; } }
+.tc-bar { display:flex; align-items:center; gap:8px; font-size:.7rem; margin:4px 0; }
+.tc-bar span:first-child { width:96px; color:var(--muted); font-weight:700; }
+.tc-bar .tc-tubo { flex:1; height:9px; border-radius:6px; background:rgba(255,255,255,.08); overflow:hidden; }
+.tc-bar .tc-tubo i { display:block; height:100%; border-radius:6px; }
+.tc-bar b { min-width:54px; text-align:right; font-size:.72rem; }
+.tc-tab { width:100%; border-collapse:collapse; font-size:.72rem; }
+.tc-tab th { text-align:left; color:var(--muted); font-weight:700; font-size:.6rem; letter-spacing:1px; text-transform:uppercase; padding:4px 6px; border-bottom:1px solid rgba(255,255,255,.08); }
+.tc-tab td { padding:6px 6px; border-bottom:1px solid rgba(255,255,255,.05); white-space:nowrap; }
+.tc-tab td:first-child { white-space:normal; font-weight:700; }
 /* mensagem no canto quando alguem termina o roteiro da IA (Bruno 05/09/2026) */
 #gm-toasts { position:fixed; right:18px; bottom:18px; z-index:100002; display:flex; flex-direction:column; gap:10px; max-width:min(380px,92vw); pointer-events:none; }
 .gm-toast { pointer-events:auto; background:linear-gradient(105deg,#0d0d1e 0%,#15152e 55%,#1b1b3c 100%); border:1px solid rgba(255,209,102,.55); border-radius:18px; padding:13px 14px 12px; box-shadow:0 18px 50px rgba(0,0,0,.6), 0 0 30px rgba(255,209,102,.12); animation:gmEntra .35s cubic-bezier(.2,1.2,.4,1); position:relative; overflow:hidden; }
