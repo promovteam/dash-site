@@ -2224,7 +2224,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1319';
+var VERSAO_DASH = '2026-09-05-1412';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5086,14 +5086,12 @@ function abrirAtendimentoClint(ev, i) {
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
   var l = _ldReg[i];
   if (!l) return false;
-  var t8 = ldTel8(l.tel), c = t8 ? CLINT[t8] : undefined;
-  // ja sabemos a conversa: abre direto (dentro do clique, o navegador nunca bloqueia)
-  if (c && c.success && c.chatId) { window.open('https://app.clint.digital/chat/' + c.chatId, '_blank'); return false; }
-  var reserva = clintLink(l) || 'https://app.clint.digital/chat';
-  if (!t8 || (c && c.success && !c.chatId)) { window.open(reserva, '_blank'); return false; }   // ja sabemos que nao tem conversa
-  // precisa perguntar ao robo (3 a 10 s). Abre a aba ja no clique (o navegador permite) e mostra o
-  // andamento nela; se o navegador BLOQUEAR a aba, mostra o andamento aqui no dash e um botao para abrir
-  // (Bruno 05/09/2026: "demora e nao abre a tela")
+  // 1) cadastro do contato ja conhecido (painel da Clint ou consulta anterior): abre NA HORA
+  var direto = clintLink(l);
+  if (direto) { window.open(direto, '_blank'); return false; }
+  var t8 = ldTel8(l.tel);
+  if (!t8) { window.open('https://app.clint.digital/chat', '_blank'); return false; }
+  // 2) nao conhecemos: pergunta ao robo (3 a 10 s), com andamento e botao se o navegador bloquear a aba
   var win = null;
   try { win = window.open('', '_blank'); } catch (e) { win = null; }
   var nomeL = String(l.nome || 'este lead').replace(/</g, '&lt;');
@@ -5105,14 +5103,13 @@ function abrirAtendimentoClint(ev, i) {
   if (win) {
     try { win.document.write('<title>Clint · ' + nomeL + '</title><body style="background:#14171d;color:#e8ecf3;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"></body>'); } catch (e) {}
   } else {
-    // aba bloqueada: caixa dentro do dash
     caixa = document.createElement('div');
     caixa.id = 'clint-abrindo';
     caixa.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:100001;background:#15152e;border:1px solid rgba(108,71,255,.6);border-radius:16px;padding:14px 18px;min-width:280px;max-width:92vw;box-shadow:0 18px 50px rgba(0,0,0,.6);font-size:.82rem;text-align:center;';
     var velho = document.getElementById('clint-abrindo'); if (velho) velho.remove();
     document.body.appendChild(caixa);
   }
-  pinta('🟣 Procurando a conversa de <b>' + nomeL + '</b> na Clint… <span id="clint-seg">0</span>s');
+  pinta('🟣 Procurando <b>' + nomeL + '</b> na Clint… <span id="clint-seg">0</span>s');
   timer = setInterval(function(){ var e1 = (win && !win.closed) ? (function(){ try { return win.document.getElementById('clint-seg'); } catch (e) { return null; } })() : document.getElementById('clint-seg'); if (e1) e1.textContent = Math.round((Date.now() - t0) / 1000); }, 1000);
   var nome = 'clAt' + Math.random().toString(36).slice(2, 8), feito = false;
   var s = document.createElement('script');
@@ -5121,15 +5118,14 @@ function abrirAtendimentoClint(ev, i) {
     clearInterval(timer);
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
     if (d && d.success) CLINT[t8] = d;
-    var achou = !!(d && d.success && d.chatId);
-    var alvo = achou ? 'https://app.clint.digital/chat/' + d.chatId : (clintLink(l) || reserva);
-    var aviso = achou ? '✅ Conversa encontrada.' : (d && d.success && !d.temConversa ? '🟣 Essa pessoa ainda <b>não tem conversa</b> na Clint — abrindo o cadastro.' : '⚠️ Não consegui achar a conversa agora' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '') + ' — abrindo o cadastro.');
+    var alvo = clintLink(l) || 'https://app.clint.digital/chat';
+    var achou = !!(d && d.success && d.achou);
+    var aviso = achou ? '✅ Encontrado na Clint.' : '⚠️ Essa pessoa não está na Clint' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '') + ' — abrindo a lista.';
     if (win && !win.closed) {
       pinta(aviso + '<br><br><a href="' + alvo + '" style="color:#b9a6ff;font-weight:800;">Se não abrir sozinho, clique aqui</a>');
       setTimeout(function(){ try { win.location = alvo; } catch (e) {} }, achou ? 200 : 1600);
-    } else {
-      // aba bloqueada: botao (clique = o navegador deixa abrir)
-      if (caixa) caixa.innerHTML = aviso + '<div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">'
+    } else if (caixa) {
+      caixa.innerHTML = aviso + '<div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">'
         + '<a class="btn primary" style="text-decoration:none;padding:9px 16px;" href="' + alvo + '" target="_blank" rel="noopener" onclick="document.getElementById(\'clint-abrindo\').remove()">🟣 Abrir na Clint</a>'
         + '<button class="btn" style="padding:9px 14px;" onclick="document.getElementById(\'clint-abrindo\').remove()">Fechar</button></div>'
         + '<div class="hint" style="margin-top:6px;">O navegador bloqueou a aba automática. Para não pedir de novo, permita pop-ups deste site.</div>';
@@ -5138,22 +5134,25 @@ function abrirAtendimentoClint(ev, i) {
   window[nome] = fim;
   s.onerror = function(){ fim(null); };
   var cid = '';
-  try { var mm = CLINT_PAINEL && CLINT_PAINEL.mapa && CLINT_PAINEL.mapa[t8]; if (mm && mm[2]) cid = mm[2]; } catch (e) {}
-  if (!cid) { try { var pn2 = clintPorNome(l.nome); if (pn2) cid = pn2.contatoId; } catch (e) {} }
+  try { var pn2 = clintPorNome(l.nome); if (pn2) cid = pn2.contatoId; } catch (e) {}
   s.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintLead', telefone: l.tel, contatoId: cid }));
   document.body.appendChild(s);
-  setTimeout(function(){ fim(null); }, 45000);   // o robo faz 3 a 4 consultas na Clint (5 a 10 s; em hora cheia mais)
+  setTimeout(function(){ fim(null); }, 45000);
   return false;
 }
 function abrirAtendimentoClintPor(ev, tel, nome) {
   var i = _ldReg.push({ tel: tel || '', nome: nome || '' }) - 1;
   return abrirAtendimentoClint(ev, i);
 }
+function clintChatLink(l) {   // endereco da CONVERSA (a Clint nem sempre aceita de fora)
+  var t = ldTel8(l.tel || l.telefone);
+  var c = CLINT[t];
+  return (c && c.success && c.chatId) ? 'https://app.clint.digital/chat/' + c.chatId : '';
+}
 function clintLink(l) {
   var t = ldTel8(l.tel || l.telefone);
   var c = CLINT[t];
-  // se ja conhecemos a conversa, abre direto no modulo de atendimento (chat)
-  if (c && c.success && c.chatId) return 'https://app.clint.digital/chat/' + c.chatId;
+  // cadastro do contato: e o endereco que a Clint abre de fora (o da conversa volta para a lista — 05/09/2026)
   if (c && c.success && c.contatoId) return 'https://app.clint.digital/contacts/' + c.contatoId;
   // painel geral: o mapa traz o id do contato de TODOS os leads com negócio na Clint
   if (CLINT_PAINEL && CLINT_PAINEL.success && t) {
@@ -10731,7 +10730,8 @@ function abrirFichaLead(i) {
   if (_btH.length) h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">' + _btH.join('') + '</div>';
   if (wa || l.insta || clintLink(l)) {
     h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
-      + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')">🟣 Abrir no atendimento da Clint</a>' : '')
+      + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abre o cadastro da pessoa na Clint; de lá, a conversa">🟣 Abrir na Clint</a>' : '')
+      + (clintChatLink(l) ? '<a class="ld-wa" style="justify-content:center;padding:12px;background:rgba(108,71,255,.08);border-color:rgba(108,71,255,.35);color:#b9a6ff;" href="' + clintChatLink(l) + '" target="_blank" onclick="event.stopPropagation()" title="Endereço direto da conversa — a Clint nem sempre aceita abrir de fora">💬 conversa direto</a>' : '')
       + (wa ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;" href="' + wa + '" target="_blank">💬 Chamar no WhatsApp</a>' : '')
       + (l.insta ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank">📷 Ver Instagram</a>' : '')
       + '</div>';
