@@ -2224,7 +2224,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1412';
+var VERSAO_DASH = '2026-09-05-1638';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5346,17 +5346,49 @@ function renderGmStatus() {
     + '</div>';
   gmBadge();
 }
-function gmAbrirLista(k) {
+// filtro de NOTA (A/B/C/D/sem nota) nas listas do GPT Maker (Bruno 05/09/2026)
+var _gmNotaF = '', _gmVerbaF = '';
+function _gmNotaDe(l) { try { var c = classeDoLead(l); return c ? c.info.rot : ''; } catch (e) { return ''; } }
+function _gmVerbaDe(l) { return l.faixa === 'alta' ? 'alta' : l.faixa === 'media' ? 'media' : l.faixa === 'nda' ? 'nda' : 'sem'; }
+function gmFiltrarNota(k, nota) { _gmNotaF = nota || ''; gmAbrirLista(k, true); }
+function gmFiltrarVerba(k, v) { _gmVerbaF = v || ''; gmAbrirLista(k, true); }
+function gmAbrirLista(k, manterFiltro) {
+  if (!manterFiltro && gmAbrirLista._ultimo !== k) { _gmNotaF = ''; _gmVerbaF = ''; }
+  gmAbrirLista._ultimo = k;
   var g = gmGrupos();
   var cfg = { ia: ['🤖', 'IA atendendo agora', 'a IA do GPT Maker está conversando com estes leads'], humano: ['⏸', 'IA em espera', 'a IA parou de responder nestas conversas (modo espera do roteiro, ou alguém assumiu no GPT Maker)'],
     fim: ['✅', 'IA terminou', 'conversas encerradas pela IA — completas (etapa 4) ou não (o lead sumiu ou não tinha verba)'], falta: ['⚠️', 'IA terminou e FALTA MARCAR', 'terminaram o roteiro e não têm reunião na planilha nem etapa de agendado na Clint — é aqui que o especialista precisa agir'] }[k];
-  var rows = g[k] || [];
-  document.getElementById('mb-titulo').textContent = cfg[1] + ' — ' + rows.length;
+  var todas = g[k] || [];
+  // contagem por nota
+  var cont = { A: 0, B: 0, C: 0, D: 0, '': 0 };
+  todas.forEach(function(l){ var n = _gmNotaDe(l); cont[n in cont ? n : ''] = (cont[n in cont ? n : ''] || 0) + 1; });
+  var contV = { alta: 0, media: 0, nda: 0, sem: 0 };
+  todas.forEach(function(l){ contV[_gmVerbaDe(l)]++; });
+  var rows = todas.filter(function(l) {
+    if (_gmNotaF && !(_gmNotaF === 'sem' ? !_gmNotaDe(l) : _gmNotaDe(l) === _gmNotaF)) return false;
+    if (_gmVerbaF && _gmVerbaDe(l) !== _gmVerbaF) return false;
+    return true;
+  });
+  document.getElementById('mb-titulo').textContent = cfg[1] + ' — ' + rows.length + (_gmNotaF || _gmVerbaF ? ' de ' + todas.length : '');
   document.getElementById('mb-ico').textContent = cfg[0];
   document.getElementById('mb-sub').textContent = cfg[2] + ' · do mais recente para o mais antigo';
-  var h = '';
+  var cores = { A: '#3ddc97', B: '#6ea8ff', C: '#f6a350', D: '#ff6b6b', sem: '#8b8fa3' };
+  var chip = function(v, rot, n) {
+    var on = _gmNotaF === v;
+    var cor = cores[v] || '#ffd166';
+    return '<span class="chart-chip' + (on ? ' active' : '') + '" style="' + (on ? 'background:' + cor + '22;border-color:' + cor + ';color:' + cor + ';' : '') + '" onclick="gmFiltrarNota(\'' + k + '\',\'' + v + '\')">' + rot + ' <b>' + n + '</b></span>';
+  };
+  var chipV = function(v, rot, n, cor) {
+    var on = _gmVerbaF === v;
+    return '<span class="chart-chip' + (on ? ' active' : '') + '" style="' + (on ? 'background:' + cor + '22;border-color:' + cor + ';color:' + cor + ';' : '') + '" onclick="gmFiltrarVerba(\'' + k + '\',\'' + v + '\')">' + rot + ' <b>' + n + '</b></span>';
+  };
+  var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;"><span class="hint" style="margin-right:2px;">Nota:</span>'
+    + chip('', 'Todas', todas.length) + chip('A', '🏅 A', cont.A) + chip('B', 'B', cont.B) + chip('C', 'C', cont.C) + chip('D', 'D', cont.D) + chip('sem', 'sem nota', cont['']) + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><span class="hint" style="margin-right:2px;">Investimento declarado:</span>'
+    + chipV('', 'Todos', todas.length, '#ffd166') + chipV('alta', '🔥 R$2–4 mil', contV.alta, '#f6a350') + chipV('media', '🟡 R$500–2 mil', contV.media, '#6ea8ff') + chipV('nda', '⚪ sem disponibilidade', contV.nda, '#8b8fa3') + chipV('sem', 'não respondeu', contV.sem, '#8b8fa3') + '</div>';
   rows.slice(0, 200).forEach(function(l){ h += ldRow(l, l.faixa === 'alta'); });
-  document.getElementById('mb-lista').innerHTML = h || '<div style="color:var(--muted);font-size:.8rem;">Nenhum.</div>';
+  if (!rows.length) h += '<div style="color:var(--muted);font-size:.8rem;">Nenhum' + (_gmNotaF || _gmVerbaF ? ' com esse filtro' : '') + '.</div>';
+  document.getElementById('mb-lista').innerHTML = h;
   var bq = document.getElementById('mb-busca'); if (bq) { bq.value = ''; bq.style.display = ''; }
   document.getElementById('modal-b').classList.add('open');
 }
