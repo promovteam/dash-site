@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1816';
+var VERSAO_DASH = '2026-09-05-1837';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -6070,6 +6070,12 @@ function clintPorNome(nome) {
     origem: (r[5] >= 0 && CLINT_PAINEL.origensClint) ? CLINT_PAINEL.origensClint[r[5]] || '' : '' });
 }
 function clintInfoDe(l) {
+  if (_ldMemo && l && l._cg === _ldGen) return l._cv;
+  var r = _clintInfoDeCalc(l);
+  if (_ldMemo && l) { l._cg = _ldGen; l._cv = r; }
+  return r;
+}
+function _clintInfoDeCalc(l) {
   var c = CLINT[l.tel8];
   if (c && c.success && (c.dono || c.etapaClint)) return { dono: c.dono || '', etapa: c.etapaClint || '' };
   if (CLINT_PAINEL && CLINT_PAINEL.success && l.tel8) {
@@ -7424,10 +7430,12 @@ function atualizarBtnFiltrosLeads() {
 function montarFiltrosLeads() {
   var el = document.getElementById('ld-filtros');
   if (!el) return;
+  if (!window._ldOpc || _ldOpc.rows !== LD.rows || _ldOpc.n !== LD.rows.length) window._ldOpc = { rows: LD.rows, n: LD.rows.length, por: {} };
   function opcoes(campo) {
+    if (_ldOpc.por[campo]) return _ldOpc.por[campo];
     var c = {};
     LD.rows.forEach(function(l){ var v = (l[campo] || '').trim(); if (v) c[v] = (c[v] || 0) + 1; });
-    return Object.keys(c).sort(function(a, b){ return c[b] - c[a]; });
+    return (_ldOpc.por[campo] = Object.keys(c).sort(function(a, b){ return c[b] - c[a]; }));
   }
   function chip(grupo, valor, texto, ativo) {
     return '<button class="chart-chip sm' + (ativo ? ' on' : '') + '" onclick="ldSetF(\'' + grupo + '\',' +
@@ -8380,6 +8388,13 @@ var CLASSES_LEAD = {
 function classeDoLead(l) {
   if (!l) return null;
   var inv = String(l.invest || ''), ren = String(l.renda || ''), seg = String(l.seg || '');
+  var kc = inv + '|' + ren + '|' + seg;
+  if (l._clK === kc) return l._clV;          // ja calculada para estes mesmos campos
+  var rc = _classeDoLeadCalc(l, inv, ren, seg);
+  l._clK = kc; l._clV = rc;
+  return rc;
+}
+function _classeDoLeadCalc(l, inv, ren, seg) {
   if (!inv && !ren && !seg) return null;      // não preencheu: não dá para qualificar
   var nota = 0, itens = [];
 
@@ -10089,9 +10104,20 @@ function _arrobasDe(txt) {
 }
 // situação do lead na aba Vendas — índice montado uma vez por render
 var _ldIdx = null;
+var _ldIdxChave = '';
+function _ldIdxAssinatura() {
+  // "impressao digital" dos dados que entram no indice: se nada mudou, nao refaz (era ~50 ms por clique)
+  var vr = V2.rows || [], f = '';
+  for (var i = 0; i < vr.length; i++) { var r = vr[i]; f += (r.sn || '') + (r.date ? r.date.getTime() : 0) + (r.telefone || '') + (r.obs ? r.obs.length : 0) + ';'; }
+  return (LD.rows ? LD.rows.length : 0) + '|' + (PAG.rows ? PAG.rows.length : 0) + '|' + vr.length + '|' + f.length + '|' + _ldHashStr(f);
+}
+function _ldHashStr(t) { var h = 0; for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return h; }
+var _ldIdxRefs = null;
 function _ldMontarIdx() {
+  if (_ldIdx && _ldIdxRefs && _ldIdxRefs[0] === LD.rows && _ldIdxRefs[1] === PAG.rows && _ldIdxRefs[2] === V2.rows && _ldIdxChave === _ldIdxAssinatura()) return;
   _ldIdx = {};
   _ldIdxAlt = { email: {}, insta: {}, nome: {} };
+  _ldIdxRefs = [LD.rows, PAG.rows, V2.rows]; _ldIdxChave = _ldIdxAssinatura();
   if (!V2.carregado) return;
   var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
 
@@ -10194,6 +10220,12 @@ function _ldMontarIdx() {
 // a situação do lead: tenta telefone, depois e-mail e @ (nome fica de fora)
 function ldSituacao(l) {
   if (!l) return null;
+  if (_ldMemo && l._sg === _ldGen) return l._sv;
+  var r = _ldSituacaoCalc(l);
+  if (_ldMemo) { l._sg = _ldGen; l._sv = r; }
+  return r;
+}
+function _ldSituacaoCalc(l) {
   if (l.tel8 && _ldIdx && _ldIdx[l.tel8]) return _ldIdx[l.tel8];
   if (!_ldIdxAlt) return null;
   var e = idEmail(l.email);
@@ -11346,7 +11378,16 @@ function renderLeadsLogo() {
 }
 var _ultimoClique = 0;
 document.addEventListener('mousedown', function(){ _ultimoClique = Date.now(); }, true);
+// ===== ⚡ VELOCIDADE DOS FILTROS (Bruno 05/09/2026: "analise a demora de tempo nos filtros") =====
+// A aba Leads refaz as contas para TODOS os leads (19 mil) a cada clique, e a situacao/Clint de cada lead
+// era procurada 5-6 vezes por lead (108 mil vezes por clique). Enquanto a aba esta sendo montada, o
+// resultado de cada lead fica guardado nele mesmo; fora da montagem, tudo e calculado na hora, como antes.
+var _ldGen = 0, _ldMemo = false;
 function renderLeads() {
+  _ldGen++; _ldMemo = true;
+  try { return _renderLeadsCorpo(); } finally { _ldMemo = false; }
+}
+function _renderLeadsCorpo() {
   if (!LD.carregado) return;
   // alguém está no meio de um clique/seleção: espera um instante e tenta de novo
   if (Date.now() - _ultimoClique < 900) { renderLeadsLogo(); return; }
@@ -11672,8 +11713,9 @@ function renderLeads() {
     +   '<span class="ld-selo' + (LD_F.faixa.indexOf('alta') !== -1 ? '' : ' morno') + '" style="cursor:pointer;" onclick="ldSetF(\'faixa\',\'alta\')" title="Perfil HT: declarou investir de R$2mil a R$4mil">🔥 Só perfil HT (R$2–4mil)</span>'
     +   (function(){
           // atalho por nota de qualificação: comece pelos A
-          var contagem = { A:0, B:0, C:0, D:0 };
-          (LD.rows || []).forEach(function(x){ var c = classeDoLead(x); if (c) contagem[c.classe]++; });
+          var contagem;
+          if (window._ldContCl && _ldContCl.rows === LD.rows && _ldContCl.n === (LD.rows || []).length) contagem = _ldContCl.c;
+          else { contagem = { A:0, B:0, C:0, D:0 }; (LD.rows || []).forEach(function(x){ var c = classeDoLead(x); if (c) contagem[c.classe]++; }); window._ldContCl = { rows: LD.rows, n: (LD.rows || []).length, c: contagem }; }
           return ['A','B','C','D'].map(function(k) {
             var i = CLASSES_LEAD[k], on = LD_F.classe.indexOf(k) !== -1;
             return '<span class="ld-selo' + (on ? '' : ' morno') + '" style="cursor:pointer;'
@@ -11974,7 +12016,10 @@ function renderLeads() {
   // respeita os filtros da barra (mas não o período, senão só sobraria uma linha)
   var hQuadro = '';
   var buckets = {}, ordem = [];
-  ldFiltrar(LD.rows).forEach(function(l) {
+  var qdChave = (LD.rows || []).length + '|' + JSON.stringify(LD_F) + '|' + LD_VIS + '|' + (LD_F.novos ? ldVisto() : 0);
+  var qdPronto = window._ldQd && _ldQd.rows === LD.rows && _ldQd.idx === _ldIdx && _ldQd.painel === CLINT_PAINEL && _ldQd.chave === qdChave;
+  if (qdPronto) { buckets = _ldQd.buckets; ordem = _ldQd.ordem; }
+  (qdPronto ? [] : ldFiltrar(LD.rows)).forEach(function(l) {
     var d = l.date, ini, fim, label;
     if (LD_VIS === 'dia') {
       ini = ldDia(d); fim = new Date(ini.getTime() + 864e5);
@@ -12002,6 +12047,7 @@ function renderLeads() {
     if (stB && stB.vd) b.vd++;
   });
   ordem.sort(function(a, b){ return b - a; }); // mais recente primeiro
+  if (!qdPronto) window._ldQd = { rows: LD.rows, idx: _ldIdx, painel: CLINT_PAINEL, chave: qdChave, buckets: buckets, ordem: ordem };
   var limite = { dia:14, sem:12, mes:14, tri:8, ano:5 }[LD_VIS] || 12;
   var vis = ordem.slice(0, limite).map(function(k){ return buckets[k]; });
   var topoB = Math.max.apply(null, vis.map(function(b){ return b.tot; }).concat([1]));
@@ -12945,7 +12991,8 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (11ª implantação, v17)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (12ª implantação, v19)
 // https://script.google.com/macros/s/AKfycbxc-dvPiXNOUtnv8il7A5XNPoGZSBz7VNLpZNhZAjlo7Eh4k2ZKzgTEd6oEbcBxgWrQ/exec (13ª implantação, v21)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9HysTL9R9CBKPc2BV6SdXH2mOTonlMVpUfI8xefG8Qf2ioqh3P1HoqcN60qq2gRnL/exec';
+// https://script.google.com/macros/s/AKfycbw9HysTL9R9CBKPc2BV6SdXH2mOTonlMVpUfI8xefG8Qf2ioqh3P1HoqcN60qq2gRnL/exec (05/09 17h, sem aba697f)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwVnSElSLEezO15hnRbQKmDnfqSUgjcs7S6KaauIPXuKtF3ofbmmWrCkmcMDYr3Nef1/exec';   // 05/09/2026 18h: tempoContato leve (fa84d47) + contato humano por user_id (aba697f)
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
