@@ -2192,7 +2192,7 @@ function fecharFiltros(){
   document.getElementById('filtros-ov').classList.remove('open');
 }
 function limparFiltros(){
-  FILTRO = { mes:'atual', prod:[], closer:[], sdr:[], origem:[], status:[], de:null, ate:null };
+  FILTRO = { mes:'atual', prod:[], closer:[], sdr:[], origem:[], forma:[], status:[], de:null, ate:null };
   renderV2();
   atualizarBadgeFiltros();
 }
@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-06-1547';
+var VERSAO_DASH = '2026-09-06-1603';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2486,7 +2486,7 @@ function v2calc(rows) {
 // ===== FILTROS GLOBAIS (gaveta ⚙) =====
 // prod/closer/sdr/origem/status são LISTAS: dá para marcar mais de uma opção por grupo
 // (lista vazia = "Todos")
-var FILTRO = { mes:'atual', prod:[], closer:[], sdr:[], origem:[], status:[], de:null, ate:null };
+var FILTRO = { mes:'atual', prod:[], closer:[], sdr:[], origem:[], forma:[], status:[], de:null, ate:null };
 
 function _fPassa(grupo, valorDaLinha) {
   var sel = FILTRO[grupo];
@@ -2500,6 +2500,7 @@ function v2fRows(rows) {
     if (!_fPassa('closer', r.closer)) return false;
     if (!_fPassa('sdr', r.sdr)) return false;
     if (!_fPassa('origem', r.origem)) return false;
+    if (!_fPassa('forma', r.forma)) return false;
     if (FILTRO.status.length && FILTRO.status.indexOf(r.sn) === -1) return false;
     return true;
   });
@@ -2577,7 +2578,7 @@ function setPeriodo() {
 
 function atualizarBadgeFiltros() {
   var n = 0;
-  ['prod','closer','sdr','origem','status'].forEach(function(k){ n += FILTRO[k].length; });
+  ['prod','closer','sdr','origem','forma','status'].forEach(function(k){ n += FILTRO[k].length; });
   if (FILTRO.mes !== 'atual' || FILTRO.de) n++;
   var b = document.getElementById('btn-filtros');
   if (b) b.innerHTML = '⚙ Filtros' + (n ? ' <b style="color:#f6a350;">(' + n + ')</b>' : '');
@@ -2889,6 +2890,24 @@ function montarFiltros() {
     vals.forEach(function(v){ h += _chipF(g[0], v2norm(v), v); });
     h += '</div></div>';
   });
+
+  // Forma de pagamento (Bruno 06/09/2026) — "À vista" e "A vista" viram uma opção só (compara sem acento)
+  var fmN = {}, fmL = {};
+  V2.rows.forEach(function(r){
+    var v = (r.forma || '').trim(); if (!v) return;
+    var k = v2norm(v);
+    fmN[k] = (fmN[k] || 0) + 1;
+    fmL[k] = fmL[k] || {}; fmL[k][v] = (fmL[k][v] || 0) + 1;
+  });
+  var formas = Object.keys(fmN).filter(function(k){ return fmN[k] >= 2; }).sort(function(a, b){ return fmN[b] - fmN[a]; }).slice(0, 12);
+  if (formas.length) {
+    h += '<div class="dtl-card"><div class="g-label">💳 Forma de pagamento</div><div class="chart-chips">' + _chipF('forma', 'todos', 'Todas');
+    formas.forEach(function(k){
+      var rot = Object.keys(fmL[k]).sort(function(a, b){ return fmL[k][b] - fmL[k][a]; })[0];   // rótulo mais usado na planilha
+      h += _chipF('forma', k, rot);
+    });
+    h += '</div></div>';
+  }
 
   // Status
   var sts = {};
