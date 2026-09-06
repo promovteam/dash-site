@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-05-1925';
+var VERSAO_DASH = '2026-09-06-1039';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -5108,13 +5108,13 @@ function abrirAtendimentoClint(ev, i) {
   var l = _ldReg[i];
   if (!l) return false;
   // 1) cadastro do contato ja conhecido (painel da Clint ou consulta anterior): abre NA HORA
-  var direto = clintLink(l);
-  if (direto) { window.open(direto, '_blank'); return false; }
+  var direto = clintPrecisaPerguntar(l) ? '' : clintLinkApp(l);
+  if (direto) { clintAbrir(direto); return false; }
   var t8 = ldTel8(l.tel);
-  if (!t8) { window.open('https://app.clint.digital/chat', '_blank'); return false; }
+  if (!t8) { clintAbrir('https://app.clint.digital/chat'); return false; }
   // 2) nao conhecemos: pergunta ao robo (3 a 10 s), com andamento e botao se o navegador bloquear a aba
-  var win = null;
-  try { win = window.open('', '_blank'); } catch (e) { win = null; }
+  var win = null;   // no celular nao abre aba em branco: a caixinha embaixo leva direto ao app
+  try { win = ehCelular() ? null : window.open('', '_blank'); } catch (e) { win = null; }
   var nomeL = String(l.nome || 'este lead').replace(/</g, '&lt;');
   var caixa = null, t0 = Date.now(), timer = null;
   function pinta(html) {
@@ -5130,7 +5130,7 @@ function abrirAtendimentoClint(ev, i) {
     var velho = document.getElementById('clint-abrindo'); if (velho) velho.remove();
     document.body.appendChild(caixa);
   }
-  pinta('🟣 Procurando <b>' + nomeL + '</b> na Clint… <span id="clint-seg">0</span>s');
+  pinta((ehCelular() ? '🟣 Abrindo <b>' + nomeL + '</b> no app da Clint… ' : '🟣 Procurando <b>' + nomeL + '</b> na Clint… ') + '<span id="clint-seg">0</span>s');
   timer = setInterval(function(){ var e1 = (win && !win.closed) ? (function(){ try { return win.document.getElementById('clint-seg'); } catch (e) { return null; } })() : document.getElementById('clint-seg'); if (e1) e1.textContent = Math.round((Date.now() - t0) / 1000); }, 1000);
   var nome = 'clAt' + Math.random().toString(36).slice(2, 8), feito = false;
   var s = document.createElement('script');
@@ -5139,17 +5139,18 @@ function abrirAtendimentoClint(ev, i) {
     clearInterval(timer);
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
     if (d && d.success) CLINT[t8] = d;
-    var alvo = clintLink(l) || 'https://app.clint.digital/chat';
+    var alvo = clintLinkApp(l) || 'https://app.clint.digital/chat';
     var achou = !!(d && d.success && d.achou);
     var aviso = achou ? '✅ Encontrado na Clint.' : '⚠️ Essa pessoa não está na Clint' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '') + ' — abrindo a lista.';
     if (win && !win.closed) {
       pinta(aviso + '<br><br><a href="' + alvo + '" style="color:#b9a6ff;font-weight:800;">Se não abrir sozinho, clique aqui</a>');
       setTimeout(function(){ try { win.location = alvo; } catch (e) {} }, achou ? 200 : 1600);
     } else if (caixa) {
+      if (ehCelular() && achou) { setTimeout(function(){ try { caixa.remove(); } catch (e) {} clintAbrir(alvo); }, 250); return; }
       caixa.innerHTML = aviso + '<div style="margin-top:10px;display:flex;gap:8px;justify-content:center;">'
-        + '<a class="btn primary" style="text-decoration:none;padding:9px 16px;" href="' + alvo + '" target="_blank" rel="noopener" onclick="document.getElementById(\'clint-abrindo\').remove()">🟣 Abrir na Clint</a>'
+        + '<a class="btn primary" style="text-decoration:none;padding:9px 16px;" href="' + alvo + '"' + (ehCelular() ? '' : ' target="_blank" rel="noopener"') + ' onclick="document.getElementById(\'clint-abrindo\').remove()">🟣 ' + (ehCelular() ? 'Abrir no app da Clint' : 'Abrir na Clint') + '</a>'
         + '<button class="btn" style="padding:9px 14px;" onclick="document.getElementById(\'clint-abrindo\').remove()">Fechar</button></div>'
-        + '<div class="hint" style="margin-top:6px;">O navegador bloqueou a aba automática. Para não pedir de novo, permita pop-ups deste site.</div>';
+        + '<div class="hint" style="margin-top:6px;">' + (ehCelular() ? 'Toque no botão para abrir no aplicativo da Clint.' : 'O navegador bloqueou a aba automática. Para não pedir de novo, permita pop-ups deste site.') + '</div>';
     }
   }
   window[nome] = fim;
@@ -5183,6 +5184,34 @@ function clintLink(l) {
   // sem telefone (ou telefone que não bate): tenta pelo nome, se for único na Clint
   if (l.nome) { var pn = clintPorNome(l.nome); if (pn && pn.contatoId) return 'https://app.clint.digital/contacts/' + pn.contatoId; }
   return '';
+}
+// ===== 📱 NO CELULAR, ABRIR NO APLICATIVO DA CLINT (Bruno 06/09/2026) =====
+// O app da Clint (digital.clint.mobile) so assume os enderecos /chat/... e /deal/... no iPhone
+// (app.clint.digital/.well-known/apple-app-site-association) — no Android assume todos.
+// Por isso, no celular: (1) preferir o endereco da CONVERSA, (2) abrir na MESMA aba —
+// o iPhone nao manda para o app quando o link abre em aba nova.
+function ehCelular() {
+  try { return /iphone|ipad|ipod|android/i.test(navigator.userAgent || '') || window.innerWidth <= 900; } catch (e) { return false; }
+}
+function clintLinkApp(l) {   // no celular, conversa ou negocio (o app so assume /chat/... e /deal/...)
+  if (ehCelular()) {
+    var c = CLINT[ldTel8(l.tel || l.telefone)];
+    if (c && c.success && c.chatId) return 'https://app.clint.digital/chat/' + c.chatId;
+    if (c && c.success && c.negocioId) return 'https://app.clint.digital/deal/' + c.negocioId;
+  }
+  return clintLink(l);
+}
+// no celular, so o endereco da conversa/negocio abre o app: se ainda nao sabemos qual e,
+// vale esperar o robo (3 a 10 s) em vez de mandar para o cadastro, que abre o navegador
+function clintPrecisaPerguntar(l) {
+  if (!ehCelular()) return false;
+  var c = CLINT[ldTel8(l.tel || l.telefone)];
+  return !(c && c.success && (c.chatId || c.negocioId));
+}
+function clintAbrir(url) {
+  if (!url) return;
+  if (ehCelular()) { try { window.location.href = url; return; } catch (e) {} }
+  window.open(url, '_blank');
 }
 // texto do tempo sem resposta, já dizendo de quem é a bola
 function clintTexto(l) {
@@ -7142,8 +7171,10 @@ function ldCSV(txt) {
 function ldData(v) {
   v = String(v || '').trim();
   if (!v) return null;
-  var m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
-  if (m) return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+  // formulário novo grava em UTC ("...T21:30:00.000Z"): converte para a hora do Brasil (Bruno 06/09/2026:
+  // "não está mostrando os leads que chegou" — os leads da noite caíam no dia seguinte)
+  var m = v.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z)?/);
+  if (m) return m[7] ? new Date(Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6])) : new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
   m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);        // só a data
   if (m) return new Date(+m[1], +m[2]-1, +m[3]);
   m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2}))?/); // DD/MM/AAAA
@@ -7398,14 +7429,14 @@ function ldSetF(grupo, valor) {
     var i = arr.indexOf(valor);
     if (i === -1) arr.push(valor); else arr.splice(i, 1);
   }
-  renderLeads();
+  renderLeads(true);
 }
 function ldLimparF() {
   LD_F = { origem: [], faixa: [], seg: [], renda: [], sit: '', score: 0, novos: false, etapa: [], dono: [], etClint: [], classe: [] };
   LD_BUSCA = '';
   var b = document.querySelector('#s-leads .search-input');
   if (b) b.value = '';
-  renderLeads();
+  renderLeads(true);
 }
 function ldContaF() {
   return (LD_F.veio ? 1 : 0) + LD_F.origem.length + LD_F.faixa.length + LD_F.seg.length + LD_F.renda.length + LD_F.etapa.length + LD_F.etClint.length + LD_F.classe.length
@@ -9699,7 +9730,7 @@ function mudarPeriodoLeads(p, el) {
   if (chipD) { chipD.classList.remove('on'); chipD.textContent = '📅 Datas…'; }
   document.querySelectorAll('#ld-chips .chart-chip').forEach(function(c){ c.classList.remove('on'); });
   if (el) el.classList.add('on');
-  renderLeads();
+  renderLeads(true);
 }
 // ===== 📅 FILTRO POR DATAS (Bruno 24/08/2026): escolher "de" e "até" =====
 function abrirDatasLeads() {
@@ -10067,7 +10098,7 @@ function escolherBucketLeads(iniTs, fimTs, label) {
   }
   document.querySelectorAll('#ld-chips .chart-chip').forEach(function(c){ c.classList.remove('on'); });
   if (!LD_RANGE) { var t = document.querySelector('#ld-chips [data-p="tudo"]'); if (t) t.classList.add('on'); }
-  renderLeads();
+  renderLeads(true);
 }
 // ===== QUEM É A MESMA PESSOA: telefone, e-mail e @ (Bruno 20/08/2026) =====
 // A pessoa some por meses e volta a marcar reunião — às vezes com OUTRO número.
@@ -10562,7 +10593,7 @@ function ldRow(l, quente) {
     + seloAnuncio(l, true) + igSeloLead(l, true)
     + (donoNome || !ldPodeTrocarDono() ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
     + (ldPodeTrocarDono() ? '<button class="btn-assumir" style="background:rgba(110,168,255,.14);color:#6ea8ff;border:1px solid rgba(110,168,255,.45);" onclick="ldPassarPara(' + i + ', event)" title="Só Bruno e Adm: mandar este lead para outra pessoa">👤 ' + (donoNome ? 'Trocar' : 'Para quem') + '</button>' : '')
-    + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abrir a conversa deste lead no atendimento da Clint">🟣 Clint</a>' : '')
+    + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLinkApp(l) + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abrir a conversa deste lead no atendimento da Clint">🟣 Clint</a>' : '')
     + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank" onclick="event.stopPropagation()">📷</a>' : '')
     + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation()">💬 WhatsApp</a>' : '')
     + '</div>'
@@ -11007,7 +11038,7 @@ function abrirFichaLead(i) {
   if (_btH.length) h += '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">' + _btH.join('') + '</div>';
   if (wa || l.insta || clintLink(l)) {
     h += '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">'
-      + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abre o cadastro da pessoa na Clint; de lá, a conversa">🟣 Abrir na Clint</a>' : '')
+      + (clintLink(l) ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLinkApp(l) + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abre o cadastro da pessoa na Clint; de lá, a conversa">🟣 Abrir na Clint</a>' : '')
       + (clintChatLink(l) ? '<a class="ld-wa" style="justify-content:center;padding:12px;background:rgba(108,71,255,.08);border-color:rgba(108,71,255,.35);color:#b9a6ff;" href="' + clintChatLink(l) + '" target="_blank" onclick="event.stopPropagation()" title="Endereço direto da conversa — a Clint nem sempre aceita abrir de fora">💬 conversa direto</a>' : '')
       + (wa ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;" href="' + wa + '" target="_blank">💬 Chamar no WhatsApp</a>' : '')
       + (l.insta ? '<a class="ld-wa" style="flex:1;justify-content:center;padding:12px;background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank">📷 Ver Instagram</a>' : '')
@@ -11383,14 +11414,15 @@ document.addEventListener('mousedown', function(){ _ultimoClique = Date.now(); }
 // era procurada 5-6 vezes por lead (108 mil vezes por clique). Enquanto a aba esta sendo montada, o
 // resultado de cada lead fica guardado nele mesmo; fora da montagem, tudo e calculado na hora, como antes.
 var _ldGen = 0, _ldMemo = false;
-function renderLeads() {
+function renderLeads(agora) {
   _ldGen++; _ldMemo = true;
-  try { return _renderLeadsCorpo(); } finally { _ldMemo = false; }
+  try { return _renderLeadsCorpo(agora); } finally { _ldMemo = false; }
 }
-function _renderLeadsCorpo() {
+function _renderLeadsCorpo(agora) {
   if (!LD.carregado) return;
-  // alguém está no meio de um clique/seleção: espera um instante e tenta de novo
-  if (Date.now() - _ultimoClique < 900) { renderLeadsLogo(); return; }
+  // redesenho de FUNDO (Clint/IA respondendo) no meio de um clique: espera um instante e tenta de novo.
+  // Clique do usuário num filtro (agora=true) desenha na hora (Bruno 06/09/2026: "os filtros ainda demoram")
+  if (!agora && Date.now() - _ultimoClique < 900) { renderLeadsLogo(); return; }
   _rlUltimo = Date.now();
   var lo = document.getElementById('ld-loading');
   if (lo) lo.style.display = 'none';
@@ -11577,7 +11609,7 @@ function _renderLeadsCorpo() {
         h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
         desqPerfil.slice(0, 120).forEach(function(l) {
           var infoQ = clintInfoDe(l);
-          h += '<a href="' + (clintLink(l) || '#') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
+          h += '<a href="' + (clintLinkApp(l) || '#') + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
             + '<b style="font-size:.76rem;flex:1;">' + (l.nome || 'Sem nome') + '</b>'
             + '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">' + (l.invest || '').replace(/\s*\(.*$/, '') + '</span>'
             + ((infoQ && infoQ.dono) ? '<span class="dono-chip">✋ ' + infoQ.dono + '</span>' : '')
@@ -12265,7 +12297,7 @@ function mostrarFormularioDoLead(r) {
           })() : '')
       + (!temAlgo ? '<div class="hint">Também não achei ela na Clint nem em contratos.</div>' : '')
       + ((t8 || pn) && clintLink({ tel: r.telefone, tel8: t8, nome: r.nome })
-          ? '<div style="margin-top:9px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink({ tel: r.telefone, tel8: t8, nome: r.nome }) + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a></div>'
+          ? '<div style="margin-top:9px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLinkApp({ tel: r.telefone, tel8: t8, nome: r.nome }) + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a></div>'
           : '')
       + '</div>';
     return;
@@ -12319,7 +12351,7 @@ function mostrarFormularioDoLead(r) {
           + ' style="max-width:100%;max-height:200px;border-radius:12px;cursor:pointer;border:1px solid rgba(255,255,255,.12);" title="clique para ver o anúncio inteiro"></div>'
         : '')
     + '<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap;">'
-    +   (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a>' : '')
+    +   (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLinkApp(l) + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a>' : '')
     +   '<span class="ld-tag" style="cursor:pointer;background:rgba(110,168,255,.14);color:#6ea8ff;" onclick="verFormularioCompleto(\'' + t8 + '\')">ver a ficha completa do lead →</span>'
     + '</div></div>';
 }
@@ -14892,7 +14924,7 @@ function agMostrarOrigem(l) {
     + linha('atendendo', l.dono)
     + linha('etapa Clint', l.etapaClint)
     + (clintLink(l)
-        ? '<div style="margin-top:6px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLink(l) + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a></div>'
+        ? '<div style="margin-top:6px;"><a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + clintLinkApp(l) + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir no atendimento da Clint</a></div>'
         : '<div class="hint" style="margin-top:6px;">Sem ficha na Clint ainda — o link fica em branco</div>')
     + '</div>';
   cx.style.display = 'block';
