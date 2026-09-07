@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-06-2157';
+var VERSAO_DASH = '2026-09-06-2228';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4702,6 +4702,33 @@ function verMeta(k) {
 }
 
 // ---------- janelas com listas reais ----------
+// 🧲 lista das reuniões de uma origem (ou de todas, k = '*') numa etapa: ag / re / fe / vd — Bruno 06/09/2026
+function abrirListaOrigem(origem, etapa) {
+  var L = origem === '*' ? _ORG_TOT : _ORG_LISTAS[origem];
+  if (!L || !L[etapa] || !L[etapa].length) return;
+  var rows = L[etapa].slice().sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
+  var nomes = { ag: 'Agendadas', re: 'Realizadas', fe: 'Fecharam', vd: 'Vendas' };
+  var icos = { ag: '📅', re: '✅', fe: '🏆', vd: '💰' };
+  var comValor = (etapa === 'vd' || etapa === 'fe');
+  var total = comValor ? rows.reduce(function(s, r){ return s + (r.valor || 0); }, 0) : 0;
+  var perO = orPeriodo();
+  var mo = document.getElementById('modal-a');
+  var mm = mo.querySelector('.modal');
+  var h = '<div class="modal-head">'
+    + '<div class="alerta-ico" style="background:rgba(246,163,80,.15);">' + icos[etapa] + '</div>'
+    + '<h2>' + nomes[etapa] + ' · ' + (origem === '*' ? 'todas as origens' : origem) + ' — ' + rows.length + '</h2>'
+    + '<button class="close-x" onclick="fecharA()">✕</button></div>'
+    + '<div class="hint" style="margin:-6px 0 10px;">' + perO.label + (OR.closer ? ' · closer: ' + (OR.closerRot || OR.closer) : '') + (OR.prod ? ' · produto: ' + OR.prod : '') + '</div>'
+    + (comValor ? '<div class="modal-total">'
+        + '<div class="g-stat"><b style="color:#3ddc97;">' + v2moeda0(total) + '</b><span>Total</span></div>'
+        + '<div class="g-stat"><b>' + v2moeda0(rows.length ? total / rows.length : 0) + '</b><span>Ticket médio</span></div></div>' : '')
+    + '<input class="search-input" style="margin:4px 0 10px;" placeholder="🔍  Buscar nesta lista..." oninput="filtrarListaModal(this.value, \'ma-lista\')">'
+    + '<div id="ma-lista">';
+  rows.forEach(function(r){ h += v2row(r); });
+  h += '</div>';
+  mm.innerHTML = h;
+  mo.classList.add('open');
+}
 function abrirA(tipo) {
   var mesRows = v2mesAtual();
   var cfg = {
@@ -7966,14 +7993,30 @@ function tipoDoAnuncio(nome, tipoDoLead) {
 // 📣 ABA ANÚNCIOS E ORIGENS — de onde vem cada reunião e cada venda
 // =====================================================================
 var AN_PER = 'mes', AN_ORD = 'auto', AN_TIPO = 'todos';   // 'auto' = Vendas nos pagos, Pedidos no orgânico
-function anPeriodo() {
+var AN_DE = null, AN_ATE = null;   // período escolhido no calendário (AN_PER = 'custom') — Bruno 06/09/2026
+// filtros PRÓPRIOS da tabela "Detalhamento por origem" (per '' = igual à aba) — Bruno 06/09/2026
+var OR = { per: '', de: null, ate: null, closer: '', prod: '' };
+var _ORG_LISTAS = {}, _ORG_TOT = {};
+function orPeriodo() { return OR.per ? anPeriodoDe(OR.per, OR.de, OR.ate) : anPeriodo(); }
+function anPeriodo() { return anPeriodoDe(AN_PER, AN_DE, AN_ATE); }
+// calendário de/até (flatpickr) num campo; chama aoEscolher(de, ate) quando fecha com 2 datas
+function _anCalendario(id, de, ate, aoEscolher) {
+  var el = document.getElementById(id);
+  if (!el || !window.flatpickr) return;
+  flatpickr(el, { mode: 'range', locale: 'pt', dateFormat: 'd/m/Y', defaultDate: (de && ate) ? [de, ate] : null,
+    onClose: function(sel) {
+      if (sel.length === 2) aoEscolher(new Date(sel[0].getFullYear(), sel[0].getMonth(), sel[0].getDate()), new Date(sel[1].getFullYear(), sel[1].getMonth(), sel[1].getDate()));
+    } });
+}
+function anPeriodoDe(chave, de, ate) {
   var hoje = new Date(); hoje.setHours(0,0,0,0);
   var ini, fim = null, label;
-  if (AN_PER === 'mes') { ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(); }
-  else if (AN_PER === 'mesant') { ini = new Date(hoje.getFullYear(), hoje.getMonth()-1, 1); fim = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[(hoje.getMonth()+11)%12] + ' de ' + (hoje.getMonth()===0?hoje.getFullYear()-1:hoje.getFullYear()); }
-  else if (AN_PER === 'sem') { ini = ldIniSemana(hoje); label = 'Esta semana'; }
-  else if (AN_PER === 'tri') { ini = ldIniTri(hoje); label = 'Trimestre'; }
-  else if (AN_PER === 'ano') { ini = new Date(hoje.getFullYear(), 0, 1); label = 'Ano de ' + hoje.getFullYear(); }
+  if (chave === 'custom' && de && ate) { ini = de; fim = new Date(ate.getFullYear(), ate.getMonth(), ate.getDate() + 1); label = de.toLocaleDateString('pt-BR') + ' a ' + ate.toLocaleDateString('pt-BR'); }
+  else if (chave === 'mes') { ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(); }
+  else if (chave === 'mesant') { ini = new Date(hoje.getFullYear(), hoje.getMonth()-1, 1); fim = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[(hoje.getMonth()+11)%12] + ' de ' + (hoje.getMonth()===0?hoje.getFullYear()-1:hoje.getFullYear()); }
+  else if (chave === 'sem') { ini = ldIniSemana(hoje); label = 'Esta semana'; }
+  else if (chave === 'tri') { ini = ldIniTri(hoje); label = 'Trimestre'; }
+  else if (chave === 'ano') { ini = new Date(hoje.getFullYear(), 0, 1); label = 'Ano de ' + hoje.getFullYear(); }
   else { ini = null; label = 'Tudo'; }
   return { ini: ini ? ini.getTime() : null, fim: fim ? fim.getTime() : null, label: label };
 }
@@ -7995,8 +8038,11 @@ function renderAnuncios() {
   if (chips) {
     var ops = [['sem','Esta semana'],['mes','Este mês'],['mesant','Mês passado'],['tri','Trimestre'],['ano','Ano'],['tudo','Tudo']];
     chips.innerHTML = ops.map(function(o){
-      return '<span class="chart-chip' + (AN_PER === o[0] ? ' on' : '') + '" style="cursor:pointer;" onclick="AN_PER=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>';
-    }).join('') + '<span style="flex:1;"></span><span class="hint">' + per.label + '</span>';
+      return '<span class="chart-chip' + (AN_PER === o[0] ? ' on' : '') + '" style="cursor:pointer;" onclick="AN_PER=\'' + o[0] + '\';AN_DE=AN_ATE=null;renderAnuncios();">' + o[1] + '</span>';
+    }).join('')
+    + '<input class="edit-in" id="an-periodo" readonly placeholder="📅 escolher datas" title="período pelo calendário (de / até)" value="' + (AN_PER === 'custom' && AN_DE && AN_ATE ? AN_DE.toLocaleDateString('pt-BR') + ' a ' + AN_ATE.toLocaleDateString('pt-BR') : '') + '" style="width:180px;text-align:center;cursor:pointer;padding:6px 10px;font-size:.74rem;' + (AN_PER === 'custom' ? 'border-color:#f6a350;color:#f6a350;font-weight:700;' : '') + '">'
+    + '<span style="flex:1;"></span><span class="hint">' + per.label + '</span>';
+    _anCalendario('an-periodo', AN_DE, AN_ATE, function(de, ate){ AN_PER = 'custom'; AN_DE = de; AN_ATE = ate; renderAnuncios(); });
   }
   // não trava a tela: mostra o que já chegou e avisa o que falta
   if (!V2.carregado && !LD.carregado) {
@@ -8009,58 +8055,82 @@ function renderAnuncios() {
   if (!V2.carregado) faltando.push('vendas');
   if (faltando.length) setTimeout(renderAnuncios, 1500);
 
-  // ---- reuniões e vendas do período, por origem ----
+  // ---- reuniões e vendas por origem — filtros PRÓPRIOS (período com calendário, closer, produto)
+  //      e números clicáveis que abrem a lista das reuniões (Bruno 06/09/2026) ----
   var REAL = ['vendido','nao vendido','bloqueio de oferta','entrada','estorno'];
   var FECHOU = ['vendido','entrada','bloqueio de oferta'];
   var porTelLead = {};
   (LD.rows || []).forEach(function(l){ if (l.tel8 && !porTelLead[l.tel8]) porTelLead[l.tel8] = l; });
+  var perO = orPeriodo();
   var org = {}, totO = { ag:0, re:0, fe:0, vd:0, fat:0 };
+  var orgL = {}, totL = { ag:[], re:[], fe:[], vd:[] };
   (V2.rows || []).forEach(function(r) {
     var d = r.date instanceof Date ? r.date : (r.date ? new Date(r.date) : null);
     if (!d || isNaN(d.getTime())) return;
     var t = d.getTime();
-    if (per.ini !== null && t < per.ini) return;
-    if (per.fim !== null && t >= per.fim) return;
+    if (perO.ini !== null && t < perO.ini) return;
+    if (perO.fim !== null && t >= perO.fim) return;
+    if (OR.closer && v2norm(r.closer) !== OR.closer) return;
+    if (OR.prod && v2norm(r.produto).indexOf(OR.prod) === -1) return;
     var lead = porTelLead[ldTel8(r.telefone)];
     var nome = (lead && lead.origem) ? lead.origem : (r.origem || '(sem origem)');
     var o = org[nome] || (org[nome] = { ag:0, re:0, fe:0, vd:0, fat:0 });
-    o.ag++; totO.ag++;
-    if (REAL.indexOf(r.sn) !== -1) { o.re++; totO.re++; }
-    if (FECHOU.indexOf(r.sn) !== -1) { o.fe++; totO.fe++; }
-    if (r.sn === 'vendido') { o.vd++; totO.vd++; o.fat += (r.valor||0); totO.fat += (r.valor||0); }
+    var L = orgL[nome] || (orgL[nome] = { ag:[], re:[], fe:[], vd:[] });
+    o.ag++; totO.ag++; L.ag.push(r); totL.ag.push(r);
+    if (REAL.indexOf(r.sn) !== -1) { o.re++; totO.re++; L.re.push(r); totL.re.push(r); }
+    if (FECHOU.indexOf(r.sn) !== -1) { o.fe++; totO.fe++; L.fe.push(r); totL.fe.push(r); }
+    if (r.sn === 'vendido') { o.vd++; totO.vd++; o.fat += (r.valor||0); totO.fat += (r.valor||0); L.vd.push(r); totL.vd.push(r); }
   });
+  _ORG_LISTAS = orgL; _ORG_TOT = totL;
   var lista = Object.keys(org).sort(function(a,b){ return org[b].fat - org[a].fat || org[b].ag - org[a].ag; });
   function rs(v){ return 'R$ ' + Math.round(v||0).toLocaleString('pt-BR'); }
+  function orChip(campo, valor, rot) {
+    var on = (OR[campo] || '') === valor;
+    return '<span class="chart-chip sm' + (on ? ' on' : '') + '" style="cursor:pointer;" onclick="OR.' + campo + '=' + JSON.stringify(valor).replace(/"/g, '&quot;') + ';' + (campo === 'per' ? 'OR.de=OR.ate=null;' : '') + (campo === 'closer' ? 'OR.closerRot=' + JSON.stringify(rot).replace(/"/g, '&quot;') + ';' : '') + 'renderAnuncios();">' + rot + '</span>';
+  }
+  function orCel(k, v, etapa, estilo) {
+    return '<td style="text-align:right;padding:10px;' + (estilo || '') + (v ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"'
+      + (v ? ' title="clique para ver quem são" onclick="abrirListaOrigem(' + JSON.stringify(k).replace(/"/g, '&quot;') + ',\'' + etapa + '\')"' : '') + '>' + v + '</td>';
+  }
+  var closers = v2usados('closer', 3).slice(0, 6);
+  var _thO = function(c){ return '<th style="text-align:right;padding:8px 10px;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">' + c + '</th>'; };
 
   var h = '';
   if (faltando.length) h += '<div class="hint" style="margin-bottom:10px;color:#f6a350;">⏳ ainda chegando: ' + faltando.join(' e ') + ' — os números abaixo completam em instantes</div>';
   h += '<div class="panel" style="margin-bottom:18px;">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">🧲 Detalhamento por origem</h3>'
-    + '<span style="flex:1;"></span><span class="hint">' + per.label + '</span></div>'
+    + '<span class="hint">clique nos números para ver quem são</span>'
+    + '<span style="flex:1;"></span><span class="hint" style="color:#f6a350;font-weight:700;">' + perO.label + (OR.closer ? ' · ' + (OR.closerRot || OR.closer) : '') + (OR.prod ? ' · ' + OR.prod : '') + '</span></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;">'
+    +   '<span class="hint" style="font-weight:800;">🗓️ Período:</span>'
+    +   orChip('per', '', 'Igual à aba') + orChip('per', 'sem', 'Esta semana') + orChip('per', 'mes', 'Este mês') + orChip('per', 'mesant', 'Mês passado') + orChip('per', 'tri', 'Trimestre') + orChip('per', 'ano', 'Ano') + orChip('per', 'tudo', 'Tudo')
+    +   '<input class="edit-in" id="or-periodo" readonly placeholder="📅 escolher datas" title="período pelo calendário (de / até)" value="' + (OR.per === 'custom' && OR.de && OR.ate ? OR.de.toLocaleDateString('pt-BR') + ' a ' + OR.ate.toLocaleDateString('pt-BR') : '') + '" style="width:170px;text-align:center;cursor:pointer;padding:5px 9px;font-size:.72rem;' + (OR.per === 'custom' ? 'border-color:#f6a350;color:#f6a350;font-weight:700;' : '') + '">'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">'
+    +   '<span class="hint" style="font-weight:800;">🧑‍💼 Closer:</span>' + orChip('closer', '', 'Todos')
+    +   closers.map(function(c){ return orChip('closer', v2norm(c), c); }).join('')
+    +   '<span style="width:10px;"></span><span class="hint" style="font-weight:800;">🎯 Produto:</span>'
+    +   orChip('prod', '', 'Todos') + orChip('prod', 'spark', 'Spark') + orChip('prod', 'growth', 'Growth') + orChip('prod', 'legado', 'Legado')
+    + '</div>'
     + '<div style="overflow-x:auto;margin-top:12px;"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">'
     + '<tr><th style="text-align:left;padding:8px 10px;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">Origem</th>'
-    + ['Agendadas','Realizadas','Fecharam','Vendas','Faturamento','Conversão'].map(function(c){
-        return '<th style="text-align:right;padding:8px 10px;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">' + c + '</th>'; }).join('')
+    + ['Agendadas','Realizadas','Fecharam','Vendas','Faturamento','Conversão'].map(_thO).join('')
     + '</tr>';
   lista.forEach(function(k) {
     var o = org[k], cv = o.re ? Math.round(o.vd/o.re*100) : 0;
     h += '<tr style="border-bottom:1px solid rgba(255,255,255,.06);">'
       + '<td style="padding:10px;"><b>' + k + '</b></td>'
-      + '<td style="text-align:right;padding:10px;">' + o.ag + '</td>'
-      + '<td style="text-align:right;padding:10px;">' + o.re + '</td>'
-      + '<td style="text-align:right;padding:10px;">' + o.fe + '</td>'
-      + '<td style="text-align:right;padding:10px;"><b style="color:#3ddc97;">' + o.vd + '</b></td>'
+      + orCel(k, o.ag, 'ag') + orCel(k, o.re, 're') + orCel(k, o.fe, 'fe')
+      + orCel(k, o.vd, 'vd', 'color:#3ddc97;font-weight:800;')
       + '<td style="text-align:right;padding:10px;color:#3ddc97;font-weight:700;">' + rs(o.fat) + '</td>'
       + '<td style="text-align:right;padding:10px;color:' + (cv>=30?'#3ddc97':cv>=15?'#f6a350':'var(--muted)') + ';font-weight:700;">' + (o.re?cv+'%':'—') + '</td></tr>';
   });
   h += '<tr style="border-top:2px solid rgba(255,255,255,.18);"><td style="padding:11px 10px;"><b>TOTAL</b></td>'
-    + '<td style="text-align:right;padding:11px 10px;"><b>' + totO.ag + '</b></td>'
-    + '<td style="text-align:right;padding:11px 10px;"><b>' + totO.re + '</b></td>'
-    + '<td style="text-align:right;padding:11px 10px;"><b>' + totO.fe + '</b></td>'
-    + '<td style="text-align:right;padding:11px 10px;"><b style="color:#3ddc97;">' + totO.vd + '</b></td>'
+    + orCel('*', totO.ag, 'ag', 'font-weight:800;') + orCel('*', totO.re, 're', 'font-weight:800;') + orCel('*', totO.fe, 'fe', 'font-weight:800;')
+    + orCel('*', totO.vd, 'vd', 'color:#3ddc97;font-weight:800;')
     + '<td style="text-align:right;padding:11px 10px;"><b style="color:#3ddc97;">' + rs(totO.fat) + '</b></td>'
     + '<td style="text-align:right;padding:11px 10px;"><b>' + (totO.re?Math.round(totO.vd/totO.re*100)+'%':'—') + '</b></td></tr>';
-  h += '</table></div></div>';
+  h += '</table></div>' + (!lista.length ? '<div class="hint" style="padding:14px;text-align:center;">Nenhuma reunião com esses filtros.</div>' : '') + '</div>';
 
   // ---- criativos: cada anúncio com leads, reuniões, vendas ----
   var an = {}, foraDoPeriodo = {};
@@ -8275,6 +8345,7 @@ function renderAnuncios() {
   }
   h += '</div>';
   el.innerHTML = h;
+  _anCalendario('or-periodo', OR.de, OR.ate, function(de, ate){ OR.per = 'custom'; OR.de = de; OR.ate = ate; renderAnuncios(); });
 }
 // valor da venda pelo telefone (para somar faturamento por anúncio)
 var _valTel = null;
