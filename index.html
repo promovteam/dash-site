@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-06-2100';
+var VERSAO_DASH = '2026-09-06-2157';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3409,13 +3409,14 @@ function igPainelResumo(per) {
   var r = igResumo(per);
   IG_RESUMO = r;
   if (!r) return '<div class="panel"><div class="hint">📷 Buscando os posts do Instagram…</div></div>';
-  if (!r.posts) return '';
+  // sem pedidos no período/isca: o painel continua na tela, zerado e com os chips (antes sumia inteiro — Bruno 06/09/2026)
   var pc = function(a, b){ return b ? (a / b * 100).toFixed(1).replace('.0', '') + '%' : '—'; };
   return '<div class="panel">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
     +   '<h3 style="margin:0;">📷 Pedidos no orgânico</h3>'
     +   '<span class="hint">@' + (IGO.perfil && IGO.posts.length ? 'joaostecca' : '') + ' · ' + r.posts + ' publicações no período · ' + r.comentarios.toLocaleString('pt-BR') + ' comentários lidos</span>'
     + '</div>'
+    + (!r.pedidos ? '<div class="hint" style="margin-top:8px;color:#f6a350;">Nenhum pedido ' + (IG_ISCA ? 'com a isca "' + IG_ISCA + '" ' : '') + 'neste período — os números abaixo ficam zerados. Troque o período ou a isca.</div>' : '')
     + (function(){
         var ks = Object.keys(IGO.iscas || {}).sort(function(a, b){ return IGO.iscas[b] - IGO.iscas[a]; });
         if (ks.length < 2) return '';
@@ -3435,7 +3436,7 @@ function igPainelResumo(per) {
     +   igCaixa(r.mql, 'MQL', '#f6a350', pc(r.mql, r.base) + ' de quem preencheu' + (r.ht ? ' · ' + r.ht + ' HT' : ''), 'mql')
     +   igCaixa(r.ag, 'AGENDARAM', '#ffd166', pc(r.ag, r.mql) + ' dos MQL', 'ag')
     +   igCaixa(r.re, 'COMPARECEU', '#b98aff', pc(r.re, r.ag) + ' dos agendados', 're')
-    +   igCaixa(r.vd, 'VENDIDO', '#3ddc97', (r.fat ? rs(r.fat) + ' · ' : '') + pc(r.vd, r.re) + ' de quem compareceu', 'vd')
+    +   igCaixa(r.vd, 'VENDIDO', '#3ddc97', (r.fat ? 'R$ ' + Math.round(r.fat).toLocaleString('pt-BR') + ' · ' : '') + pc(r.vd, r.re) + ' de quem compareceu', 'vd')   // rs() era local do renderAnuncios: com venda no período o painel sumia
     + '</div>'
     + ((r.quem.nao5k.length || r.quem.nao10k.length)
         ? '<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:11px;">'
@@ -3450,7 +3451,62 @@ function igPainelResumo(per) {
           + (r.quem.g100.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(185,138,255,.6);color:#b98aff;" onclick="igVerEtapa(\'g100\')">⭐ ' + r.quem.g100.length + ' com 100 mil+</span>' : '')
           + '<span class="hint">a lista abre com os melhores primeiro</span>'
         + '</div>' : '')
+    + igTabelaIscas(per)
     + '</div>';
+}
+// 🎣 análise por isca: o que cada palavra trouxe no período (Bruno 06/09/2026: "não tem análise")
+function igTabelaIscas(per) {
+  var ks = Object.keys(IGO.iscas || {});
+  if (ks.length < 2) return '';
+  var guarda = IG_ISCA, linhas = [];
+  ks.forEach(function(k) {
+    IG_ISCA = k;
+    var r = null;
+    try { r = igResumo(per); } catch (e) {}
+    if (r && r.pedidos) linhas.push({ k: k, r: r });
+  });
+  IG_ISCA = guarda;
+  if (!linhas.length) return '';
+  linhas.sort(function(a, b) { return b.r.vd - a.r.vd || b.r.fat - a.r.fat || b.r.ag - a.r.ag || b.r.mql - a.r.mql || b.r.pedidos - a.r.pedidos; });
+  var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
+  var th = function(t) { return '<th style="text-align:right;padding:8px 10px;font-size:.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);white-space:nowrap;">' + t + '</th>'; };
+  function cel(k, v, etapa, cor) {
+    var cli = v > 0;
+    return '<td style="text-align:right;padding:8px 10px;' + (cor ? 'color:' + cor + ';font-weight:700;' : '') + (cli ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"'
+      + (cli ? ' title="clique para ver quem são" onclick="IG_ISCA=' + JSON.stringify(k).replace(/"/g, '&quot;') + ';renderAnuncios();igVerEtapa(\'' + etapa + '\')"' : '')
+      + '>' + (v || 0).toLocaleString('pt-BR') + '</td>';
+  }
+  var h = '<div style="margin-top:14px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+    + '<b style="font-size:.8rem;">🎣 O que cada isca trouxe</b><span class="hint">no período · melhor isca primeiro · clique nos números para ver quem são</span></div>'
+    + '<div style="overflow-x:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;font-size:.8rem;">'
+    + '<tr><th style="text-align:left;padding:8px 10px;font-size:.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">Isca</th>'
+    + th('Pedidos') + th('Pessoas') + th('Preencheu') + th('% preencheu') + th('MQL') + th('Agendaram') + th('Compareceu') + th('Vendido') + th('Faturamento') + th('Conversão') + '</tr>';
+  var tot = { pedidos: 0, pessoas: 0, base: 0, mql: 0, ag: 0, re: 0, vd: 0, fat: 0 };
+  linhas.forEach(function(x) {
+    var r = x.r, k = x.k;
+    ['pedidos', 'pessoas', 'base', 'mql', 'ag', 're', 'vd', 'fat'].forEach(function(c) { tot[c] += (r[c] || 0); });
+    h += '<tr style="border-bottom:1px solid rgba(255,255,255,.06);' + (guarda === k ? 'background:rgba(246,163,80,.08);' : '') + '">'
+      + '<td style="padding:8px 10px;"><b>' + k + '</b></td>'
+      + cel(k, r.pedidos, 'com') + cel(k, r.pessoas, 'com') + cel(k, r.base, 'pre', '#6ea8ff')
+      + '<td style="text-align:right;padding:8px 10px;color:var(--muted);">' + pc(r.base, r.pessoas) + '</td>'
+      + cel(k, r.mql, 'mql', '#f6a350') + cel(k, r.ag, 'ag', '#ffd166') + cel(k, r.re, 're', '#b98aff') + cel(k, r.vd, 'vd', '#3ddc97')
+      + '<td style="text-align:right;padding:8px 10px;color:#3ddc97;font-weight:700;">' + (r.fat ? 'R$ ' + Math.round(r.fat).toLocaleString('pt-BR') : '—') + '</td>'
+      + '<td style="text-align:right;padding:8px 10px;color:' + (r.re && r.vd / r.re >= .3 ? '#3ddc97' : 'var(--muted)') + ';font-weight:700;">' + (r.re ? pc(r.vd, r.re) : '—') + '</td></tr>';
+  });
+  h += '<tr style="border-top:2px solid rgba(255,255,255,.18);"><td style="padding:9px 10px;"><b>TOTAL</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b>' + tot.pedidos.toLocaleString('pt-BR') + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b>' + tot.pessoas.toLocaleString('pt-BR') + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b>' + tot.base + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;color:var(--muted);">' + pc(tot.base, tot.pessoas) + '</td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b>' + tot.mql + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b>' + tot.ag + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b>' + tot.re + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b style="color:#3ddc97;">' + tot.vd + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;color:#3ddc97;"><b>' + (tot.fat ? 'R$ ' + Math.round(tot.fat).toLocaleString('pt-BR') : '—') + '</b></td>'
+    + '<td style="text-align:right;padding:9px 10px;"><b>' + (tot.re ? pc(tot.vd, tot.re) : '—') + '</b></td></tr>';
+  h += '</table></div>'
+    + '<div class="hint" style="margin-top:6px;">Uma mesma pessoa pode comentar mais de uma isca; por isso o total de pessoas pode passar do número de cima.</div></div>';
+  return h;
 }
 // Quanto essa pessoa comprou: soma as linhas "vendido" da ficha dela. Antes eu
 // procurava pelo telefone e quem foi achado só pelo @ ficava com valor zero.
@@ -8093,7 +8149,8 @@ function renderAnuncios() {
                 gasto:function(a,b){return ((metaPor[_chaveAnuncio(b)]||{}).gasto||0)-((metaPor[_chaveAnuncio(a)]||{}).gasto||0)} }[AN_ORD_EFETIVA()] || null;
   if (ordFn) chaves.sort(ordFn);
 
-  if (AN_TIPO === 'organico' || AN_TIPO === 'todos') { try { h += igPainelResumo(per); } catch (eR) {} }
+  // o painel do orgânico aparece com qualquer filtro (Todos, Tráfego pago, Orgânico, Sem imagem) — Bruno 06/09/2026
+  try { h += igPainelResumo(per); } catch (eR) {}
   var _ordEf = AN_ORD_EFETIVA();
   h += '<div class="panel">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Criativos</h3>'
