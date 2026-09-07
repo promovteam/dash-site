@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-06-2228';
+var VERSAO_DASH = '2026-09-06-2243';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3405,10 +3405,18 @@ function igVerEtapa(et) {
                          meta: {}, ig: null, quem: IG_RESUMO.quem };
   verLeadsDoAnuncio(et);
 }
+// o resumo de cada isca no período (uma conta só, usada nos chips e na tabela)
+function igResumoPorIsca(per) {
+  var out = {}, guarda = IG_ISCA;
+  Object.keys(IGO.iscas || {}).forEach(function(k) { IG_ISCA = k; try { out[k] = igResumo(per); } catch (e) { out[k] = null; } });
+  IG_ISCA = guarda;
+  return out;
+}
 function igPainelResumo(per) {
   var r = igResumo(per);
   IG_RESUMO = r;
   if (!r) return '<div class="panel"><div class="hint">📷 Buscando os posts do Instagram…</div></div>';
+  var porIsca = igResumoPorIsca(per);
   // sem pedidos no período/isca: o painel continua na tela, zerado e com os chips (antes sumia inteiro — Bruno 06/09/2026)
   var pc = function(a, b){ return b ? (a / b * 100).toFixed(1).replace('.0', '') + '%' : '—'; };
   return '<div class="panel">'
@@ -3418,16 +3426,22 @@ function igPainelResumo(per) {
     + '</div>'
     + (!r.pedidos ? '<div class="hint" style="margin-top:8px;color:#f6a350;">Nenhum pedido ' + (IG_ISCA ? 'com a isca "' + IG_ISCA + '" ' : '') + 'neste período — os números abaixo ficam zerados. Troque o período ou a isca.</div>' : '')
     + (function(){
-        var ks = Object.keys(IGO.iscas || {}).sort(function(a, b){ return IGO.iscas[b] - IGO.iscas[a]; });
+        var ks = Object.keys(IGO.iscas || {});
         if (ks.length < 2) return '';
+        // o número do chip é o de pedidos NO PERÍODO (antes era o total de sempre e não batia com os cards — Bruno 06/09/2026)
+        var ped = function(k){ return (porIsca[k] && porIsca[k].pedidos) || 0; };
+        ks.sort(function(a, b){ return ped(b) - ped(a) || IGO.iscas[b] - IGO.iscas[a]; });
         return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center;">'
           + '<span class="hint" style="font-weight:800;">🎣 Isca:</span>'
-          + '<span class="chart-chip' + (IG_ISCA === '' ? ' on' : '') + '" style="cursor:pointer;" onclick="IG_ISCA=\'\';renderAnuncios();">todas</span>'
+          + '<span class="chart-chip' + (IG_ISCA === '' ? ' on' : '') + '" style="cursor:pointer;" onclick="IG_ISCA=\'\';renderAnuncios();">todas <b style="opacity:.65;">' + (r.pedidos || 0).toLocaleString('pt-BR') + '</b></span>'
           + ks.map(function(k){
-              return '<span class="chart-chip' + (IG_ISCA === k ? ' on' : '') + '" style="cursor:pointer;" onclick="IG_ISCA=' + JSON.stringify(k).replace(/"/g, '&quot;') + ';renderAnuncios();">'
-                + k + ' <b style="opacity:.65;">' + IGO.iscas[k].toLocaleString('pt-BR') + '</b></span>';
+              var rk = porIsca[k] || {};
+              return '<span class="chart-chip' + (IG_ISCA === k ? ' on' : '') + '" style="cursor:pointer;' + (ped(k) ? '' : 'opacity:.45;') + '" onclick="IG_ISCA=' + JSON.stringify(k).replace(/"/g, '&quot;') + ';renderAnuncios();" title="' + IGO.iscas[k].toLocaleString('pt-BR') + ' pedidos desde sempre">'
+                + k + ' <b style="opacity:.65;">' + ped(k).toLocaleString('pt-BR') + '</b>'
+                + (rk.vd ? ' <b style="color:#3ddc97;">· ' + rk.vd + ' venda' + (rk.vd > 1 ? 's' : '') + '</b>' : '') + '</span>';
             }).join('')
-        + '</div>';
+        + '</div>'
+        + igTabelaIscas(per, porIsca);   // a análise fica logo abaixo dos chips (Bruno: "essa ainda falta análise")
       })()
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
     +   igCaixa(r.pedidos, 'COMENTARAM', '#3ddc97', r.pessoas ? r.pessoas.toLocaleString('pt-BR') + ' pessoas diferentes' : '', 'com')
@@ -3451,22 +3465,16 @@ function igPainelResumo(per) {
           + (r.quem.g100.length ? '<span class="chart-chip" style="cursor:pointer;border-color:rgba(185,138,255,.6);color:#b98aff;" onclick="igVerEtapa(\'g100\')">⭐ ' + r.quem.g100.length + ' com 100 mil+</span>' : '')
           + '<span class="hint">a lista abre com os melhores primeiro</span>'
         + '</div>' : '')
-    + igTabelaIscas(per)
     + '</div>';
 }
 // 🎣 análise por isca: o que cada palavra trouxe no período (Bruno 06/09/2026: "não tem análise")
-function igTabelaIscas(per) {
+function igTabelaIscas(per, porIsca) {
   var ks = Object.keys(IGO.iscas || {});
   if (ks.length < 2) return '';
+  porIsca = porIsca || igResumoPorIsca(per);
   var guarda = IG_ISCA, linhas = [];
-  ks.forEach(function(k) {
-    IG_ISCA = k;
-    var r = null;
-    try { r = igResumo(per); } catch (e) {}
-    if (r && r.pedidos) linhas.push({ k: k, r: r });
-  });
-  IG_ISCA = guarda;
-  if (!linhas.length) return '';
+  ks.forEach(function(k) { var r = porIsca[k]; if (r && r.pedidos) linhas.push({ k: k, r: r }); });
+  if (!linhas.length) return '<div class="hint" style="margin-top:8px;">Nenhuma isca com pedido neste período.</div>';
   linhas.sort(function(a, b) { return b.r.vd - a.r.vd || b.r.fat - a.r.fat || b.r.ag - a.r.ag || b.r.mql - a.r.mql || b.r.pedidos - a.r.pedidos; });
   var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
   var th = function(t) { return '<th style="text-align:right;padding:8px 10px;font-size:.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);white-space:nowrap;">' + t + '</th>'; };
@@ -7997,7 +8005,7 @@ var AN_DE = null, AN_ATE = null;   // período escolhido no calendário (AN_PER 
 // filtros PRÓPRIOS da tabela "Detalhamento por origem" (per '' = igual à aba) — Bruno 06/09/2026
 var OR = { per: '', de: null, ate: null, closer: '', prod: '' };
 var _ORG_LISTAS = {}, _ORG_TOT = {};
-function orPeriodo() { return OR.per ? anPeriodoDe(OR.per, OR.de, OR.ate) : anPeriodo(); }
+function orPeriodo() { return anPeriodo(); }   // a tabela por origem segue o período da aba (Bruno 06/09/2026)
 function anPeriodo() { return anPeriodoDe(AN_PER, AN_DE, AN_ATE); }
 // calendário de/até (flatpickr) num campo; chama aoEscolher(de, ate) quando fecha com 2 datas
 function _anCalendario(id, de, ate, aoEscolher) {
@@ -8092,7 +8100,6 @@ function renderAnuncios() {
     return '<td style="text-align:right;padding:10px;' + (estilo || '') + (v ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"'
       + (v ? ' title="clique para ver quem são" onclick="abrirListaOrigem(' + JSON.stringify(k).replace(/"/g, '&quot;') + ',\'' + etapa + '\')"' : '') + '>' + v + '</td>';
   }
-  var closers = v2usados('closer', 3).slice(0, 6);
   var _thO = function(c){ return '<th style="text-align:right;padding:8px 10px;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">' + c + '</th>'; };
 
   var h = '';
@@ -8101,17 +8108,7 @@ function renderAnuncios() {
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">🧲 Detalhamento por origem</h3>'
     + '<span class="hint">clique nos números para ver quem são</span>'
     + '<span style="flex:1;"></span><span class="hint" style="color:#f6a350;font-weight:700;">' + perO.label + (OR.closer ? ' · ' + (OR.closerRot || OR.closer) : '') + (OR.prod ? ' · ' + OR.prod : '') + '</span></div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;">'
-    +   '<span class="hint" style="font-weight:800;">🗓️ Período:</span>'
-    +   orChip('per', '', 'Igual à aba') + orChip('per', 'sem', 'Esta semana') + orChip('per', 'mes', 'Este mês') + orChip('per', 'mesant', 'Mês passado') + orChip('per', 'tri', 'Trimestre') + orChip('per', 'ano', 'Ano') + orChip('per', 'tudo', 'Tudo')
-    +   '<input class="edit-in" id="or-periodo" readonly placeholder="📅 escolher datas" title="período pelo calendário (de / até)" value="' + (OR.per === 'custom' && OR.de && OR.ate ? OR.de.toLocaleDateString('pt-BR') + ' a ' + OR.ate.toLocaleDateString('pt-BR') : '') + '" style="width:170px;text-align:center;cursor:pointer;padding:5px 9px;font-size:.72rem;' + (OR.per === 'custom' ? 'border-color:#f6a350;color:#f6a350;font-weight:700;' : '') + '">'
-    + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">'
-    +   '<span class="hint" style="font-weight:800;">🧑‍💼 Closer:</span>' + orChip('closer', '', 'Todos')
-    +   closers.map(function(c){ return orChip('closer', v2norm(c), c); }).join('')
-    +   '<span style="width:10px;"></span><span class="hint" style="font-weight:800;">🎯 Produto:</span>'
-    +   orChip('prod', '', 'Todos') + orChip('prod', 'spark', 'Spark') + orChip('prod', 'growth', 'Growth') + orChip('prod', 'legado', 'Legado')
-    + '</div>'
+    // (os filtros próprios da tabela saíram a pedido do Bruno 06/09/2026: ela segue o período da aba, que tem o calendário)
     + '<div style="overflow-x:auto;margin-top:12px;"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">'
     + '<tr><th style="text-align:left;padding:8px 10px;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.12);">Origem</th>'
     + ['Agendadas','Realizadas','Fecharam','Vendas','Faturamento','Conversão'].map(_thO).join('')
@@ -8345,7 +8342,6 @@ function renderAnuncios() {
   }
   h += '</div>';
   el.innerHTML = h;
-  _anCalendario('or-periodo', OR.de, OR.ate, function(de, ate){ OR.per = 'custom'; OR.de = de; OR.ate = ate; renderAnuncios(); });
 }
 // valor da venda pelo telefone (para somar faturamento por anúncio)
 var _valTel = null;
@@ -8730,7 +8726,52 @@ function ldJuntarRepetidos(lista) {
 
 // ===== ▶ VER O CRIATIVO DENTRO DO DASH (imagem grande / vídeo tocando) =====
 var _anAtual = null;
-function abrirCriativo(nome, jaTocar) {
+// 🗓️ resultado do criativo em OUTRO período (desde a postagem / calendário) — Bruno 06/09/2026
+var _criPer = { modo: 'aba', de: null, ate: null }, _criOriginal = null;
+function _criChip(nome, modo, rot) {
+  return '<span class="chart-chip sm' + (_criPer.modo === modo ? ' on' : '') + '" style="cursor:pointer;" onclick="_criPer={modo:\'' + modo + '\',de:null,ate:null};abrirCriativo(' + JSON.stringify(nome).replace(/"/g, '&quot;') + ', false, true)">' + rot + '</span>';
+}
+// os números de UM criativo num período qualquer (mesma conta da aba, só que para esse criativo)
+function anDadosDoCriativo(nome, per) {
+  var d = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp:'', tipo:'', meta:{}, ig:null, quem:{ n:[], q:[], mql:[], ag:[], re:[], vd:[] } };
+  var ehPost = String(nome).indexOf('POST:') === 0;
+  var alvoLink = ehPost ? _lerPost(nome).link : '';
+  (LD.rows || []).forEach(function(l) {
+    if (!l.date) return;
+    var t = l.date.getTime();
+    if (per && ((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim))) return;
+    var bruto = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
+    var n = (String(bruto || '').indexOf('POST:') === 0) ? bruto : ldAnuncioLimpo(bruto);
+    if (ehPost) { if (!(String(n).indexOf('POST:') === 0 && _lerPost(n).link === alvoLink)) return; }
+    else if (n !== nome) return;
+    if (!d.tipo) d.tipo = tipoDoAnuncio(n, ldTipoTrafego(l));
+    if (!d.camp) d.camp = l.campanha || '';
+    d.n++; d.quem.n.push(l);
+    if (l.faixa === 'alta') { d.q++; d.quem.q.push(l); }
+    if (l.faixa === 'alta' || l.faixa === 'media') { d.mql++; d.quem.mql.push(l); }
+    var st = ldSituacao(l);
+    if (st) {
+      d.ag++; d.quem.ag.push(l);
+      if (st.re) { d.re++; d.quem.re.push(l); }
+      if (st.vd) { d.vd++; d.fat += (_valorDoTel(l.tel8) || 0); d.quem.vd.push(l); }
+    }
+  });
+  if (ehPost) {
+    var c = null;
+    try { c = igCardsOrganicos(per).filter(function(x){ return _lerPost(x.chave).link === alvoLink; })[0]; } catch (e) {}
+    if (c) {
+      if (d.n) d.ig = c.dados.ig;          // já tinha leads marcados no post: só acrescenta os pedidos
+      else { d = c.dados; }                 // senão vale a conta feita pelos @ que comentaram
+    }
+  }
+  if (!d.tipo) d.tipo = ehPost ? 'organico' : ((_anDados[nome] || {}).tipo || 'pago');
+  return d;
+}
+function abrirCriativo(nome, jaTocar, manterPer) {
+  if (!manterPer) {
+    _criPer = { modo: 'aba', de: null, ate: null };
+    if (_criOriginal) { _anDados[_criOriginal.nome] = _criOriginal.d; _criOriginal = null; }
+  }
   var d = _anDados[nome];
   if (!d) {
     // veio da ficha de um lead, sem ter aberto a aba Anúncios: monta na hora
@@ -8743,6 +8784,18 @@ function abrirCriativo(nome, jaTocar) {
   _anAtual = nome;
   var m = d.meta || {};
   var ehPostOrg = String(nome).indexOf('POST:') === 0;
+  // período do resultado mostrado: o da aba (padrão), desde a postagem, ou datas escolhidas
+  var perCri = anPeriodo();
+  if (_criPer.modo === 'tudo') perCri = { ini: null, fim: null, label: ehPostOrg ? 'desde a postagem' : 'desde o início' };
+  else if (_criPer.modo === 'custom' && _criPer.de && _criPer.ate) perCri = anPeriodoDe('custom', _criPer.de, _criPer.ate);
+  if (_criPer.modo !== 'aba') {
+    if (!_criOriginal || _criOriginal.nome !== nome) _criOriginal = { nome: nome, d: _anDados[nome] };
+    var dNovo = anDadosDoCriativo(nome, perCri);
+    dNovo.meta = (_criOriginal.d || {}).meta || m;
+    if (!dNovo.camp) dNovo.camp = d.camp || '';
+    d = _anDados[nome] = dNovo;   // os cliques nos números leem daqui; volta ao normal ao fechar
+    m = d.meta || {};
+  }
   var cx = document.getElementById('modal-criativo');
   if (!cx) {
     cx = document.createElement('div');
@@ -8789,6 +8842,12 @@ function abrirCriativo(nome, jaTocar) {
           : (m.foto ? '' : '<div class="hint">Sem prévia disponível</div>'))
     +   '</div>'
     +   '<div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:9px;">'
+    +     '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+    +       '<span class="hint" style="font-weight:800;">Resultado:</span>'
+    +       _criChip(nome, 'aba', 'No período da aba') + _criChip(nome, 'tudo', ehPostOrg ? 'Desde a postagem' : 'Desde o início')
+    +       '<input class="edit-in" id="cri-periodo" readonly placeholder="📅 escolher datas" title="resultado deste criativo entre duas datas" value="' + (_criPer.modo === 'custom' && _criPer.de && _criPer.ate ? _criPer.de.toLocaleDateString('pt-BR') + ' a ' + _criPer.ate.toLocaleDateString('pt-BR') : '') + '" style="width:160px;text-align:center;cursor:pointer;padding:5px 9px;font-size:.72rem;' + (_criPer.modo === 'custom' ? 'border-color:#f6a350;color:#f6a350;font-weight:700;' : '') + '">'
+    +     '</div>'
+    +     '<div class="hint" style="margin-top:-4px;color:#f6a350;font-weight:700;">📆 ' + perCri.label + '</div>'
     +     (d.ig ? '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
     +       cardMini(d.ig.pedidos, 'PEDIRAM', '#3ddc97', 'igPediu') + cardMini(d.n, 'NA BASE', '#6ea8ff', 'n')
     +       cardMini(d.ig.novos, 'GENTE NOVA', '#f6a350', 'igNovo')
@@ -8822,10 +8881,11 @@ function abrirCriativo(nome, jaTocar) {
             });
             return h2 + '</div>';
           })()
-    +     (m.gasto ? '<div class="card" style="padding:12px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.28);border-radius:13px;">'
+    +     (m.gasto && _criPer.modo === 'aba' ? '<div class="card" style="padding:12px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.28);border-radius:13px;">'
     +       '<b style="color:#ff6b6b;font-size:1.1rem;">' + rs(m.gasto) + '</b><div class="hint">investido'
     +       (d.n ? ' · ' + rs(m.gasto/d.n) + ' por lead' : '')
-    +       (d.vd ? ' · ' + rs(m.gasto/d.vd) + ' por venda' : '') + '</div></div>' : '')
+    +       (d.vd ? ' · ' + rs(m.gasto/d.vd) + ' por venda' : '') + '</div></div>'
+          : (m.gasto ? '<div class="hint">💰 o investimento (' + rs(m.gasto) + ') é o do período da aba — para outro período, veja no Facebook</div>' : ''))
     +     (d.fat ? '<div class="card" style="padding:12px;background:rgba(61,220,151,.08);border:1px solid rgba(61,220,151,.28);border-radius:13px;">'
     +       '<b style="color:#3ddc97;font-size:1.1rem;">' + rs(d.fat) + '</b><div class="hint">faturamento gerado'
     +       + (m.gasto ? ' · retorno de ' + (d.fat/m.gasto).toFixed(1) + 'x' : '') + '</div></div>' : '')
@@ -8833,6 +8893,7 @@ function abrirCriativo(nome, jaTocar) {
     +   '</div>'
     + '</div></div>';
   cx.style.display = 'flex';
+  _anCalendario('cri-periodo', _criPer.de, _criPer.ate, function(de, ate){ _criPer = { modo: 'custom', de: de, ate: ate }; abrirCriativo(nome, false, true); });
 }
 function verPostCriativo() {
   var p = document.getElementById('cri-player');
@@ -9001,6 +9062,9 @@ function fecharCriativo() {
   var cx = document.getElementById('modal-criativo');
   if (cx) { cx.innerHTML = ''; cx.style.display = 'none'; }
   _anAtual = null;
+  // devolve os números do período da aba ao card (se a janela estava em outro período)
+  if (_criOriginal) { _anDados[_criOriginal.nome] = _criOriginal.d; _criOriginal = null; }
+  _criPer = { modo: 'aba', de: null, ate: null };
 }
 document.addEventListener('keydown', function(e){ if (e.key === 'Escape') fecharCriativo(); });
 var _anDados = {};
