@@ -2247,7 +2247,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-08-1346';
+var VERSAO_DASH = '2026-09-08-1405';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -14028,9 +14028,52 @@ function _ctrCorSt(st) {
   if (s.indexOf('dispensado') !== -1) return '#8d8478';
   return '#8b8fa3';
 }
+// ao abrir a aba, confere com a Clicksign sozinho se a última conferência tem mais de 30 min (Bruno 08/09/2026)
+var _ctrAutoEm = 0;
+function _ctrConferirSePrecisa() {
+  var agora = Date.now();
+  if (agora - _ctrAutoEm < 30 * 60000) return;
+  _ctrAutoEm = agora;
+  var ultima = _ctrUltimaCache && _ctrUltimaCache.v ? String(_ctrUltimaCache.v) : '';
+  var mU = ultima.match(/(\d{2})\/(\d{2}) (\d{2}):(\d{2})/);
+  if (mU) {
+    var dU = new Date(); dU.setMonth(+mU[2] - 1, +mU[1]); dU.setHours(+mU[3], +mU[4], 0, 0);
+    if (agora - dU.getTime() < 30 * 60000) return;   // conferiu ha pouco (por outra pessoa/robo)
+  }
+  try { conferirAssinaturasAgora(null); } catch (e) {}
+}
+// 📄 o que existe na Clicksign (Documentos + envelopes) — para mostrar o que esta la e NAO na planilha
+var _csDocs = { lista: null, em: 0, pedindo: false };
+function _csDocsCarregar() {
+  if (_csDocs.pedindo || (_csDocs.lista && Date.now() - _csDocs.em < 600000)) return;
+  _csDocs.pedindo = true;
+  fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'clicksignDocumentos' })), { redirect: 'follow' })
+    .then(function(x) { return x.json(); })
+    .then(function(r) {
+      _csDocs.pedindo = false;
+      if (r && r.success && r.lista) { _csDocs.lista = r.lista; _csDocs.semRobo = false; }
+      else { _csDocs.lista = []; _csDocs.semRobo = true; }   // robô no ar ainda sem essa função (falta implantar a versão nova)
+      _csDocs.em = Date.now();
+      try { renderContratos(); } catch (e) {}
+    })
+    .catch(function() { _csDocs.pedindo = false; });
+}
+function _csDocsForaDaPlanilha(rows) {
+  if (!_csDocs.lista) return null;
+  var nomes = {};
+  (PAG.rows || []).forEach(function(p) { var k = _nomeChave(p.nome || ''); if (k) nomes[k] = 1; var pr = v2norm(p.nome || '').split(' ').slice(0, 2).join(' '); if (pr) nomes['2:' + pr] = 1; });
+  return _csDocs.lista.filter(function(d) {
+    if (!d.nome || /distrato|documento sem t[íi]tulo|teste/i.test(d.nome) || d.status === 'canceled') return false;
+    var limpo = String(d.nome).replace(/contrato de ades[ãa]o\s*/i, '').replace(/\(.*?\)/g, '').replace(/[-–]\s*clicksign/i, '').replace(/mentoria\s+\w+/i, '').trim();
+    var k = _nomeChave(limpo), pr = v2norm(limpo).split(' ').slice(0, 2).join(' ');
+    return !(nomes[k] || nomes['2:' + pr]);
+  });
+}
 function renderContratos() {
   var cx = document.getElementById('ctr-corpo');
   if (!cx) return;
+  try { _ctrConferirSePrecisa(); } catch (eC) {}
+  try { _csDocsCarregar(); } catch (eD) {}
   var rows = (PAG.rows || []).filter(function(p) { return !/legado/i.test(String(p.programa || '')); })
     .sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
   if (!rows.length) { cx.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Ainda carregando as vendas… (ou nenhuma registrada)</div>'; return; }
@@ -14064,6 +14107,8 @@ function renderContratos() {
   lista.slice(0, 120).forEach(function(p) {
     var i = (PAG.rows || []).indexOf(p);
     var st = String(p.stC || '').trim() || (p.contrato ? '—' : 'Sem contrato');
+    var assEm = (p.extras && (p.extras['Assinado em (Clicksign)'] || '')) || '';
+    if (/conclu/i.test(st) && assEm) st += ' · ✍️ ' + String(assEm).slice(0, 10);
     var cor = p.contrato || p.stC ? _ctrCorSt(p.stC) : '#8b8fa3';
     h += '<div class="dtl-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:12px 16px;">'
       + '<div class="avatar" style="width:38px;height:38px;font-size:.85rem;background:linear-gradient(135deg,' + v2grad(p.nome) + ');">' + v2ini(p.nome) + '</div>'
@@ -14092,6 +14137,23 @@ function renderContratos() {
       + '</div></div>';
   });
   if (lista.length > 120) h += '<div class="hint" style="text-align:center;">Mostrando os 120 mais recentes — use os filtros para achar os outros.</div>';
+  // 📄 na Clicksign e FORA da planilha (nome nao bate com nenhuma venda registrada)
+  var fora = _csDocsForaDaPlanilha(rows);
+  if (fora === null) h += '<div class="hint" style="margin-top:14px;">📄 Conferindo o que existe na Clicksign…</div>';
+  else if (_csDocs.semRobo) h += '<div class="hint" style="margin-top:14px;color:#f6a350;">📄 O robô no ar ainda não lista o que está na Clicksign (falta implantar o Code.gs novo).</div>';
+  else if (fora.length) {
+    h += '<div class="dtl-card" style="margin-top:16px;padding:12px 16px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b style="font-size:.85rem;">📄 Na Clicksign, mas sem venda com esse nome na planilha (' + fora.length + ')</b>'
+      + '<span class="hint">contratos feitos direto na Clicksign; confira se a venda foi registrada</span></div>'
+      + '<div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">';
+    fora.slice(0, 60).forEach(function(d) {
+      var cor2 = d.status === 'closed' ? '#3ddc97' : d.status === 'running' ? '#6ea8ff' : '#8b8fa3';
+      h += '<div style="display:flex;gap:10px;align-items:center;font-size:.78rem;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,.04);">'
+        + '<b style="flex:1;min-width:160px;">' + String(d.nome).replace(/</g, '&lt;') + '</b>'
+        + '<span class="ld-tag" style="background:' + cor2 + '22;color:' + cor2 + ';">' + (d.status === 'closed' ? '✍️ assinado' + (d.assinadoEm ? ' ' + String(d.assinadoEm).slice(0, 10) : '') : d.status === 'running' ? 'aguardando assinatura' : d.status) + '</span>'
+        + '<span class="hint" style="margin:0;">' + (d.criadoEm ? 'criado ' + String(d.criadoEm).slice(0, 10) : '') + ' · ' + (d.fonte === 'envelope' ? 'robô' : 'Documentos') + '</span></div>';
+    });
+    h += '</div></div>';
+  } else h += '<div class="hint" style="margin-top:14px;">📄 Tudo que está na Clicksign tem venda registrada na planilha.</div>';
   cx.innerHTML = h;
   _ctrUltimaMostra();
 }
@@ -14123,7 +14185,7 @@ function verContratoPag(i) {
   var stC = String(p.stC || ''), assinado = /conclu|assinad|aguardando assinatura/.test(v2norm(stC));
   // ja vimos esse contrato? abre na hora (o arquivo da Clicksign vence em ~5 min; a previa do Drive nao)
   var visto = window._ctrVistos && window._ctrVistos[chave];
-  if (visto && !(assinado && visto.tipo === 'previa') && (visto.tipo === 'previa' || Date.now() - visto.em < 240000)) { _ctrJanela(p, visto.url); return; }
+  if (visto && !(assinado && visto.tipo === 'previa') && (visto.tipo === 'previa' || visto.tipo === 'assinado' || Date.now() - visto.em < 240000)) { var ovV = _ctrJanela(p, null); _ctrJanelaPreenche(ovV, p, visto.url, visto.tipo === 'previa', visto.resp || null); return; }
   var ov = _ctrJanela(p, null);   // janela abre NA HORA, montando por dentro
   var payload = encodeURIComponent(JSON.stringify({ action: 'contratoVer', envelope: m ? m[1] : '', nome: p.nome || '', telefone: p.celular || '', status: stC, link: lk }));
   fetch(APPS_SCRIPT_URL + '?payload=' + payload, { redirect: 'follow' })
@@ -14134,8 +14196,8 @@ function verContratoPag(i) {
         alert('Não consegui buscar o contrato: ' + ((resp && resp.error) || 'erro'));
         return;
       }
-      (window._ctrVistos = window._ctrVistos || {})[chave] = { url: resp.url, tipo: resp.tipo || '', em: Date.now() };
-      _ctrJanelaPreenche(ov, p, resp.url, resp.tipo === 'previa');
+      (window._ctrVistos = window._ctrVistos || {})[chave] = { url: resp.url, tipo: resp.tipo || '', em: Date.now(), resp: resp };
+      _ctrJanelaPreenche(ov, p, resp.url, resp.tipo === 'previa', resp);
     })
     .catch(function(e) { ov.remove(); alert('Erro: ' + e); });
 }
@@ -14156,9 +14218,12 @@ function _ctrJanela(p, urlPronta) {
   if (urlPronta) _ctrJanelaPreenche(ov, p, urlPronta, false);
   return ov;
 }
-function _ctrJanelaPreenche(ov, p, url, ehPrevia) {
+function _ctrJanelaPreenche(ov, p, url, ehPrevia, resp) {
   var tit = ov.querySelector('#ctr-jan-tit');
   if (tit && ehPrevia) tit.innerHTML += ' <span class="hint">(prévia montada agora — o oficial está na Clicksign)</span>';
+  // ✍️ assinado: o robô guardou uma cópia no Drive — abre aqui e baixa pelo dash (Bruno 08/09/2026)
+  if (tit && resp && resp.tipo === 'assinado') tit.innerHTML += ' <span class="ld-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;font-weight:800;">✍️ assinado' + (resp.assinadoEm ? ' em ' + resp.assinadoEm : '') + '</span>';
+  else if (tit && resp && resp.statusClicksign === 'running') tit.innerHTML += ' <span class="ld-tag" style="background:rgba(110,168,255,.16);color:#6ea8ff;">🔵 aguardando assinatura na Clicksign</span>';
   var ab = ov.querySelector('#ctr-jan-abrir');
   if (ab) {
     var iP = (PAG.rows || []).indexOf(p);
@@ -14176,6 +14241,8 @@ function _ctrJanelaPreenche(ov, p, url, ehPrevia) {
     if (!fechado && iP >= 0) h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;" onclick="this.closest(\'.modal-overlay\').remove();editarContratoPag(' + iP + ')" title="Corrige dados e o texto do pagamento — o robô gera o contrato novo na hora.">✏️ Editar dados</button>';
     if (!fechado && iP >= 0 && ehContratos()) h2 += '<button class="btn" style="padding:6px 12px;font-size:.7rem;margin-right:8px;color:#ffd166;border-color:rgba(255,209,102,.45);" onclick="editarClausulas(this.closest(\'.modal-overlay\'), ' + iP + ')" title="Edita o texto das cláusulas aqui dentro — o robô remonta o contrato.">📑 Editar cláusulas</button>';
     if (!fechado && ehPrevia && mArq) h2 += '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;color:#8f6bff;" href="https://docs.google.com/document/d/' + mArq[1] + '/edit" target="_blank" rel="noopener" title="Abre ESTE documento no editor do Google Docs — depois use ⬆️ Usar editado na lista.">📝 Editar no Word</a>';
+    if (resp && resp.download) h2 += '<a class="btn primary" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;" href="' + resp.download + '" target="_blank" rel="noopener" title="Baixa o PDF assinado (cópia guardada no Drive)">⬇️ Baixar PDF assinado</a>';
+    if (resp && resp.drive) h2 += '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;" href="' + resp.drive + '" target="_blank" rel="noopener">📂 no Drive</a>';
     h2 += '<a class="btn" style="padding:6px 12px;font-size:.7rem;text-decoration:none;margin-right:8px;" href="' + url + '" target="_blank" rel="noopener">Abrir em outra aba ↗</a>';
     ab.innerHTML = h2;
   }
