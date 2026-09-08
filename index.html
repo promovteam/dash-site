@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-06-2243';
+var VERSAO_DASH = '2026-09-08-1013';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2442,6 +2442,7 @@ window.__gvizV2 = function(resp) {
     V2.temCarimbo = iCar >= 0;
     V2.carregado = true;
     renderV2();
+    try { setTimeout(agPreCarregar, 1500); } catch (ePre) {}   // ⚡ agenda da semana já fica pronta
     try { if (typeof renderPlacar === 'function' && telaVisivel('s-placar')) renderPlacar(); } catch (ePl) {}
     try { if (typeof plDetectarNovidades === 'function') plDetectarNovidades(plCalcular(plPeriodo('hoje'))); } catch (ePf) {}   // 🎉 festa em qualquer aba
     try { if (typeof plSincronizarAgenda === 'function' && typeof APPS_SCRIPT_URL !== 'undefined') setTimeout(function(){ plSincronizarAgenda(false); }, 1500); } catch (eSa) {}   // 📆 no-shows que so estao na agenda
@@ -3968,7 +3969,7 @@ function _apagarLeadVai(r, alvo) {
             try { renderLeads(); } catch (e2) {}
           }
           try { document.getElementById('modal-lead').classList.remove('open'); } catch (e3) {}
-          AG.cache = {};
+          agInvalidar();
           avisoRapido('🗑 ' + (resp.nome || '') + ' — ' + (resp.feito || []).join(' · '));
         } else alert('Não consegui apagar: ' + ((resp && resp.error) || 'erro'));
       })
@@ -4730,13 +4731,32 @@ function abrirListaOrigem(origem, etapa) {
     + (comValor ? '<div class="modal-total">'
         + '<div class="g-stat"><b style="color:#3ddc97;">' + v2moeda0(total) + '</b><span>Total</span></div>'
         + '<div class="g-stat"><b>' + v2moeda0(rows.length ? total / rows.length : 0) + '</b><span>Ticket médio</span></div></div>' : '')
-    + '<input class="search-input" style="margin:4px 0 10px;" placeholder="🔍  Buscar nesta lista..." oninput="filtrarListaModal(this.value, \'ma-lista\')">'
-    + '<div id="ma-lista">';
-  rows.forEach(function(r){ h += v2row(r); });
-  h += '</div>';
+    + '<input class="search-input" style="margin:4px 0 10px;" placeholder="🔍  Buscar nesta lista..." oninput="clearTimeout(window._orgBt);var v=this.value;window._orgBt=setTimeout(function(){_orgListaMostrar(v, 0);}, 250);">'
+    + '<div id="ma-lista"></div>';
   mm.innerHTML = h;
   mo.classList.add('open');
+  // lista grande ("Tudo" passa de mil reuniões) trava a tela se montar tudo de uma vez:
+  // mostra 80 por vez, com "mostrar mais" (Bruno 08/09/2026: "os cards ao clicar estão travando")
+  window._orgListaRows = rows;
+  _orgListaMostrar('', 0);
 }
+var _ORG_BLOCO = 80;
+function _orgListaMostrar(filtro, ate) {
+  var rows = window._orgListaRows || [];
+  var f = v2norm(filtro || '');
+  var vis = f ? rows.filter(function(r){ return v2norm([r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' ')).indexOf(f) !== -1; }) : rows;
+  var fim = Math.min(vis.length, (ate || 0) + _ORG_BLOCO);
+  var box = document.getElementById('ma-lista');
+  if (!box) return;
+  var h = '';
+  if (!ate) { box.innerHTML = ''; }
+  else { var btn = document.getElementById('ma-mais'); if (btn) btn.remove(); }
+  for (var i = (ate || 0); i < fim; i++) h += v2row(vis[i]);
+  if (!vis.length) h = '<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:20px;">Nenhuma reunião' + (f ? ' com "' + String(filtro).replace(/</g, '&lt;') + '"' : '') + '.</div>';
+  if (fim < vis.length) h += '<button class="btn" id="ma-mais" style="width:100%;margin-top:8px;padding:10px;" onclick="_orgListaMostrar(' + JSON.stringify(filtro || '').replace(/"/g, '&quot;') + ', ' + fim + ')">Mostrar mais ' + Math.min(_ORG_BLOCO, vis.length - fim) + ' (faltam ' + (vis.length - fim) + ')</button>';
+  box.insertAdjacentHTML('beforeend', h);
+}
+
 function abrirA(tipo) {
   var mesRows = v2mesAtual();
   var cfg = {
@@ -13221,19 +13241,19 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbxnkM3artPx6q3ROnOKvvZ0whjvvX6pV_GucWWA1GPBkVaY26DSCBm_X0oD7Cs9uugl/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (13ª implantação, v21)
 // https://script.google.com/macros/s/AKfycbw9HysTL9R9CBKPc2BV6SdXH2mOTonlMVpUfI8xefG8Qf2ioqh3P1HoqcN60qq2gRnL/exec (05/09 17h, sem aba697f)
 // https://script.google.com/macros/s/AKfycbwVnSElSLEezO15hnRbQKmDnfqSUgjcs7S6KaauIPXuKtF3ofbmmWrCkmcMDYr3Nef1/exec (05/09 18h, sem 89f7ce8)
 // https://script.google.com/macros/s/AKfycbwIsE4smP-Dr_rNSgax00hP2LA1kWOXB7rVWJ-EepmHtBvGpQT2Sdz97iMBqCbX5oQQ/exec (05/09 19h, sem clintMensagensBrutas)
@@ -13440,6 +13460,39 @@ function mudarVista(v) {
   document.getElementById('va-mes').classList.toggle('on', v === 'mes');
   if (v === 'mes') desenharCalendario();
 }
+// ⚡ agenda mais rápida (Bruno 08/09/2026: "a agenda está demorando a abrir"): o robô leva ~4 s para
+//    responder (2,4 s são só o Apps Script acordar). Então: (1) a semana atual é buscada logo que a planilha
+//    carrega; (2) a última agenda fica guardada no navegador e aparece NA HORA, atualizando por trás;
+//    (3) depois de uma ação (remarcar, mudar status) tudo é apagado — nunca mostra dado velho.
+function agGuardarLocal(wk, data) { try { localStorage.setItem('agSemana_' + wk, JSON.stringify({ em: Date.now(), data: data })); } catch (e) {} }
+function agLerLocal(wk) {
+  try { var x = JSON.parse(localStorage.getItem('agSemana_' + wk) || 'null'); return (x && x.data && Date.now() - x.em < 3 * 86400000) ? x.data : null; } catch (e) { return null; }
+}
+function agInvalidar() {
+  AG.cache = {};
+  try { Object.keys(localStorage).forEach(function(k){ if (k.indexOf('agSemana_') === 0) localStorage.removeItem(k); }); } catch (e) {}
+}
+function agBuscar(wk, cb) {
+  AG._buscando = AG._buscando || {};
+  if (AG._buscando[wk]) { if (cb) AG._buscando[wk].push(cb); return; }
+  AG._buscando[wk] = cb ? [cb] : [];
+  fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + wk + '&_t=' + Date.now(), { redirect: 'follow' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) {
+      if (!data.success) throw new Error(data.error || 'resposta inválida');
+      AG.cache[wk] = data; agGuardarLocal(wk, data);
+      var cbs = AG._buscando[wk] || []; delete AG._buscando[wk];
+      cbs.forEach(function(f){ try { f(null, data); } catch (e) {} });
+    })
+    .catch(function(err) {
+      var cbs = AG._buscando[wk] || []; delete AG._buscando[wk];
+      cbs.forEach(function(f){ try { f(err); } catch (e) {} });
+    });
+}
+function agPreCarregar() {   // roda uma vez depois que a planilha chegou
+  var wk = agDataStr(agSegunda(new Date()));
+  if (!AG.cache[wk]) agBuscar(wk);
+}
 function carregarAgenda() {
   if (!AG.weekStart) AG.weekStart = agSegunda(new Date());
   var wk = agDataStr(AG.weekStart);
@@ -13448,18 +13501,26 @@ function carregarAgenda() {
   document.getElementById('week-label').textContent =
     AG.weekStart.getDate() + ' ' + mesesN[AG.weekStart.getMonth()] + ' — ' + fim.getDate() + ' ' + mesesN[fim.getMonth()] + ' ' + fim.getFullYear();
   if (AG.cache[wk]) { renderSemanaV2(AG.cache[wk]); return; }
-  document.getElementById('v2-sg').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Carregando agenda do Google Calendar…</div>';
-  fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + wk, { redirect: 'follow' })
-    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(data) {
-      if (!data.success) throw new Error(data.error || 'resposta inválida');
-      AG.cache[wk] = data;
-      renderSemanaV2(data);
-    })
-    .catch(function(err) {
+  var sg = document.getElementById('v2-sg');
+  var guardada = agLerLocal(wk);
+  if (guardada) {
+    renderSemanaV2(guardada);   // aparece na hora com o que o navegador guardou
+    if (sg) sg.insertAdjacentHTML('afterbegin', '<div class="hint" id="ag-atualizando" style="text-align:center;padding:2px 0 6px;">🔄 atualizando com o Google Agenda…</div>');
+  } else if (sg) {
+    sg.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Carregando agenda do Google Calendar…</div>';
+  }
+  agBuscar(wk, function(err, data) {
+    if (err) {
+      if (guardada) { var h = document.getElementById('ag-atualizando'); if (h) h.textContent = '⚠️ não consegui atualizar agora (' + err.message + ') — mostrando a última agenda guardada'; return; }
       document.getElementById('v2-sg').innerHTML = '<div style="text-align:center;padding:30px;color:var(--red);font-size:.8rem;">Erro ao carregar o calendário: ' + err.message
         + '<br><button class="btn" style="margin-top:10px;" onclick="delete AG.cache[\'' + wk + '\'];carregarAgenda()">Tentar novamente</button></div>';
-    });
+      return;
+    }
+    if (AG.weekStart && agDataStr(AG.weekStart) === wk) renderSemanaV2(data);   // só redesenha se ainda está nessa semana
+  });
+  // a semana seguinte já fica pronta para quando clicar em "próxima"
+  var prox = agDataStr(new Date(AG.weekStart.getTime() + 7 * 86400000));
+  if (!AG.cache[prox]) agBuscar(prox);
 }
 
 function agMin(t) { var pp = String(t || '0:0').split(':'); return parseInt(pp[0],10) * 60 + parseInt(pp[1],10); }
@@ -13816,7 +13877,7 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
     r.date = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]), parseInt(hp[0] || 0, 10), parseInt(hp[1] || 0, 10));
     r.status = 'Reunião agendada'; r.sn = 'reuniao agendada';
     cancelarRemarcacao();
-    AG.cache = {};
+    agInvalidar();
     setTimeout(function(){ try { carregarAgenda(); } catch (e) {} try { renderV2(); } catch (e) {} }, 2500);
     try { avisoRapido('🗓 REMARCADA para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — mesma pessoa, mesma linha, evento novo na agenda de ' + (agendaKey === 'tony' ? 'Tony' : 'Bruno')); } catch (e) {}
     return;
@@ -13838,7 +13899,7 @@ function _remarcarEventoOk(ev, dataStr, hora, dp) {
     sendToGAS({ action: 'updateEventStatus', calendar: ev._cal || AG.closer, eventId: ev.id, status: 'remarcada' });
     ev.status = 'remarcada'; ev._statusExplicit = true;
     cancelarRemarcacao();
-    AG.cache = {};
+    agInvalidar();
     try { carregarAgenda(); } catch (e) {}
     try { avisoRapido('🗓 REMARCADA para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — closer e SDR avisados · mesma pessoa no dash'); } catch (e) {}
   });
@@ -13861,7 +13922,7 @@ function confirmarRemarcar() {
     sendToGAS({ action: 'updateEventStatus', calendar: ev._cal || AG.closer, eventId: ev.id, status: 'remarcada' });
     ev.status = 'remarcada'; ev._statusExplicit = true;
     fecharRemarcar();
-    AG.cache = {};
+    agInvalidar();
     try { carregarAgenda(); } catch (e) {}
     var dp = nd.split('-');
     avisoRapido('🗓 Remarcada para ' + dp[2] + '/' + dp[1] + ' às ' + nt + ' — closer e SDR avisados · a pessoa continua a mesma no dash');
@@ -14423,7 +14484,7 @@ function sincronizarStatusEvento(r) {
 }
 function _syncEvStatus(ev, st) {
   sendToGAS({ action: 'updateEventStatus', calendar: ev.cal, eventId: ev.id, status: st });
-  AG.cache = {}; // agenda recarrega com o status novo
+  agInvalidar(); // agenda recarrega com o status novo
 }
 function mudarStatusEvento(st) {
   fecharSlotMenu();
