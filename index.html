@@ -2245,7 +2245,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-08-1028';
+var VERSAO_DASH = '2026-09-08-1130';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2388,6 +2388,7 @@ window.__gvizV2 = function(resp) {
     var iForma = idxDe('forma');
     var iObs = idxDe('observacao', 'obs');
     var iCar = idxDe('carimbo');
+    var iCarV = idxDe('carimbo_venda');   // quando a linha virou Vendido (o placar conta a venda por essa data)
     var iId = idxDe('id');
 
     function cel(r, i) {
@@ -2420,6 +2421,10 @@ window.__gvizV2 = function(resp) {
         var cd = carS.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
         if (cd) { var cy2 = parseInt(cd[3],10); if (cy2 < 100) cy2 += 2000; carT = new Date(cy2, parseInt(cd[2],10)-1, parseInt(cd[1],10)).getTime(); }
       }
+      // carimbo da VENDA: dia em que a linha virou "Vendido" (Bruno 08/09/2026: venda fechada dias depois da reunião)
+      var cvS = iCarV >= 0 ? cel(r, iCarV).trim() : '', cvT = 0;
+      var cvm = cvS.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\D+(\d{1,2}):(\d{2}))?/);
+      if (cvm) { var cvy = parseInt(cvm[3], 10); if (cvy < 100) cvy += 2000; cvT = new Date(cvy, parseInt(cvm[2],10)-1, parseInt(cvm[1],10), parseInt(cvm[4]||'0',10), parseInt(cvm[5]||'0',10)).getTime(); if (isNaN(cvT)) cvT = 0; }
       rows.push({
         nome: cel(r, iNome).trim(),
         telefone: cel(r, iTel).trim(),
@@ -2434,6 +2439,8 @@ window.__gvizV2 = function(resp) {
         valor: v2valor(cel(r, iVal)),
         carimbo: carS,
         carimboT: carT,
+        carimboVenda: cvS,
+        vendaT: cvT,
         leadId: cel(r, iId).trim(),
         date: dt
       });
@@ -5349,7 +5356,7 @@ function clintTexto(l) {
   if (c === null) return { txt: '⏱ consultando Clint…', cor: 'var(--muted)' };
   if (!c || !c.success) return null;
   if (!c.achou) return { txt: '💬 sem cadastro na Clint', cor: 'var(--muted)' };
-  if (!c.temConversa) return { txt: '💬 sem conversa iniciada', cor: '#f6a350' };
+  if (!c.temConversa) return { txt: '💬 sem conversa na Clint (só a IA falou)', cor: '#f6a350' };   // Bruno 08/09/2026: "como é só marcar se não tem conversa?"—a IA falou no GPT Maker; na Clint ninguém chamou
   var t = ldTempoTexto(c.horas);
   if (c.quem === 'lead') return { txt: '🔴 lead esperando resposta há ' + t, cor: '#ff6b6b' };
   return { txt: '⏱ sem resposta do lead há ' + t, cor: c.horas >= 48 ? '#ff6b6b' : c.horas >= 24 ? '#f6a350' : 'var(--muted)' };
@@ -8078,6 +8085,89 @@ function AN_ORD_EFETIVA() {
   if (AN_ORD && AN_ORD !== 'auto') return AN_ORD;
   return AN_TIPO === 'organico' ? 'ped' : 'vendas';
 }
+// ===== chave do "criativo" de cada lead e coleta dos números por criativo (Bruno 08/09/2026) =====
+// - lead com anúncio/post: o próprio criativo
+// - lead SEM anúncio: a ORIGEM vira o card ("🧲 [Org][Diag] · bio") — antes sumia da aba
+// - venda SEM lead na base (workshop, indicação): entra pela origem da linha da aba Vendas
+// - a VENDA conta no período em que foi VENDIDA (carimbo/formulário/dia da reunião), não pela data do lead
+function anRotuloOrigem(origem, fonte) {
+  var o = String(origem || '').trim(), f = String(fonte || '').trim();
+  if (o && f && v2norm(o).indexOf(v2norm(f)) === -1) return o + ' · ' + f;
+  return o || f || 'sem origem';
+}
+function anEhOrigem(k) { return String(k).indexOf('ORIGEM:') === 0; }
+function anRotuloChave(k) { return anEhOrigem(k) ? '🧲 ' + String(k).replace(/^ORIGEM:/, '') : (String(k).indexOf('POST:') === 0 ? '📱 ' + ldAnuncioLimpo(k) : k); }
+function anChaveDoLead(l) {
+  var bruto = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
+  var nome = (String(bruto || '').indexOf('POST:') === 0) ? bruto : ldAnuncioLimpo(bruto);
+  if (nome && nome !== '(sem anúncio)') return nome;
+  return 'ORIGEM:' + anRotuloOrigem(l.origem, l.fonte || l.utm);
+}
+// a venda deste lead: quando foi (carimbo da venda > formulário > dia da reunião) e quanto
+function anVendaDoLead(l, st) {
+  st = st || ldSituacao(l);
+  if (!st || !st.vd) return null;
+  var linhas = (st.linhas || []).filter(function(r){ return r.sn === 'vendido'; });
+  var r = linhas[0];
+  return { t: r ? plDataVenda(r) : (l.date ? l.date.getTime() : null), valor: _valorDoTel(l.tel8) || (r ? r.valor : 0) || 0 };
+}
+function anColetar(per, tipoFiltro) {
+  var an = {}, fora = {};
+  try { PL_PAG_TEL = plPagPorTel(); } catch (e) {}
+  var noPer = function(t){ return t != null && !((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)); };
+  var passa = function(tipo){ return !tipoFiltro || tipoFiltro === 'todos' || tipoFiltro === 'sem' || tipo === tipoFiltro; };
+  var novoA = function(nome, tipo, camp) { return an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: camp || '', tipo: tipo, _tipoFixo: true, quem: { n:[], q:[], mql:[], ag:[], re:[], vd:[] } }); };
+  var vendasContadas = {}, porTelLead = {}, nomesLead = {};
+  (LD.rows || []).forEach(function(l){ if (l.tel8 && !porTelLead[l.tel8]) porTelLead[l.tel8] = l; var kn = v2nomeChave(l.nome); if (kn) nomesLead[kn] = true; });
+  (LD.rows || []).forEach(function(l) {
+    if (!l.date) return;
+    var t = l.date.getTime();
+    var nome = anChaveDoLead(l);
+    var tipo = anEhOrigem(nome) ? ldTipoTrafego(l) : tipoDoAnuncio(nome, ldTipoTrafego(l));
+    var st = ldSituacao(l);
+    var chaveV = l.tel8 || ('n:' + v2nomeChave(l.nome));
+    if (!noPer(t)) {
+      // fora do período: fica registrado para avisar (card zerado não é marcação perdida)
+      if (!anEhOrigem(nome)) { var ff = fora[nome] || (fora[nome] = { n: 0, re: 0, vd: 0 }); ff.n++; if (st) { if (st.re) ff.re++; if (st.vd) ff.vd++; } }
+      // …mas a VENDA conta no período em que aconteceu, mesmo o lead sendo de antes
+      var vF = anVendaDoLead(l, st);
+      if (vF && noPer(vF.t) && passa(tipo) && !vendasContadas[chaveV]) {
+        vendasContadas[chaveV] = true;
+        var aF = novoA(nome, tipo, l.campanha); aF.vd++; aF.fat += vF.valor; aF.quem.vd.push(l); aF._vendasDeLeadAntigo = (aF._vendasDeLeadAntigo || 0) + 1;
+      }
+      return;
+    }
+    if (!passa(tipo)) return;
+    var a = novoA(nome, tipo, l.campanha);
+    a.n++; a.quem.n.push(l);
+    if (l.faixa === 'alta') { a.q++; a.quem.q.push(l); }
+    if (l.faixa === 'alta' || l.faixa === 'media') { a.mql++; a.quem.mql.push(l); }   // MQL = declarou qualquer investimento
+    if (st) {
+      a.ag++; a.quem.ag.push(l);
+      if (st.re) { a.re++; a.quem.re.push(l); }
+      if (st.vd) {
+        var v1 = anVendaDoLead(l, st), tV = (v1 && v1.t != null) ? v1.t : t;
+        if (noPer(tV) && !vendasContadas[chaveV]) { vendasContadas[chaveV] = true; a.vd++; a.fat += (v1 ? v1.valor : (_valorDoTel(l.tel8) || 0)); a.quem.vd.push(l); }
+      }
+    }
+  });
+  // vendas do período SEM lead na base (workshop, indicação…): entram pela ORIGEM da linha da aba Vendas
+  (V2.rows || []).forEach(function(r) {
+    if (r.sn !== 'vendido') return;
+    var t8 = ldTel8(r.telefone), kNome = v2nomeChave(r.nome);
+    if ((t8 && porTelLead[t8]) || (kNome && nomesLead[kNome])) return;   // tem lead (pelo telefone ou pelo nome): já foi tratado acima
+    var vT = plDataVenda(r); if (!noPer(vT)) return;
+    var chaveV = t8 || ('n:' + v2nomeChave(r.nome)); if (vendasContadas[chaveV]) return;
+    var tipoO = /\[ads\]|\bads\b|pago/i.test(String(r.origem || '')) ? 'pago' : 'organico';
+    if (!passa(tipoO)) return;
+    vendasContadas[chaveV] = true;
+    var aO = novoA('ORIGEM:' + anRotuloOrigem(r.origem, ''), tipoO, '');
+    var falso = { nome: r.nome, tel: r.telefone, telefone: r.telefone, tel8: t8, email: '', insta: '', dataTxt: r.date ? r.date.toLocaleDateString('pt-BR') : '',
+                  faixa: 'sem', obj: '', renda: '', invest: '', seg: '', score: 0, origem: r.origem || '', _semLead: true };
+    aO.vd++; aO.fat += (r.valor || 0); aO.quem.vd.push(falso);
+  });
+  return { an: an, fora: fora };
+}
 function renderAnuncios() {
   var el = document.getElementById('an-corpo');
   if (!el) return;
@@ -8171,43 +8261,8 @@ function renderAnuncios() {
   h += '</table></div>' + (!lista.length ? '<div class="hint" style="padding:14px;text-align:center;">Nenhuma reunião com esses filtros.</div>' : '') + '</div>';
 
   // ---- criativos: cada anúncio com leads, reuniões, vendas ----
-  var an = {}, foraDoPeriodo = {};
-  (LD.rows || []).forEach(function(l) {
-    if (!l.date) return;
-    var t = l.date.getTime();
-    // fora do período escolhido: não entra na conta, mas fica registrado para avisar
-    // (senão o card aparece zerado e parece que a marcação não pegou — Bruno 19/08/2026)
-    if ((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)) {
-      var bf = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
-      var nf = (String(bf || '').indexOf('POST:') === 0) ? bf : ldAnuncioLimpo(bf);
-      if (nf && nf !== '(sem anúncio)') {
-        var ff = foraDoPeriodo[nf] || (foraDoPeriodo[nf] = { n: 0, re: 0, vd: 0 });
-        ff.n++;
-        var sf = ldSituacao(l);
-        if (sf) { if (sf.re) ff.re++; if (sf.vd) ff.vd++; }
-      }
-      return;
-    }
-    // o que foi marcado à mão vale tanto quanto o que veio da planilha — sem isso,
-    // o lead marcado num post não era contado no card daquele post (Bruno 19/08/2026)
-    var bruto = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
-    var nome = (String(bruto || '').indexOf('POST:') === 0) ? bruto : ldAnuncioLimpo(bruto);
-    if (nome === '(sem anúncio)') return;
-    var tipo = tipoDoAnuncio(nome, ldTipoTrafego(l));
-    if (AN_TIPO !== 'todos' && AN_TIPO !== 'sem' && tipo !== AN_TIPO) return;
-    var a = an[nome] || (an[nome] = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp: l.campanha || '', tipo: tipo,
-      _tipoFixo: true,
-      quem: { n:[], q:[], mql:[], ag:[], re:[], vd:[] } });   // guarda quem é, para poder clicar e ver
-    a.n++; a.quem.n.push(l);
-    if (l.faixa === 'alta') { a.q++; a.quem.q.push(l); }
-    if (l.faixa === 'alta' || l.faixa === 'media') { a.mql++; a.quem.mql.push(l); }   // MQL = declarou qualquer investimento
-    var st = ldSituacao(l);
-    if (st) {
-      a.ag++; a.quem.ag.push(l);
-      if (st.re) { a.re++; a.quem.re.push(l); }
-      if (st.vd) { a.vd++; a.fat += (_valorDoTel(l.tel8) || 0); a.quem.vd.push(l); }
-    }
-  });
+  var _col = anColetar(per, AN_TIPO);
+  var an = _col.an, foraDoPeriodo = _col.fora;
   // gasto/imagem do Facebook, se conectado
   carregarMetaAds(per);
   var metaPor = {};
@@ -8237,6 +8292,7 @@ function renderAnuncios() {
   // para a lista de criativos mostrar só o que dá para ver — Bruno 25/08/2026
   function _temImagem(k) {
     if (String(k).indexOf('POST:') === 0) return true;
+    if (anEhOrigem(k)) return true;   // card de origem (sem criativo) fica junto dos outros
     var mm = metaPor[_chaveAnuncio(k)] || {};
     if (mm.foto) return true;
     try { var cc = criativoDe(k, mm.adId); if (cc && cc.foto) return true; } catch (e) {}
@@ -8308,8 +8364,8 @@ function renderAnuncios() {
       +   (ehPost ? '' : (function(){
               if (m.foto) return '<span class="semfoto" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>';
               // sem imagem: em vez do megafone, mostra o que aquela origem é
-              var ico = /bio/i.test(k) ? '🔗' : /manychat|mchat/i.test(k) ? '💬' : /org[âa]nico/i.test(k) ? '🌱' : '📣';
-              var rot = /bio/i.test(k) ? 'link na bio' : /manychat|mchat/i.test(k) ? 'ManyChat' : /org[âa]nico/i.test(k) ? 'sem anúncio' : 'sem imagem';
+              var ico = anEhOrigem(k) ? '🧲' : /bio/i.test(k) ? '🔗' : /manychat|mchat/i.test(k) ? '💬' : /org[âa]nico/i.test(k) ? '🌱' : '📣';
+              var rot = anEhOrigem(k) ? 'origem, sem criativo' : /bio/i.test(k) ? 'link na bio' : /manychat|mchat/i.test(k) ? 'ManyChat' : /org[âa]nico/i.test(k) ? 'sem anúncio' : 'sem imagem';
               return '<span class="semfoto" style="position:absolute;inset:0;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;">'
                 + '<span style="font-size:1.9rem;opacity:.55;">' + ico + '</span>'
                 + '<span style="font-size:.62rem;color:var(--muted);font-weight:700;">' + rot + '</span></span>';
@@ -8325,7 +8381,7 @@ function renderAnuncios() {
             : (m.link ? '<a href="' + m.link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : ''))
       + '</div>'
       + '<div style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
-      +   '<b style="font-size:.74rem;line-height:1.3;">' + (ehPost ? '📱 ' + ldAnuncioLimpo(k) : k) + '</b>'
+      +   '<b style="font-size:.74rem;line-height:1.3;">' + anRotuloChave(k) + '</b>'
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:' + (a.tipo === 'pago' ? 'rgba(255,107,107,.13);color:#ff6b6b' : 'rgba(61,220,151,.13);color:#3ddc97') + ';">' + (a.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
       +   (function(){
             var kk = JSON.stringify(k).replace(/"/g, '&quot;');
@@ -8774,38 +8830,14 @@ function _criChip(nome, modo, rot) {
 }
 // os números de UM criativo num período qualquer (mesma conta da aba, só que para esse criativo)
 function anDadosDoCriativo(nome, per) {
-  var d = { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp:'', tipo:'', meta:{}, ig:null, quem:{ n:[], q:[], mql:[], ag:[], re:[], vd:[] } };
-  var ehPost = String(nome).indexOf('POST:') === 0;
-  var alvoLink = ehPost ? _lerPost(nome).link : '';
-  (LD.rows || []).forEach(function(l) {
-    if (!l.date) return;
-    var t = l.date.getTime();
-    if (per && ((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim))) return;
-    var bruto = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
-    var n = (String(bruto || '').indexOf('POST:') === 0) ? bruto : ldAnuncioLimpo(bruto);
-    if (ehPost) { if (!(String(n).indexOf('POST:') === 0 && _lerPost(n).link === alvoLink)) return; }
-    else if (n !== nome) return;
-    if (!d.tipo) d.tipo = tipoDoAnuncio(n, ldTipoTrafego(l));
-    if (!d.camp) d.camp = l.campanha || '';
-    d.n++; d.quem.n.push(l);
-    if (l.faixa === 'alta') { d.q++; d.quem.q.push(l); }
-    if (l.faixa === 'alta' || l.faixa === 'media') { d.mql++; d.quem.mql.push(l); }
-    var st = ldSituacao(l);
-    if (st) {
-      d.ag++; d.quem.ag.push(l);
-      if (st.re) { d.re++; d.quem.re.push(l); }
-      if (st.vd) { d.vd++; d.fat += (_valorDoTel(l.tel8) || 0); d.quem.vd.push(l); }
-    }
-  });
-  if (ehPost) {
-    var c = null;
+  var d = anColetar(per, 'todos').an[nome]
+    || { n:0, q:0, mql:0, ag:0, re:0, vd:0, fat:0, camp:'', tipo:'', meta:{}, ig:null, quem:{ n:[], q:[], mql:[], ag:[], re:[], vd:[] } };
+  if (String(nome).indexOf('POST:') === 0) {
+    var alvoLink = _lerPost(nome).link, c = null;
     try { c = igCardsOrganicos(per).filter(function(x){ return _lerPost(x.chave).link === alvoLink; })[0]; } catch (e) {}
-    if (c) {
-      if (d.n) d.ig = c.dados.ig;          // já tinha leads marcados no post: só acrescenta os pedidos
-      else { d = c.dados; }                 // senão vale a conta feita pelos @ que comentaram
-    }
+    if (c) { if (d.n) d.ig = c.dados.ig; else d = c.dados; }
   }
-  if (!d.tipo) d.tipo = ehPost ? 'organico' : ((_anDados[nome] || {}).tipo || 'pago');
+  if (!d.tipo) d.tipo = String(nome).indexOf('POST:') === 0 ? 'organico' : ((_anDados[nome] || {}).tipo || (anEhOrigem(nome) ? 'organico' : 'pago'));
   return d;
 }
 function abrirCriativo(nome, jaTocar, manterPer) {
@@ -8866,7 +8898,7 @@ function abrirCriativo(nome, jaTocar, manterPer) {
   var ehCatalogo = /^adv[-_]/i.test(nome) || /catalog|dpa|dinamic/i.test(nome);
   cx.innerHTML = '<div style="background:var(--card,#15152b);border:1px solid rgba(255,255,255,.14);border-radius:20px;max-width:960px;width:100%;max-height:92vh;overflow-y:auto;padding:20px;">'
     + '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;">'
-    +   '<div style="flex:1;"><b style="font-size:1.02rem;">' + (ehPostOrg ? '📱 ' + ldAnuncioLimpo(nome) : nome) + '</b>'
+    +   '<div style="flex:1;"><b style="font-size:1.02rem;">' + anRotuloChave(nome) + '</b>'
     +     '<div class="hint" style="margin-top:3px;">' + (ehPostOrg ? '<a href="' + _lerPost(nome).link + '" target="_blank" style="color:#3ddc97;text-decoration:none;">' + _lerPost(nome).link + ' ↗</a>' : (d.camp || '')) + '</div></div>'
     +   '<span class="ld-tag" style="background:' + (d.tipo === 'pago' ? 'rgba(255,107,107,.14);color:#ff6b6b' : 'rgba(61,220,151,.14);color:#3ddc97') + ';">' + (d.tipo === 'pago' ? '💰 pago' : ehPostOrg ? '📱 postagem' : '🌱 orgânico') + '</span>'
     +   '<span style="cursor:pointer;font-size:1.3rem;opacity:.7;padding:0 4px;" onclick="fecharCriativo()">✕</span>'
@@ -9025,7 +9057,7 @@ function verLeadsDoAnuncio(chave) {
         var grande = (l._igSegN != null && l._igSegN >= 5000);
         var pos = _ldReg.indexOf(l);
         // quem não está na base abre a mini-ficha do social selling (dá para agir por ali)
-        return '<div class="click" onclick="' + (l._igU && !l.tel8 ? 'crmVerPerfil(\'' + l._igU + '\')' : 'verFichaDaLista(' + i + ')') + '" title="clique para ver todos os dados"'
+        return '<div class="click" onclick="' + (l._igU && !l.tel8 ? 'crmVerPerfil(\'' + l._igU + '\')' : (l._semLead ? (l.tel8 ? 'abrirFichaDoTelefone(\'' + l.tel8 + '\')' : '') : 'verFichaDaLista(' + i + ')')) + '" title="clique para ver todos os dados"'
           + ' style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:' + (grande ? 'rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.35)' : 'rgba(255,255,255,.05)') + ';flex-wrap:wrap;cursor:pointer;"'
           + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'">'
           + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');' + (grande ? 'box-shadow:0 0 0 2px #ffd166;' : '') + '">' + v2ini(l.nome || '?')
@@ -13262,23 +13294,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbz8Yu0PzBX7XKJjNfZTW3DwxdrpTfFCBWwFQGrHwIJNVShSnESKNERl-sa8TzLBbmeB/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbw9HysTL9R9CBKPc2BV6SdXH2mOTonlMVpUfI8xefG8Qf2ioqh3P1HoqcN60qq2gRnL/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbwVnSElSLEezO15hnRbQKmDnfqSUgjcs7S6KaauIPXuKtF3ofbmmWrCkmcMDYr3Nef1/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbwIsE4smP-Dr_rNSgax00hP2LA1kWOXB7rVWJ-EepmHtBvGpQT2Sdz97iMBqCbX5oQQ/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-RDFPz7y_cNk1onEW1ebqnw1hf_La-xdWE3MoS6hQBUHR_jFhSIh0zf1ui_L8i_TL/exec';   // 05/09/2026 19h30: memoria em pedacos + tempoContato leve + clintMensagensBrutas (03a559d)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -16009,8 +16041,37 @@ function plNoShowDeNovo(r) {
   return novo.getTime() + 60 * 60000 < Date.now();   // a hora nova ja passou ha mais de 1h e o status ficou No-Show (nao conta reuniao em andamento)
 }
 // conta, para um periodo, o que cada SDR e cada closer fez
+// 💳 vendas pelo FORMULÁRIO DE PAGAMENTO, por telefone: { t: data do formulário, valor, f: linha }
+var PL_PAG_TEL = {}, PL_PAG_NOME = {};
+function plPagPorTel() {
+  var m = {}, n = {};
+  (PAG.rows || []).forEach(function(f) {
+    if (!f.date) return;
+    var t = f.date.getTime(), reg = { t: t, valor: f.valor || 0, f: f };
+    var t8 = ldTel8(f.celular); if (t8 && (!m[t8] || t < m[t8].t)) m[t8] = reg;          // fica a primeira venda daquele telefone
+    var k = v2nomeChave(f.nome); if (k && (!n[k] || t < n[k].t)) n[k] = reg;             // e pelo nome (linha da planilha sem telefone)
+  });
+  PL_PAG_NOME = n;
+  return m;
+}
+// formulário de pagamento desta linha: pelo telefone; se a linha não tem telefone, pelo nome
+function plFormDe(r) {
+  var t8 = ldTel8(r.telefone);
+  return (t8 && PL_PAG_TEL[t8]) || PL_PAG_NOME[v2nomeChave(r.nome)] || null;
+}
+// data em que a venda aconteceu: carimbo da venda > formulário de pagamento > dia da reunião
+// (Bruno 08/09/2026: "vendi no dia e não apareceu" — o placar contava pela data da reunião)
+function plDataVenda(r) {
+  var dT = r.date ? r.date.getTime() : null;
+  if (r.vendaT && (dT == null || r.vendaT >= dT - 864e5)) return r.vendaT;
+  var f = plFormDe(r);
+  if (f && f.t && (dT == null || f.t >= dT - 864e5)) return f.t;
+  return dT;
+}
 function plCalcular(p) {
   var S = {}, C = {}, tot = { marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, pend: 0, l: { marc: [], re: [], ns: [], vd: [], pend: [] } };
+  PL_PAG_TEL = plPagPorTel();
+  var vendasTel = {};   // não conta a mesma pessoa duas vezes (planilha + formulário)
   var novo = function(n){ return { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }; };
   // closer (Bruno/Tony) NUNCA entra na coluna de SDRs, mesmo quando marca uma reuniao — a marcacao
   // conta no total do time, mas nao no ranking dos SDRs (Bruno 02/09/2026: "Bruno nao e SDR")
@@ -16033,8 +16094,21 @@ function plCalcular(p) {
     var nsRemarcado = ehNs && nsT !== dT && !faltouDeNovo;          // no-show antigo, reuniao nova ainda por acontecer
     if (no(dT)) {
       if (_fsRealizada(r.sn)) { tot.re++; tot.l.re.push(r); if (s) { s.re++; s.l.re.push(r); } if (c) { c.re++; c.l.re.push(r); } }
-      if (r.sn === 'vendido') { tot.vd++; tot.vdV += r.valor || 0; tot.l.vd.push(r); if (s) { s.vd++; s.vdV += r.valor || 0; s.l.vd.push(r); } if (c) { c.vd++; c.vdV += r.valor || 0; c.l.vd.push(r); } }
       if (r.sn.indexOf('agendada') !== -1 || r.sn === 'remarcada' || nsRemarcado) { tot.pend++; tot.l.pend.push(r); }
+    }
+    // VENDA: pela data em que foi vendida (carimbo da venda ou formulário de pagamento), não pela data da reunião.
+    // Quem tem formulário de pagamento no período conta como venda mesmo que a linha ainda não esteja "Vendido".
+    var t8v = ldTel8(r.telefone), fPag = plFormDe(r);
+    var chaveV = t8v || ('n:' + v2nomeChave(r.nome));
+    var vT = plDataVenda(r);
+    // estorno / não vendido / no-show com formulário NÃO é venda (o formulário ficou, o dinheiro não)
+    var negativo = /estorno|nao vendido|no show|cancel/.test(r.sn);
+    var ehVenda = r.sn === 'vendido' || (!negativo && fPag && no(fPag.t));
+    if (ehVenda && no(vT) && !vendasTel[chaveV]) {
+      vendasTel[chaveV] = true;
+      var val = r.valor || (fPag ? fPag.valor : 0) || 0;
+      if (!r.valor && val) r._valorDoForm = val;
+      tot.vd++; tot.vdV += val; tot.l.vd.push(r); if (s) { s.vd++; s.vdV += val; s.l.vd.push(r); } if (c) { c.vd++; c.vdV += val; c.l.vd.push(r); }
     }
     if (ehNs && no(nsT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
     if (faltouDeNovo && no(dT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
@@ -16045,6 +16119,19 @@ function plCalcular(p) {
       var t = new Date(ano, +m[2] - 1, +m[1]).getTime();
       if (no(t)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
     });
+  });
+  // vendas que só existem no FORMULÁRIO DE PAGAMENTO (sem linha na aba Vendas) — é a fonte mais confiável (Bruno 08/09/2026)
+  var telsV2 = {}, nomesV2 = {};
+  (V2.rows || []).forEach(function(r){ var t = ldTel8(r.telefone); if (t) telsV2[t] = true; var k = v2nomeChave(r.nome); if (k) nomesV2[k] = true; });
+  (PAG.rows || []).forEach(function(f) {
+    var t8 = ldTel8(f.celular), fT = f.date ? f.date.getTime() : null, kN = v2nomeChave(f.nome);
+    if (!fT || !no(fT)) return;
+    // já tem linha na aba Vendas (pelo telefone OU pelo nome)? então já entrou (ou não é venda) — não duplica
+    if ((t8 && (telsV2[t8] || vendasTel[t8])) || (kN && (nomesV2[kN] || vendasTel['n:' + kN]))) return;
+    if (t8) vendasTel[t8] = true; if (kN) vendasTel['n:' + kN] = true;
+    var r = { nome: f.nome, telefone: f.celular, produto: f.programa, status: 'Vendido (formulário)', sn: 'vendido', closer: f.vendedor || '', sdr: '', valor: f.valor || 0, date: f.date, obs: '', leadId: '', _pag: true };
+    var c3 = cd(r.closer);
+    tot.vd++; tot.vdV += r.valor; tot.l.vd.push(r); if (c3) { c3.vd++; c3.vdV += r.valor; c3.l.vd.push(r); }
   });
   // no-shows que so existem na AGENDA (evento cinza sem linha na planilha) entram na conta
   (PL_AG.extras || []).forEach(function(x) {
@@ -16446,7 +16533,7 @@ function plVer(tipo, chave, met, _denovo) {
   if (!lista) return;
   var rows = ((lista.l && lista.l[met]) || []).slice();
   var horas = {}, faltam = {};
-  rows.forEach(function(r, i) { var hh = plHoraDaLinha(r); if (hh === null) { faltam[agDataStr(agSegunda(r.date))] = true; hh = ''; } horas[i] = hh; });
+  rows.forEach(function(r, i) { if (r._pag) { horas[i] = ''; return; } var hh = plHoraDaLinha(r); if (hh === null) { faltam[agDataStr(agSegunda(r.date))] = true; hh = ''; } horas[i] = hh; });
   if (met !== 'marc') {   // reunioes em ordem de dia e hora (marcadas ficam na ordem da marcacao)
     var idx = rows.map(function(r, i){ return i; });
     idx.sort(function(a, b) {
@@ -16471,20 +16558,24 @@ function plVer(tipo, chave, met, _denovo) {
   var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + lista.nome.replace(/</g, '&lt;') + ' — ' + rows.length + ' ' + rot + '</b>'
     + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
-    + '<div class="hint" style="margin-bottom:10px;">Exatamente as linhas da aba Vendas que entraram nessa conta. Clique no nome para abrir a ficha.</div>';
+    + '<div class="hint" style="margin-bottom:10px;">' + (met === 'vd' ? 'Vendas pela data em que foram vendidas (carimbo da venda ou formulário de pagamento). 💳 = só no formulário, sem linha na aba Vendas.' : 'Exatamente as linhas da aba Vendas que entraram nessa conta.') + ' Clique no nome para abrir a ficha.</div>';
   if (!rows.length) h += '<div class="pl-vazio">Nenhuma</div>';
   rows.forEach(function(r, iRow) {
     var iR = r._agenda ? -1 : v2reg(r);
     var hora = horas[iRow] || '';
     h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);margin-bottom:6px;font-size:.76rem;">'
-      + (r._agenda ? '<b style="color:#f6a350;" title="Evento cinza na agenda sem linha na planilha">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + ' 📆</b>' : '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>')
+      + (r._agenda ? '<b style="color:#f6a350;" title="Evento cinza na agenda sem linha na planilha">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + ' 📆</b>'
+        : r._pag ? '<b style="color:#3ddc97;" title="Venda registrada no formulário de pagamento, sem linha na aba Vendas">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + ' 💳</b>'
+        : '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>')
       + '<span class="hint" style="margin:0;">' + (r.leadId || '') + '</span>'
-      + '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + (hora ? ' <b style="color:#ffd166;">' + hora + '</b>' : (semanasFaltando.length && !_denovo ? ' <i style="opacity:.6;">⏳</i>' : '')) + '</span>'
-      + '<span class="hint" style="margin:0;">marcada em ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : '') + '</span>'
+      + (r._pag ? '<span class="hint" style="margin:0;">💳 formulário de pagamento em ' + fmt(r.date ? r.date.getTime() : null) + '</span>'
+        : '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + (hora ? ' <b style="color:#ffd166;">' + hora + '</b>' : (semanasFaltando.length && !_denovo ? ' <i style="opacity:.6;">⏳</i>' : '')) + '</span>'
+        + '<span class="hint" style="margin:0;">marcada em ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : '') + '</span>')
+      + (met === 'vd' && !r._pag && plDataVenda(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#3ddc97;">venda em ' + fmt(plDataVenda(r)) + '</span>' : '')
       + ((met === 'ns' || met === 'todas') && r.sn === 'no show' && plDataNoShow(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#ffd166;">no-show em ' + fmt(plDataNoShow(r)) + ' · remarcada</span>' : '')
       + '<span class="ld-tag"' + (met === 'todas' ? ' style="color:' + (r.sn === 'no show' ? '#ff6b6b' : _fsRealizada(r.sn) ? '#6ea8ff' : '#ffd166') + ';"' : '') + '>' + (r.status || '') + '</span>'
       + '<span class="hint" style="margin:0;">' + (tipo === 'sdr' ? 'closer ' + (r.closer || '—') : (tipo === 'closer' ? 'SDR ' + (plPessoa(r.sdr) || '—') : 'closer ' + (r.closer || '—') + ' · SDR ' + (plPessoa(r.sdr) || '—'))) + '</span>'
-      + (r.valor ? '<span class="ld-tag" style="color:#ffd166;">' + v2moeda0(r.valor) + '</span>' : '')
+      + ((r.valor || r._valorDoForm) ? '<span class="ld-tag" style="color:#ffd166;">' + v2moeda0(r.valor || r._valorDoForm) + '</span>' : '')
       + (met === 'pend' ? '<span style="margin-left:auto;display:flex;gap:6px;">'
           + '<button class="btn-assumir" style="padding:5px 10px;font-size:.7rem;background:rgba(255,107,107,.16);color:#ff6b6b;border:1px solid rgba(255,107,107,.5);" onclick="event.stopPropagation();plMarcarNoShow(' + iR + ', this)">🤦 No-show</button>'
           + '<button class="btn-assumir" style="padding:5px 10px;font-size:.7rem;" onclick="event.stopPropagation();this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')" title="Abre a ficha para marcar vendido, não vendido, bloqueio…">✅ compareceu → ficha</button></span>' : '')
