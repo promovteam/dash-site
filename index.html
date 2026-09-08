@@ -2247,7 +2247,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-08-1335';
+var VERSAO_DASH = '2026-09-08-1346';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -14974,12 +14974,15 @@ function _fichaPelaUrl() {
   }
   var mF = hx.match(/[#&?]ficha=(\d{8,13})/);
   if (mF) { try { abrirFichaDoTelefone(mF[1]); } catch (e) {} }
+  // #aba=agenda (ou placar, leads, contratos…): abre direto naquela tela (botão "📅 agenda" da extensão)
+  var mA = hx.match(/[#&?]aba=([a-z0-9-]+)/);
+  if (mA) { var vaiA = function() { var it = document.querySelector('.nav-item[data-s="' + mA[1] + '"]'); if (it) it.click(); }; setTimeout(vaiA, 350); setTimeout(vaiA, 1800); }
 }
 try { _fichaPelaUrl(); } catch (e) {}
 // a extensao da Clint reaproveita uma aba do dash ja aberta trocando so o #marcar=... (ou #ficha=...)
 window.addEventListener('hashchange', function() {
   var hx = String(location.hash || '');
-  if (hx.indexOf('ficha=') !== -1) { try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {} try { _fichaPelaUrl(); } catch (e) {} return; }
+  if (hx.indexOf('ficha=') !== -1 || hx.indexOf('aba=') !== -1) { try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {} try { _fichaPelaUrl(); } catch (e) {} return; }
   if (hx.indexOf('marcar=') === -1) return;
   try { cancelarMarcarDoLead(); } catch (e) {}
   if (hx.indexOf('painel=lead') !== -1) {
