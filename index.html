@@ -1044,7 +1044,8 @@ img { max-width:100%; height:auto; }
   <div class="nav-item" data-s="pagamentos"><span class="nav-icon">💳</span><span class="nav-label">Pagamentos</span></div>
   <div class="nav-item" data-s="contratos"><span class="nav-icon">📄</span><span class="nav-label">Contratos</span><span id="ctr-alerta" style="display:none;margin-left:auto;background:#ff6b6b;color:#fff;border-radius:99px;font-size:.62rem;font-weight:800;padding:2px 7px;line-height:1.3;" title="Vendas com contrato ainda não assinado"></span></div>
   <div class="nav-item" data-s="regras"><span class="nav-icon">📋</span><span class="nav-label">Regras</span></div>
-  <div class="sidebar-foot"><div class="nav-item"><span class="nav-icon">🔔</span><span class="nav-label">Notificações</span></div></div>
+  <div class="sidebar-foot"><div class="nav-item"><span class="nav-icon">🔔</span><span class="nav-label">Notificações</span></div>
+    <div class="nav-item" onclick="trocarAcesso()" title="Sair e entrar com outro nome e senha"><span class="nav-icon">🔁</span><span class="nav-label">Trocar de acesso</span></div></div>
 </aside>
 
 <main class="main">
@@ -2245,7 +2246,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-08-1130';
+var VERSAO_DASH = '2026-09-08-1146';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -4135,7 +4136,7 @@ function abrirFormVendaLead() {
   var v = _vendaLeadAtual; if (!v || !v.lead) return;
   var l = v.lead, r = v.reuniao;
   abrirFormVenda({ nome: l.nome, cel: l.tel, email: l.email, insta: _instaHandle(l.insta), seg: l.seg,
-    vendedor: (r && r.closer) ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: (r && r.sdr) ? _nomeCurto(r.sdr) : _nomeCurto(l.dono),
+    vendedor: (r && r.closer) ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: (r && r.sdr) ? _nomeCurto(r.sdr) : _nomeCurto(ldDonoDe(l)),   /* dono da Clint primeiro (Bruno 08/09/2026) */
     programa: r ? r.produto : '', valor: (r && r.valor > 0) ? v2moeda(r.valor) : '', clint: clintLink(l) });
 }
 // da ficha da REUNIAO (Visao Geral / Agenda)
@@ -4184,7 +4185,7 @@ function abrirFormBloqueioLead() {
   var v = _vendaLeadAtual; if (!v || !v.lead) return;
   var l = v.lead, r = v.reuniao;
   abrirFormBloqueio({ nome: l.nome, cel: l.tel, email: l.email, insta: _instaHandle(l.insta),
-    vendedor: (r && r.closer) ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: (r && r.sdr) ? _nomeCurto(r.sdr) : _nomeCurto(l.dono),
+    vendedor: (r && r.closer) ? _nomeCurto(r.closer) : _vendedorLogado(), sdr: (r && r.sdr) ? _nomeCurto(r.sdr) : _nomeCurto(ldDonoDe(l)),   /* dono da Clint primeiro (Bruno 08/09/2026) */
     programa: r ? r.produto : '', valor: (r && r.valor > 0) ? v2moeda(r.valor) : '', clint: clintLink(l) });
 }
 function abrirFormBloqueioReuniao() {
@@ -13294,23 +13295,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzSKeGGniYAj68cEnQuSvoJ87YJU_Xg-I1_knL4XyExf2gsxNpQ8jjxLKfR8pP8D3PW/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTs0kE_ZjP6tpo1rzMjgKSdklblsZiDJuGMpjbhr2F9-D1w4o1bUO40KavqWN45HTs/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -15613,6 +15614,11 @@ function loginConferir() {
   renderLeads();
 }
 if (loginPrecisa()) montarLogin();
+// 🔁 sair e entrar com outro acesso (Bruno 08/09/2026: "que tenha opção de mudar de acesso")
+function trocarAcesso() {
+  try { localStorage.removeItem('v2Login'); localStorage.removeItem('v2LeadEu'); } catch (e) {}
+  location.reload();
+}
 
 // ---------- arranque + atualização automática ----------
 carregarV2();
