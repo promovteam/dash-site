@@ -2248,7 +2248,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-09-1221';
+var VERSAO_DASH = '2026-09-09-1249';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -16647,19 +16647,37 @@ function plMarcarNoShow(iR, btn) {
   try { renderV2(); } catch (e) {}
 }
 // ===== 🎉 FESTA: quando alguem marca ou vende, o placar avisa em grande (Bruno 02/09/2026) =====
-var PL_PREV = null, PL_FILA = [], PL_FESTANDO = false;
+var PL_PREV = null, PL_FILA = [], PL_FESTANDO = false, PL_ABRIU = Date.now();
+// o que ja foi comemorado HOJE fica guardado no navegador: fechar e abrir o dash nao repete a festa (Bruno 09/09/2026:
+// "nao pode toda vez que entrar mostrar que vendeu a mesma pessoa, tem que ser na hora")
+function _plVistoChave() { var h = new Date(); return 'plFestaVisto:' + h.getFullYear() + '-' + (h.getMonth() + 1) + '-' + h.getDate(); }
 function plDetectarNovidades(d) {
+  if (!d || !d.sdrs || !d.closers) return;
+  // as vendas vem do formulario de pagamento (PAG): antes dele chegar a conta ainda vai subir — nao e venda nova, e carga
+  if (typeof PAG !== 'undefined' && !PAG.carregado) return;
   var atual = {};
   d.sdrs.forEach(function(x){ atual['s:' + v2norm(x.nome)] = { marc: x.marc, nome: x.nome }; });
   d.closers.forEach(function(x){ atual['c:' + v2norm(x.nome)] = { vd: x.vd, vdV: x.vdV, nome: x.nome }; });
-  if (PL_PREV) {
+  var visto = null; try { visto = JSON.parse(localStorage.getItem(_plVistoChave()) || 'null'); } catch (e) {}
+  var base = visto || PL_PREV;
+  // so comemora o que subiu ALEM do maior valor ja visto hoje (nesta ou em outra entrada) e depois dos primeiros 15 s de carga
+  if (base && Date.now() - PL_ABRIU > 15000) {
     Object.keys(atual).forEach(function(k) {
-      var a = atual[k], p = PL_PREV[k]; if (!p) return;
-      if (k.charAt(0) === 's' && a.marc > p.marc) plComemorar('marcou', a.nome, a.marc - p.marc);
-      if (k.charAt(0) === 'c' && a.vd > p.vd) plComemorar('vendeu', a.nome, a.vdV - p.vdV);
+      var a = atual[k], p = base[k] || {}, p2 = (PL_PREV && PL_PREV[k]) || {};
+      if (!base[k] && !PL_PREV) return;
+      var refMarc = Math.max(p.marc || 0, p2.marc || 0), refVd = Math.max(p.vd || 0, p2.vd || 0), refVdV = Math.max(p.vdV || 0, p2.vdV || 0);
+      if (k.charAt(0) === 's' && a.marc > refMarc) plComemorar('marcou', a.nome, a.marc - refMarc);
+      if (k.charAt(0) === 'c' && a.vd > refVd) plComemorar('vendeu', a.nome, a.vdV - refVdV);
     });
   }
   PL_PREV = atual;
+  var guardar = {};
+  Object.keys(atual).forEach(function(k) {
+    var a = atual[k], p = (visto && visto[k]) || {};
+    guardar[k] = { nome: a.nome, marc: Math.max(a.marc || 0, p.marc || 0), vd: Math.max(a.vd || 0, p.vd || 0), vdV: Math.max(a.vdV || 0, p.vdV || 0) };
+  });
+  if (visto) Object.keys(visto).forEach(function(k) { if (!guardar[k]) guardar[k] = visto[k]; });
+  try { localStorage.setItem(_plVistoChave(), JSON.stringify(guardar)); } catch (e) {}
 }
 function plComemorar(tipo, nome, q) {
   PL_FILA.push({ tipo: tipo, nome: nome, q: q });
