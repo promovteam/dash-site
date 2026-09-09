@@ -2229,6 +2229,8 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     // (espera um pouco para o filtro "só os novos" ainda funcionar nesta visita)
     if (s === 'leads' && typeof marcarLeadsVistos === 'function') setTimeout(marcarLeadsVistos, 2500);
     if (s === 'placar' && typeof renderPlacar === 'function') renderPlacar();
+    if (s === 'visao' && typeof carregarVisaoGeral === 'function') carregarVisaoGeral();
+    if (s === 'anuncios' && typeof IGO !== 'undefined' && !IGO.carregado && !IGO.buscando && typeof carregarPostsOrganicos === 'function') { try { carregarPostsOrganicos(); } catch (ePo) {} }
     if (s === 'anuncios' && typeof renderAnuncios === 'function') renderAnuncios();
     if (s === 'contratos' && typeof renderContratos === 'function') renderContratos();
     // a tela que precisa dos bloqueios os busca na hora (se ainda não vieram)
@@ -2248,7 +2250,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-09-1249';
+var VERSAO_DASH = '2026-09-09-1610';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3277,7 +3279,7 @@ function carregarIGOrganico() {
     }
     _igNomeBioIdx = null;
     IGO.carregado = true; IGO.buscando = false;
-    try { if (document.getElementById('an-corpo')) renderAnuncios(); } catch (e) {}
+    try { if (document.getElementById('an-corpo') && telaVisivel('s-anuncios')) renderAnuncios(); } catch (e) {}   // só com a aba à vista (09/09/2026: carregava o Facebook na abertura)
     try { renderLeads(); } catch (e2) {}
     try { renderV2(); } catch (e3) {}
   }).catch(function(e){ IGO.buscando = false; IGO.erro = String(e && e.message || e); });
@@ -3610,8 +3612,8 @@ function carregarPostsOrganicos() {
   document.body.appendChild(sc);
 }
 // espera o resto do painel carregar (o endereço do robô é declarado mais abaixo no arquivo)
-setTimeout(function(){ try { carregarPostsOrganicos(); } catch (e) {} }, 1200);
-setTimeout(function(){ try { carregarEtiquetas(); } catch (e) {} }, 2500);
+setTimeout(function(){ try { if (!/clint=1/.test(String(location.hash || '') + String(location.search || ''))) carregarPostsOrganicos(); } catch (e) {} }, 12000);   // Criativos: fora da Clint, depois do essencial
+setTimeout(function(){ try { carregarEtiquetas(); } catch (e) {} }, 9000);
 // os pedidos do Instagram chegam em segundo plano (a aba é grande) — quando
 // chegam, as listas de leads são redesenhadas com o selo 📷
 setTimeout(function(){ try { carregarIGOrganico(); } catch (e) {} }, 4000);
@@ -7968,7 +7970,7 @@ function verAconteceu(qual) {
 }
 // quadro do investimento: gasto do Facebook × leads × reuniões × vendas
 function blocoMetaAds(listaAn, per) {
-  carregarMetaAds(per);
+  if (telaVisivel('s-anuncios')) carregarMetaAds(per);
   if (META.buscando && !META.dados) return '<div class="hint" style="margin-top:10px;">⏳ Buscando o investimento no Facebook…</div>';
   if (!META.dados) {
     return '<div class="hint" style="margin-top:10px;color:#f6a350;">💸 Investimento do Facebook ainda não conectado'
@@ -8266,8 +8268,8 @@ function renderAnuncios() {
   // ---- criativos: cada anúncio com leads, reuniões, vendas ----
   var _col = anColetar(per, AN_TIPO);
   var an = _col.an, foraDoPeriodo = _col.fora;
-  // gasto/imagem do Facebook, se conectado
-  carregarMetaAds(per);
+  // gasto/imagem do Facebook, se conectado — só pede ao robô com a aba Criativos na tela
+  if (telaVisivel('s-anuncios')) carregarMetaAds(per);
   var metaPor = {};
   if (META.dados) META.dados.anuncios.forEach(function(m){ metaPor[_chaveAnuncio(m.anuncio)] = m; });
 
@@ -8343,7 +8345,7 @@ function renderAnuncios() {
   // aqui a aba só MOSTRA os posts junto com os anúncios, com os números de cada um.
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
   if (!chaves.length) h += '<div class="hint">Nenhum anúncio no período.</div>';
-  carregarCriativos();
+  if (telaVisivel('s-anuncios')) carregarCriativos();   // as 25 páginas de criativos só com a aba aberta
   chaves.slice(0, AN_QUANTOS).forEach(function(k, i) {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {};
     var ehPost = String(k).indexOf('POST:') === 0;
@@ -15801,12 +15803,23 @@ function ldExcluirLead(i) {
 }
 
 // ---------- arranque + atualização automática ----------
+// ⚡ MODO LEVE (09/09/2026, Bruno: "o dash dentro da Clint é muito lento"): na abertura o dash disparava 17 pedidos ao robô
+// de uma vez (Facebook, GPT Maker, tempos, etiquetas…), cada dash aberto saturava o robô para todo mundo.
+// Agora: dentro da Clint (#clint=1) só carrega o que a agenda e a ficha usam; fora dela, os painéis da tela inicial
+// entram escalonados e o Facebook só quando a aba Criativos é aberta.
+var MODO_CLINT = /clint=1/.test(String(location.hash || '') + String(location.search || ''));
+var _visaoCarregada = false;
+function carregarVisaoGeral() {   // painéis da tela inicial (GPT Maker, tempos de resposta, comentários)
+  if (_visaoCarregada) return;
+  _visaoCarregada = true;
+  try { carregarGptMaker(); } catch (e1) {}
+  setTimeout(function(){ try { carregarTempos(); } catch (e2) {} }, 4000);
+  setTimeout(function(){ try { carregarComentarios(); } catch (e3) {} }, 8000);
+}
 carregarV2();
 carregarLeads();
 carregarClintPainel();
-carregarGptMaker();
-carregarTempos();
-carregarComentarios();
+if (!MODO_CLINT) setTimeout(carregarVisaoGeral, 6000);   // deixa planilhas e agenda chegarem primeiro
 // ===== ⚡ SÓ ATUALIZA COM O PAINEL À VISTA (Bruno 19/08/2026) =====
 // Com o dash aberto atrás de outra janela o dia todo, cada releitura gastava
 // internet e memória à toa. Agora, escondido, o painel descansa; ao voltar,
@@ -15823,7 +15836,7 @@ document.addEventListener('visibilitychange', function() {
   _pendenteAoVoltar = false;
   try { carregarV2(); carregarLeads(); carregarClintPainel(); } catch (e) {}
 });
-_cadaTanto(carregarComentarios, 180000);
+_cadaTanto(function(){ if (_visaoCarregada) carregarComentarios(); }, 180000);
 // avisos do closer (reunião nova na agenda dele): confere a cada 2 minutos
 carregarAvisosCloser();
 _cadaTanto(carregarAvisosCloser, 120000);
@@ -15833,8 +15846,8 @@ _cadaTanto(function(){ SB.carregado = false; LD._fundido = null; carregarSupabas
 // a cada 5 minutos atualiza o painel da Clint (etapas, donos e esperando resposta)
 _cadaTanto(carregarLeads, 180000);
 _cadaTanto(carregarClintPainel, 300000);
-_cadaTanto(carregarGptMaker, 300000);
-_cadaTanto(carregarTempos, 900000);
+_cadaTanto(function(){ if (_visaoCarregada) carregarGptMaker(); }, 300000);
+_cadaTanto(function(){ if (_visaoCarregada) carregarTempos(); }, 900000);
 carregarPag();
 setTimeout(carregarAgenda, 800);
 _cadaTanto(carregarV2, 120000);
