@@ -1046,6 +1046,7 @@ img { max-width:100%; height:auto; }
   <div class="nav-item" data-s="regras"><span class="nav-icon">📋</span><span class="nav-label">Regras</span></div>
   <div class="sidebar-foot"><div class="nav-item"><span class="nav-icon">🔔</span><span class="nav-label">Notificações</span></div>
     <div class="nav-item" onclick="trocarAcesso()" title="Sair e entrar com outro nome e senha"><span class="nav-icon">🔁</span><span class="nav-label">Trocar de acesso</span></div>
+    <div class="nav-item" onclick="abrirExtensaoClint()" title="Baixar a extensão que coloca este dash dentro da Clint"><span class="nav-icon">🧩</span><span class="nav-label">Extensão da Clint</span></div>
     <div class="hint" id="acesso-atual" style="padding:4px 14px 8px;font-size:.66rem;"></div></div>
 </aside>
 
@@ -2247,7 +2248,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-08-1425';
+var VERSAO_DASH = '2026-09-09-1116';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -14964,7 +14965,9 @@ function _marcarPelaUrl() {
   var t8 = dig.slice(-8);
   // abre a agenda NA HORA (sem esperar a base baixar); os dados entram no clique do horário
   setTimeout(function() {
-    var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] || { nome: '', tel: dig, tel8: t8, insta: '', email: '' };
+    var mN = tudoM.match(/[#&?]nome=([^&]+)/), nomeClint = '';   // a extensão manda o nome lido na tela da Clint (v2.3)
+    if (mN) { try { nomeClint = decodeURIComponent(mN[1]).replace(/\+/g, ' ').trim().slice(0, 80); } catch (e) {} }
+    var l = (LD.rows || []).filter(function(x){ return x.tel8 === t8; })[0] || { nome: nomeClint, tel: dig, tel8: t8, insta: '', email: '' };
     var i = (l._reg != null && _ldReg[l._reg] === l) ? l._reg : (l._reg = _ldReg.push(l) - 1);
     marcarReuniaoDoLead(i);
     try { history.replaceState(null, '', location.pathname); } catch (e) {}   // tira o ?marcar= para o F5 nao repetir
@@ -15034,11 +15037,17 @@ function abrirFichaDoTelefone(dig) {
 try { _modoPainelAgenda(); } catch (e) {}
 // #ficha=TEL: dash COMPLETO com a ficha da pessoa aberta (extensão "Dash na Clint", Bruno 08/09/2026)
 // #clint=1: está dentro da Clint (letra um pouco menor para caber na gaveta)
+// tamanho do conteúdo dentro da Clint (extensão v2.3: A− / A+ mandam #zoom=0.8 etc.)
+function _zoomPelaUrl(hx) {
+  var mZ = String(hx || location.hash || '').match(/[#&?]zoom=(\d(?:\.\d+)?)/);
+  if (mZ && parseFloat(mZ[1]) >= 0.4 && parseFloat(mZ[1]) <= 2) document.body.style.zoom = mZ[1];
+}
 function _fichaPelaUrl() {
   var hx = String(location.hash || '') + ' ' + String(location.search || '');
   if (hx.indexOf('clint=1') !== -1 && !document.getElementById('clint-css')) {
     var stC = document.createElement('style'); stC.id = 'clint-css'; stC.textContent = 'body{zoom:.9}'; document.head.appendChild(stC);
   }
+  try { _zoomPelaUrl(hx); } catch (e) {}   // #zoom=0.8 (botões A− / A+ da extensão)
   var mF = hx.match(/[#&?]ficha=(\d{8,13})/);
   if (mF) { try { abrirFichaDoTelefone(mF[1]); } catch (e) {} }
   // #aba=agenda (ou placar, leads, contratos…): abre direto naquela tela (botão "📅 agenda" da extensão)
@@ -15049,6 +15058,7 @@ try { _fichaPelaUrl(); } catch (e) {}
 // a extensao da Clint reaproveita uma aba do dash ja aberta trocando so o #marcar=... (ou #ficha=...)
 window.addEventListener('hashchange', function() {
   var hx = String(location.hash || '');
+  if (hx.indexOf('zoom=') !== -1) { try { _zoomPelaUrl(hx); } catch (e) {} }
   if (hx.indexOf('ficha=') !== -1 || hx.indexOf('aba=') !== -1) { try { document.getElementById('modal-b').classList.remove('open'); } catch (e) {} try { _fichaPelaUrl(); } catch (e) {} return; }
   if (hx.indexOf('marcar=') === -1) return;
   try { cancelarMarcarDoLead(); } catch (e) {}
@@ -15061,6 +15071,31 @@ window.addEventListener('hashchange', function() {
   }
   try { _marcarPelaUrl(); } catch (e) {}
 });
+// ===== 🧩 EXTENSÃO DA CLINT — baixar e instalar pelo dash (Bruno 08/09/2026) =====
+// O zip é publicado junto com o dash pelo publicar.sh (extensao-clint.zip + extensao-versao.txt).
+function abrirExtensaoClint() {
+  var ov = document.getElementById('ext-clint-ov');
+  if (ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'ext-clint-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  var passo = function(n, txt) { return '<div style="display:flex;gap:12px;align-items:flex-start;margin:8px 0;"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:rgba(246,163,80,.18);color:#f6a350;font-weight:800;font-size:.72rem;display:flex;align-items:center;justify-content:center;">' + n + '</span><span style="font-size:.82rem;line-height:1.5;">' + txt + '</span></div>'; };
+  ov.innerHTML = '<div style="background:var(--card,#14171d);border:1px solid rgba(246,163,80,.45);border-radius:16px;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.6);">'
+    + '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:1.5rem;">🧩</span><div style="flex:1;"><div style="font-weight:800;font-size:1.05rem;">O dash dentro da Clint</div><div class="hint" id="ext-clint-ver">extensão para o Chrome</div></div>'
+    + '<span onclick="document.getElementById(\'ext-clint-ov\').remove()" style="cursor:pointer;font-weight:800;color:#9aa3b2;padding:4px 8px;">✕</span></div>'
+    + '<p style="font-size:.84rem;line-height:1.55;margin:14px 0 10px;">Ela coloca um botão <b>📊 Dash</b> na Clint. Um clique abre a agenda <b>já marcando reunião para a pessoa da conversa aberta</b> (lê o telefone e o nome na tela). Também mostra a ficha do lead, e dá para arrastar e mudar o tamanho da janela pelo mouse. O conteúdo é sempre este dash: atualizou aqui, atualizou lá.</p>'
+    + '<a href="extensao-clint.zip" download="Promov Dash na Clint.zip" class="btn primary" style="display:inline-flex;align-items:center;gap:8px;padding:11px 18px;text-decoration:none;font-weight:800;">⬇️ Baixar a extensão (zip)</a>'
+    + '<div style="margin-top:16px;font-weight:800;font-size:.8rem;color:#f6a350;">Como instalar (só uma vez, no Chrome)</div>'
+    + passo(1, 'Baixe e <b>descompacte</b> o zip (clique duas vezes nele). Vai aparecer a pasta <b>Promov Dash na Clint</b>.')
+    + passo(2, 'No Chrome, abra <code style="background:rgba(255,255,255,.08);padding:2px 6px;border-radius:6px;">chrome://extensions</code> <span onclick="try{navigator.clipboard.writeText(\'chrome://extensions\');avisoRapido(\'Endereço copiado — cole na barra do Chrome\')}catch(e){}" style="cursor:pointer;color:#6ea8ff;font-weight:700;">copiar endereço</span> (cole na barra de endereço e dê Enter).')
+    + passo(3, 'Ligue o <b>Modo do desenvolvedor</b> (botão no canto superior direito).')
+    + passo(4, 'Clique em <b>Carregar sem compactação</b> e escolha a pasta descompactada.')
+    + passo(5, 'Abra a Clint (<b>app.useclint.com</b>). O botão 📊 Dash aparece no canto de baixo, à direita.')
+    + '<div class="hint" style="margin-top:14px;line-height:1.5;">Já tem a extensão? A versão instalada aparece no topo da janela dentro da Clint ("ext 2.3"). Se a versão daqui for mais nova, baixe de novo, apague a pasta antiga, descompacte a nova no mesmo lugar e clique em ↻ na extensão em chrome://extensions. Fora isso, não precisa reinstalar: ela sempre abre a versão mais nova do dash.</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  fetch('extensao-versao.txt?t=' + Date.now()).then(function(r){ return r.text(); }).then(function(v){ var el = document.getElementById('ext-clint-ver'); if (el && /^\d/.test(v.trim())) el.textContent = 'extensão para o Chrome · versão ' + v.trim(); }).catch(function(){});
+}
 // ===== 🔎 PUXAR OS DADOS DO LEAD NA HORA DE MARCAR A REUNIÃO =====
 // Pedido do Bruno 18/08/2026: em vez de digitar tudo de novo, o formulário acha
 // a pessoa na base (diagnóstico + site) e já preenche nome, telefone, e-mail,
