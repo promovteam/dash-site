@@ -209,6 +209,37 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .sg-fixo.passada { background:rgba(255,255,255,.02); border:1px dashed rgba(255,255,255,.1); color:var(--muted); font-weight:700; }
 .fx-insight { display:block; font-size:.58rem; color:var(--yellow); font-weight:800; margin-top:2px; }
 .sg-grid { position:relative; }
+/* ⏱ LINHA DO TEMPO (Bruno 10/09/2026: "como a agenda do Google, mais fluida, e mostrando o que está fora da grade") */
+.tl-wrap { display:grid; grid-template-columns:48px repeat(6,1fr); gap:6px; }
+.tl-col { position:relative; border-radius:12px; background:rgba(255,255,255,.015); border:1px solid rgba(255,255,255,.05); overflow:hidden; }
+.tl-col.passado { opacity:.78; }
+.tl-col.hoje { border-color:rgba(246,163,80,.35); }
+.tl-gutter { position:relative; }
+.tl-hora { position:absolute; left:0; right:4px; font-size:.62rem; color:var(--muted); text-align:right; transform:translateY(-50%); font-variant-numeric:tabular-nums; }
+.tl-linha { position:absolute; left:0; right:0; border-top:1px solid rgba(255,255,255,.05); pointer-events:none; }
+.tl-slot { position:absolute; left:4px; right:4px; border-radius:9px; border:1px dashed rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; gap:6px; font-size:.68rem; color:var(--muted); cursor:pointer; transition:background .15s, border-color .15s; }
+.tl-slot:hover { background:rgba(61,220,151,.10); border-color:rgba(61,220,151,.55); color:var(--green); }
+.tl-slot.passado { cursor:default; border-style:solid; border-color:rgba(255,107,107,.18); background:repeating-linear-gradient(135deg, rgba(255,107,107,.05) 0 6px, transparent 6px 12px); color:rgba(255,107,107,.7); }
+.tl-slot.passado:hover { background:repeating-linear-gradient(135deg, rgba(255,107,107,.05) 0 6px, transparent 6px 12px); border-color:rgba(255,107,107,.18); color:rgba(255,107,107,.7); }
+.tl-slot.extra { border-color:rgba(255,209,102,.35); color:rgba(255,209,102,.85); }
+.tl-slot.extra:hover { background:rgba(255,209,102,.10); border-color:rgba(255,209,102,.7); }
+.tl-fixo { position:absolute; left:4px; right:4px; border-radius:9px; background:linear-gradient(150deg, rgba(110,168,255,.14), rgba(110,168,255,.04)); border:1px solid rgba(110,168,255,.25); font-size:.64rem; color:#9dbcff; display:flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; }
+.tl-lunch { position:absolute; left:4px; right:4px; border-radius:9px; background:repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 8px, transparent 8px 16px); border:1px solid rgba(255,255,255,.06); font-size:.62rem; color:var(--muted); display:flex; align-items:center; justify-content:center; pointer-events:none; }
+.tl-ev { position:absolute; border-radius:10px; padding:6px 8px; overflow:hidden; cursor:pointer; border:1px solid rgba(255,255,255,.12); box-shadow:0 4px 14px rgba(0,0,0,.25); display:flex; flex-direction:column; gap:3px; min-height:26px; }
+.tl-ev:hover { filter:brightness(1.12); z-index:5; }
+.tl-ev .sg-head { gap:6px; }
+.tl-ev .sg-avatar { width:20px; height:20px; font-size:.55rem; flex-shrink:0; }
+.tl-ev .sg-nome { font-size:.72rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tl-ev .tl-h { font-size:.62rem; color:rgba(255,255,255,.75); font-variant-numeric:tabular-nums; }
+.tl-ev.curto { padding:3px 7px; gap:0; }
+.tl-ev.curto .sg-nome { font-size:.66rem; }
+.tl-ev .sg-st { font-size:.56rem; padding:2px 7px; border-radius:999px; font-weight:800; width:max-content; }
+.tl-ev.fora { outline:2px dashed rgba(255,209,102,.7); outline-offset:-2px; }
+.tl-legado { position:absolute; left:6px; right:6px; border-radius:8px; border:1px dashed rgba(61,220,151,.45); color:var(--green); font-size:.62rem; font-weight:800; display:flex; align-items:center; justify-content:center; cursor:pointer; background:rgba(61,220,151,.06); }
+.tl-legado:hover { background:rgba(61,220,151,.14); }
+.tl-agora { position:absolute; left:0; right:0; border-top:2px solid #ff6b6b; z-index:6; pointer-events:none; }
+.tl-agora::before { content:''; position:absolute; left:-1px; top:-5px; width:8px; height:8px; border-radius:50%; background:#ff6b6b; }
+.tl-fora-tag { font-size:.56rem; color:#ffd166; font-weight:800; }
 /* visão "Os dois" lado a lado (Bruno 10/09/2026) — cada agenda rola de lado se faltar espaço */
 .sg-duas { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
 .sg-duas.empilhado { grid-template-columns:1fr; }
@@ -1117,7 +1148,8 @@ img { max-width:100%; height:auto; }
           <button class="chart-chip on" id="cl-ambos" onclick="mudarCloser('ambos')">👥 As duas agendas</button>
           <button class="chart-chip" id="cl-bruno" onclick="mudarCloser('bruno')">Bruno Pardim</button>
           <button class="chart-chip" id="cl-tony" onclick="mudarCloser('tony')">Tony Londe</button>
-          <button class="chart-chip" id="cl-lado" onclick="agTrocarDisposicao()" title="Na visão dos dois closers: agendas lado a lado ou uma em cima da outra" style="margin-left:auto;">↔ lado a lado</button>
+          <button class="chart-chip" id="cl-vista" onclick="agTrocarVista()" title="Linha do tempo (como a agenda do Google) ou grade de blocos" style="margin-left:auto;">▦ grade</button>
+          <button class="chart-chip" id="cl-lado" onclick="agTrocarDisposicao()" title="Na visão dos dois closers: agendas lado a lado ou uma em cima da outra">↔ lado a lado</button>
         </div>
       </div>
 
@@ -2272,7 +2304,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-10-0918';
+var VERSAO_DASH = '2026-09-10-1107';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -13566,6 +13598,20 @@ function mudarSemana(delta) {
   AG.weekStart = new Date(AG.weekStart.getTime() + delta * 7 * 86400000);
   carregarAgenda();
 }
+// vista da agenda: 'linha' (linha do tempo, padrão — Bruno 10/09/2026) ou 'grade' (blocos) — fica lembrada no navegador
+function agVista() { var g = null; try { g = localStorage.getItem('agVista'); } catch (e) {} return g === 'grade' ? 'grade' : 'linha'; }
+function agTrocarVista() {
+  try { localStorage.setItem('agVista', agVista() === 'grade' ? 'linha' : 'grade'); } catch (e) {}
+  agAtualizarBotaoVista();
+  var wk = agDataStr(AG.weekStart);
+  if (AG.cache[wk]) renderSemanaV2(AG.cache[wk]); else carregarAgenda();
+}
+function agAtualizarBotaoVista() {
+  var b = document.getElementById('cl-vista'); if (!b) return;
+  var linha = agVista() === 'linha';
+  b.textContent = linha ? '▦ ver em grade' : '⏱ ver linha do tempo';
+  b.title = linha ? 'Agora é a linha do tempo — clique para ver em blocos' : 'Agora são blocos — clique para ver a linha do tempo';
+}
 // disposição da visão "Os dois": lado a lado (padrão em tela larga) ou empilhado — fica lembrado no navegador
 function agLadoALado() {
   var g = null; try { g = localStorage.getItem('agLadoALado'); } catch (e) {}
@@ -13863,16 +13909,107 @@ function renderSemanaV2(calData) {
   return h;
   } // fim de gridDe
 
+  // ⏱ LINHA DO TEMPO: cada reunião na hora real (mesmo fora da grade); os horários livres ficam por trás, clicáveis
+  function timelineDe(evsDo, titulo, gradeDo) {
+    var G = gradeDo || GRADE_BASE;
+    var PX = 1.15;   // pixels por minuto (100 min ≈ 115 px)
+    var slotsReg = G.filter(function(sl) { return sl.end && !sl.fixo; });
+    var minG = 8 * 60, maxG = 20 * 60 + 40;
+    // a reunião comercial do Google já aparece como bloco fixo da grade: não desenha o evento duplicado
+    var ehReuniaoComercial = function(e) { return /reuni[aã]o\s+comercial/i.test(String(e.title || '')); };
+    evsDo = evsDo.filter(function(e) { return !ehReuniaoComercial(e); });
+    // faixa de horas: quando as duas agendas estão lado a lado, as duas usam a MESMA régua (mesma altura)
+    var gradesFaixa = (AG.closer === 'ambos') ? [gradeNova ? slotsDo('bruno') : SLOTS_BRUNO, gradeNova ? slotsDo('tony') : SLOTS_BRUNO] : [G];
+    gradesFaixa.forEach(function(GG) { GG.forEach(function(sl) { var a = sl.start === 'LUNCH' ? agMin(sl.ini) : agMin(sl.start), b = sl.start === 'LUNCH' ? agMin(sl.fim) : agMin(sl.end); if (a < minG) minG = a; if (b > maxG) maxG = b; }); });
+    var evsFaixa = (AG.closer === 'ambos' && typeof evs !== 'undefined') ? evs : evsDo;
+    evsFaixa.forEach(function(e) { if (ehReuniaoComercial(e)) return; var a = agMin((e.startTime || '').substring(0, 5)), b = agMin((e.endTime || '').substring(0, 5)) || (a + (e.duration || 100)); if (a && a < minG) minG = a; if (b > maxG) maxG = b; });
+    if (maxG > 22 * 60) maxG = 22 * 60;   // régua vai no máximo até 22:00 (evento mais tarde fica cortado no fim)
+    minG = Math.floor(minG / 60) * 60; maxG = Math.ceil(maxG / 60) * 60;
+    var H = (maxG - minG) * PX;
+    var top = function(min) { return Math.round((min - minG) * PX); };
+    var htmlT = (titulo ? '<div class="sg-titulo">' + titulo + '</div>' : '') + '<div class="tl-wrap">';
+    htmlT += '<div class="sg-time"></div>';
+    dias.forEach(function(dd, i) {
+      var passado = dd < hoje, ehHoje = dd.getTime() === hoje.getTime();
+      var fer = gradeNova && ehFeriado(agDataStr(dd));
+      htmlT += '<div class="sg-day' + (ehHoje ? ' hoje' : '') + (passado ? ' passado' : '') + (i === 5 || fer ? ' sab' : '') + '">' + dowN[i] + '<br><b>' + dd.getDate() + '</b><span>' + mesesN[dd.getMonth()] + '</span>'
+        + (fer ? '<span style="color:var(--yellow);font-weight:800;">FERIADO 🔒</span>' : '') + '</div>';
+    });
+    // régua das horas
+    htmlT += '<div class="tl-gutter" style="height:' + H + 'px;">';
+    for (var mh = minG; mh <= maxG; mh += 60) htmlT += '<div class="tl-hora" style="top:' + top(mh) + 'px;">' + ('0' + Math.floor(mh / 60)).slice(-2) + ':00</div>';
+    htmlT += '</div>';
+    dias.forEach(function(dd, i) {
+      var dStr = agDataStr(dd), passadoDia = dd < hoje, ehHoje = dd.getTime() === hoje.getTime();
+      var fer = gradeNova && ehFeriado(dStr), sab = i === 5;
+      var doDia = evsDo.filter(function(e) { return e.date === dStr; }).slice().sort(function(a, b) { return agMin(a.startTime) - agMin(b.startTime); });
+      htmlT += '<div class="tl-col' + (passadoDia ? ' passado' : '') + (ehHoje ? ' hoje' : '') + '" style="height:' + H + 'px;">';
+      for (var ml = minG + 60; ml < maxG; ml += 60) htmlT += '<div class="tl-linha" style="top:' + top(ml) + 'px;"></div>';
+      // horários da grade por trás (sábado: só os da manhã, com 🔒; feriado: tudo com 🔒)
+      var slotsDia = sab ? (gradeNova ? SLOTS_SABADO.map(function(sl) { return { start: sl.start, end: sl.end, extra: true }; }) : []) : G;
+      slotsDia.forEach(function(sl) {
+        if (sl.start === 'LUNCH') { htmlT += '<div class="tl-lunch" style="top:' + top(agMin(sl.ini)) + 'px;height:' + ((agMin(sl.fim) - agMin(sl.ini)) * PX - 2) + 'px;">🍽 ' + sl.ini + '–' + sl.fim + '</div>'; return; }
+        var a = agMin(sl.start), b = agMin(sl.end);
+        if (sl.fixo) {
+          if (fer) htmlT += '<div class="tl-fixo" style="top:' + top(a) + 'px;height:' + ((b - a) * PX - 2) + 'px;">🎉 Feriado</div>';
+          else htmlT += '<a class="tl-fixo" href="' + (passadoDia ? LINK_REUNIOES_COMERCIAIS : LINK_MEET_COMERCIAL) + '" target="_blank" rel="noopener" style="top:' + top(a) + 'px;height:' + ((b - a) * PX - 2) + 'px;">🧑‍🤝‍🧑 ' + sl.fixo + ' ' + sl.start + '–' + sl.end + (passadoDia ? ' · 💡 insights' : ' · 🎥') + '</a>';
+          return;
+        }
+        var dentro = doDia.filter(function(e) { var st = agMin((e.startTime || '').substring(0, 5)); return st >= a && st < b; });
+        var usado = 0; dentro.forEach(function(e) { usado += e.duration || 100; });
+        var extraOuTrava = !!sl.extra || fer;
+        if (!dentro.length) {
+          if (passadoDia) { vaziosPassados++; htmlT += '<div class="tl-slot passado" title="Horário útil passou SEM reunião" style="top:' + top(a) + 'px;height:' + ((b - a) * PX - 2) + 'px;">⚠ ' + sl.start + '–' + sl.end + ' sem reunião</div>'; }
+          else if (extraOuTrava) htmlT += '<div class="tl-slot extra" onclick="agendarComAprovacao(event,\'' + dStr + '\',\'' + sl.start + '\')" style="top:' + top(a) + 'px;height:' + ((b - a) * PX - 2) + 'px;">🔒 ' + sl.start + '–' + sl.end + ' · ' + (fer ? 'feriado' : sab ? 'sábado' : 'extra') + ' · precisa OK do closer</div>';
+          else { vaziosFuturos++; htmlT += '<div class="tl-slot" onclick="abrirTipoV2(event,\'' + dStr + '\',\'' + sl.start + '\')" style="top:' + top(a) + 'px;height:' + ((b - a) * PX - 2) + 'px;"><b>+</b> ' + sl.start + '–' + sl.end + ' · agendar</div>'; }
+        } else {
+          if (!sl.extra) cheios++;
+          if (!passadoDia && !sl.extra && (b - a) - usado >= 50) {   // sobrou meio horário: cabe um Legado
+            var fimUsado = a; dentro.forEach(function(e) { var f = agMin((e.endTime || '').substring(0, 5)); if (f > fimUsado) fimUsado = f; });
+            var ini2 = Math.max(fimUsado, a), horaLivre = ('0' + Math.floor(ini2 / 60)).slice(-2) + ':' + ('0' + (ini2 % 60)).slice(-2);
+            if (b - ini2 >= 45) htmlT += '<div class="tl-legado" onclick="event.stopPropagation();abrirAgendarCom(50,\'' + dStr + '\',\'' + horaLivre + '\');" style="top:' + (top(ini2) + 2) + 'px;height:' + ((b - ini2) * PX - 6) + 'px;">+ Legado · ' + horaLivre + '–' + sl.end + '</div>';
+          }
+        }
+      });
+      // eventos na hora real; quem se sobrepõe divide a largura
+      var lanes = [];
+      doDia.forEach(function(e) {
+        var st = agMin((e.startTime || '').substring(0, 5)), en = agMin((e.endTime || '').substring(0, 5)) || (st + (e.duration || 100));
+        var lane = 0; while (lanes[lane] && lanes[lane] > st) lane++;
+        lanes[lane] = en; e._lane = lane;
+      });
+      var nLanes = Math.max(1, lanes.length);
+      doDia.forEach(function(e) {
+        var st = agMin((e.startTime || '').substring(0, 5)), en = agMin((e.endTime || '').substring(0, 5)) || (st + (e.duration || 100));
+        var idxEv = _v2evs.indexOf(e), info = agStatusInfo(e.status), nome = agNomeDoEvento(e.title), dur = e.duration || (en - st);
+        var naGrade = slotsDia.some(function(sl) { return sl.end && !sl.fixo && st >= agMin(sl.start) && st < agMin(sl.end); });
+        var alt = Math.max(24, (en - st) * PX - 4), curto = alt < 60;
+        var larg = 100 / nLanes, esq = e._lane * larg;
+        htmlT += '<div class="tl-ev' + (curto ? ' curto' : '') + (naGrade ? '' : ' fora') + '" onclick="abrirMenuEvento(event,' + idxEv + ')" title="' + String(nome).replace(/"/g, '&quot;') + ' · ' + (e.startTime || '') + '–' + (e.endTime || '') + (naGrade ? '' : ' · fora da grade') + '" style="top:' + (top(st) + 2) + 'px;height:' + alt + 'px;left:calc(' + esq + '% + 5px);width:calc(' + larg + '% - 10px);background:' + info.bg + ';">'
+          + '<div class="sg-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(nome) + ');">' + v2ini(nome) + '</span><div class="sg-nome" style="color:' + info.fg + ';">' + nome + '</div></div>'
+          + (curto ? '' : '<div class="tl-h">' + (e.startTime || '') + '–' + (e.endTime || '') + ' · ' + (dur <= 50 ? 'Legado' : 'HT') + (naGrade ? '' : ' <span class="tl-fora-tag">fora da grade</span>') + '</div>'
+          + '<span class="sg-st" style="background:rgba(0,0,0,.28);color:' + info.fg + ';">' + info.lbl + '</span>')
+          + '</div>';
+      });
+      if (ehHoje) { var mAg = agora.getHours() * 60 + agora.getMinutes(); if (mAg >= minG && mAg <= maxG) htmlT += '<div class="tl-agora" style="top:' + top(mAg) + 'px;"></div>'; }
+      htmlT += '</div>';
+    });
+    htmlT += '</div>';
+    return htmlT;
+  } // fim de timelineDe
+  var desenha = (typeof agVista === 'function' && agVista() === 'grade') ? gridDe : timelineDe;
+
   var htmlFinal;
   if (AG.closer === 'ambos') {
     // visão "Os dois": uma agenda EM CIMA da outra — Bruno primeiro, Tony embaixo
-    var gB = gridDe(evs.filter(function(e){ return e._cal === 'bruno'; }), '👤 Bruno Pardim', gradeNova ? slotsDo('bruno') : SLOTS_BRUNO);
-    var gT = gridDe(evs.filter(function(e){ return e._cal === 'tony'; }), '👤 Tony Londe', gradeNova ? slotsDo('tony') : SLOTS_BRUNO);
+    var gB = desenha(evs.filter(function(e){ return e._cal === 'bruno'; }), '👤 Bruno Pardim', gradeNova ? slotsDo('bruno') : SLOTS_BRUNO);
+    var gT = desenha(evs.filter(function(e){ return e._cal === 'tony'; }), '👤 Tony Londe', gradeNova ? slotsDo('tony') : SLOTS_BRUNO);
     htmlFinal = '<div class="sg-duas' + (agLadoALado() ? '' : ' empilhado') + '"><div class="sg-col">' + gB + '</div><div class="sg-col">' + gT + '</div></div>';
   } else {
-    htmlFinal = gridDe(evs, '');
+    htmlFinal = desenha(evs, '');
   }
   document.getElementById('v2-sg').innerHTML = htmlFinal;
+  try { agAtualizarBotaoVista(); } catch (eV) {}
   try { agAtualizarBotaoLado(); } catch (eL2) {}
   posicionarLinhaAgora();
 
