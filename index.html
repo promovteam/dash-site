@@ -2332,7 +2332,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-10-1524';
+var VERSAO_DASH = '2026-09-10-1739';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -8183,7 +8183,7 @@ function tipoDoAnuncio(nome, tipoDoLead) {
 // =====================================================================
 // 📣 ABA ANÚNCIOS E ORIGENS — de onde vem cada reunião e cada venda
 // =====================================================================
-var AN_PER = 'mes', AN_ORD = 'auto', AN_TIPO = 'todos';   // 'auto' = Vendas nos pagos, Pedidos no orgânico
+var AN_PER = 'mes', AN_ORD = 'auto', AN_TIPO = 'pago';   // 'auto' = Vendas nos pagos, Pedidos no orgânico · abre em Tráfego pago (Bruno 10/09/2026: sem a opção "Todos")
 var AN_DE = null, AN_ATE = null;   // período escolhido no calendário (AN_PER = 'custom') — Bruno 06/09/2026
 // filtros PRÓPRIOS da tabela "Detalhamento por origem" (per '' = igual à aba) — Bruno 06/09/2026
 var OR = { per: '', de: null, ate: null, closer: '', prod: '' };
@@ -8406,7 +8406,7 @@ function renderAnuncios() {
   // as postagens que a equipe cadastrou entram na lista junto com os anúncios,
   // mesmo as que ainda não trouxeram lead (Bruno 19/08/2026)
   // posts reais do Instagram (aba "IG Posts"), com os pedidos de diagnóstico
-  if (typeof igCardsOrganicos === 'function' && (AN_TIPO === 'organico' || AN_TIPO === 'todos')) {
+  if (typeof igCardsOrganicos === 'function' && AN_TIPO === 'organico') {
     var _igLinksJa = {};
     Object.keys(an).forEach(function(k){ if (String(k).indexOf('POST:') === 0) _igLinksJa[_lerPost(k).link] = k; });
     igCardsOrganicos(per).forEach(function(c) {
@@ -8433,8 +8433,11 @@ function renderAnuncios() {
     try { var cc = criativoDe(k, mm.adId); if (cc && cc.foto) return true; } catch (e) {}
     return false;
   }
+  // cartões de ORIGEM da planilha (workshop, indicação, [Org][Diag]…) saem da lista de criativos — a tabela
+  // "Detalhamento por origem" lá em cima já mostra isso (Bruno 10/09/2026: "tire as origens da planilha também")
+  chaves = chaves.filter(function(k){ return !anEhOrigem(k); });
   var _semImagem = chaves.filter(function(k){ return !_temImagem(k); });
-  chaves = (AN_TIPO === 'sem') ? _semImagem : chaves.filter(_temImagem);
+  if (AN_TIPO === 'sem') chaves = _semImagem;   // nos outros filtros os sem imagem continuam na lista, mas por ÚLTIMO (ordenação mais abaixo)
   if (AN_SO === 'mql') chaves = chaves.filter(function(k){ return an[k].mql > 0; });
   else if (AN_SO === 'venda') chaves = chaves.filter(function(k){ return an[k].vd > 0; });
   else if (AN_SO === 'reuniao') chaves = chaves.filter(function(k){ return an[k].re > 0; });
@@ -8447,6 +8450,7 @@ function renderAnuncios() {
                 ped:function(a,b){return ((an[b].ig||{}).pedidos||0)-((an[a].ig||{}).pedidos||0)},
                 gasto:function(a,b){return ((metaPor[_chaveAnuncio(b)]||{}).gasto||0)-((metaPor[_chaveAnuncio(a)]||{}).gasto||0)} }[AN_ORD_EFETIVA()] || null;
   if (ordFn) chaves.sort(ordFn);
+  if (AN_TIPO !== 'sem') chaves = chaves.filter(_temImagem).concat(chaves.filter(function(k){ return !_temImagem(k); }));   // quem não tem imagem vai para o fim (Bruno 10/09/2026)
 
   // o painel do orgânico aparece com qualquer filtro (Todos, Tráfego pago, Orgânico, Sem imagem) — Bruno 06/09/2026
   try { h += igPainelResumo(per); } catch (eR) {}
@@ -8460,7 +8464,7 @@ function renderAnuncios() {
     + '</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">'
     + '<input class="search-input" id="an-busca" value="' + String(AN_BUSCA || '').replace(/"/g, '&quot;') + '" placeholder="🔍 achar post ou anúncio…" style="margin-bottom:0;flex:1;min-width:160px;max-width:280px;padding:7px 11px;font-size:.75rem;" oninput="AN_BUSCA=this.value;clearTimeout(window._anBt);window._anBt=setTimeout(function(){renderAnuncios();document.getElementById(\'an-busca\').focus();},400);">'
-    + [['todos','Todos'],['pago','💰 Tráfego pago'],['organico','🌱 Orgânico'],['sem','🔗 Sem imagem' + (_semImagem.length ? ' (' + _semImagem.length + ')' : '')]].map(function(o){
+    + [['pago','💰 Tráfego pago'],['organico','🌱 Orgânico'],['sem','🔗 Sem imagem' + (_semImagem.length ? ' (' + _semImagem.length + ')' : '')]].map(function(o){
         return '<span class="chart-chip' + (AN_TIPO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_TIPO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '<span style="width:10px;"></span>'
     + [['','Tudo'],['mql','⭐ só com MQL'],['agend','📅 só com agendamento'],['reuniao','✅ só com reunião'],['venda','💰 só com venda']].map(function(o){
@@ -13434,23 +13438,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWBGNMU1WZ4MmieczE2_vbgoJgO47muNERpoxEa-sVUgpk8yO4r2GlUURiOl9gmeAa/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -15896,7 +15900,7 @@ function agendarReuniao(btn) {
 
   btn.disabled = true;
   btn.textContent = '⏳ Gravando na planilha + Calendar + Meet…';
-  sendToGAS({
+  var pedido = {
     action: 'addRowAndCalendar',
     gid: V2_GID,
     fields: fields,
@@ -15913,7 +15917,8 @@ function agendarReuniao(btn) {
       obs: document.getElementById('ag-obs').value.trim(),
       titulo: nome + (sdr ? ' | Equipe ' + sdr : '')
     }
-  }).then(function() {
+  };
+  var _depoisDeGravar = function() {
     btn.disabled = false;
     btn.textContent = '✓ Agendar reunião';
     fecharAgendar();
@@ -15939,7 +15944,65 @@ function agendarReuniao(btn) {
     setTimeout(carregarV2, 5000);
     // confere se o evento entrou MESMO na agenda do closer; se não entrou, avisa
     setTimeout(function(){ conferirEventoNaAgenda(agenda, dataBr, nome); }, 9000);
+  };
+  // (Bruno 10/09/2026: "tendo que lançar duas vezes todas as reuniões") — o dash passava a mão na cabeça:
+  // mandava o pedido às cegas e fingia sucesso. Com o robô saturado a 1ª tentativa se perdia em silêncio.
+  // Agora ESPERA a resposta do robô; sem resposta, confere na agenda antes de liberar nova tentativa.
+  gravarComResposta(pedido, 45000).then(function(res) {
+    if (res && res.success) { _depoisDeGravar(); return; }
+    if (res && res._semResposta) {
+      btn.textContent = '⏳ Robô demorou — conferindo se entrou na agenda…';
+      setTimeout(function() {
+        conferirSeEntrou(agenda, dataBr, nome, function(entrou, falhou) {
+          btn.disabled = false; btn.textContent = '✓ Agendar reunião';
+          if (entrou) { _depoisDeGravar(); return; }
+          caixaPromov({ ico: '⚠️', titulo: falhou ? 'Não consegui confirmar' : 'Não entrou',
+            texto: falhou
+              ? 'O robô não respondeu e não consegui conferir a agenda.\n\nAbra o Google Agenda do closer: se a reunião de ' + nome + ' NÃO estiver lá, espere 1 minuto e clique em "Agendar reunião" de novo.'
+              : 'O robô não respondeu e a reunião de ' + nome + ' NÃO entrou na agenda.\n\nNada foi criado. Espere 1 minuto e clique em "Agendar reunião" de novo.',
+            botoes: [{ t: 'Entendi' }] });
+        });
+      }, 8000);
+      return;
+    }
+    btn.disabled = false; btn.textContent = '✓ Agendar reunião';
+    caixaPromov({ ico: '⚠️', titulo: 'Não consegui gravar', texto: 'O robô respondeu com erro: ' + ((res && res.error) || 'sem detalhe') + '\n\nNada foi criado. Tente de novo.', botoes: [{ t: 'Entendi' }] });
   });
+}
+
+// manda o pedido ao robô e ESPERA a resposta (JSON); sem resposta em `ms` → {_semResposta:true}
+function gravarComResposta(pedido, ms) {
+  return new Promise(function(resolve) {
+    var pronto = false;
+    var t = setTimeout(function() { if (!pronto) { pronto = true; resolve({ success: false, _semResposta: true }); } }, ms || 45000);
+    try {
+      fetch(APPS_SCRIPT_URL, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(pedido) })
+        .then(function(x) { return x.text(); })
+        .then(function(txt) {
+          if (pronto) return; pronto = true; clearTimeout(t);
+          var j = null; try { j = JSON.parse(txt); } catch (e) {}
+          resolve(j || { success: false, _semResposta: true });   // HTML de erro do Google = sem resposta útil
+        })
+        .catch(function() { if (pronto) return; pronto = true; clearTimeout(t); resolve({ success: false, _semResposta: true }); });
+    } catch (e) { if (!pronto) { pronto = true; clearTimeout(t); resolve({ success: false, _semResposta: true }); } }
+  });
+}
+// confere no Google Agenda se a reunião entrou: cb(entrou, falhouAConsulta)
+function conferirSeEntrou(agenda, dataBr, nome, cb) {
+  var dp = dataBr.split('/');
+  if (dp.length !== 3) { cb(false, true); return; }
+  var d = new Date(+dp[2], +dp[1] - 1, +dp[0]);
+  var wk = agDataStr(agSegunda(d)), dia = dp[2] + '-' + dp[1] + '-' + dp[0];
+  var primeiroNome = v2norm(nome).split(' ')[0];
+  fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + wk + '&_t=' + Date.now(), { redirect: 'follow' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data.success) { cb(false, true); return; }
+      var achou = (data[agenda] || []).some(function(ev) { return ev.date === dia && v2norm(ev.title || '').indexOf(primeiroNome) !== -1; });
+      if (achou) { var wk2 = agDataStr(AG.weekStart); delete AG.cache[wk2]; }
+      cb(achou, false);
+    })
+    .catch(function() { cb(false, true); });
 }
 
 // depois de agendar, verifica no Google Agenda se o evento realmente foi criado.
