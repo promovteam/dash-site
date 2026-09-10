@@ -2262,7 +2262,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-10-0848';
+var VERSAO_DASH = '2026-09-10-0854';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -13508,7 +13508,8 @@ var SLOTS_TONY_14 = [
   { start:'LUNCH', ini:'12:20', fim:'13:00' },
   { start:'13:00', end:'14:40' },
   { start:'14:40', end:'16:20' },
-  { start:'16:20', end:'18:00' }
+  { start:'16:20', end:'18:00' },
+  { start:'18:00', end:'19:40', extra:true }
 ];
 var SLOTS_BRUNO_14 = [
   { start:'08:20', end:'09:00', fixo:'Reunião comercial' },
@@ -13517,7 +13518,8 @@ var SLOTS_BRUNO_14 = [
   { start:'LUNCH', ini:'12:20', fim:'14:00' },
   { start:'14:00', end:'15:40' },
   { start:'15:40', end:'17:20' },
-  { start:'17:20', end:'19:00' }
+  { start:'17:20', end:'19:00' },
+  { start:'19:00', end:'20:40', extra:true }
 ];
 var GRADE_14_DESDE = new Date(2026, 8, 14);
 function slotsDo(closer, dataRef){
@@ -15537,9 +15539,11 @@ function agendarReuniao(btn) {
   var dataAg = mData ? new Date(+mData[3], +mData[2]-1, +mData[1]) : null;
   var ehSabado = dataAg && dataAg.getDay() === 6;
   var ehDiaFeriado = mData && ehFeriado(mData[3] + '-' + mData[2] + '-' + mData[1]);
-  var ehExtra = dataAg && dataAg >= NOVA_GRADE_DESDE && (ehSabado || ehDiaFeriado || hora === '18:00');
+  var horaExtra = false;
+  try { horaExtra = dataAg && slotsDo(agenda, dataAg).some(function(sl) { return sl.extra && agMin(sl.start) <= agMin(hora) && agMin(hora) < agMin(sl.end); }); } catch (eX) { horaExtra = hora === '18:00'; }
+  var ehExtra = dataAg && dataAg >= NOVA_GRADE_DESDE && (ehSabado || ehDiaFeriado || horaExtra);
   if (ehExtra && !window._agAprovado) {
-    pedirAprovacao(closerNome, ehDiaFeriado ? 'feriado' : ehSabado ? 'sábado' : '18:00', function() {
+    pedirAprovacao(closerNome, ehDiaFeriado ? 'feriado' : ehSabado ? 'sábado' : hora, function() {
       window._agAprovado = true;
       agendarReuniao(btn);
     });
