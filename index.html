@@ -209,6 +209,13 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .sg-fixo.passada { background:rgba(255,255,255,.02); border:1px dashed rgba(255,255,255,.1); color:var(--muted); font-weight:700; }
 .fx-insight { display:block; font-size:.58rem; color:var(--yellow); font-weight:800; margin-top:2px; }
 .sg-grid { position:relative; }
+/* visão "Os dois" lado a lado (Bruno 10/09/2026) — cada agenda rola de lado se faltar espaço */
+.sg-duas { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+.sg-duas.empilhado { grid-template-columns:1fr; }
+.sg-duas .sg-col { min-width:0; }
+.sg-duas:not(.empilhado) .sg-grid { overflow-x:auto; grid-template-columns:48px repeat(6,minmax(96px,1fr)); }
+.sg-duas:not(.empilhado) .sg-titulo:first-child { margin-top:0; }
+@media (max-width:1180px) { .sg-duas { grid-template-columns:1fr; } }
 .sg-titulo { font-size:.84rem; font-weight:800; color:var(--text); margin:20px 0 10px; display:flex; align-items:center; gap:8px;
   padding:8px 14px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
 .sg-titulo:first-child { margin-top:0; }
@@ -1110,6 +1117,7 @@ img { max-width:100%; height:auto; }
           <button class="chart-chip on" id="cl-ambos" onclick="mudarCloser('ambos')">👥 As duas agendas</button>
           <button class="chart-chip" id="cl-bruno" onclick="mudarCloser('bruno')">Bruno Pardim</button>
           <button class="chart-chip" id="cl-tony" onclick="mudarCloser('tony')">Tony Londe</button>
+          <button class="chart-chip" id="cl-lado" onclick="agTrocarDisposicao()" title="Na visão dos dois closers: agendas lado a lado ou uma em cima da outra" style="margin-left:auto;">↔ lado a lado</button>
         </div>
       </div>
 
@@ -2109,6 +2117,8 @@ function produtoMudou(prod) {
   var preco = precoDoProduto(prod);
   if (vi && preco !== null) vi.value = fmtValor(preco);
   if (typeof atualizarFila === 'function') atualizarFila();
+  // a lista de horários segue o produto: Spark/Growth = horário inteiro; só Legado tem 1ª/2ª metade (Bruno 10/09/2026)
+  if (typeof atualizarHorarios === 'function') { try { atualizarHorarios(); } catch (eH) {} }
 }
 
 function abrirAgendar(dur){
@@ -2262,7 +2272,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-10-0854';
+var VERSAO_DASH = '2026-09-10-0918';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -13326,23 +13336,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxEybyxo3biGORZcY_JGxx6hTe4YF2GMMmkp2jqJLkAemMwvQ2jqiN_AXL22uqUQ1G_/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxkSQxCFn0vDllIQzqdET9A16T5c7_jRFSFnd7ACqCAC-bUjKSwoJVNlgczrKQHIEcG/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -13556,8 +13566,29 @@ function mudarSemana(delta) {
   AG.weekStart = new Date(AG.weekStart.getTime() + delta * 7 * 86400000);
   carregarAgenda();
 }
+// disposição da visão "Os dois": lado a lado (padrão em tela larga) ou empilhado — fica lembrado no navegador
+function agLadoALado() {
+  var g = null; try { g = localStorage.getItem('agLadoALado'); } catch (e) {}
+  if (g === '1') return true; if (g === '0') return false;
+  return window.innerWidth >= 1180;
+}
+function agTrocarDisposicao() {
+  var novo = !agLadoALado();
+  try { localStorage.setItem('agLadoALado', novo ? '1' : '0'); } catch (e) {}
+  agAtualizarBotaoLado();
+  var wk = agDataStr(AG.weekStart);
+  if (AG.closer === 'ambos') { if (AG.cache[wk]) renderSemanaV2(AG.cache[wk]); else carregarAgenda(); }
+}
+function agAtualizarBotaoLado() {
+  var b = document.getElementById('cl-lado'); if (!b) return;
+  var lado = agLadoALado();
+  b.textContent = lado ? '⬍ em cima' : '↔ lado a lado';
+  b.title = lado ? 'Agora estão lado a lado — clique para colocar uma em cima da outra' : 'Agora estão uma em cima da outra — clique para colocar lado a lado';
+  b.style.display = AG.closer === 'ambos' ? '' : 'none';
+}
 function mudarCloser(k) {
   AG.closer = k;
+  try { agAtualizarBotaoLado(); } catch (eL) {}
   document.getElementById('cl-bruno').classList.toggle('on', k === 'bruno');
   document.getElementById('cl-tony').classList.toggle('on', k === 'tony');
   var amb = document.getElementById('cl-ambos');
@@ -13835,12 +13866,14 @@ function renderSemanaV2(calData) {
   var htmlFinal;
   if (AG.closer === 'ambos') {
     // visão "Os dois": uma agenda EM CIMA da outra — Bruno primeiro, Tony embaixo
-    htmlFinal = gridDe(evs.filter(function(e){ return e._cal === 'bruno'; }), '👤 Bruno Pardim', gradeNova ? slotsDo('bruno') : SLOTS_BRUNO)
-              + gridDe(evs.filter(function(e){ return e._cal === 'tony'; }), '👤 Tony Londe', gradeNova ? slotsDo('tony') : SLOTS_BRUNO);
+    var gB = gridDe(evs.filter(function(e){ return e._cal === 'bruno'; }), '👤 Bruno Pardim', gradeNova ? slotsDo('bruno') : SLOTS_BRUNO);
+    var gT = gridDe(evs.filter(function(e){ return e._cal === 'tony'; }), '👤 Tony Londe', gradeNova ? slotsDo('tony') : SLOTS_BRUNO);
+    htmlFinal = '<div class="sg-duas' + (agLadoALado() ? '' : ' empilhado') + '"><div class="sg-col">' + gB + '</div><div class="sg-col">' + gT + '</div></div>';
   } else {
     htmlFinal = gridDe(evs, '');
   }
   document.getElementById('v2-sg').innerHTML = htmlFinal;
+  try { agAtualizarBotaoLado(); } catch (eL2) {}
   posicionarLinhaAgora();
 
   var regularesDe = function(g){ return g.filter(function(s){ return s.end && !s.fixo && !s.extra; }).length * 5; };
