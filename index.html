@@ -2262,7 +2262,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-10-0830';
+var VERSAO_DASH = '2026-09-10-0848';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2781,12 +2781,24 @@ function atualizarHorarios() {
   } else if (diaSem === 6) {
     horas = SLOTS_SABADO.map(function(s){ return { h:s.start, lock:true }; });
   } else {
-    horas = slotsDo(key).filter(function(s){ return s.end && !s.fixo; })
-      .map(function(s){ return { h:s.start, lock:!!s.extra }; });
+    horas = slotsDo(key, dataEsc).filter(function(s){ return s.end && !s.fixo; })
+      .map(function(s){ return { h:s.start, fim:s.end, lock:!!s.extra }; });
+  }
+  // Legado (50 min) num horário de 100: o SDR escolhe a 1ª ou a 2ª metade (Bruno 10/09/2026)
+  if (dur === 50 && dataEsc >= NOVA_GRADE_DESDE && diaSem !== 6) {
+    var hm = function(min) { return ('0' + Math.floor(min / 60)).slice(-2) + ':' + ('0' + (min % 60)).slice(-2); };
+    var comMetades = [];
+    horas.forEach(function(o) {
+      var ini = agMin(o.h), fimSlot = o.fim ? agMin(o.fim) : ini + 100;
+      if (fimSlot - ini < 100) { comMetades.push(o); return; }
+      comMetades.push({ h: o.h, lock: o.lock, rot: '1ª metade · ' + o.h + '–' + hm(ini + 50) });
+      comMetades.push({ h: hm(ini + 50), lock: o.lock, rot: '2ª metade · ' + hm(ini + 50) + '–' + hm(fimSlot) });
+    });
+    horas = comMetades;
   }
   // feriado: todos os horários do dia pedem aprovação do closer
   if (dataEsc >= NOVA_GRADE_DESDE && ehFeriado(m[3] + '-' + m[2] + '-' + m[1])) {
-    horas = horas.map(function(o){ return { h:o.h, lock:true }; });
+    horas = horas.map(function(o){ return { h:o.h, lock:true, rot:o.rot }; });
   }
   // o horário clicado na grade NUNCA some da lista (ex.: metade livre de um bloco Legado)
   if (escolhido && !horas.some(function(o){ return o.h === escolhido; })) {
@@ -2794,7 +2806,7 @@ function atualizarHorarios() {
     horas.sort(function(a, b){ return agMin(a.h) - agMin(b.h); });
   }
   sel.innerHTML = horas.map(function(o){
-    return '<option value="' + o.h + '"' + (o.lock ? ' data-lock="1"' : '') + '>' + o.h + (o.lock ? ' 🔒' : '') + '</option>';
+    return '<option value="' + o.h + '"' + (o.lock ? ' data-lock="1"' : '') + (o.rot ? ' data-rot="' + o.rot + '"' : '') + '>' + (o.rot ? o.rot : o.h) + (o.lock ? ' 🔒' : '') + '</option>';
   }).join('');
   if (escolhido && horas.some(function(o){ return o.h === escolhido; })) sel.value = escolhido;
   var seg = agSegunda(new Date(+m[3], +m[2]-1, +m[1]));
@@ -2812,7 +2824,7 @@ function atualizarHorarios() {
       // o horário ocupado NÃO trava mais (pedido do Bruno 19/08/2026): só avisa
       op.disabled = false;
       op.dataset.ocupado = ocupado ? '1' : '';
-      op.textContent = hv + (op.dataset.lock ? ' 🔒' : '') + (ocupado ? ' — ⚠️ já tem reunião' : '');
+      op.textContent = (op.dataset.rot || hv) + (op.dataset.lock ? ' 🔒' : '') + (ocupado ? ' — ⚠️ já tem reunião' : '');
     });
     // NUNCA troca o horário sozinho: se o escolhido já tem reunião, avisa em laranja
     var opSel = sel.selectedOptions[0];
@@ -13487,7 +13499,32 @@ var SLOTS_SABADO = [
 ];
 // a partir de 03/08 a grade nova vale para OS DOIS closers (a reunião comercial das 9h é de todos);
 // SLOTS_BRUNO fica guardada só para desenhar as semanas antigas
-function slotsDo(closer){ return SLOTS_TONY; }
+// 14/09/2026 em diante (Bruno 10/09/2026): volta ao modelo antigo, POR CLOSER, com a reunião comercial às 8h20.
+// Tony: 9h, 10h40, almoço 12h20–13h, 13h, 14h40, 16h20 (até 18h). Bruno: 9h, 10h40, academia+almoço 12h20–14h, 14h, 15h40, 17h20 (até 19h).
+var SLOTS_TONY_14 = [
+  { start:'08:20', end:'09:00', fixo:'Reunião comercial' },
+  { start:'09:00', end:'10:40' },
+  { start:'10:40', end:'12:20' },
+  { start:'LUNCH', ini:'12:20', fim:'13:00' },
+  { start:'13:00', end:'14:40' },
+  { start:'14:40', end:'16:20' },
+  { start:'16:20', end:'18:00' }
+];
+var SLOTS_BRUNO_14 = [
+  { start:'08:20', end:'09:00', fixo:'Reunião comercial' },
+  { start:'09:00', end:'10:40' },
+  { start:'10:40', end:'12:20' },
+  { start:'LUNCH', ini:'12:20', fim:'14:00' },
+  { start:'14:00', end:'15:40' },
+  { start:'15:40', end:'17:20' },
+  { start:'17:20', end:'19:00' }
+];
+var GRADE_14_DESDE = new Date(2026, 8, 14);
+function slotsDo(closer, dataRef){
+  var d = dataRef || AG.weekStart;
+  if (d && d >= GRADE_14_DESDE) return closer === 'tony' ? SLOTS_TONY_14 : SLOTS_BRUNO_14;
+  return SLOTS_TONY;
+}
 // a grade nova (Tony / sábado / reunião extra) vale SÓ DAQUI PARA FRENTE;
 // semanas até 02/08/2026 continuam no formato antigo
 var NOVA_GRADE_DESDE = new Date(2026, 7, 3);
@@ -13653,13 +13690,15 @@ function renderSemanaV2(calData) {
 
   // semanas antigas (antes de 03/08/2026) ficam no formato antigo
   var gradeNova = AG.weekStart >= NOVA_GRADE_DESDE;
-  var GRADE = gradeNova ? slotsDo(AG.closer) : SLOTS_BRUNO;
+  var GRADE_BASE = gradeNova ? slotsDo(AG.closer) : SLOTS_BRUNO;
+  var GRADE = GRADE_BASE;
   var slotIdx = -1; // índice só das linhas normais (para casar com os 2 slots do sábado)
 
   function linhaAgora() { return ''; } // a linha do agora atravessa a grade inteira (ver posicionarLinhaAgora)
 
   // desenha UMA grade de semana para um conjunto de eventos (usada 1x normal, 2x na visão "Os dois")
-  function gridDe(evsDo, titulo) {
+  function gridDe(evsDo, titulo, gradeDo) {
+  var GRADE = gradeDo || GRADE_BASE;
 
   // célula do SÁBADO: só os 2 horários da manhã, sempre com aprovação do closer
   function celSabado(n) {
@@ -13794,16 +13833,18 @@ function renderSemanaV2(calData) {
   var htmlFinal;
   if (AG.closer === 'ambos') {
     // visão "Os dois": uma agenda EM CIMA da outra — Bruno primeiro, Tony embaixo
-    htmlFinal = gridDe(evs.filter(function(e){ return e._cal === 'bruno'; }), '👤 Bruno Pardim')
-              + gridDe(evs.filter(function(e){ return e._cal === 'tony'; }), '👤 Tony Londe');
+    htmlFinal = gridDe(evs.filter(function(e){ return e._cal === 'bruno'; }), '👤 Bruno Pardim', gradeNova ? slotsDo('bruno') : SLOTS_BRUNO)
+              + gridDe(evs.filter(function(e){ return e._cal === 'tony'; }), '👤 Tony Londe', gradeNova ? slotsDo('tony') : SLOTS_BRUNO);
   } else {
     htmlFinal = gridDe(evs, '');
   }
   document.getElementById('v2-sg').innerHTML = htmlFinal;
   posicionarLinhaAgora();
 
-  var totalRegulares = GRADE.filter(function(s){ return s.end && !s.fixo && !s.extra; }).length * 5;
-  if (AG.closer === 'ambos') totalRegulares *= 2; // duas agendas = o dobro de horários
+  var regularesDe = function(g){ return g.filter(function(s){ return s.end && !s.fixo && !s.extra; }).length * 5; };
+  var totalRegulares = AG.closer === 'ambos'
+    ? regularesDe(gradeNova ? slotsDo('bruno') : SLOTS_BRUNO) + regularesDe(gradeNova ? slotsDo('tony') : SLOTS_BRUNO)   // duas agendas, cada uma com a sua grade
+    : regularesDe(GRADE);
   var ocup = Math.round(cheios / totalRegulares * 100);
   document.getElementById('ag-stats').innerHTML =
     '<div class="g-stat"><b style="color:' + (ocup < 40 ? '#ff6b6b' : ocup < 70 ? '#f6a350' : '#3ddc97') + ';">' + ocup + '%</b><span>Ocupação (' + cheios + ' de ' + totalRegulares + ')</span></div>'
