@@ -261,6 +261,10 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 /* o que sobrou de um horário que uma reunião "atravessou" */
 .tl-legado { position:absolute; left:7px; right:7px; border-radius:9px; border:1.5px dashed rgba(61,220,151,.55); color:var(--green); font-size:.66rem; font-weight:800; display:flex; align-items:center; justify-content:center; text-align:center; padding:0 6px; cursor:pointer; background:rgba(61,220,151,.07); z-index:2; }
 .tl-legado:hover { background:rgba(61,220,151,.16); }
+.tl-ev.fantasma { opacity:.9; z-index:4; padding:4px 4px 4px 7px; }
+.tl-ev.fantasma .sg-nome { font-size:.6rem; }
+.tl-ev.fantasma .tl-h, .tl-ev.fantasma .sg-st { display:none; }
+.tl-slot.com-fantasma, .tl-legado.com-fantasma, .tl-sobra.com-fantasma { padding-left:36%; }
 .tl-sobra { position:absolute; left:7px; right:7px; border-radius:7px; border:1px dashed rgba(255,255,255,.14); background:rgba(255,255,255,.035); color:var(--muted); font-size:.6rem; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:help; z-index:2; }
 .tl-agora { position:absolute; left:0; right:0; border-top:2px solid #ff6b6b; z-index:6; pointer-events:none; }
 .tl-agora::before { content:''; position:absolute; left:-1px; top:-5px; width:8px; height:8px; border-radius:50%; background:#ff6b6b; }
@@ -2328,7 +2332,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-10-1453';
+var VERSAO_DASH = '2026-09-10-1524';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -2879,7 +2883,7 @@ function atualizarHorarios() {
   var wk = agDataStr(seg);
   function aplicar(data) {
     var dia = m[3] + '-' + m[2] + '-' + m[1];
-    var busy = (data[key] || []).filter(function(ev){ return ev.date === dia; });
+    var busy = (data[key] || []).filter(function(ev){ return ev.date === dia && !/no.?show|remarcada/i.test(String(ev.status || '')); });   // no-show/remarcada nao seguram o horário (10/09/2026)
     Array.from(sel.options).forEach(function(op) {
       var hv = op.getAttribute('value');
       var ini = agMin(hv), fim = ini + dur;
@@ -14012,6 +14016,10 @@ function renderSemanaV2(calData) {
       // horários da grade por trás (sábado: só os da manhã, com 🔒; feriado: tudo com 🔒)
       var slotsDia = sab ? (gradeNova ? SLOTS_SABADO.map(function(sl) { return { start: sl.start, end: sl.end, extra: true }; }) : []) : G;
       var janelas = slotsDia.filter(function(sl) { return sl.end && !sl.fixo; });
+      // no-show e remarcada nao seguram mais o horario (Bruno 10/09/2026: "posso marcar por cima de um no-show?") —
+      // o cartao vira uma tira estreita ("fantasma") e o resto do horario volta a ficar livre, se ainda nao passou
+      var agoraMin = agora.getHours() * 60 + agora.getMinutes();
+      var fantasma = function(e) { var stt = v2norm(e.status || ''); return stt === 'noshow' || stt === 'no show' || stt.indexOf('remarcada') !== -1; };
       slotsDia.forEach(function(sl) {
         if (sl.start === 'LUNCH') { htmlT += '<div class="tl-lunch" style="top:' + top(agMin(sl.ini)) + 'px;height:' + ((agMin(sl.fim) - agMin(sl.ini)) * PX - 3) + 'px;"><b>🍽 almoço</b><span>' + sl.ini + '–' + sl.fim + '</span></div>'; return; }
         var a = agMin(sl.start), b = agMin(sl.end), altura = (b - a) * PX - 3;
@@ -14024,11 +14032,15 @@ function renderSemanaV2(calData) {
         var extraOuTrava = !!sl.extra || fer;
         var rotTrava = fer ? 'feriado' : sab ? 'sábado' : 'extra';
         // quem encosta neste horário (por sobreposição de verdade, não só pelo início)
-        var ovl = doDia.filter(function(e) { return stDe(e) < b && enDe(e) > a; });
+        var slotPassou = passadoDia || (ehHoje && b <= agoraMin);
+        var ocupantes = slotPassou ? doDia : doDia.filter(function(e) { return !fantasma(e); });
+        var ovl = ocupantes.filter(function(e) { return stDe(e) < b && enDe(e) > a; });
+        var comFantasma = !slotPassou && doDia.some(function(e) { return fantasma(e) && stDe(e) < b && enDe(e) > a; });
+        var clsF = comFantasma ? ' com-fantasma' : '';
         if (!ovl.length) {
-          if (passadoDia) { vaziosPassados++; htmlT += '<div class="tl-slot passado" title="Horário útil passou SEM reunião" ' + box + '><b>' + sl.start + '–' + sl.end + '</b><span>sem reunião</span></div>'; }
-          else if (extraOuTrava) htmlT += '<div class="tl-slot extra" onclick="agendarComAprovacao(event,\'' + dStr + '\',\'' + sl.start + '\')" title="' + rotTrava + ': só com OK do closer" ' + box + '><b>🔒 ' + sl.start + '–' + sl.end + '</b><span>OK do closer</span></div>';
-          else { vaziosFuturos++; htmlT += '<div class="tl-slot" onclick="abrirTipoV2(event,\'' + dStr + '\',\'' + sl.start + '\')" ' + box + '><b>' + sl.start + '–' + sl.end + '</b><span class="tl-mais">+ agendar</span></div>'; }
+          if (slotPassou) { vaziosPassados++; htmlT += '<div class="tl-slot passado" title="Horário útil passou SEM reunião" ' + box + '><b>' + sl.start + '–' + sl.end + '</b><span>sem reunião</span></div>'; }
+          else if (extraOuTrava) htmlT += '<div class="tl-slot extra' + clsF + '" onclick="agendarComAprovacao(event,\'' + dStr + '\',\'' + sl.start + '\')" title="' + rotTrava + ': só com OK do closer" ' + box + '><b>🔒 ' + sl.start + '–' + sl.end + '</b><span>OK do closer</span></div>';
+          else { vaziosFuturos++; htmlT += '<div class="tl-slot' + clsF + '" onclick="abrirTipoV2(event,\'' + dStr + '\',\'' + sl.start + '\')" ' + box + '><b>' + sl.start + '–' + sl.end + '</b><span class="tl-mais">+ agendar</span></div>'; }
           return;
         }
         // mede o que sobrou: pedaços livres dentro do horário
@@ -14038,16 +14050,17 @@ function renderSemanaV2(calData) {
         if (cursor < b) livres.push([cursor, b]);
         var comecaDentro = ovl.some(function(e) { var s1 = stDe(e); return s1 >= a && s1 < b; });
         if (!sl.extra && comecaDentro) cheios++;   // conta a reunião só no horário em que ela começa
+        if (ehHoje) livres = livres.map(function(iv) { return [Math.max(iv[0], agoraMin), iv[1]]; });   // hoje: o que ja passou nao conta como livre
         if (livres.some(function(iv) { return iv[1] - iv[0] >= 15; })) htmlT += '<div class="tl-slot parcial" ' + box + '></div>';
         livres.forEach(function(iv) {
-          var len = iv[1] - iv[0]; if (len < 15 || passadoDia) return;
+          var len = iv[1] - iv[0]; if (len < 15 || slotPassou) return;
           var ini = hhmm(iv[0]), fim = hhmm(iv[1]);
           if (len >= 45) {   // cabe um Legado (50 min) no pedaço que sobrou
             var fimLeg = hhmm(Math.min(iv[0] + 50, iv[1]));
             var click = extraOuTrava ? 'agendarComAprovacao(event,\'' + dStr + '\',\'' + ini + '\')' : 'event.stopPropagation();abrirAgendarCom(50,\'' + dStr + '\',\'' + ini + '\');';
-            htmlT += '<div class="tl-legado" onclick="' + click + '" title="Sobraram ' + len + ' min neste horário (' + ini + '–' + fim + '): cabe um Legado de 50 min" style="top:' + (top(iv[0]) + 2) + 'px;height:' + (len * PX - 6) + 'px;">' + (extraOuTrava ? '🔒 ' : '+ ') + 'Legado · ' + ini + '–' + fimLeg + '</div>';
+            htmlT += '<div class="tl-legado' + clsF + '" onclick="' + click + '" title="Sobraram ' + len + ' min neste horário (' + ini + '–' + fim + '): cabe um Legado de 50 min" style="top:' + (top(iv[0]) + 2) + 'px;height:' + (len * PX - 6) + 'px;">' + (extraOuTrava ? '🔒 ' : '+ ') + 'Legado · ' + ini + '–' + fimLeg + '</div>';
           } else {           // sobra pequena: não cabe nada — remarcar a reunião vizinha para o começo do horário resolve
-            htmlT += '<div class="tl-sobra" title="Sobraram só ' + len + ' min (' + ini + '–' + fim + '): não cabe reunião. Para aproveitar, remarque a reunião vizinha para o começo do horário (clique nela → Remarcar)." style="top:' + (top(iv[0]) + 2) + 'px;height:' + (len * PX - 6) + 'px;">sobra ' + len + ' min</div>';
+            htmlT += '<div class="tl-sobra' + clsF + '" title="Sobraram só ' + len + ' min (' + ini + '–' + fim + '): não cabe reunião. Para aproveitar, remarque a reunião vizinha para o começo do horário (clique nela → Remarcar)." style="top:' + (top(iv[0]) + 2) + 'px;height:' + (len * PX - 6) + 'px;">sobra ' + len + ' min</div>';
           }
         });
       });
@@ -14066,13 +14079,15 @@ function renderSemanaV2(calData) {
         var alt = Math.max(26, (en - st) * PX - 4), curto = alt < 62;
         var cor = String(info.bg), solida = cor.replace(/,\s*[\d.]+\)$/, ',1)'), tinta = cor.replace(/,\s*[\d.]+\)$/, ',.30)');
         var pos, colunaEstreita = (AG.closer === 'ambos' && typeof agLadoALado === 'function' && agLadoALado());
-        if (n <= 1) pos = 'left:6px;right:6px;';
+        var ehFantasma = fantasma(e) && !passadoDia && !(ehHoje && en <= agoraMin);
+        if (ehFantasma) pos = 'left:6px;width:32%;';
+        else if (n <= 1) pos = 'left:6px;right:6px;';
         else if (n === 2 && !colunaEstreita) pos = 'left:calc(' + (e._lane * 50) + '% + 5px);width:calc(50% - 8px);';   // duas ao mesmo tempo: lado a lado (quando há largura)
         else pos = 'left:' + (6 + e._lane * 20) + 'px;right:6px;z-index:' + (10 + e._lane) + ';';                          // em cascata: a de cima cobre, a de baixo mostra a faixa
         var cascata = n >= 3 || (n === 2 && colunaEstreita);
-        var cls = 'tl-ev' + (curto ? ' curto' : '') + (naGrade ? '' : ' fora') + (n >= 2 && !cascata ? ' estreito' : '') + (cascata ? ' cascata' : '');
+        var cls = 'tl-ev' + (curto ? ' curto' : '') + (naGrade && !ehFantasma ? '' : (ehFantasma ? '' : ' fora')) + (n >= 2 && !cascata && !ehFantasma ? ' estreito' : '') + (cascata && !ehFantasma ? ' cascata' : '') + (ehFantasma ? ' fantasma' : '');
         var tipo = dur <= 50 ? 'Legado' : 'HT';
-        var tit = nome + ' · ' + hhmm(st) + '–' + hhmm(en) + ' · ' + tipo + ' · ' + info.lbl + (naGrade ? '' : ' · FORA DA GRADE — clique → Remarcar para encaixar num horário');
+        var tit = nome + ' · ' + hhmm(st) + '–' + hhmm(en) + ' · ' + tipo + ' · ' + info.lbl + (ehFantasma ? ' · não segura o horário: dá para marcar outra pessoa aqui' : (naGrade ? '' : ' · FORA DA GRADE — clique → Remarcar para encaixar num horário'));
         htmlT += '<div class="' + cls + '" onclick="abrirMenuEvento(event,' + idxEv + ')" title="' + tit.replace(/"/g, '&quot;') + '" style="top:' + (top(st) + 2) + 'px;height:' + alt + 'px;' + pos + 'border-left-color:' + solida + ';background:linear-gradient(160deg,' + tinta + ', rgba(20,23,29,0) 72%), #171b23;">'
           + '<div class="sg-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(nome) + ');">' + v2ini(nome) + '</span><div class="sg-nome">' + nome + '</div></div>'
           + '<div class="tl-h">' + hhmm(st) + '–' + hhmm(en) + (tipo === 'Legado' ? ' · Legado' : '') + (naGrade ? '' : ' <span class="tl-fora-tag">fora da grade</span>') + '</div>'
@@ -14229,8 +14244,11 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
   var dp = dataStr.split('-');
   {
     var dataBr = dp[2] + '/' + dp[1] + '/' + dp[0];
-    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'data', valor: dataBr, dataRef: v2dataRef(r), gid: V2_GID });
-    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Reunião agendada', dataRef: v2dataRef(r), gid: V2_GID });
+    var _refAntiga = v2dataRef(r), _mesNovo = mesPlanilhaDe(dataStr), _mesAntigo = r.date ? mesPlanilhaDe(r.date.getFullYear() + '-' + String(r.date.getMonth() + 1).padStart(2, '0') + '-' + String(r.date.getDate()).padStart(2, '0')) : '';
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'data', valor: dataBr, dataRef: _refAntiga, gid: V2_GID }).then(function() {   // data primeiro; mês e status depois, pela data nova
+      if (_mesNovo && _mesNovo !== _mesAntigo) sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'mes', valor: _mesNovo, dataRef: dataBr, gid: V2_GID });   // mudou de mês: a coluna Mês acompanha
+      sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Reunião agendada', dataRef: dataBr, gid: V2_GID });
+    });
     var _eraNoShow = (r.sn || v2norm(r.status || '')) === 'no show';
     r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '')
       + (_eraNoShow ? '🔴 No-show em ' + (r.date ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : '') + ' ##NOSHOW## | ' : '')
@@ -14257,6 +14275,27 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
     return;
   }
 }
+// texto da coluna "Mês" da aba Vendas, no formato que a planilha usa ("9.setembro")
+function mesPlanilhaDe(dataStr) {
+  var q = String(dataStr || '').split('-'); if (q.length !== 3) return '';
+  var mesesP = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  var mi = parseInt(q[1], 10); return mi ? (mi + '.' + mesesP[mi - 1]) : '';
+}
+// depois de remarcar pela AGENDA: a mesma linha da planilha recebe a data nova, o mês novo (se mudou de mês) e volta a "Reunião agendada"
+// (Bruno 10/09/2026: "muda a data na planilha?" / "e que troque o mês também caso for mês diferente")
+function _remarcarPlanilhaMesmaLinha(ev, dataStr) {
+  var r = null; try { r = leadDoEvento(ev); } catch (e) {}
+  if (!r || !r.nome) return false;
+  var dp = dataStr.split('-'), dataBr = dp[2] + '/' + dp[1] + '/' + dp[0], ref = v2dataRef(r);
+  var mesNovo = mesPlanilhaDe(dataStr), mesAntigo = r.date ? mesPlanilhaDe(r.date.getFullYear() + '-' + String(r.date.getMonth() + 1).padStart(2, '0') + '-' + String(r.date.getDate()).padStart(2, '0')) : '';
+  // primeiro a data (acha a linha pelo nome + data antiga); só depois o mês e o status, já pela data nova
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'data', valor: dataBr, dataRef: ref, gid: V2_GID }).then(function() {
+    if (mesNovo && mesNovo !== mesAntigo) sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'mes', valor: mesNovo, dataRef: dataBr, gid: V2_GID });
+    sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Reunião agendada', dataRef: dataBr, gid: V2_GID });
+  });
+  try { r.date = new Date(+dp[0], +dp[1] - 1, +dp[2]); r.mes = mesNovo || r.mes; } catch (e2) {}
+  return true;
+}
 function _remarcarEventoOk(ev, dataStr, hora, dp) {
   // se o evento estava em NO-SHOW, a marca do no-show fica na observação da linha (não some da história)
   try {
@@ -14272,6 +14311,8 @@ function _remarcarEventoOk(ev, dataStr, hora, dp) {
     if (!res || !res.success) { alert('Não consegui remarcar: ' + ((res && res.error) || 'sem resposta do robô')); return; }
     sendToGAS({ action: 'updateEventStatus', calendar: ev._cal || AG.closer, eventId: ev.id, status: 'remarcada' });
     ev.status = 'remarcada'; ev._statusExplicit = true;
+    var _naPlanilha = false; try { _naPlanilha = _remarcarPlanilhaMesmaLinha(ev, dataStr); } catch (ePl) {}
+    if (!_naPlanilha) { try { avisoRapido('⚠️ Não achei essa pessoa na planilha: confira a data dela na aba Vendas'); } catch (eA) {} }
     cancelarRemarcacao();
     agInvalidar();
     try { carregarAgenda(); } catch (e) {}
