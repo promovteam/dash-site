@@ -2309,7 +2309,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     if (s === 'placar' && typeof renderPlacar === 'function') renderPlacar();
     if (s === 'visao' && typeof carregarVisaoGeral === 'function') carregarVisaoGeral();
     if (s === 'anuncios' && typeof IGO !== 'undefined' && !IGO.carregado && !IGO.buscando && typeof carregarPostsOrganicos === 'function') { try { carregarPostsOrganicos(); } catch (ePo) {} }
-    if (s === 'anuncios' && typeof renderAnuncios === 'function') renderAnuncios();
+    if (s === 'anuncios' && typeof renderAnuncios === 'function') { renderAnuncios(); setTimeout(function(){ try { aplicarCapasIG(); pedirCapasIG(); } catch (eCp) {} }, 1500); }
     if (s === 'contratos' && typeof renderContratos === 'function') renderContratos();
     // a tela que precisa dos bloqueios os busca na hora (se ainda não vieram)
     if (typeof BLQ !== 'undefined' && !BLQ.carregado && !BLQ.buscando) { try { carregarBloqueios(); } catch (e) {} }
@@ -2328,7 +2328,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-10-1202';
+var VERSAO_DASH = '2026-09-10-1221';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -3685,16 +3685,20 @@ function igCardsOrganicos(per) {
   return out;
 }
 // prints dos posts organicos (aba "Posts Orgânicos" via robo): link -> foto do Drive
-var POSTS_ORG = { porLink: {}, carregado: false };
+var POSTS_ORG = { porLink: {}, porCodigo: {}, carregado: false };
+// codigo do post no link do Instagram (reel/p/tv) — assim o mesmo post casa mesmo com ?igsh=… ou sem www
+function _igCodigoDash(link) { var m = String(link || '').match(/instagram\.com\/(?:[^\/?#]+\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i); return m ? m[1] : ''; }
 function carregarPostsOrganicos() {
   var nome = 'poCb' + Math.random().toString(36).slice(2, 8);
   var sc = document.createElement('script');
   window[nome] = function(d) {
     try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
     if (d && d.success) {
-      POSTS_ORG.porLink = {};
-      (d.lista || []).forEach(function(p){ if (p.link && p.fotoId) POSTS_ORG.porLink[p.link] = p; });
+      POSTS_ORG.porLink = {}; POSTS_ORG.porCodigo = {};
+      (d.lista || []).forEach(function(p){ if (p.link && p.fotoId) { POSTS_ORG.porLink[p.link] = p; var c = _igCodigoDash(p.link); if (c) POSTS_ORG.porCodigo[c] = p; } });
       POSTS_ORG.carregado = true;
+      try { aplicarCapasIG(); } catch (eC) {}
+      setTimeout(function(){ try { pedirCapasIG(); } catch (eP) {} }, 800);
     }
   };
   sc.onerror = function(){ try { delete window[nome]; } catch (e) {} };
@@ -3708,8 +3712,39 @@ setTimeout(function(){ try { carregarEtiquetas(); } catch (e) {} }, 9000);
 // chegam, as listas de leads são redesenhadas com o selo 📷
 setTimeout(function(){ try { carregarIGOrganico(); } catch (e) {} }, 4000);
 function fotoDoPost(link) {
-  var p = POSTS_ORG.porLink[String(link || '').trim()];
+  var lk = String(link || '').trim();
+  var p = POSTS_ORG.porLink[lk] || POSTS_ORG.porCodigo[_igCodigoDash(lk)];
   return p && p.fotoId ? 'https://drive.google.com/thumbnail?id=' + p.fotoId + '&sz=w400' : '';
+}
+// ===== capas dos posts na aba Criativos (Bruno 10/09/2026: o embed do Instagram vinha preto) =====
+// preenche as capas que ainda estao vazias com a foto guardada no Drive
+function aplicarCapasIG() {
+  document.querySelectorAll('img.ig-capa[data-link]').forEach(function(img) {
+    if (img.getAttribute('src')) return;
+    var f = fotoDoPost(img.getAttribute('data-link'));
+    if (f) { img.src = f; img.style.display = 'block'; }
+  });
+}
+// se sobrou post sem capa, pede ao robo (acao igFotosPosts, a mesma da rotina diaria das 6h) para buscar as miniaturas na API do Instagram — no maximo a cada 3 h
+var _capasPedindo = false;
+function pedirCapasIG() {
+  if (_capasPedindo || !POSTS_ORG.carregado) return;
+  var faltam = Array.prototype.filter.call(document.querySelectorAll('img.ig-capa[data-link]'), function(img) { return !img.getAttribute('src') && _igCodigoDash(img.getAttribute('data-link')); });
+  if (!faltam.length) return;
+  var ultimo = 0; try { ultimo = +(localStorage.getItem('igCapasPedido') || 0); } catch (e) {}
+  if (Date.now() - ultimo < 3 * 3600 * 1000) return;
+  try { localStorage.setItem('igCapasPedido', String(Date.now())); } catch (e) {}
+  _capasPedindo = true;
+  var nome = 'icCb' + Math.random().toString(36).slice(2, 8);
+  var sc = document.createElement('script');
+  window[nome] = function(d) {
+    try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    _capasPedindo = false;
+    if (d && d.success && d.baixadas) { POSTS_ORG.carregado = false; carregarPostsOrganicos(); }   // baixou capa nova: relê a aba e preenche
+  };
+  sc.onerror = function(){ _capasPedindo = false; try { delete window[nome]; } catch (e) {} };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'igFotosPosts', posts: 40 }));
+  document.body.appendChild(sc);
 }
 function guardarPostOrganico(apelido, link) {
   var meus = [];
@@ -8449,11 +8484,13 @@ function renderAnuncios() {
       +   ' style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
       +   (ehPost
             ? (function(){
-                var lk = _lerPost(k).link;
-                var mm = String(lk).match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
-                return mm
-                  ? '<iframe src="https://www.instagram.com/' + mm[1] + '/' + mm[2] + '/embed/captioned/" loading="lazy" scrolling="no" frameborder="0" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:#000;"></iframe>'
-                  : '<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.7rem;opacity:.4;">📱</span>';
+                // capa = foto guardada no Drive pelo robo (o embed do Instagram passou a vir preto — 10/09/2026)
+                var lk = _lerPost(k).link, foto = fotoDoPost(lk), temCodigo = !!_igCodigoDash(lk);
+                return '<img class="ig-capa" data-link="' + String(lk).replace(/"/g, '&quot;') + '"' + (foto ? ' src="' + foto + '"' : '') + ' loading="lazy" style="width:100%;height:100%;object-fit:cover;' + (foto ? '' : 'display:none;') + '"'
+                  +   ' onerror="this.style.display=\'none\';var s=this.parentNode.querySelector(\'.semfoto\');if(s)s.style.display=\'flex\';" onload="var s=this.parentNode.querySelector(\'.semfoto\');if(s)s.style.display=\'none\';">'
+                  + '<span class="semfoto" style="position:absolute;inset:0;display:' + (foto ? 'none' : 'flex') + ';flex-direction:column;gap:4px;align-items:center;justify-content:center;">'
+                  +   '<span style="font-size:1.9rem;opacity:.55;">📱</span>'
+                  +   '<span style="font-size:.62rem;color:var(--muted);font-weight:700;">' + (temCodigo ? 'buscando a capa…' : 'post do Instagram') + '</span></span>';
               })()
             : (m.foto ? '<img src="' + m.foto + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : ''))
       +   (ehPost ? '' : (function(){
