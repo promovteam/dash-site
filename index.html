@@ -2332,7 +2332,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-11-1852';
+var VERSAO_DASH = '2026-09-11-1857';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -17364,14 +17364,30 @@ function plPxJanelaEspacos(p) {
   return [{ rot: p.per === 'mes' ? 'até o fim do mês' : 'no período', ini: Math.max(p.ini, hoje.getTime()), fim: fim }];
 }
 function plPxCarregarAgenda(janelas) {   // busca as semanas que as janelas cobrem; quando chegarem, redesenha o placar uma vez
-  var pend = 0, semanas = {};
+  // (11/09/2026: a versão anterior redesenhava em loop a cada 400 ms enquanto a busca estava no ar — o placar "ficava doido")
+  var semanas = {};
   janelas.forEach(function(j) { for (var t = ldIniSemana(new Date(Math.max(j.ini, Date.now() - 864e5))).getTime(); t < j.fim; t += 7 * 864e5) semanas[agDataStr(new Date(t))] = t; });
   Object.keys(semanas).slice(0, 6).forEach(function(k) {
     var c = PL_AG.cache[k];
-    if (c && Date.now() - c.t < 180000) return;
-    pend++;
-    plAgEventos(new Date(semanas[k]), function() { if (--pend <= 0 && !PLACAR._pxRedesenhando) { PLACAR._pxRedesenhando = true; setTimeout(function(){ PLACAR._pxRedesenhando = false; try { renderPlacar(); } catch (e) {} }, 400); } });
+    if (c && Date.now() - c.t < 180000) return;   // já tem
+    if (PL_AG.buscando[k]) return;                 // já está buscando: quem pediu primeiro redesenha quando chegar
+    plAgEventos(new Date(semanas[k]), function(data) {
+      if (!data) return;                           // falhou: não redesenha (o próximo minuto tenta de novo)
+      var agora = Date.now();
+      if (PLACAR._pxUltimoRedesenho && agora - PLACAR._pxUltimoRedesenho < 3000) return;   // no máximo um redesenho a cada 3 s
+      PLACAR._pxUltimoRedesenho = agora;
+      setTimeout(function(){ try { if (telaVisivel('s-placar')) renderPlacar(); } catch (e) {} }, 300);
+    });
   });
+}
+// período anterior calculado UMA vez por redesenho (os dois painéis usam o mesmo)
+function plPxAnterior(p) {
+  var pa = plPxPeriodoAnterior(p), chave = pa.ini + '_' + pa.fim + '_' + ((V2.rows || []).length) + '_' + ((PAG && PAG.rows) ? PAG.rows.length : 0);
+  var m = PLACAR._pxAntMemo;
+  if (m && m.chave === chave && Date.now() - m.t < 5000) return m.d;
+  var d = null; try { d = plCalcular({ ini: pa.ini, fim: pa.fim, per: p.per }); PL_PAG_TEL = plPagPorTel(); } catch (e) {}
+  PLACAR._pxAntMemo = { chave: chave, t: Date.now(), d: d };
+  return d;
 }
 function plPxEspacosTxt(closers, janelas) {
   return janelas.map(function(j) {
@@ -17421,7 +17437,7 @@ function plPainelSdrs(p, d) {
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   var agora = Date.now(), rotP = plPxRotPeriodo(p);
   var janelas = plPxJanelaEspacos(p); plPxCarregarAgenda(janelas);
-  var pa = plPxPeriodoAnterior(p), dAnt = null; try { dAnt = plCalcular({ ini: pa.ini, fim: pa.fim, per: p.per }); PL_PAG_TEL = plPagPorTel(); } catch (e) {}
+  var dAnt = plPxAnterior(p);
   var antesDe = function(nome) { if (!dAnt) return null; var pn = plPxPrimeiro(nome); return (dAnt.sdrs || []).filter(function(y) { return plPxPrimeiro(y.nome) === pn; })[0] || { marc: 0, ns: 0, re: 0 }; };
   var porTelTodos = {}; (LD.rows || []).forEach(function(l) { if (!l.tel8) return; (porTelTodos[l.tel8] = porTelTodos[l.tel8] || []).push(l); });
   var leadAntesDe = function(t8, mT) { var ls = porTelTodos[t8]; if (!ls) return null; var melhor = null; ls.forEach(function(l) { if (!l.date) return; var lt = l.date.getTime(); if (lt <= mT + 3600000 && (!melhor || lt > melhor.date.getTime())) melhor = l; }); if (melhor) return melhor; ls.forEach(function(l) { if (l.date && (!melhor || l.date.getTime() < melhor.date.getTime())) melhor = l; }); return melhor; };
@@ -17488,7 +17504,7 @@ function plPainelClosers(p, d) {
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   var tHoje = hoje.getTime(), rotP = plPxRotPeriodo(p);
   var janelas = plPxJanelaEspacos(p); plPxCarregarAgenda(janelas);
-  var pa = plPxPeriodoAnterior(p), dAnt = null; try { dAnt = plCalcular({ ini: pa.ini, fim: pa.fim, per: p.per }); PL_PAG_TEL = plPagPorTel(); } catch (e) {}
+  var dAnt = plPxAnterior(p);
   var porTel = {}; (LD.rows || []).forEach(function(l) { if (l.tel8 && !porTel[l.tel8]) porTel[l.tel8] = l; });
   var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
   var closers = (d.closers || []).slice();
