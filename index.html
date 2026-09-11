@@ -2332,7 +2332,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-11-1252';
+var VERSAO_DASH = '2026-09-11-1852';
 var _versaoNova = null;
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
@@ -17260,7 +17260,7 @@ function plVer(tipo, chave, met, _denovo) {
     });
   }
   var um = rows.length === 1;
-  var rotPx = { m24: 'marcadas nas últimas 24 h', direto: 'marcadas DIRETO (até 24 h do formulário)', resgate: 'marcadas por RESGATE (48 h ou mais)', meio: 'marcadas entre 1 e 2 dias', hojeNovas: 'reuniões NOVAS de hoje', hojeRet: 'RETORNOS de hoje', ontemRe: 'realizadas ontem', ontemVd: 'fechamentos de ontem', ontemEnt: 'entradas/bloqueios de ontem', ontemNao: 'não vendidos de ontem', ontemNs: 'no-shows de ontem', fup7: 'follow-ups que venceram nos últimos 7 dias' };
+  var rotPx = { direto: 'marcadas DIRETO (até 24 h após chegar)', resgate: 'marcadas por RESGATE (48 h ou mais)', meio: 'marcadas entre 1 e 2 dias', perNovas: 'reuniões NOVAS no período', perRet: 'RETORNOS no período', perRe: 'realizadas no período', perVd: 'fechamentos no período', perEnt: 'entradas/bloqueios no período', perNao: 'não vendidos no período', perNs: 'no-shows no período', perPend: 'reuniões sem resultado', fup: 'follow-ups que vencem no período' };
   var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', todas: um ? 'REUNIÃO no período' : 'REUNIÕES no período', pend: um ? 'reunião AINDA SEM RESULTADO' : 'reuniões AINDA SEM RESULTADO' }[met] || rotPx[met] || met;
   var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + lista.nome.replace(/</g, '&lt;') + ' — ' + rows.length + ' ' + rot + '</b>'
@@ -17310,46 +17310,77 @@ function plAnimarNumeros(el) {
   requestAnimationFrame(passo);
 }
 // ===== 📞🏆 PAINÉIS POR SDR E POR CLOSER — fim do Placar (Bruno 11/09/2026) =====
-// Fase 1: só cruza dados que já existem (planilha de reuniões, leads, Clint, agenda).
-// Fase 2 (a fazer): motivo de perda, motivo de no-show, compromisso do dia. Fase 3: dores e abordagem (anotações do Gemini).
+// Tudo segue o PERÍODO do placar (Hoje, Ontem, Semana, Mês, Datas) e compara com o período anterior equivalente.
+// Fase 1: só cruza dados que já existem. Fase 2 (a fazer): motivo de perda, motivo de no-show, compromisso do dia. Fase 3: dores e abordagem.
 function plPxNum(v, tipo, chave, met, cor) {
   var st = cor ? ' style="color:' + cor + ';"' : '';
   if (!v || !met) return '<b' + st + '>' + (v || 0) + '</b>';
   return '<b class="n"' + st + ' onclick="plVer(\'' + tipo + '\',\'' + chave + '\',\'' + met + '\')">' + v + '</b>';
 }
+function plPxAntes(atual, antes) {   // "(antes: 12)" com seta, comparando com o período anterior
+  if (antes == null) return '';
+  var seta = atual > antes ? '<span style="color:#3ddc97;">▲</span>' : atual < antes ? '<span style="color:#ff6b6b;">▼</span>' : '<span style="color:#9aa3b2;">=</span>';
+  return '<small title="período anterior equivalente">' + seta + ' antes ' + antes + '</small>';
+}
 function plPxPrimeiro(n) { return v2norm(plPessoa(n) || n || '').split(' ')[0]; }
-// horários LIVRES de um closer numa semana (só o que ainda não passou; no-show/remarcada não seguram horário)
-function plPxEspacos(closer, seg) {
-  var k = agDataStr(seg), c = PL_AG.cache[k];
-  if (!c || !c.data) return null;
-  var evs = (c.data[closer] || []).filter(function(e) { var st = v2norm(e.status || ''); return st !== 'noshow' && st !== 'no show' && st.indexOf('remarcada') === -1 && !/reuni[aã]o\s+comercial/i.test(String(e.title || '')); });
-  var agora = Date.now(), livres = 0;
-  for (var d = 0; d < 5; d++) {
-    var dd = new Date(seg.getTime() + d * 864e5), dStr = agDataStr(dd);
+function plPxPeriodoAnterior(p) {
+  var ini = new Date(p.ini), fim = new Date(p.fim);
+  if (p.per === 'mes') { var a = new Date(ini.getFullYear(), ini.getMonth() - 1, 1); return { ini: a.getTime(), fim: ini.getTime() }; }
+  var dur = p.fim - p.ini; return { ini: p.ini - dur, fim: p.ini };
+}
+// horários LIVRES de um closer entre dois instantes (só o que ainda não passou; no-show/remarcada não seguram horário)
+function plPxEspacosEntre(closer, tIni, tFim) {
+  var agora = Date.now(), de = Math.max(tIni, agora), livres = 0, faltou = false;
+  if (de >= tFim) return 0;
+  var d0 = new Date(de); d0.setHours(0, 0, 0, 0);
+  for (var t = d0.getTime(); t < tFim; t += 864e5) {
+    var dd = new Date(t), dow = dd.getDay();
+    if (dow === 0 || dow === 6) continue;
+    var dStr = agDataStr(dd);
     if (typeof ehFeriado === 'function' && ehFeriado(dStr)) continue;
-    var G = slotsDo(closer, dd) || [];
-    G.forEach(function(sl) {
+    var wk = agDataStr(ldIniSemana(dd)), c = PL_AG.cache[wk];
+    if (!c || !c.data) { faltou = true; continue; }
+    var evs = (c.data[closer] || []).filter(function(e) { if (e.date !== dStr) return false; var st = v2norm(e.status || ''); return st !== 'noshow' && st !== 'no show' && st.indexOf('remarcada') === -1 && !/reuni[aã]o\s+comercial/i.test(String(e.title || '')); });
+    (slotsDo(closer, dd) || []).forEach(function(sl) {
       if (!sl.end || sl.fixo || sl.extra || sl.start === 'LUNCH') return;
       var a = agMin(sl.start), b = agMin(sl.end);
-      if (dd.getTime() + b * 60000 <= agora) return;   // já passou
-      var ocupado = evs.some(function(e) { if (e.date !== dStr) return false; var s0 = agMin((e.startTime || '').substring(0, 5)), f0 = agMin((e.endTime || '').substring(0, 5)) || (s0 + (e.duration || 100)); return s0 < b && f0 > a; });
+      if (t + b * 60000 <= agora) return;
+      var ocupado = evs.some(function(e) { var s0 = agMin((e.startTime || '').substring(0, 5)), f0 = agMin((e.endTime || '').substring(0, 5)) || (s0 + (e.duration || 100)); return s0 < b && f0 > a; });
       if (!ocupado) livres++;
     });
   }
-  return livres;
+  return faltou ? null : livres;
 }
-function plPxCarregarAgenda() {   // esta semana e a próxima; quando chegarem, redesenha o placar uma vez
+// janela de "espaços" conforme o período: Hoje/Ontem → hoje; Semana → esta e a próxima; Mês/Datas → até o fim do período (máx. 5 semanas)
+function plPxFimFuturo(p) {   // até onde olhar "para a frente": Mês = fim do mês (o período Mês do placar vai do dia 1 até hoje)
+  if (p.per === 'mes') { var d = new Date(p.ini); return new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime(); }
+  return p.fim;
+}
+function plPxJanelaEspacos(p) {
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  var seg = ldIniSemana(hoje), prox = new Date(seg.getTime() + 7 * 864e5), pend = 0;
-  [seg, prox].forEach(function(wk) {
-    var k = agDataStr(wk), c = PL_AG.cache[k];
+  if (p.per === 'hoje' || p.per === 'ontem') return [{ rot: 'hoje', ini: hoje.getTime(), fim: hoje.getTime() + 864e5 }];
+  if (p.per === 'semana') { var seg = ldIniSemana(hoje).getTime(); return [{ rot: 'esta semana', ini: seg, fim: seg + 7 * 864e5 }, { rot: 'próxima', ini: seg + 7 * 864e5, fim: seg + 14 * 864e5 }]; }
+  var fim = Math.min(plPxFimFuturo(p), hoje.getTime() + 35 * 864e5);
+  return [{ rot: p.per === 'mes' ? 'até o fim do mês' : 'no período', ini: Math.max(p.ini, hoje.getTime()), fim: fim }];
+}
+function plPxCarregarAgenda(janelas) {   // busca as semanas que as janelas cobrem; quando chegarem, redesenha o placar uma vez
+  var pend = 0, semanas = {};
+  janelas.forEach(function(j) { for (var t = ldIniSemana(new Date(Math.max(j.ini, Date.now() - 864e5))).getTime(); t < j.fim; t += 7 * 864e5) semanas[agDataStr(new Date(t))] = t; });
+  Object.keys(semanas).slice(0, 6).forEach(function(k) {
+    var c = PL_AG.cache[k];
     if (c && Date.now() - c.t < 180000) return;
     pend++;
-    plAgEventos(wk, function() { if (--pend <= 0 && !PLACAR._pxRedesenhando) { PLACAR._pxRedesenhando = true; setTimeout(function(){ PLACAR._pxRedesenhando = false; try { renderPlacar(); } catch (e) {} }, 400); } });
+    plAgEventos(new Date(semanas[k]), function() { if (--pend <= 0 && !PLACAR._pxRedesenhando) { PLACAR._pxRedesenhando = true; setTimeout(function(){ PLACAR._pxRedesenhando = false; try { renderPlacar(); } catch (e) {} }, 400); } });
   });
-  return { seg: seg, prox: prox };
 }
-function plPxListaLeads(titulo, leads) {   // lista simples de leads (quentes sem reunião, perdidos…)
+function plPxEspacosTxt(closers, janelas) {
+  return janelas.map(function(j) {
+    var tot = 0, falta = false;
+    closers.forEach(function(c) { var v = plPxEspacosEntre(c, j.ini, j.fim); if (v === null) falta = true; else tot += v; });
+    return (falta ? '…' : '<b>' + tot + '</b>') + '<small>' + j.rot + '</small>';
+  }).join(' ');
+}
+function plPxListaLeads(titulo, leads) {
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + titulo.replace(/</g, '&lt;') + ' — ' + leads.length + '</b>'
     + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>';
   if (!leads.length) h += '<div class="pl-vazio">Nenhum</div>';
@@ -17357,7 +17388,7 @@ function plPxListaLeads(titulo, leads) {   // lista simples de leads (quentes se
     var ci = null; try { ci = clintInfoDe(l); } catch (e) {}
     h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);margin-bottom:6px;font-size:.76rem;">'
       + '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + (l.i !== undefined ? l.i : -1) + ')">' + (l.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>'
-      + (l.date ? '<span class="hint" style="margin:0;">formulário ' + l.date.toLocaleDateString('pt-BR') + '</span>' : '')
+      + (l._chegou ? '<span class="hint" style="margin:0;">chegou ' + new Date(l._chegou).toLocaleDateString('pt-BR') + '</span>' : (l.date ? '<span class="hint" style="margin:0;">formulário ' + l.date.toLocaleDateString('pt-BR') + '</span>' : ''))
       + (l.invest ? '<span class="ld-tag">' + String(l.invest).replace(/</g, '&lt;').slice(0, 28) + '</span>' : '')
       + (l.seg ? '<span class="hint" style="margin:0;">' + String(l.seg).slice(0, 12) + ' seg.</span>' : '')
       + (ci && ci.etapa ? '<span class="px-tag">' + String(ci.etapa).replace(/</g, '&lt;').slice(0, 26) + '</span>' : '')
@@ -17373,126 +17404,139 @@ function plPxListaLeads(titulo, leads) {   // lista simples de leads (quentes se
 var _pxListas = {};
 function plPxAbrirLista(k) { var x = _pxListas[k]; if (x) plPxListaLeads(x.t, x.l); }
 function plPxEhRetorno(r) { return r.sn === 'remarcada' || /2[ªº°]\s*reuni|retorno|remarcad|follow/i.test(String(r.nome || '') + ' ' + String(r.produto || '') + ' ' + String(r.obs || '').slice(0, 120)); }
-function plPxCalorDe(l, tc) {   // quão quente é o lead: faixa de investimento, nota da IA, seguidores
+function plPxCalorDe(l, tc) {
   var pts = 0, por = [];
   if (!l) return { pts: 0, por: [] };
   if (l.faixa === 'alta') { pts += 3; por.push('investe ' + String(l.invest || '').replace(/\s*\(.*$/, '').slice(0, 22)); }
   else if (l.faixa === 'media') { pts += 2; por.push('investe ' + String(l.invest || '').replace(/\s*\(.*$/, '').slice(0, 22)); }
   if (tc && tc.nota === 'A') { pts += 2; por.push('nota A'); } else if (tc && tc.nota === 'B') { pts += 1; por.push('nota B'); }
-  var seg = parseInt((String(l.seg || '').match(/\d[\d.]*/) || ['0'])[0].replace(/\./g, ''), 10) || 0;   // "10.005" → 10005 · "1.000 a 5.000" → 1000
+  var seg = parseInt((String(l.seg || '').match(/\d[\d.]*/) || ['0'])[0].replace(/\./g, ''), 10) || 0;
   if (seg >= 10000) { pts += 1; por.push((seg / 1000).toFixed(0) + ' mil seguidores'); }
   if (l.score >= 70) { pts += 1; por.push('score ' + Math.round(l.score)); }
   if (/workshop|indica/i.test(String(l.origem || ''))) { pts += 1; por.push(String(l.origem).slice(0, 14)); }
   return { pts: pts, por: por };
 }
+function plPxRotPeriodo(p) { return p.per === 'hoje' ? 'hoje' : p.per === 'ontem' ? 'ontem' : p.per === 'semana' ? 'na semana' : p.per === 'mes' ? 'no mês' : 'no período'; }
 function plPainelSdrs(p, d) {
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  var agora = Date.now(), h24 = agora - 24 * 3600000;
-  var semanas = plPxCarregarAgenda();
-  // vários formulários do mesmo telefone: para "direto × resgate" vale o formulário mais recente ANTES da marcação
+  var agora = Date.now(), rotP = plPxRotPeriodo(p);
+  var janelas = plPxJanelaEspacos(p); plPxCarregarAgenda(janelas);
+  var pa = plPxPeriodoAnterior(p), dAnt = null; try { dAnt = plCalcular({ ini: pa.ini, fim: pa.fim, per: p.per }); PL_PAG_TEL = plPagPorTel(); } catch (e) {}
+  var antesDe = function(nome) { if (!dAnt) return null; var pn = plPxPrimeiro(nome); return (dAnt.sdrs || []).filter(function(y) { return plPxPrimeiro(y.nome) === pn; })[0] || { marc: 0, ns: 0, re: 0 }; };
   var porTelTodos = {}; (LD.rows || []).forEach(function(l) { if (!l.tel8) return; (porTelTodos[l.tel8] = porTelTodos[l.tel8] || []).push(l); });
   var leadAntesDe = function(t8, mT) { var ls = porTelTodos[t8]; if (!ls) return null; var melhor = null; ls.forEach(function(l) { if (!l.date) return; var lt = l.date.getTime(); if (lt <= mT + 3600000 && (!melhor || lt > melhor.date.getTime())) melhor = l; }); if (melhor) return melhor; ls.forEach(function(l) { if (l.date && (!melhor || l.date.getTime() < melhor.date.getTime())) melhor = l; }); return melhor; };
   var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
-  var espB = plPxEspacos('bruno', semanas.seg), espT = plPxEspacos('tony', semanas.seg), espB2 = plPxEspacos('bruno', semanas.prox), espT2 = plPxEspacos('tony', semanas.prox);
-  var espSem = (espB === null && espT === null) ? null : (espB || 0) + (espT || 0), espProx = (espB2 === null && espT2 === null) ? null : (espB2 || 0) + (espT2 || 0);
   var resp = {}; try { (CLINT_PAINEL && CLINT_PAINEL.primeiraResposta || []).forEach(function(x) { resp[plPxPrimeiro(x.dono)] = x; }); } catch (e) {}
+  var espTxt = plPxEspacosTxt(['bruno', 'tony'], janelas);
   var sdrs = (d.sdrs || []).slice().sort(function(a, b) { return b.marc - a.marc || b.re - a.re; });
+  // SDRs sem marcação no período mas com marcação no anterior também aparecem (para a comparação não sumir)
+  if (dAnt) (dAnt.sdrs || []).forEach(function(y) { if (!sdrs.some(function(x) { return plPxPrimeiro(x.nome) === plPxPrimeiro(y.nome); })) sdrs.push({ nome: y.nome, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }); });
+  // só quem é SDR de verdade (linhas sujas da planilha, tipo "de fechamento", não viram cartão)
+  var ativos = []; try { ativos = (plSdrsAtivos() || []).map(function(n) { return plPxPrimeiro(typeof n === 'string' ? n : (n && n.nome) || ''); }).filter(Boolean); } catch (e) {}
+  if (ativos.length) sdrs = sdrs.filter(function(x) { return ativos.indexOf(plPxPrimeiro(x.nome)) !== -1; });
+  sdrs = sdrs.filter(function(x) { return plPxPrimeiro(x.nome).length >= 3 && !/^de$|^ss$|^sdr$/.test(plPxPrimeiro(x.nome)); });
   if (!sdrs.length) return '';
   var cards = sdrs.map(function(x) {
-    var chave = v2norm(x.nome), pn = plPxPrimeiro(x.nome);
-    x.l.m24 = []; x.l.direto = []; x.l.resgate = []; x.l.meio = []; var semForm = 0, canal = { pago: 0, organico: 0 };
+    var chave = v2norm(x.nome), pn = plPxPrimeiro(x.nome), ant = antesDe(x.nome);
+    if (!(d.sdrs || []).some(function(y) { return y === x; })) { d.sdrs.push(x); }   // para o plVer achar as listas
+    x.l.direto = []; x.l.resgate = []; x.l.meio = []; var semForm = 0, canal = { pago: 0, organico: 0 };
     (x.l.marc || []).forEach(function(r) {
-      var mT = plDataMarcacao(r); if (mT >= h24 && mT <= agora) x.l.m24.push(r);
-      var t8r = ldTel8(r.telefone), l = leadAntesDe(t8r, mT), tcR = tcPor[t8r];
-      var tForm = (tcR && tcR.chegou && tcR.chegou <= mT + 3600000) ? tcR.chegou : ((l && l.date) ? l.date.getTime() : null);   // hora real de chegada (robô) > data da planilha
+      var mT = plDataMarcacao(r), t8r = ldTel8(r.telefone), l = leadAntesDe(t8r, mT), tcR = tcPor[t8r];
+      var tForm = (tcR && tcR.chegou && tcR.chegou <= mT + 3600000) ? tcR.chegou : ((l && l.date) ? l.date.getTime() : null);
       if (tForm == null) { semForm++; return; }
       if (!l) l = { origem: '', meio: '', fonte: '', anuncio: '' };
       var horas = (mT - tForm) / 3600000;
       if (horas <= 24) x.l.direto.push(r); else if (horas >= 48) x.l.resgate.push(r); else x.l.meio.push(r);
       canal[ldTipoTrafego(l) === 'pago' ? 'pago' : 'organico']++;
     });
-    (V2.rows || []).forEach(function(r) { if (plPxPrimeiro(r.sdr) !== pn) return; var mT = plDataMarcacao(r); if (mT >= h24 && mT <= agora && r.sn !== 'remarcada' && x.l.m24.indexOf(r) === -1) x.l.m24.push(r); });
-    var quentes = [], perdidos = [], tAg = [], tPerd = [], t30 = hoje.getTime() - 30 * 864e5;
-    var vistosTel = {};
+    // leads deste SDR (dono na Clint): quentes sem reunião (agora, últimos 30 dias), perdidos e tempo de resposta (chegaram no período)
+    var quentes = [], perdidos = [], tAg = [], tPerd = [], t30 = hoje.getTime() - 30 * 864e5, vistos = {};
     (LD.rows || []).forEach(function(l) {
-      var tc = tcPor[l.tel8];
-      var lT = (tc && tc.chegou) ? tc.chegou : (l.date ? l.date.getTime() : null);   // chegada real (robô) > data da planilha
-      if (lT == null || lT < t30) return;   // só leads dos últimos 30 dias (o histórico inteiro não é fila de ninguém)
-      if (l.tel8) { if (vistosTel[l.tel8]) return; vistosTel[l.tel8] = 1; }   // a mesma pessoa conta uma vez
+      var tc = tcPor[l.tel8], lT = (tc && tc.chegou) ? tc.chegou : (l.date ? l.date.getTime() : null);
+      if (lT == null || lT < Math.min(t30, p.ini)) return;
+      if (l.tel8) { if (vistos[l.tel8]) return; vistos[l.tel8] = 1; }
       var ci = null; try { ci = clintInfoDe(l); } catch (e) {}
       if (!ci || plPxPrimeiro(ci.dono) !== pn) return;
+      var noPer = lT >= p.ini && lT < p.fim;
       var perdido = /desqualific|perdid|descart|sem interesse|n[aã]o qualific|cancel/i.test(ci.etapa || '');
-      if (tc && tc.humano && tc.chegou) { (tc.reuniao ? tAg : tPerd).push(tc.humano - tc.chegou); }
-      if (perdido) { perdidos.push(l); return; }
+      if (noPer && tc && tc.humano && tc.chegou) (tc.reuniao ? tAg : tPerd).push(tc.humano - tc.chegou);
+      if (perdido) { if (noPer) { l._chegou = lT; perdidos.push(l); } return; }
       var sit = null; try { sit = ldSituacao(l); } catch (e) {}
-      if (sit) return;
-      if (l.faixa === 'alta' || (tc && (tc.nota === 'A' || tc.nota === 'B'))) quentes.push(l);
+      if (sit || lT < t30) return;
+      if (l.faixa === 'alta' || (tc && (tc.nota === 'A' || tc.nota === 'B'))) { l._chegou = lT; quentes.push(l); }
     });
-    quentes.sort(function(a, b) { return plPxCalorDe(b, tcPor[b.tel8]).pts - plPxCalorDe(a, tcPor[a.tel8]).pts || (b.date || 0) - (a.date || 0); });
-    _pxListas['q_' + chave] = { t: 'Leads quentes sem reunião · ' + x.nome, l: quentes };
-    _pxListas['p_' + chave] = { t: 'Leads perdidos nos últimos 30 dias · ' + x.nome, l: perdidos };
+    quentes.sort(function(a, b) { return plPxCalorDe(b, tcPor[b.tel8]).pts - plPxCalorDe(a, tcPor[a.tel8]).pts || (b._chegou || 0) - (a._chegou || 0); });
+    _pxListas['q_' + chave] = { t: 'Leads quentes sem reunião (últimos 30 dias) · ' + x.nome, l: quentes };
+    _pxListas['p_' + chave] = { t: 'Leads perdidos que chegaram ' + rotP + ' · ' + x.nome, l: perdidos };
     var med = function(arr) { if (!arr.length) return null; arr = arr.slice().sort(function(a, b) { return a - b; }); return arr[Math.floor(arr.length / 2)]; };
     var mAg = med(tAg), mPe = med(tPerd), rp = resp[pn];
-    var espTxt = espSem === null ? '…' : espSem + ' <small>esta sem.</small> ' + (espProx === null ? '' : '· ' + espProx + ' <small>próxima</small>');
     return '<div class="px-card">'
       + '<div class="px-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span><div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>SDR</span></div></div>'
-      + '<div class="px-row"><div class="px-k">Marcadas no período<small>últimas 24 h ao lado</small></div><div class="px-v">' + plPxNum(x.marc, 'sdr', chave, 'marc', '#ffd166') + '<small>24h:</small> ' + plPxNum(x.l.m24.length, 'sdr', chave, 'm24', '#ffd166') + '</div></div>'
-      + '<div class="px-row"><div class="px-k">Espaços × leads quentes<small>horários livres (Bruno + Tony) · quentes deste SDR sem reunião, últimos 30 dias</small></div><div class="px-v">' + espTxt + '<br><b class="n" style="color:#3ddc97;" onclick="plPxAbrirLista(\'q_' + chave + '\')">' + quentes.length + '</b><small>quentes</small></div></div>'
-      + '<div class="px-row"><div class="px-k">Direto × resgate<small>direto = marcou até 24 h após o formulário · resgate = 48 h ou mais</small></div><div class="px-v">' + plPxNum(x.l.direto.length, 'sdr', chave, 'direto', '#6ea8ff') + '<small>direto</small> ' + plPxNum(x.l.resgate.length, 'sdr', chave, 'resgate', '#b98aff') + '<small>resgate</small>'
-      +   (x.l.meio.length ? ' ' + plPxNum(x.l.meio.length, 'sdr', chave, 'meio', '#9aa3b2') + '<small>1–2 dias</small>' : '') + (semForm ? '<br><small>' + semForm + ' sem formulário</small>' : '')
+      + '<div class="px-row"><div class="px-k">Reuniões marcadas ' + rotP + '<small>pela hora em que marcou · comparado com o período anterior</small></div><div class="px-v">' + plPxNum(x.marc, 'sdr', chave, 'marc', '#ffd166') + plPxAntes(x.marc, ant ? ant.marc : null) + '</div></div>'
+      + '<div class="px-row"><div class="px-k">Espaços × leads quentes<small>horários livres (Bruno + Tony) · quentes deste SDR sem reunião, últimos 30 dias</small></div><div class="px-v">' + espTxt + '<br><b class="n" style="color:#3ddc97;" onclick="plPxAbrirLista(\'q_' + chave + '\')">' + quentes.length + '</b><small>quentes agora</small></div></div>'
+      + '<div class="px-row"><div class="px-k">Direto × resgate<small>das marcadas ' + rotP + ' · direto = até 24 h após chegar · resgate = 48 h ou mais</small></div><div class="px-v">' + plPxNum(x.l.direto.length, 'sdr', chave, 'direto', '#6ea8ff') + '<small>direto</small> ' + plPxNum(x.l.resgate.length, 'sdr', chave, 'resgate', '#b98aff') + '<small>resgate</small>'
+      +   (x.l.meio.length ? ' ' + plPxNum(x.l.meio.length, 'sdr', chave, 'meio', '#9aa3b2') + '<small>1–2 dias</small>' : '') + (semForm ? '<br><small>' + semForm + ' sem chegada conhecida</small>' : '')
       +   '<br><span class="px-tag">pago ' + canal.pago + '</span><span class="px-tag g">orgânico ' + canal.organico + '</span></div></div>'
-      + '<div class="px-row"><div class="px-k">Perdidos (últimos 30 dias)<small>etapa perdido/desqualificado na Clint · motivo: fase 2</small></div><div class="px-v"><b class="n" style="color:#ff6b6b;" onclick="plPxAbrirLista(\'p_' + chave + '\')">' + perdidos.length + '</b></div></div>'
-      + '<div class="px-row"><div class="px-k">Tempo até um humano falar<small>quem agendou × quem não agendou (mediana)</small></div><div class="px-v">' + (mAg !== null ? '<b style="color:#3ddc97;">' + tcTempoTxt(mAg) + '</b><small>agendou</small> ' : '') + (mPe !== null ? '<b style="color:#ff6b6b;">' + tcTempoTxt(mPe) + '</b><small>não</small>' : '') + ((mAg === null && mPe === null) ? (rp ? '<b>' + tcTempoTxt(rp.minutos * 60000) + '</b><small>' + rp.qtd + ' conversas</small>' : '<span class="px-falta">sem medição ainda</span>') : '') + '</div></div>'
-      + '<div class="px-row"><div class="px-k">No-shows no período<small>motivo: fase 2</small></div><div class="px-v">' + plPxNum(x.ns, 'sdr', chave, 'ns', '#ff6b6b') + (x.marc ? '<small>' + Math.round(x.ns / Math.max(x.re + x.ns, 1) * 100) + '% das realizadas+faltas</small>' : '') + '</div></div>'
+      + '<div class="px-row"><div class="px-k">Perdidos<small>leads que chegaram ' + rotP + ' e estão como perdido/desqualificado na Clint · motivo: fase 2</small></div><div class="px-v"><b class="n" style="color:#ff6b6b;" onclick="plPxAbrirLista(\'p_' + chave + '\')">' + perdidos.length + '</b></div></div>'
+      + '<div class="px-row"><div class="px-k">Tempo até um humano falar<small>leads que chegaram ' + rotP + ' · quem agendou × quem não (mediana)</small></div><div class="px-v">' + (mAg !== null ? '<b style="color:#3ddc97;">' + tcTempoTxt(mAg) + '</b><small>agendou</small> ' : '') + (mPe !== null ? '<b style="color:#ff6b6b;">' + tcTempoTxt(mPe) + '</b><small>não</small>' : '') + ((mAg === null && mPe === null) ? (rp ? '<b>' + tcTempoTxt(rp.minutos * 60000) + '</b><small>média geral · ' + rp.qtd + ' conversas</small>' : '<span class="px-falta">sem medição</span>') : '') + '</div></div>'
+      + '<div class="px-row"><div class="px-k">No-shows ' + rotP + '<small>motivo: fase 2</small></div><div class="px-v">' + plPxNum(x.ns, 'sdr', chave, 'ns', '#ff6b6b') + plPxAntes(x.ns, ant ? ant.ns : null) + (x.re + x.ns ? '<br><small>' + Math.round(x.ns / Math.max(x.re + x.ns, 1) * 100) + '% das realizadas+faltas</small>' : '') + '</div></div>'
       + '</div>';
   }).join('');
-  return '<div class="px-wrap"><div class="px-titulo"><h3>📞 Acompanhamento por SDR</h3><span class="hint">período do placar: ' + p.rot.replace(/</g, '&lt;') + ' · clique nos números para ver quem são</span></div><div class="px-grid">' + cards + '</div></div>';
+  return '<div class="px-wrap"><div class="px-titulo"><h3>📞 Acompanhamento por SDR</h3><span class="hint">' + p.rot.replace(/</g, '&lt;') + ' · ▲▼ compara com o período anterior · clique nos números para ver quem são</span></div><div class="px-grid">' + cards + '</div></div>';
 }
 function plPainelClosers(p, d) {
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  var tHoje = hoje.getTime(), tOntem = tHoje - 864e5, t7 = tHoje - 7 * 864e5;
-  var semanas = plPxCarregarAgenda();
+  var tHoje = hoje.getTime(), rotP = plPxRotPeriodo(p);
+  var janelas = plPxJanelaEspacos(p); plPxCarregarAgenda(janelas);
+  var pa = plPxPeriodoAnterior(p), dAnt = null; try { dAnt = plCalcular({ ini: pa.ini, fim: pa.fim, per: p.per }); PL_PAG_TEL = plPagPorTel(); } catch (e) {}
   var porTel = {}; (LD.rows || []).forEach(function(l) { if (l.tel8 && !porTel[l.tel8]) porTel[l.tel8] = l; });
   var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
   var closers = (d.closers || []).slice();
-  plClosersAtivos().forEach(function(n) { if (!closers.some(function(c) { return plPxPrimeiro(c.nome) === plPxPrimeiro(n); })) closers.push({ nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }); });
+  plClosersAtivos().forEach(function(n) { if (!closers.some(function(c) { return plPxPrimeiro(c.nome) === plPxPrimeiro(n); })) { var novo = { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }; closers.push(novo); d.closers.push(novo); } });
   closers.sort(function(a, b) { return b.vdV - a.vdV; });
   var cards = closers.map(function(x) {
     var chave = v2norm(x.nome), pn = plPxPrimeiro(x.nome), agKey = pn === 'tony' ? 'tony' : 'bruno';
+    var ant = dAnt ? ((dAnt.closers || []).filter(function(y) { return plPxPrimeiro(y.nome) === pn; })[0] || { re: 0, vd: 0, ns: 0 }) : null;
     var minhas = (V2.rows || []).filter(function(r) { return plPxPrimeiro(r.closer) === pn; });
-    var deHoje = minhas.filter(function(r) { return r.date && r.date.getTime() === tHoje; });
-    x.l.hojeNovas = deHoje.filter(function(r) { return !plPxEhRetorno(r); }); x.l.hojeRet = deHoje.filter(plPxEhRetorno);
-    var deOntem = minhas.filter(function(r) { return r.date && r.date.getTime() === tOntem; });
-    x.l.ontemRe = deOntem.filter(function(r) { return _fsRealizada(r.sn); }); x.l.ontemVd = deOntem.filter(function(r) { return r.sn === 'vendido'; });
-    x.l.ontemEnt = deOntem.filter(function(r) { return r.sn === 'entrada' || r.sn === 'bloqueio de oferta'; }); x.l.ontemNao = deOntem.filter(function(r) { return r.sn === 'nao vendido'; }); x.l.ontemNs = deOntem.filter(function(r) { return r.sn === 'no show'; });
-    x.l.fup7 = []; var fupOk = 0;
+    var fimFut = plPxFimFuturo(p);
+    var noPer = minhas.filter(function(r) { return r.date && r.date.getTime() >= p.ini && r.date.getTime() < p.fim; });
+    var noPerFut = minhas.filter(function(r) { return r.date && r.date.getTime() >= p.ini && r.date.getTime() < fimFut; });
+    x.l.perNovas = noPer.filter(function(r) { return !plPxEhRetorno(r); }); x.l.perRet = noPer.filter(plPxEhRetorno);
+    x.l.perRe = noPer.filter(function(r) { return _fsRealizada(r.sn); }); x.l.perVd = noPer.filter(function(r) { return r.sn === 'vendido'; });
+    x.l.perEnt = noPer.filter(function(r) { return r.sn === 'entrada' || r.sn === 'bloqueio de oferta'; }); x.l.perNao = noPer.filter(function(r) { return r.sn === 'nao vendido'; }); x.l.perNs = noPer.filter(function(r) { return r.sn === 'no show'; });
+    x.l.perPend = noPer.filter(function(r) { return r.date.getTime() < tHoje && (r.sn.indexOf('agendada') !== -1 || r.sn === 'remarcada'); });
+    // follow-ups: retornos com data dentro do período · respondidos = ganharam nova marca depois (ou encerraram)
+    x.l.fup = []; var fupOk = 0;
     minhas.forEach(function(r) {
       var ms = String(r.obs || '').match(/##FUP:([0-9]{4}-[0-9]{2}-[0-9]{2}|nao)##/g); if (!ms) return;
-      var venceu = false, ultimoIdx = -1;
-      ms.forEach(function(m, i) { var v = m.replace(/##FUP:|##/g, ''); if (v === 'nao') return; var q = v.split('-'); var t = new Date(+q[0], +q[1] - 1, +q[2]).getTime(); if (t >= t7 && t <= tHoje) { venceu = true; ultimoIdx = i; } });
-      if (!venceu) return;
-      x.l.fup7.push(r); if (ultimoIdx < ms.length - 1 || /##FUP:nao##/.test(r.obs)) fupOk++;
+      var dentro = false, idx = -1;
+      ms.forEach(function(m, i) { var v = m.replace(/##FUP:|##/g, ''); if (v === 'nao') return; var q = v.split('-'); var t = new Date(+q[0], +q[1] - 1, +q[2]).getTime(); if (t >= p.ini && t < fimFut) { dentro = true; idx = i; } });
+      if (!dentro) return;
+      x.l.fup.push(r); if (idx < ms.length - 1 || /##FUP:nao##/.test(r.obs)) fupOk++;
     });
-    var quentes = deHoje.map(function(r) { var l = porTel[ldTel8(r.telefone)]; var c = plPxCalorDe(l, l ? tcPor[l.tel8] : null); return { r: r, l: l, pts: c.pts, por: c.por }; }).sort(function(a, b) { return b.pts - a.pts; }).slice(0, 3);
-    var motivos = {}, semMotivo = 0, naoNoPer = 0;
-    minhas.forEach(function(r) { if (r.sn !== 'nao vendido' || !r.date) return; var t = r.date.getTime(); if (t < p.ini || t >= p.fim) return; naoNoPer++; var m = String(r.obs || '').match(/N[aã]o fechou:\s*([^|#\n]+)/i); if (!m) { semMotivo++; return; } var k = v2norm(m[1]).replace(/[^a-z0-9 ]/g, '').split(' ').slice(0, 4).join(' ').trim(); if (!k) { semMotivo++; return; } motivos[k] = motivos[k] || { n: 0, txt: m[1].trim() }; motivos[k].n++; });
+    // mais quentes: hoje → as de hoje; outros períodos → as que ainda vão acontecer no período
+    var base = (p.per === 'hoje' || p.per === 'ontem') ? noPer : noPerFut.filter(function(r) { return r.date.getTime() >= tHoje && (r.sn.indexOf('agendada') !== -1 || r.sn === 'remarcada'); });
+    var quentes = base.map(function(r) { var l = porTel[ldTel8(r.telefone)]; var c = plPxCalorDe(l, l ? tcPor[l.tel8] : null); return { r: r, l: l, pts: c.pts, por: c.por }; }).sort(function(a, b) { return b.pts - a.pts; }).slice(0, 3);
+    var motivos = {}, semMotivo = 0;
+    x.l.perNao.forEach(function(r) { var m = String(r.obs || '').match(/N[aã]o fechou:\s*([^|#\n]+)/i); if (!m) { semMotivo++; return; } var k = v2norm(m[1]).replace(/[^a-z0-9 ]/g, '').split(' ').slice(0, 4).join(' ').trim(); if (!k) { semMotivo++; return; } motivos[k] = motivos[k] || { n: 0, txt: m[1].trim() }; motivos[k].n++; });
     var topM = Object.keys(motivos).map(function(k) { return motivos[k]; }).sort(function(a, b) { return b.n - a.n; }).slice(0, 4), maxM = topM.length ? topM[0].n : 1;
-    var eSem = plPxEspacos(agKey, semanas.seg), ePro = plPxEspacos(agKey, semanas.prox);
+    var conv = x.l.perRe.length ? Math.round(x.l.perVd.length / x.l.perRe.length * 100) : null;
     return '<div class="px-card">'
       + '<div class="px-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span><div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>CLOSER</span></div></div>'
-      + '<div class="px-row"><div class="px-k">Reuniões hoje<small>novas × retornos (2ª reunião, remarcada, follow-up)</small></div><div class="px-v">' + plPxNum(x.l.hojeNovas.length, 'closer', chave, 'hojeNovas', '#6ea8ff') + '<small>novas</small> ' + plPxNum(x.l.hojeRet.length, 'closer', chave, 'hojeRet', '#b98aff') + '<small>retornos</small></div></div>'
-      + '<div class="px-row"><div class="px-k">Mais quentes de hoje<small>investimento declarado, nota da IA, seguidores, origem</small></div><div class="px-v"></div></div>'
-      + (quentes.length ? quentes.map(function(q, i) { var iR = -1; try { iR = v2reg(q.r); } catch (e) {} return '<div class="px-quente"><i>' + ['🔥', '🌶', '✨'][i] + '</i><b onclick="abrirLead(' + iR + ')">' + (q.r.nome || '').replace(/</g, '&lt;') + '</b><span class="hint">' + (q.por.length ? q.por.join(' · ') : 'sem dados do formulário') + '</span></div>'; }).join('') : '<div class="px-falta">nenhuma reunião hoje</div>')
-      + '<div class="px-row" style="margin-top:6px;"><div class="px-k">Compromisso de hoje<small>fase 2: o closer digita de manhã e o placar compara no fim do dia</small></div><div class="px-v"><span class="px-falta">em breve</span></div></div>'
-      + '<div class="px-row"><div class="px-k">Ontem<small>realizadas · fechamentos · entrada/bloqueio · não · no-show</small></div><div class="px-v">' + plPxNum(x.l.ontemRe.length, 'closer', chave, 'ontemRe', '#6ea8ff') + ' · ' + plPxNum(x.l.ontemVd.length, 'closer', chave, 'ontemVd', '#3ddc97') + ' · ' + plPxNum(x.l.ontemEnt.length, 'closer', chave, 'ontemEnt', '#ffd166') + ' · ' + plPxNum(x.l.ontemNao.length, 'closer', chave, 'ontemNao', '#ff9a5a') + ' · ' + plPxNum(x.l.ontemNs.length, 'closer', chave, 'ontemNs', '#ff6b6b') + '</div></div>'
-      + '<div class="px-row"><div class="px-k">Follow-ups dos últimos 7 dias<small>retornos que venceram · respondidos</small></div><div class="px-v">' + plPxNum(x.l.fup7.length, 'closer', chave, 'fup7', '#ff9a5a') + '<small>venceram</small> <b style="color:#3ddc97;">' + fupOk + '</b><small>respondidos</small></div></div>'
-      + '<div class="px-row"><div class="px-k">Espaços na agenda<small>horários livres que ainda não passaram</small></div><div class="px-v">' + (eSem === null ? '…' : '<b>' + eSem + '</b><small>esta semana</small> ' + (ePro === null ? '' : '<b>' + ePro + '</b><small>próxima</small>')) + '</div></div>'
-      + '<div class="px-row"><div class="px-k">Motivos de não fechamento<small>' + naoNoPer + ' não vendidos no período' + (semMotivo ? ' · ' + semMotivo + ' sem motivo anotado' : '') + '</small></div><div class="px-v"></div></div>'
-      + (topM.length ? '<div class="px-barras">' + topM.map(function(m) { return '<div class="px-barra"><span title="' + m.txt.replace(/"/g, '&quot;') + '">' + m.txt.replace(/</g, '&lt;').slice(0, 40) + '</span><i style="--w:' + Math.round(m.n / maxM * 100) + '%"></i><b>' + m.n + '</b></div>'; }).join('') + '</div>' : '<div class="px-falta">nenhum motivo anotado no período</div>')
+      + '<div class="px-row"><div class="px-k">Reuniões ' + rotP + '<small>novas × retornos (2ª reunião, remarcada, follow-up)</small></div><div class="px-v">' + plPxNum(x.l.perNovas.length, 'closer', chave, 'perNovas', '#6ea8ff') + '<small>novas</small> ' + plPxNum(x.l.perRet.length, 'closer', chave, 'perRet', '#b98aff') + '<small>retornos</small></div></div>'
+      + '<div class="px-row"><div class="px-k">Mais quentes' + ((p.per === 'hoje' || p.per === 'ontem') ? ' do dia' : ' ainda por acontecer ' + rotP) + '<small>investimento declarado, nota da IA, seguidores, origem</small></div><div class="px-v"></div></div>'
+      + (quentes.length ? quentes.map(function(q, i) { var iR = -1; try { iR = v2reg(q.r); } catch (e) {} return '<div class="px-quente"><i>' + ['🔥', '🌶', '✨'][i] + '</i><b onclick="abrirLead(' + iR + ')">' + (q.r.nome || '').replace(/</g, '&lt;') + '</b><span class="hint">' + (q.r.date ? q.r.date.toLocaleDateString('pt-BR').slice(0, 5) + ' · ' : '') + (q.por.length ? q.por.join(' · ') : 'sem dados do formulário') + '</span></div>'; }).join('') : '<div class="px-falta">nenhuma</div>')
+      + '<div class="px-row" style="margin-top:6px;"><div class="px-k">Compromisso do dia<small>fase 2: o closer digita de manhã e o placar compara no fim do dia</small></div><div class="px-v"><span class="px-falta">em breve</span></div></div>'
+      + '<div class="px-row"><div class="px-k">Resultado ' + rotP + '<small>realizadas · fechamentos · entrada/bloqueio · não · no-show' + (x.l.perPend.length ? ' · <b style="color:#ffd166;">' + x.l.perPend.length + ' sem resultado</b>' : '') + '</small></div><div class="px-v" style="white-space:normal;">' + plPxNum(x.l.perRe.length, 'closer', chave, 'perRe', '#6ea8ff') + ' · ' + plPxNum(x.l.perVd.length, 'closer', chave, 'perVd', '#3ddc97') + ' · ' + plPxNum(x.l.perEnt.length, 'closer', chave, 'perEnt', '#ffd166') + ' · ' + plPxNum(x.l.perNao.length, 'closer', chave, 'perNao', '#ff9a5a') + ' · ' + plPxNum(x.l.perNs.length, 'closer', chave, 'perNs', '#ff6b6b')
+      +   '<br>' + (conv !== null ? '<small>fecha ' + conv + '% das realizadas</small> ' : '') + (ant ? plPxAntes(x.l.perVd.length, ant.vd).replace('antes', 'fechamentos antes') : '') + '</div></div>'
+      + '<div class="px-row"><div class="px-k">Follow-ups ' + rotP + '<small>retornos combinados que vencem ' + (p.per === 'mes' ? 'até o fim do mês' : 'no período') + ' · respondidos</small></div><div class="px-v">' + plPxNum(x.l.fup.length, 'closer', chave, 'fup', '#ff9a5a') + '<small>vencem</small> <b style="color:#3ddc97;">' + fupOk + '</b><small>respondidos</small></div></div>'
+      + '<div class="px-row"><div class="px-k">Espaços na agenda<small>horários livres que ainda não passaram</small></div><div class="px-v">' + plPxEspacosTxt([agKey], janelas) + '</div></div>'
+      + '<div class="px-row"><div class="px-k">Motivos de não fechamento<small>' + x.l.perNao.length + ' não vendidos ' + rotP + (semMotivo ? ' · ' + semMotivo + ' sem motivo anotado' : '') + '</small></div><div class="px-v"></div></div>'
+      + (topM.length ? '<div class="px-barras">' + topM.map(function(m) { return '<div class="px-barra"><span title="' + m.txt.replace(/"/g, '&quot;') + '">' + m.txt.replace(/</g, '&lt;').slice(0, 40) + '</span><i style="--w:' + Math.round(m.n / maxM * 100) + '%"></i><b>' + m.n + '</b></div>'; }).join('') + '</div>' : '<div class="px-falta">nenhum motivo anotado</div>')
       + '<div class="px-row" style="margin-top:6px;"><div class="px-k">Dores e abordagem dos "não"<small>fase 3: cartão por reunião lido das anotações do Gemini</small></div><div class="px-v"><span class="px-falta">em breve</span></div></div>'
       + '</div>';
   }).join('');
-  return '<div class="px-wrap"><div class="px-titulo"><h3>🏆 Acompanhamento por closer</h3><span class="hint">hoje, ontem e últimos 7 dias são fixos · motivos seguem o período do placar</span></div><div class="px-grid">' + cards + '</div></div>';
+  return '<div class="px-wrap"><div class="px-titulo"><h3>🏆 Acompanhamento por closer</h3><span class="hint">' + p.rot.replace(/</g, '&lt;') + ' · ▲▼ compara com o período anterior · clique nos números para ver quem são</span></div><div class="px-grid">' + cards + '</div></div>';
 }
 
 function renderPlacar() {
