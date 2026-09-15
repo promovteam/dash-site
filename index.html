@@ -1188,7 +1188,7 @@ img { max-width:100%; height:auto; }
 
       <div id="vista-semana">
         <div id="v2-sg"><div style="text-align:center;padding:40px;color:var(--muted);">Carregando agenda do Google Calendar…</div></div>
-        <div class="hint" style="margin-top:12px;">Blocos de 1h40 · Legado = 50 min (2 por bloco) · 🔒 = precisa OK do closer (18h do Tony e sábado de manhã) · Clique num horário livre para agendar</div>
+        <div class="hint" id="ag-legenda" style="margin-top:12px;">Blocos de 1h40 · Legado = 50 min (2 por bloco) · 🔒 = precisa OK do closer (18h do Tony e sábado de manhã) · Clique num horário livre para agendar</div>
       </div>
 
       <div id="vista-mes" style="display:none;">
@@ -2176,7 +2176,11 @@ function fmtValor(v) {
 }
 function produtoMudou(prod) {
   var d = document.getElementById('ag-duracao');
-  if (d) d.value = v2norm(prod).indexOf('legado') !== -1 ? '50' : '100';
+  if (d) {
+    try { agAjustarDuracao(); } catch (eD) {}
+    var quemP = (typeof closerChaveDe === 'function' ? closerChaveDe(closerEscolhido()) : '') || 'bruno';
+    d.value = v2norm(prod).indexOf('legado') !== -1 ? '50' : String(durHT(quemP));
+  }
   var vi = document.getElementById('ag-valor');
   var preco = precoDoProduto(prod);
   if (vi && preco !== null) vi.value = fmtValor(preco);
@@ -2185,24 +2189,29 @@ function produtoMudou(prod) {
   if (typeof atualizarHorarios === 'function') { try { atualizarHorarios(); } catch (eH) {} }
 }
 
-function abrirAgendar(dur){
+function abrirAgendar(dur, ck){
+  // de qual agenda partiu o clique (na visão de todas, é a coluna clicada)
+  var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
+  var cs0 = document.getElementById('ag-closer');
+  if (cs0 && closerNomeDe(quem)) cs0.value = closerNomeDe(quem);
+  agAjustarDuracao();   // a agenda de 1 em 1 hora usa 2h no HT; as outras, 1h40
   var d = document.getElementById('ag-duracao');
-  if (d && dur) d.value = String(dur);
   var lbl = document.getElementById('ag-tipo-lbl');
-  if (lbl) lbl.textContent = dur === 50 ? '· Legado (50 min)' : dur === 100 ? '· HT (1h40)' : '';
+  if (lbl) lbl.textContent = dur === 50 ? '· Legado (50 min)' : dur === 120 ? '· HT (2h)' : dur === 100 ? '· HT (1h40)' : '';
   // se abriu como Legado, já seleciona o produto Legado; senão mantém o escolhido
   var ps = document.getElementById('ag-prod');
   if (ps && dur === 50) {
     for (var i = 0; i < ps.options.length; i++) {
       if (v2norm(ps.options[i].text).indexOf('legado') !== -1) { ps.selectedIndex = i; break; }
     }
+  } else if (ps && dur && v2norm(ps.value).indexOf('legado') !== -1) {
+    // clicou em HT com o produto Legado sobrando do agendamento anterior: volta ao primeiro produto
+    ps.selectedIndex = 0;
   }
   if (ps) produtoMudou(ps.value); // preenche o valor do programa
-  // se o SDR estava olhando a agenda de um closer, já vem escolhido esse (dá para trocar)
-  var cs = document.getElementById('ag-closer');
-  if (cs && closerNomeDe(AG.closer)) {
-    cs.value = closerNomeDe(AG.closer);
-  }
+  // a duração vem por último: o tipo escolhido no clique (HT ou Legado) manda,
+  // mesmo que o produto que ficou do agendamento anterior seja outro
+  if (d && dur) d.value = String(dur);
   agLimparFicha();  // sem isso, os dados do lead anterior ficavam no formulário
   agLimparLead();
   agEuNoSdr();      // quem entrou no dash já vem como SDR / social seller
@@ -2336,7 +2345,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-15-1714';
+var VERSAO_DASH = '2026-09-15-1731';
 var _versaoNova = null;
 
 // =====================================================================
@@ -2348,7 +2357,7 @@ var _versaoNova = null;
 var CLOSERS = [
   { key: 'bruno',    nome: 'Bruno Pardim', grade: 'bruno' },
   { key: 'tony',     nome: 'Tony Londe',   grade: 'tony'  },
-  { key: 'wesllene', nome: 'Wesllene',     grade: 'tony'  }
+  { key: 'wesllene', nome: 'Wesllene',     grade: 'hora'  }
 ];
 function closerKeys()  { return CLOSERS.map(function(c){ return c.key; }); }
 function closerNomes() { return CLOSERS.map(function(c){ return c.nome; }); }
@@ -2825,7 +2834,22 @@ function closerEscolhido() {
   var el = document.getElementById('ag-closer');
   return (el && el.value) || 'Bruno Pardim';
 }
+// a agenda de 1 em 1 hora (Wesllene) faz HT em 2 horas; as outras, 1h40
+function agAjustarDuracao() {
+  var d = document.getElementById('ag-duracao');
+  if (!d) return;
+  var quem = closerChaveDe(closerEscolhido()) || 'bruno';
+  var novo = String(durHT(quem));
+  var op = d.options[0];
+  if (op && op.value !== novo) {
+    var eraHT = d.value === op.value;
+    op.value = novo;
+    op.textContent = novo === '120' ? '2h (Spark/Growth)' : '1h40 (Spark/Growth)';
+    if (eraHT) d.value = novo;
+  }
+}
 function closerMudou() {
+  agAjustarDuracao();
   var el = document.getElementById('ag-fila');
   if (el) el.innerHTML = 'Os horários abaixo são da agenda de <b style="color:var(--accent);">' + closerEscolhido() + '</b>';
   atualizarHorarios();
@@ -13696,14 +13720,36 @@ var SLOTS_BRUNO_14 = [
   { start:'17:20', end:'19:00' },
   { start:'19:00', end:'20:40', extra:true }
 ];
+// 15/09/2026 (Bruno: "coloca ela de hora em hora … 12 às 13 de almoço … e 2 horas se for HT"):
+// grade de 1 em 1 hora da Wesllene. Reunião HT nessa agenda ocupa 2 blocos (120 min); Legado cabe num bloco.
+var SLOTS_HORA = [
+  { start:'08:20', end:'09:00', fixo:'Reunião comercial' },
+  { start:'09:00', end:'10:00' },
+  { start:'10:00', end:'11:00' },
+  { start:'11:00', end:'12:00' },
+  { start:'LUNCH', ini:'12:00', fim:'13:00' },
+  { start:'13:00', end:'14:00' },
+  { start:'14:00', end:'15:00' },
+  { start:'15:00', end:'16:00' },
+  { start:'16:00', end:'17:00' },
+  { start:'17:00', end:'18:00' },
+  { start:'18:00', end:'19:00', extra:true }
+];
 var GRADE_14_DESDE = new Date(2026, 8, 14);
+function gradeDoCloser(closer) {
+  for (var i = 0; i < CLOSERS.length; i++) if (CLOSERS[i].key === closer) return CLOSERS[i].grade;
+  return 'bruno';
+}
 function slotsDo(closer, dataRef){
+  var grade = gradeDoCloser(closer);
+  if (grade === 'hora') return SLOTS_HORA;             // grade de 1 em 1 hora: vale para qualquer semana
   var d = dataRef || AG.weekStart;
-  var grade = 'bruno';
-  for (var i = 0; i < CLOSERS.length; i++) if (CLOSERS[i].key === closer) grade = CLOSERS[i].grade;
   if (d && d >= GRADE_14_DESDE) return grade === 'tony' ? SLOTS_TONY_14 : SLOTS_BRUNO_14;
   return SLOTS_TONY;
 }
+// quanto dura uma reunião HT (Spark/Growth) na agenda de cada closer
+function durHT(closer) { return gradeDoCloser(closer) === 'hora' ? 120 : 100; }
+function rotHT(closer) { return durHT(closer) === 120 ? '120 min (2h)' : '100 min (1h40)'; }
 // a grade nova (Tony / sábado / reunião extra) vale SÓ DAQUI PARA FRENTE;
 // semanas até 02/08/2026 continuam no formato antigo
 var NOVA_GRADE_DESDE = new Date(2026, 7, 3);
@@ -13778,6 +13824,21 @@ function mudarCloser(k) {
   if (amb) amb.classList.toggle('on', k === 'ambos');
   var wk = agDataStr(AG.weekStart);
   if (AG.cache[wk]) renderSemanaV2(AG.cache[wk]); else carregarAgenda();
+}
+// a legenda embaixo da grade fala da agenda que está aberta
+function agAtualizarLegenda() {
+  var el = document.getElementById('ag-legenda');
+  if (!el) return;
+  var fim = ' · 🔒 = precisa do OK do closer (horário extra do fim do dia, sábado de manhã e feriado) · Clique num horário livre para agendar';
+  if (AG.closer !== 'ambos' && gradeDoCloser(AG.closer) === 'hora') {
+    el.innerHTML = 'Agenda de ' + closerNomeDe(AG.closer) + ': blocos de 1 hora · almoço 12:00–13:00 · HT (Spark/Growth) ocupa 2 blocos · Legado = 50 min' + fim;
+  } else if (AG.closer === 'ambos' && CLOSERS.some(function(c){ return c.grade === 'hora'; })) {
+    el.innerHTML = 'Bruno e Tony: blocos de 1h40 (Legado = 50 min, 2 por bloco) · '
+      + CLOSERS.filter(function(c){ return c.grade === 'hora'; }).map(function(c){ return c.nome; }).join(' e ')
+      + ': blocos de 1 hora (HT ocupa 2)' + fim;
+  } else {
+    el.innerHTML = 'Blocos de 1h40 · Legado = 50 min (2 por bloco)' + fim;
+  }
 }
 function mudarVista(v) {
   document.getElementById('vista-semana').style.display = v === 'semana' ? '' : 'none';
@@ -13914,8 +13975,9 @@ function renderSemanaV2(calData) {
   function linhaAgora() { return ''; } // a linha do agora atravessa a grade inteira (ver posicionarLinhaAgora)
 
   // desenha UMA grade de semana para um conjunto de eventos (usada 1x normal, 2x na visão "Os dois")
-  function gridDe(evsDo, titulo, gradeDo) {
+  function gridDe(evsDo, titulo, gradeDo, ckDo) {
   var GRADE = gradeDo || GRADE_BASE;
+  var CK = ckDo || (AG.closer !== 'ambos' ? AG.closer : '');
 
   // célula do SÁBADO: só os 2 horários da manhã, sempre com aprovação do closer
   function celSabado(n) {
@@ -13941,7 +14003,7 @@ function renderSemanaV2(calData) {
         + '<div class="sg-badges"><span class="sg-st" style="background:' + info.bg + ';color:' + info.fg + ';">' + info.lbl + '</span></div></div>';
     }
     if (passado) return '<div class="sg-cell fora"></div>';
-    return '<div class="sg-cell vazio extra-slot" onclick="agendarComAprovacao(event,\'' + dStr + '\',\'' + s.start + '\')">'
+    return '<div class="sg-cell vazio extra-slot" onclick="agendarComAprovacao(event,\'' + dStr + '\',\'' + s.start + '\',\'' + CK + '\')">'
       + '<span class="sg-lock">🔒</span><b>+</b><span>' + s.start + '–' + s.end + '</span><span class="sg-extra-tag">precisa OK do closer</span></div>';
   }
 
@@ -14022,7 +14084,7 @@ function renderSemanaV2(calData) {
         });
         if (sobra >= 50 && !passado) {
           var horaLivre = doSlot[doSlot.length - 1].endTime || slot.start;
-          h += '<div class="sg-legado" onclick="event.stopPropagation();abrirAgendarCom(50,\'' + dStr + '\',\'' + horaLivre + '\');"><b>+ Legado</b><span>' + sobra + 'min livres</span></div>';
+          h += '<div class="sg-legado" onclick="event.stopPropagation();abrirAgendarCom(50,\'' + dStr + '\',\'' + horaLivre + '\',\'' + CK + '\');"><b>+ Legado</b><span>' + sobra + 'min livres</span></div>';
         }
         h += '</div>';
       } else if (passado) {
@@ -14048,8 +14110,9 @@ function renderSemanaV2(calData) {
   } // fim de gridDe
 
   // ⏱ LINHA DO TEMPO: cada reunião na hora real (mesmo fora da grade); os horários livres ficam por trás, clicáveis
-  function timelineDe(evsDo, titulo, gradeDo) {
+  function timelineDe(evsDo, titulo, gradeDo, ckDo) {
     var G = gradeDo || GRADE_BASE;
+    var CK = ckDo || (AG.closer !== 'ambos' ? AG.closer : '');
     var PX = 1.3;   // pixels por minuto (100 min = 130 px)
     var minG = 8 * 60, maxG = 20 * 60 + 40;
     // a reunião comercial do Google já aparece como bloco fixo da grade: não desenha o evento duplicado
@@ -14113,8 +14176,8 @@ function renderSemanaV2(calData) {
         var clsF = comFantasma ? ' com-fantasma' : '';
         if (!ovl.length) {
           if (slotPassou) { vaziosPassados++; htmlT += '<div class="tl-slot passado" title="Horário útil passou SEM reunião" ' + box + '><b>' + sl.start + '–' + sl.end + '</b><span>sem reunião</span></div>'; }
-          else if (extraOuTrava) htmlT += '<div class="tl-slot extra' + clsF + '" onclick="agendarComAprovacao(event,\'' + dStr + '\',\'' + sl.start + '\')" title="' + rotTrava + ': só com OK do closer" ' + box + '><b>🔒 ' + sl.start + '–' + sl.end + '</b><span>OK do closer</span></div>';
-          else { vaziosFuturos++; htmlT += '<div class="tl-slot' + clsF + '" onclick="abrirTipoV2(event,\'' + dStr + '\',\'' + sl.start + '\')" ' + box + '><b>' + sl.start + '–' + sl.end + '</b><span class="tl-mais">+ agendar</span></div>'; }
+          else if (extraOuTrava) htmlT += '<div class="tl-slot extra' + clsF + '" onclick="agendarComAprovacao(event,\'' + dStr + '\',\'' + sl.start + '\',\'' + CK + '\')" title="' + rotTrava + ': só com OK do closer" ' + box + '><b>🔒 ' + sl.start + '–' + sl.end + '</b><span>OK do closer</span></div>';
+          else { vaziosFuturos++; htmlT += '<div class="tl-slot' + clsF + '" onclick="abrirTipoV2(event,\'' + dStr + '\',\'' + sl.start + '\',\'' + CK + '\')" ' + box + '><b>' + sl.start + '–' + sl.end + '</b><span class="tl-mais">+ agendar</span></div>'; }
           return;
         }
         // mede o que sobrou: pedaços livres dentro do horário
@@ -14131,7 +14194,7 @@ function renderSemanaV2(calData) {
           var ini = hhmm(iv[0]), fim = hhmm(iv[1]);
           if (len >= 45) {   // cabe um Legado (50 min) no pedaço que sobrou
             var fimLeg = hhmm(Math.min(iv[0] + 50, iv[1]));
-            var click = extraOuTrava ? 'agendarComAprovacao(event,\'' + dStr + '\',\'' + ini + '\')' : 'event.stopPropagation();abrirAgendarCom(50,\'' + dStr + '\',\'' + ini + '\');';
+            var click = extraOuTrava ? 'agendarComAprovacao(event,\'' + dStr + '\',\'' + ini + '\',\'' + CK + '\')' : 'event.stopPropagation();abrirAgendarCom(50,\'' + dStr + '\',\'' + ini + '\',\'' + CK + '\');';
             htmlT += '<div class="tl-legado' + clsF + '" onclick="' + click + '" title="Sobraram ' + len + ' min neste horário (' + ini + '–' + fim + '): cabe um Legado de 50 min" style="top:' + (top(iv[0]) + 2) + 'px;height:' + (len * PX - 6) + 'px;">' + (extraOuTrava ? '🔒 ' : '+ ') + 'Legado · ' + ini + '–' + fimLeg + '</div>';
           } else {           // sobra pequena: não cabe nada — remarcar a reunião vizinha para o começo do horário resolve
             htmlT += '<div class="tl-sobra' + clsF + '" title="Sobraram só ' + len + ' min (' + ini + '–' + fim + '): não cabe reunião. Para aproveitar, remarque a reunião vizinha para o começo do horário (clique nela → Remarcar)." style="top:' + (top(iv[0]) + 2) + 'px;height:' + (len * PX - 6) + 'px;">sobra ' + len + ' min</div>';
@@ -14180,7 +14243,7 @@ function renderSemanaV2(calData) {
   if (AG.closer === 'ambos') {
     // visão "Todas": uma coluna por closer, na ordem da lista CLOSERS
     var cols = CLOSERS.map(function(c) {
-      var g = desenha(evs.filter(function(e){ return e._cal === c.key; }), '👤 ' + c.nome, gradeNova ? slotsDo(c.key) : SLOTS_BRUNO);
+      var g = desenha(evs.filter(function(e){ return e._cal === c.key; }), '👤 ' + c.nome, gradeNova ? slotsDo(c.key) : SLOTS_BRUNO, c.key);
       return '<div class="sg-col">' + g + '</div>';
     }).join('');
     htmlFinal = '<div class="sg-duas' + (CLOSERS.length > 2 ? ' tres' : '') + (agLadoALado() ? '' : ' empilhado') + '">' + cols + '</div>';
@@ -14188,6 +14251,7 @@ function renderSemanaV2(calData) {
     htmlFinal = desenha(evs, '');
   }
   document.getElementById('v2-sg').innerHTML = htmlFinal;
+  try { agAtualizarLegenda(); } catch (eLg) {}
   try { agAtualizarBotaoVista(); } catch (eV) {}
   try { agAtualizarBotaoLado(); } catch (eL2) {}
   posicionarLinhaAgora();
@@ -14335,7 +14399,7 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
     var lR = (LD.rows || []).filter(function(x){ return x.tel8 === ldTel8(r.telefone); })[0];
     var agendaKey = closerChaveDe(r.closer) || (AG.closer !== 'ambos' ? AG.closer : 'bruno');
     sendToGAS({ action: 'addCalendarOnly', calendar: {
-      agenda: agendaKey, data: dataBr, hora: hora, duracao: /legado/i.test(r.produto || '') ? 50 : 100,
+      agenda: agendaKey, data: dataBr, hora: hora, duracao: /legado/i.test(r.produto || '') ? 50 : durHT(agendaKey),
       nome: r.nome, sdr: r.sdr || '', telefone: r.telefone || '',
       instagram: lR && lR.insta ? '@' + String(lR.insta).replace(/^@/, '') : '',
       clint: clintLink({ tel: r.telefone, nome: r.nome }) || '',
@@ -15102,21 +15166,23 @@ function _ovAprov() {
 }
 
 // passo 2: depois de aprovado, escolher o tipo de reunião — na MESMA janela
-function escolherTipoExtra(dataStr, hora) {
+function escolherTipoExtra(dataStr, hora, ck) {
   var ov = _ovAprov();
   var dp = dataStr.split('-');
+  var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
+  var dHT = durHT(quem);
   ov.innerHTML = '<div class="modal" style="max-width:430px;">'
     + '<div class="modal-head"><div class="alerta-ico" style="background:rgba(246,163,80,.15);">📅</div>'
     + '<h2>' + dp[2] + '/' + dp[1] + ' às ' + hora + '</h2>'
     + '<button class="close-x" onclick="fecharAprovacao()">✕</button></div>'
     + '<p style="font-size:.8rem;color:var(--muted);margin:6px 0 16px;">✓ Aprovado pelo closer · escolha o tipo de reunião</p>'
-    + '<button class="btn primary" id="tipo-ht" style="width:100%;padding:14px;margin-bottom:10px;text-align:left;">🎯 &nbsp;<b>HT — Spark / Growth</b> &nbsp;<span style="opacity:.75;font-weight:600;">100 min (1h40)</span></button>'
+    + '<button class="btn primary" id="tipo-ht" style="width:100%;padding:14px;margin-bottom:10px;text-align:left;">🎯 &nbsp;<b>HT — Spark / Growth</b> &nbsp;<span style="opacity:.75;font-weight:600;">' + rotHT(quem) + '</span></button>'
     + '<button class="btn" id="tipo-lg" style="width:100%;padding:14px;text-align:left;">⚡ &nbsp;<b>Legado</b> &nbsp;<span style="opacity:.75;font-weight:600;">50 min · meio bloco</span></button>'
     + '</div>';
   ov.classList.add('open');
   ov.onclick = function(ev){ ev.stopPropagation(); if (ev.target === ov) fecharAprovacao(); };
-  document.getElementById('tipo-ht').onclick = function(ev){ ev.stopPropagation(); fecharAprovacao(); abrirAgendarCom(100, dataStr, hora); window._agAprovado = true; };
-  document.getElementById('tipo-lg').onclick = function(ev){ ev.stopPropagation(); fecharAprovacao(); abrirAgendarCom(50, dataStr, hora); window._agAprovado = true; };
+  document.getElementById('tipo-ht').onclick = function(ev){ ev.stopPropagation(); fecharAprovacao(); abrirAgendarCom(dHT, dataStr, hora, quem); window._agAprovado = true; };
+  document.getElementById('tipo-lg').onclick = function(ev){ ev.stopPropagation(); fecharAprovacao(); abrirAgendarCom(50, dataStr, hora, quem); window._agAprovado = true; };
 }
 
 function pedirAprovacao(closerNome, extraLbl, cb) {
@@ -15142,35 +15208,39 @@ function fecharAprovacao() {
 }
 
 // horário 🔒 (reunião extra, sábado ou feriado): pede a aprovação do closer antes
-function agendarComAprovacao(e, dataStr, hora) {
+function agendarComAprovacao(e, dataStr, hora, ck) {
   e.stopPropagation();
   if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
-  var closerNome = AG.closer === 'ambos' ? 'responsável' : (closerNomeDe(AG.closer) || 'Bruno Pardim');
+  var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
+  var closerNome = closerNomeDe(quem) || 'responsável';
   pedirAprovacao(closerNome, hora, function() {
-    escolherTipoExtra(dataStr, hora); // aprovado → já mostra as opções de agendar
+    escolherTipoExtra(dataStr, hora, quem); // aprovado → já mostra as opções de agendar
   });
 }
 
 // popup HT/Legado com data/hora reais
-function abrirTipoV2(e, dataStr, hora) {
+function abrirTipoV2(e, dataStr, hora, ck) {
   e.stopPropagation();
   if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
   window._agAprovado = false;
   var dp = dataStr.split('-');
   var lbl = dp[2] + '/' + dp[1];
+  var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
+  var dHT = durHT(quem), rHT = rotHT(quem);
+  var rLG = gradeDoCloser(quem) === 'hora' ? '50 min · cabe no bloco' : '50 min · meio bloco';
   var m = document.getElementById('tipo-popup');
-  m.innerHTML = '<div class="tipo-head"><span class="tipo-data">📅 ' + lbl + ' às ' + hora + '</span><div class="tipo-sub">Escolha o tipo de reunião</div></div>'
-    + '<div class="tipo-op ht" onclick="fecharTipo();abrirAgendarCom(100,\'' + dataStr + '\',\'' + hora + '\');"><span class="tipo-ico">🎯</span><div class="tipo-txt"><b>HT — Spark/Growth</b><span>100 min (1h40)</span></div><span class="tipo-seta">›</span></div>'
-    + '<div class="tipo-op lg" onclick="fecharTipo();abrirAgendarCom(50,\'' + dataStr + '\',\'' + hora + '\');"><span class="tipo-ico">⚡</span><div class="tipo-txt"><b>Legado</b><span>50 min · meio bloco</span></div><span class="tipo-seta">›</span></div>';
+  m.innerHTML = '<div class="tipo-head"><span class="tipo-data">📅 ' + lbl + ' às ' + hora + (quem ? ' · ' + (closerNomeDe(quem) || '') : '') + '</span><div class="tipo-sub">Escolha o tipo de reunião</div></div>'
+    + '<div class="tipo-op ht" onclick="fecharTipo();abrirAgendarCom(' + dHT + ',\'' + dataStr + '\',\'' + hora + '\',\'' + quem + '\');"><span class="tipo-ico">🎯</span><div class="tipo-txt"><b>HT — Spark/Growth</b><span>' + rHT + '</span></div><span class="tipo-seta">›</span></div>'
+    + '<div class="tipo-op lg" onclick="fecharTipo();abrirAgendarCom(50,\'' + dataStr + '\',\'' + hora + '\',\'' + quem + '\');"><span class="tipo-ico">⚡</span><div class="tipo-txt"><b>Legado</b><span>' + rLG + '</span></div><span class="tipo-seta">›</span></div>';
   m.classList.add('open');
   m.style.left = Math.min(e.clientX, window.innerWidth - 270) + 'px';
   m.style.top = Math.min(e.clientY + 8, window.innerHeight - 230) + 'px';
 }
-function abrirAgendarCom(dur, dataStr, hora) {
+function abrirAgendarCom(dur, dataStr, hora, ck) {
   // no modo REMARCAR (Bruno 10/09/2026: "não está dando para remarcar, aparece como se eu estivesse agendando outra"),
   // qualquer clique num horário — inclusive o pedaço "+ Legado" da linha do tempo — é o horário NOVO da mesma reunião
   if (window._agRemarcando && dataStr && hora) { remarcarNoSlot(dataStr, hora); return; }
-  abrirAgendar(dur);
+  abrirAgendar(dur, ck);
   if (dataStr) {
     var dp = dataStr.split('-');
     document.getElementById('ag-data').value = dp[2] + '/' + dp[1] + '/' + dp[0];
