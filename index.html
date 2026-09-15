@@ -270,6 +270,8 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .tl-agora::before { content:''; position:absolute; left:-1px; top:-5px; width:8px; height:8px; border-radius:50%; background:#ff6b6b; }
 /* visão "Os dois" lado a lado (Bruno 10/09/2026) — cada agenda rola de lado se faltar espaço */
 .sg-duas { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+.sg-duas.tres { grid-template-columns:1fr 1fr 1fr; }
+@media (max-width:1500px) { .sg-duas.tres { grid-template-columns:1fr 1fr; } }
 .sg-duas.empilhado { grid-template-columns:1fr; }
 .sg-duas .sg-col { min-width:0; }
 .sg-duas:not(.empilhado) .sg-grid { overflow-x:auto; grid-template-columns:48px repeat(6,minmax(96px,1fr)); }
@@ -1173,11 +1175,12 @@ img { max-width:100%; height:auto; }
         <button class="btn" style="padding:8px 14px;font-size:.72rem;" onclick="mudarSemana(1)">Próxima semana ▶</button>
         <span style="flex:1;"></span>
         <div class="chart-chips" style="margin-bottom:0;">
-          <button class="chart-chip on" id="cl-ambos" onclick="mudarCloser('ambos')">👥 As duas agendas</button>
+          <button class="chart-chip on" id="cl-ambos" onclick="mudarCloser('ambos')">👥 Todas as agendas</button>
           <button class="chart-chip" id="cl-bruno" onclick="mudarCloser('bruno')">Bruno Pardim</button>
           <button class="chart-chip" id="cl-tony" onclick="mudarCloser('tony')">Tony Londe</button>
+          <button class="chart-chip" id="cl-wesllene" onclick="mudarCloser('wesllene')">Wesllene</button>
           <button class="chart-chip" id="cl-vista" onclick="agTrocarVista()" title="Linha do tempo (como a agenda do Google) ou grade de blocos" style="margin-left:auto;">▦ grade</button>
-          <button class="chart-chip" id="cl-lado" onclick="agTrocarDisposicao()" title="Na visão dos dois closers: agendas lado a lado ou uma em cima da outra">↔ lado a lado</button>
+          <button class="chart-chip" id="cl-lado" onclick="agTrocarDisposicao()" title="Na visão de todas as agendas: lado a lado ou uma em cima da outra">↔ lado a lado</button>
         </div>
       </div>
 
@@ -1466,6 +1469,7 @@ img { max-width:100%; height:auto; }
         <select class="edit-in edit-sel ag-in" id="ag-closer" onchange="closerMudou()">
           <option value="Bruno Pardim">Bruno Pardim</option>
           <option value="Tony Londe">Tony Londe</option>
+          <option value="Wesllene">Wesllene</option>
         </select>
         <div id="ag-fila" style="font-size:.66rem;color:var(--muted);margin-top:5px;">Os horários abaixo são da agenda deste closer</div>
       </div>
@@ -2196,8 +2200,8 @@ function abrirAgendar(dur){
   if (ps) produtoMudou(ps.value); // preenche o valor do programa
   // se o SDR estava olhando a agenda de um closer, já vem escolhido esse (dá para trocar)
   var cs = document.getElementById('ag-closer');
-  if (cs && (AG.closer === 'bruno' || AG.closer === 'tony')) {
-    cs.value = AG.closer === 'tony' ? 'Tony Londe' : 'Bruno Pardim';
+  if (cs && closerNomeDe(AG.closer)) {
+    cs.value = closerNomeDe(AG.closer);
   }
   agLimparFicha();  // sem isso, os dados do lead anterior ficavam no formulário
   agLimparLead();
@@ -2332,8 +2336,32 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-14-0816';
+var VERSAO_DASH = '2026-09-15-1714';
 var _versaoNova = null;
+
+// =====================================================================
+// CLOSERS — quem atende reunião (15/09/2026: entrou a Wesllene)
+// =====================================================================
+// Para acrescentar um closer: UMA linha aqui, a agenda dele no robô (CALENDARS,
+// no começo do Code.gs) e, se ele for entrar no dash, o PIN lá embaixo em ACESSOS.
+// grade = qual grade de horários ele usa: 'tony' (almoço 12:20–13:00) ou 'bruno' (12:20–14:00).
+var CLOSERS = [
+  { key: 'bruno',    nome: 'Bruno Pardim', grade: 'bruno' },
+  { key: 'tony',     nome: 'Tony Londe',   grade: 'tony'  },
+  { key: 'wesllene', nome: 'Wesllene',     grade: 'tony'  }
+];
+function closerKeys()  { return CLOSERS.map(function(c){ return c.key; }); }
+function closerNomes() { return CLOSERS.map(function(c){ return c.nome; }); }
+function closerNomeDe(k) {
+  for (var i = 0; i < CLOSERS.length; i++) if (CLOSERS[i].key === k) return CLOSERS[i].nome;
+  return '';
+}
+// "tony londe", "Tony", "TONY LONDE (2ª cadeira)", "Wesllene " -> a chave da agenda
+function closerChaveDe(nome) {
+  var t = String(nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  for (var i = 0; i < CLOSERS.length; i++) if (t.indexOf(CLOSERS[i].key) !== -1) return CLOSERS[i].key;
+  return '';
+}
 
 // recarrega furando a memória do navegador (a URL muda, então ele busca de novo)
 function atualizarDash(versao) {
@@ -2836,7 +2864,7 @@ function atualizarHorarios() {
   var m = dataBr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!m) return;
   var closer = closerEscolhido();
-  var key = closer === 'Tony Londe' ? 'tony' : 'bruno';
+  var key = closerChaveDe(closer) || 'bruno';
   var dur = parseInt((document.getElementById('ag-duracao') || {value:'100'}).value, 10) || 100;
 
   // monta a lista de horários conforme a grade do closer e o dia (sábado = só manhã, com 🔒)
@@ -3973,9 +4001,8 @@ function _programaForms(p) {
   return base + (/cadeira/.test(t) ? (base === 'Growth anual' ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA') : '');
 }
 function _vendedorForms(v) {
-  var t = v2norm(v);
-  if (/bruno/.test(t)) return 'Bruno Pardim';
-  if (/tony/.test(t)) return 'Tony Londe';
+  var k = closerChaveDe(v);
+  if (k) return closerNomeDe(k);
   return String(v || '');
 }
 // plano B: o Google Forms de verdade, ja preenchido (usado se o robo nao conseguir responder o formulario)
@@ -6478,9 +6505,7 @@ function renderAlertaClintHome() {
 var AV_CLOSER = { lista: [], carregado: false };
 function _euSouCloser() {
   var eu = localStorage.getItem('v2Login') || '';
-  if (v2norm(eu).indexOf('bruno') !== -1) return 'bruno';
-  if (v2norm(eu).indexOf('tony') !== -1) return 'tony';
-  return '';
+  return closerChaveDe(eu);
 }
 function carregarAvisosCloser() {
   var quem = _euSouCloser();
@@ -6567,7 +6592,7 @@ var ST_RAPIDOS = ['Vendido', 'Não vendido', 'No-Show', 'Bloqueio de oferta', 'E
 function reunioesSemResultado() {
   var quem = _euSouCloser();
   if (!quem) return [];
-  var nomeCloser = quem === 'tony' ? 'tony londe' : 'bruno pardim';
+  var nomeCloser = v2norm(closerNomeDe(quem) || 'bruno pardim');
   var agora = Date.now();
   var limite = agora - 30 * 86400000;   // não cobra reunião de mais de um mês atrás
   // cobra só no PERÍODO seguinte (Bruno 24/08/2026): manhã→à tarde, tarde→à noite,
@@ -6585,7 +6610,7 @@ function reunioesSemResultado() {
   }
   return (V2.rows || []).filter(function(r) {
     if (!r.date) return false;
-    if (v2norm(r.closer || '').indexOf(quem === 'tony' ? 'tony' : 'bruno') === -1) return false;
+    if (closerChaveDe(r.closer) !== quem) return false;
     if (r.date.getTime() < limite) return false;
     if (!podeCobrar(r)) return false;
     return v2norm(r.status || '') === v2norm('Reunião agendada') || !(r.status || '').trim();
@@ -7193,7 +7218,7 @@ function montarSeletorEu() {
   }
   sel.disabled = false;
   var nomes = v2mais(OPCOES_PLANILHA.sdr || [], v2usados('sdr', 1));
-  ['Bruno Pardim', 'Tony Londe'].forEach(function(n){ if (nomes.indexOf(n) === -1) nomes.push(n); });
+  closerNomes().forEach(function(n){ if (nomes.indexOf(n) === -1) nomes.push(n); });
   var eu = ldEu();
   if (eu && nomes.indexOf(eu) === -1) nomes.push(eu);
   sel.innerHTML = '<option value="">— escolha —</option>'
@@ -7225,7 +7250,7 @@ function ldPessoasDoTime() {
   try { if (CLINT_PAINEL && CLINT_PAINEL.success) donosClint = CLINT_PAINEL.donos || []; } catch (e) {}
   var base = [];
   try { if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a){ if (!a.soOlha && !a.contratos && a.nome !== 'Adm') base.push(a.nome); }); } catch (e) {}
-  ['Bruno Pardim', 'Tony Londe'].forEach(function(n){ if (base.indexOf(n) === -1) base.push(n); });
+  closerNomes().forEach(function(n){ if (base.indexOf(n) === -1) base.push(n); });
   return base.map(function(n) {
     var p = v2norm(n).split(' ')[0];
     var c = donosClint.filter(function(d){ return v2norm(d).split(' ')[0] === p; })[0] || '';
@@ -12616,7 +12641,7 @@ function abrirLead(i) {
     { ico:'💰', nome:'Valor', valor: r.valor ? v2moeda(r.valor) : '—', campo:'valor' },
     { ico:'💳', nome:'Forma pgto.', valor: r.forma || '—', campo:'forma_de_pagamento',
       opcoes:['À vista','Cartão de crédito','Recorrente','Entrada + boleto','Boleto'] },
-    { ico:'🧑‍💼', nome:'Closer', valor: r.closer || '—', campo:'closer', opcoes: v2usados('closer') },
+    { ico:'🧑‍💼', nome:'Closer', valor: r.closer || '—', campo:'closer', opcoes: v2mais(closerNomes(), v2usados('closer')) },
     { ico:'📞', nome:'SDR', valor: r.sdr || '—', campo:'sdr', opcoes: OPCOES_PLANILHA.sdr }
   ];
   var nt = document.getElementById('fl-notas');
@@ -12886,8 +12911,8 @@ function preencherGravacao(r) {
   if (!r || !r.date || typeof AG === 'undefined') return;
   var seg = agSegunda(r.date), wk = agDataStr(seg);
   function aplicar(data) {
-    var evs = (data.bruno || []).map(function(e){ e._cal = 'bruno'; return e; })
-      .concat((data.tony || []).map(function(e){ e._cal = 'tony'; return e; }));
+    var evs = [];
+    closerKeys().forEach(function(ck) { (data[ck] || []).forEach(function(e){ e._cal = ck; evs.push(e); }); });
     var ev = eventoDoLead(r, evs);
     if (!ev) return;
     r._ev = { id: ev.id, cal: ev._cal }; // vínculo planilha ↔ evento (para sincronizar edições)
@@ -13476,23 +13501,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDolvRzUAuGLytDgx5eoVSj4M-vVbG4fl40qXokCX-1RFiKtn48LdgUQhWT7l43JJS/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -13623,7 +13648,7 @@ function salvarAnotacao(btn) {
 
 // ---------- AGENDA REAL (Google Calendar via Apps Script) ----------
 var FOTO_VAZIO = 'data:image/jpeg;base64,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';
-// a agenda abre mostrando as DUAS (pedido do Bruno 19/08/2026)
+// a agenda abre mostrando TODAS (pedido do Bruno 19/08/2026; 15/09/2026 entrou a Wesllene)
 var AG = { weekStart: null, closer: 'ambos', cache: {} };
 var _evAtual = null;
 // grade de horários POR CLOSER (Bruno mantém a original; Tony tem a dele)
@@ -13642,12 +13667,12 @@ var SLOTS_TONY = [
   { start:'16:20', end:'18:00' },
   { start:'18:00', end:'19:40', extra:true }
 ];
-// sábado de manhã (os dois closers): sempre com aprovação do closer
+// sábado de manhã (todos os closers): sempre com aprovação do closer
 var SLOTS_SABADO = [
   { start:'09:00', end:'10:40' },
   { start:'10:40', end:'12:20' }
 ];
-// a partir de 03/08 a grade nova vale para OS DOIS closers (a reunião comercial das 9h é de todos);
+// a partir de 03/08 a grade nova vale para TODOS os closers (a reunião comercial das 9h é de todos);
 // SLOTS_BRUNO fica guardada só para desenhar as semanas antigas
 // 14/09/2026 em diante (Bruno 10/09/2026): volta ao modelo antigo, POR CLOSER, com a reunião comercial às 8h20.
 // Tony: 9h, 10h40, almoço 12h20–13h, 13h, 14h40, 16h20 (até 18h). Bruno: 9h, 10h40, academia+almoço 12h20–14h, 14h, 15h40, 17h20 (até 19h).
@@ -13674,7 +13699,9 @@ var SLOTS_BRUNO_14 = [
 var GRADE_14_DESDE = new Date(2026, 8, 14);
 function slotsDo(closer, dataRef){
   var d = dataRef || AG.weekStart;
-  if (d && d >= GRADE_14_DESDE) return closer === 'tony' ? SLOTS_TONY_14 : SLOTS_BRUNO_14;
+  var grade = 'bruno';
+  for (var i = 0; i < CLOSERS.length; i++) if (CLOSERS[i].key === closer) grade = CLOSERS[i].grade;
+  if (d && d >= GRADE_14_DESDE) return grade === 'tony' ? SLOTS_TONY_14 : SLOTS_BRUNO_14;
   return SLOTS_TONY;
 }
 // a grade nova (Tony / sábado / reunião extra) vale SÓ DAQUI PARA FRENTE;
@@ -13743,8 +13770,10 @@ function agAtualizarBotaoLado() {
 function mudarCloser(k) {
   AG.closer = k;
   try { agAtualizarBotaoLado(); } catch (eL) {}
-  document.getElementById('cl-bruno').classList.toggle('on', k === 'bruno');
-  document.getElementById('cl-tony').classList.toggle('on', k === 'tony');
+  closerKeys().forEach(function(ck) {
+    var b = document.getElementById('cl-' + ck);
+    if (b) b.classList.toggle('on', k === ck);
+  });
   var amb = document.getElementById('cl-ambos');
   if (amb) amb.classList.toggle('on', k === 'ambos');
   var wk = agDataStr(AG.weekStart);
@@ -13850,10 +13879,11 @@ var _v2evs = [];
 function renderSemanaV2(calData) {
   var evs;
   if (AG.closer === 'ambos') {
-    // as duas agendas juntas — cada evento lembra de qual closer veio
-    var eb = (calData.bruno || []).slice(); eb.forEach(function(e){ e._cal = 'bruno'; });
-    var et = (calData.tony || []).slice(); et.forEach(function(e){ e._cal = 'tony'; });
-    evs = eb.concat(et);
+    // todas as agendas juntas — cada evento lembra de qual closer veio
+    evs = [];
+    closerKeys().forEach(function(ck) {
+      (calData[ck] || []).forEach(function(e){ e._cal = ck; evs.push(e); });
+    });
   } else {
     evs = (calData[AG.closer] || []).slice();
     evs.forEach(function(e){ e._cal = AG.closer; });
@@ -14028,8 +14058,10 @@ function renderSemanaV2(calData) {
     var hhmm = function(m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); };
     var stDe = function(e) { return agMin((e.startTime || '').substring(0, 5)); };
     var enDe = function(e) { var s0 = stDe(e), f0 = agMin((e.endTime || '').substring(0, 5)); return f0 > s0 ? f0 : s0 + (e.duration || 100); };
-    // faixa de horas: quando as duas agendas estão lado a lado, as duas usam a MESMA régua (mesma altura)
-    var gradesFaixa = (AG.closer === 'ambos') ? [gradeNova ? slotsDo('bruno') : SLOTS_BRUNO, gradeNova ? slotsDo('tony') : SLOTS_BRUNO] : [G];
+    // faixa de horas: com as agendas lado a lado, todas usam a MESMA régua (mesma altura)
+    var gradesFaixa = (AG.closer === 'ambos')
+      ? closerKeys().map(function(ck){ return gradeNova ? slotsDo(ck) : SLOTS_BRUNO; })
+      : [G];
     gradesFaixa.forEach(function(GG) { GG.forEach(function(sl) { var a = sl.start === 'LUNCH' ? agMin(sl.ini) : agMin(sl.start), b = sl.start === 'LUNCH' ? agMin(sl.fim) : agMin(sl.end); if (a < minG) minG = a; if (b > maxG) maxG = b; }); });
     var evsFaixa = (AG.closer === 'ambos' && typeof evs !== 'undefined') ? evs : evsDo;
     evsFaixa.forEach(function(e) { if (ehReuniaoComercial(e)) return; var a = stDe(e), b = enDe(e); if (a && a < minG) minG = a; if (b > maxG) maxG = b; });
@@ -14146,10 +14178,12 @@ function renderSemanaV2(calData) {
 
   var htmlFinal;
   if (AG.closer === 'ambos') {
-    // visão "Os dois": uma agenda EM CIMA da outra — Bruno primeiro, Tony embaixo
-    var gB = desenha(evs.filter(function(e){ return e._cal === 'bruno'; }), '👤 Bruno Pardim', gradeNova ? slotsDo('bruno') : SLOTS_BRUNO);
-    var gT = desenha(evs.filter(function(e){ return e._cal === 'tony'; }), '👤 Tony Londe', gradeNova ? slotsDo('tony') : SLOTS_BRUNO);
-    htmlFinal = '<div class="sg-duas' + (agLadoALado() ? '' : ' empilhado') + '"><div class="sg-col">' + gB + '</div><div class="sg-col">' + gT + '</div></div>';
+    // visão "Todas": uma coluna por closer, na ordem da lista CLOSERS
+    var cols = CLOSERS.map(function(c) {
+      var g = desenha(evs.filter(function(e){ return e._cal === c.key; }), '👤 ' + c.nome, gradeNova ? slotsDo(c.key) : SLOTS_BRUNO);
+      return '<div class="sg-col">' + g + '</div>';
+    }).join('');
+    htmlFinal = '<div class="sg-duas' + (CLOSERS.length > 2 ? ' tres' : '') + (agLadoALado() ? '' : ' empilhado') + '">' + cols + '</div>';
   } else {
     htmlFinal = desenha(evs, '');
   }
@@ -14160,7 +14194,8 @@ function renderSemanaV2(calData) {
 
   var regularesDe = function(g){ return g.filter(function(s){ return s.end && !s.fixo && !s.extra; }).length * 5; };
   var totalRegulares = AG.closer === 'ambos'
-    ? regularesDe(gradeNova ? slotsDo('bruno') : SLOTS_BRUNO) + regularesDe(gradeNova ? slotsDo('tony') : SLOTS_BRUNO)   // duas agendas, cada uma com a sua grade
+    ? closerKeys().filter(function(ck){ return calData[ck]; })   // só as agendas que o robô conhece
+        .reduce(function(t, ck){ return t + regularesDe(gradeNova ? slotsDo(ck) : SLOTS_BRUNO); }, 0)
     : regularesDe(GRADE);
   var ocup = Math.round(cheios / totalRegulares * 100);
   document.getElementById('ag-stats').innerHTML =
@@ -14298,7 +14333,7 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
     sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
     // evento novo ja com os dados do lead (Instagram, Clint, e-mail — o que a base souber)
     var lR = (LD.rows || []).filter(function(x){ return x.tel8 === ldTel8(r.telefone); })[0];
-    var agendaKey = /tony/i.test(r.closer || '') ? 'tony' : /bruno/i.test(r.closer || '') ? 'bruno' : (AG.closer !== 'ambos' ? AG.closer : 'bruno');
+    var agendaKey = closerChaveDe(r.closer) || (AG.closer !== 'ambos' ? AG.closer : 'bruno');
     sendToGAS({ action: 'addCalendarOnly', calendar: {
       agenda: agendaKey, data: dataBr, hora: hora, duracao: /legado/i.test(r.produto || '') ? 50 : 100,
       nome: r.nome, sdr: r.sdr || '', telefone: r.telefone || '',
@@ -14313,7 +14348,7 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
     cancelarRemarcacao();
     agInvalidar();
     setTimeout(function(){ try { carregarAgenda(); } catch (e) {} try { renderV2(); } catch (e) {} }, 2500);
-    try { avisoRapido('🗓 REMARCADA para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — mesma pessoa, mesma linha, evento novo na agenda de ' + (agendaKey === 'tony' ? 'Tony' : 'Bruno')); } catch (e) {}
+    try { avisoRapido('🗓 REMARCADA para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — mesma pessoa, mesma linha, evento novo na agenda de ' + (closerNomeDe(agendaKey) || 'Bruno')); } catch (e) {}
     return;
   }
 }
@@ -15005,8 +15040,8 @@ function sincronizarStatusEvento(r) {
   if (!r.date || typeof AG === 'undefined') return;
   var wk = agDataStr(agSegunda(r.date));
   function achar(data) {
-    var evs = (data.bruno || []).map(function(e){ e._cal = 'bruno'; return e; })
-      .concat((data.tony || []).map(function(e){ e._cal = 'tony'; return e; }));
+    var evs = [];
+    closerKeys().forEach(function(ck) { (data[ck] || []).forEach(function(e){ e._cal = ck; evs.push(e); }); });
     var ev = eventoDoLead(r, evs);
     if (!ev) return;
     r._ev = { id: ev.id, cal: ev._cal };
@@ -15110,7 +15145,7 @@ function fecharAprovacao() {
 function agendarComAprovacao(e, dataStr, hora) {
   e.stopPropagation();
   if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
-  var closerNome = AG.closer === 'tony' ? 'Tony Londe' : AG.closer === 'ambos' ? 'responsável' : 'Bruno Pardim';
+  var closerNome = AG.closer === 'ambos' ? 'responsável' : (closerNomeDe(AG.closer) || 'Bruno Pardim');
   pedirAprovacao(closerNome, hora, function() {
     escolherTipoExtra(dataStr, hora); // aprovado → já mostra as opções de agendar
   });
@@ -15870,7 +15905,7 @@ function agendarReuniao(btn) {
   var mesRef = (document.getElementById('ag-mes') || {value:''}).value;
   // o SDR escolheu o closer no formulário
   var closerNome = closerEscolhido();
-  var agenda = closerNome === 'Tony Londe' ? 'tony' : 'bruno';
+  var agenda = closerChaveDe(closerNome) || 'bruno';
   // horário ocupado apenas avisa — quem decide é quem está agendando
   var opHora = document.getElementById('ag-hora').selectedOptions[0];
   if (opHora && opHora.dataset && opHora.dataset.ocupado) {
@@ -16083,7 +16118,7 @@ function posicionarLinhaAgora() {
   var fimSemana = new Date(AG.weekStart.getTime() + 6 * 86400000);
   var agora = new Date();
   var mNow = agora.getHours() * 60 + agora.getMinutes();
-  // na visão "Os dois" existem duas grades — a linha aparece nas duas
+  // na visão "Todas" existe uma grade por closer — a linha aparece em todas
   box.querySelectorAll('.sg-grid').forEach(function(grid) {
     var velha = grid.querySelector('.sg-agora-full'); if (velha) velha.remove();
     if (hoje < AG.weekStart || hoje >= fimSemana) return;
@@ -16167,6 +16202,7 @@ function verPendencias() {
 var ACESSOS = [
   { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
   { nome: 'Tony Londe',    pin: '9264' },
+  { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
   { nome: 'Juliane Promov', pin: '4172', contratos: true },   // envia contratos (Clicksign), sem poderes de adm
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
@@ -17083,7 +17119,7 @@ function plSincronizarAgenda(simular, cb) {
   var hojeStr = plEvDataStr({ date: new Date() });
   semanas.forEach(function(wk) {
     plAgEventos(wk, function(data) {
-      if (data) [['bruno', 'Bruno Pardim'], ['tony', 'Tony Londe']].forEach(function(par) {
+      if (data) CLOSERS.map(function(c){ return [c.key, c.nome]; }).forEach(function(par) {
         (data[par[0]] || []).forEach(function(ev) { try {
           var ehNs = ev.status === 'noshow' || String(ev.color || '') === '8';
           if (!ehNs || !ev.date) return;
@@ -17340,7 +17376,8 @@ function plPxEspacosEntre(closer, tIni, tFim) {
     if (typeof ehFeriado === 'function' && ehFeriado(dStr)) continue;
     var wk = agDataStr(ldIniSemana(dd)), c = PL_AG.cache[wk];
     if (!c || !c.data) { faltou = true; continue; }
-    var evs = (c.data[closer] || []).filter(function(e) { if (e.date !== dStr) return false; var st = v2norm(e.status || ''); return st !== 'noshow' && st !== 'no show' && st.indexOf('remarcada') === -1 && !/reuni[aã]o\s+comercial/i.test(String(e.title || '')); });
+    if (!c.data[closer]) return 0;   // closer sem agenda ligada no robô ainda: não inventa espaço livre
+    var evs = c.data[closer].filter(function(e) { if (e.date !== dStr) return false; var st = v2norm(e.status || ''); return st !== 'noshow' && st !== 'no show' && st.indexOf('remarcada') === -1 && !/reuni[aã]o\s+comercial/i.test(String(e.title || '')); });
     (slotsDo(closer, dd) || []).forEach(function(sl) {
       if (!sl.end || sl.fixo || sl.extra || sl.start === 'LUNCH') return;
       var a = agMin(sl.start), b = agMin(sl.end);
@@ -17443,7 +17480,7 @@ function plPainelSdrs(p, d) {
   var leadAntesDe = function(t8, mT) { var ls = porTelTodos[t8]; if (!ls) return null; var melhor = null; ls.forEach(function(l) { if (!l.date) return; var lt = l.date.getTime(); if (lt <= mT + 3600000 && (!melhor || lt > melhor.date.getTime())) melhor = l; }); if (melhor) return melhor; ls.forEach(function(l) { if (l.date && (!melhor || l.date.getTime() < melhor.date.getTime())) melhor = l; }); return melhor; };
   var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
   var resp = {}; try { (CLINT_PAINEL && CLINT_PAINEL.primeiraResposta || []).forEach(function(x) { resp[plPxPrimeiro(x.dono)] = x; }); } catch (e) {}
-  var espTxt = plPxEspacosTxt(['bruno', 'tony'], janelas);
+  var espTxt = plPxEspacosTxt(closerKeys(), janelas);
   var sdrs = (d.sdrs || []).slice().sort(function(a, b) { return b.marc - a.marc || b.re - a.re; });
   // SDRs sem marcação no período mas com marcação no anterior também aparecem (para a comparação não sumir)
   if (dAnt) (dAnt.sdrs || []).forEach(function(y) { if (!sdrs.some(function(x) { return plPxPrimeiro(x.nome) === plPxPrimeiro(y.nome); })) sdrs.push({ nome: y.nome, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }); });
@@ -17525,7 +17562,7 @@ function plPainelClosers(p, d) {
   plClosersAtivos().forEach(function(n) { if (!closers.some(function(c) { return plPxPrimeiro(c.nome) === plPxPrimeiro(n); })) { var novo = { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }; closers.push(novo); d.closers.push(novo); } });
   closers.sort(function(a, b) { return b.vdV - a.vdV; });
   var cards = closers.map(function(x) {
-    var chave = v2norm(x.nome), pn = plPxPrimeiro(x.nome), agKey = pn === 'tony' ? 'tony' : 'bruno';
+    var chave = v2norm(x.nome), pn = plPxPrimeiro(x.nome), agKey = closerChaveDe(x.nome) || 'bruno';
     var ant = dAnt ? ((dAnt.closers || []).filter(function(y) { return plPxPrimeiro(y.nome) === pn; })[0] || { re: 0, vd: 0, ns: 0 }) : null;
     var minhas = (V2.rows || []).filter(function(r) { return plPxPrimeiro(r.closer) === pn; });
     var fimFut = plPxFimFuturo(p);
