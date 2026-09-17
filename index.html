@@ -269,6 +269,9 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .tl-agora { position:absolute; left:0; right:0; border-top:2px solid #ff6b6b; z-index:6; pointer-events:none; }
 .tl-agora::before { content:''; position:absolute; left:-1px; top:-5px; width:8px; height:8px; border-radius:50%; background:#ff6b6b; }
 /* visão "Os dois" lado a lado (Bruno 10/09/2026) — cada agenda rola de lado se faltar espaço */
+.cd7-tab th { font-size:.6rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--text2); padding:7px 8px; border-bottom:1px solid rgba(255,255,255,.14); text-align:center; white-space:nowrap; }
+.cd7-tab td { padding:9px 8px; border-bottom:1px solid rgba(255,255,255,.07); font-size:.8rem; text-align:center; font-variant-numeric:tabular-nums; vertical-align:top; }
+.cd7-tab tr:hover td { background:rgba(255,255,255,.03); }
 .sg-duas { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
 .sg-duas.tres { grid-template-columns:1fr 1fr 1fr; }
 @media (max-width:1500px) { .sg-duas.tres { grid-template-columns:1fr 1fr; } }
@@ -2345,7 +2348,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-15-1731';
+var VERSAO_DASH = '2026-09-17-1804';
 var _versaoNova = null;
 
 // =====================================================================
@@ -2756,12 +2759,27 @@ function _emailDoLead(r) {
   var m = String((r && r.obs) || '').match(/e-?mail:\s*([^\s|]+@[^\s|]+)/i);
   return m ? m[1].toLowerCase() : '';
 }
+// 15/09/2026 (Bruno: "o dash está puxando pelo nome, quero que seja pelo e-mail ou pelo
+// telefone e instagram, não pelo nome"): o nome muda o tempo todo (apelido, sobrenome,
+// "e esposa"), telefone/e-mail/@ não. Agora o casamento é POR ESSES, e o nome só entra
+// quando nenhum deles existe dos dois lados.
+function _instaDoLead(r) {
+  var m = String((r && r.obs) || '').match(/@\s?([A-Za-z0-9._]{3,})/);
+  return m ? m[1].toLowerCase() : '';
+}
+function _instaChave(v) {
+  var t = String(v || '').trim().toLowerCase();
+  if (!t) return '';
+  var m = t.match(/instagram\.com\/([a-z0-9._]+)/i);
+  return (m ? m[1] : t.replace(/^@+/, '').split(/[?\s/]/)[0]).toLowerCase();
+}
 function eventoDoLead(r, evs) {
   if (!r || !evs || !evs.length) return null;
   var idLead = String(r.leadId || '').trim().toUpperCase().replace(/\s/g, '');
   var nId = idLead.match(/^L-?(\d+)$/);
   var t8 = (typeof ldTel8 === 'function') ? ldTel8(r.telefone) : '';
   var em = _emailDoLead(r);
+  var ig = _instaDoLead(r);
   var ds = r.date ? (r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0')) : '';
   function nomeBate(e){ return v2mesmoLead(agNomeDoEvento(e.title), r.nome); }
   function idBate(e){
@@ -2772,44 +2790,107 @@ function eventoDoLead(r, evs) {
   }
   function telBate(e){ return !!(t8 && e.tel8 && String(e.tel8) === String(t8)); }
   function emailBate(e){ return !!(em && e.email && String(e.email).toLowerCase() === em); }
+  function igBate(e){ return !!(ig && e.instagram && _instaChave(e.instagram) === ig); }
 
-  // 1) o NOME tem que bater sempre — sem isso não é a mesma pessoa
-  var cand = evs.filter(nomeBate);
+  // escolhe entre vários: primeiro o do mesmo dia; se sobrar mais de um, não arrisca
+  function escolher(lista) {
+    if (!lista.length) return null;
+    if (lista.length === 1) return lista[0];
+    if (ds) {
+      var doDia = lista.filter(function(e){ return e.date === ds; });
+      if (doDia.length === 1) return doDia[0];
+      if (doDia.length > 1) lista = doDia;
+    }
+    // mesma pessoa em várias reuniões: fica com a mais próxima da data da linha
+    if (ds) {
+      var alvo = new Date(ds).getTime();
+      lista = lista.slice().sort(function(a, b) {
+        return Math.abs(new Date(a.date).getTime() - alvo) - Math.abs(new Date(b.date).getTime() - alvo);
+      });
+      return lista[0];
+    }
+    return null;
+  }
+
+  // 1) TELEFONE — a prova mais forte
+  var porTel = evs.filter(telBate);
+  if (porTel.length) { var eT = escolher(porTel); if (eT) return eT; }
+  // 2) E-MAIL
+  var porEmail = evs.filter(emailBate);
+  if (porEmail.length) { var eE = escolher(porEmail); if (eE) return eE; }
+  // 3) INSTAGRAM
+  var porIg = evs.filter(igBate);
+  if (porIg.length) { var eI = escolher(porIg); if (eI) return eI; }
+  // 4) número do lead (L-000) no título ou na descrição
+  var porId = evs.filter(idBate);
+  if (porId.length) { var eD = escolher(porId); if (eD) return eD; }
+  // 5) último recurso: nome, e só quando o evento não tem telefone/e-mail/@ para conferir
+  var cand = evs.filter(function(e) {
+    if (!nomeBate(e)) return false;
+    if (t8 && e.tel8) return false;          // tem telefone dos dois lados e não bateu: não é ela
+    if (em && e.email) return false;
+    if (ig && e.instagram) return false;
+    return true;
+  });
   if (!cand.length) return null;
-  // 2) na agenda, o DIA também: se houver reunião no dia do lead, é entre essas
-  if (ds) { var doDia = cand.filter(function(e){ return e.date === ds; }); if (doDia.length) cand = doDia; }
-  // 3) e ainda uma segunda prova: número do lead, telefone ou e-mail
-  var comProva = cand.filter(function(e){ return idBate(e) || telBate(e) || emailBate(e); });
-  if (comProva.length === 1) return comProva[0];
-  if (comProva.length > 1) return null;                  // duas provas iguais: não arrisca
-  // 4) sem segunda prova, só aceita se for a única reunião do dia com esse nome
-  if (ds && cand.length === 1 && cand[0].date === ds) return cand[0];
-  return null;
+  if (ds) { var doDia2 = cand.filter(function(e){ return e.date === ds; }); if (doDia2.length === 1) return doDia2[0]; }
+  return cand.length === 1 ? cand[0] : null;
 }
-// acha o LEAD da planilha que corresponde a um evento do Calendar (ID no título > nome parecido)
+// acha o LEAD da planilha que corresponde a um evento do Calendar.
+// 15/09/2026: telefone, e-mail e @ do Instagram mandam; nome só quando não há nenhum deles.
 function leadDoEvento(ev) {
   var nomeEv = agNomeDoEvento(ev.title);
-  // o ID do título só vale se o NOME da linha bater — os números de ID se deslocam
-  // quando entram linhas novas no meio da planilha, então ID sozinho não é prova
+  var t8 = String(ev.tel8 || '').replace(/\D/g, '').slice(-8);
+  var em = String(ev.email || '').trim().toLowerCase();
+  var ig = _instaChave(ev.instagram);
   var mId = String(ev.title || '').match(/L-?\s?(\d{3,})/i);
-  if (mId) {
-    var alvoId = 'l' + parseInt(mId[1], 10);
-    for (var i = 0; i < V2.rows.length; i++) {
-      var rid = String(V2.rows[i].leadId || '').match(/^L-?(\d+)$/i);
-      if (rid && ('l' + parseInt(rid[1], 10)) === alvoId && v2mesmoLead(V2.rows[i].nome, nomeEv)) return V2.rows[i];
-    }
+  var tagId = String(ev.leadTag || '').toUpperCase().replace(/\s/g, '').match(/^L-?(\d+)$/);
+  var alvoId = tagId ? parseInt(tagId[1], 10) : (mId ? parseInt(mId[1], 10) : 0);
+  var ds = ev.date || '';
+
+  function dataDa(r) {
+    return r.date ? (r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0')) : '';
   }
-  var porData = null, porNome = null;
-  for (var j = 0; j < V2.rows.length; j++) {
-    var r = V2.rows[j];
-    if (!v2mesmoLead(r.nome, nomeEv)) continue;
-    if (r.date && ev.date) {
-      var ds = r.date.getFullYear() + '-' + String(r.date.getMonth()+1).padStart(2,'0') + '-' + String(r.date.getDate()).padStart(2,'0');
-      if (ds === ev.date) { porData = r; break; }
+  // entre vários registros da mesma pessoa, fica com o do dia do evento; senão, o mais próximo
+  function escolher(lista) {
+    if (!lista.length) return null;
+    if (lista.length === 1) return lista[0];
+    if (ds) {
+      var doDia = lista.filter(function(r){ return dataDa(r) === ds; });
+      if (doDia.length) return doDia[0];
+      var alvo = new Date(ds).getTime();
+      var comData = lista.filter(function(r){ return r.date; });
+      if (comData.length) {
+        return comData.slice().sort(function(a, b) {
+          return Math.abs(a.date.getTime() - alvo) - Math.abs(b.date.getTime() - alvo);
+        })[0];
+      }
     }
-    if (!porNome) porNome = r;
+    return lista[lista.length - 1];
   }
-  return porData || porNome;
+
+  var porTel = [], porEmail = [], porIg = [], porId = [], porNome = [];
+  for (var i = 0; i < V2.rows.length; i++) {
+    var r = V2.rows[i];
+    if (t8 && (typeof ldTel8 === 'function') && ldTel8(r.telefone) === t8) { porTel.push(r); continue; }
+    if (em && _emailDoLead(r) === em) { porEmail.push(r); continue; }
+    if (ig && _instaDoLead(r) === ig) { porIg.push(r); continue; }
+    if (alvoId) {
+      var rid = String(r.leadId || '').match(/^L-?(\d+)$/i);
+      if (rid && parseInt(rid[1], 10) === alvoId) { porId.push(r); continue; }
+    }
+    if (v2mesmoLead(r.nome, nomeEv)) porNome.push(r);
+  }
+  var achado = escolher(porTel) || escolher(porEmail) || escolher(porIg) || escolher(porId);
+  if (achado) return achado;
+  // sem telefone/e-mail/@ para conferir: cai no nome
+  if (!t8 && !em && !ig) return escolher(porNome);
+  // o evento tem telefone/e-mail/@ mas nenhuma linha bateu: só aceita pelo nome se a linha
+  // também não tiver nenhum desses dados (registro antigo, digitado à mão)
+  var semDados = porNome.filter(function(r) {
+    return !(typeof ldTel8 === 'function' && ldTel8(r.telefone)) && !_emailDoLead(r) && !_instaDoLead(r);
+  });
+  return escolher(semDados);
 }
 // prevê o ID que a planilha vai dar a um lead novo (mesmo telefone = mesmo ID; novo = próximo número)
 function preverIdDoLead(tel, nome) {
@@ -8352,6 +8433,167 @@ function anColetar(per, tipoFiltro) {
   });
   return { an: an, fora: fora };
 }
+// =====================================================================
+// 📆 CONTEÚDO — COMO FICOU NO 7º DIA (Bruno 17/09/2026)
+// =====================================================================
+// Vem da aba "Conteudo D7" da planilha, que o robô preenche todo dia às 6h:
+// no sétimo dia depois de publicado, cada post ganha uma linha com link,
+// visualizações, comentários e seguidores. Aqui embaixo a tela junta isso
+// com os LEADS que chegaram nos 7 dias seguintes ao post. Fica no fim da aba,
+// separado dos criativos pagos e dos posts orgânicos — são contas diferentes.
+var CD7 = { rows: [], carregado: false, buscando: false, erro: '', quando: 0 };
+var CD7_QUANTOS = 15;
+function carregarConteudoD7(forcar) {
+  if (CD7.buscando) return;
+  if (CD7.carregado && !forcar && Date.now() - CD7.quando < 10 * 60000) return;
+  CD7.buscando = true; CD7.erro = '';
+  var old = document.getElementById('cd7-gviz'); if (old) old.remove();
+  var sc = document.createElement('script');
+  sc.id = 'cd7-gviz';
+  sc.src = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET
+    + '/gviz/tq?tqx=out:json;responseHandler:__gvizCD7&sheet=' + encodeURIComponent('Conteudo D7')
+    + '&headers=1&_t=' + Date.now();
+  sc.onerror = function() { CD7.buscando = false; CD7.erro = 'não consegui ler a planilha'; };
+  document.body.appendChild(sc);
+}
+window.__gvizCD7 = function(res) {
+  CD7.buscando = false; CD7.quando = Date.now();
+  try {
+    if (!res || !res.table || res.status === 'error') {
+      CD7.erro = 'a aba "Conteudo D7" ainda não existe na planilha';
+      CD7.carregado = true; return;
+    }
+    var cols = (res.table.cols || []).map(function(c){ return v2norm(c.label || ''); });
+    var idx = function() {
+      for (var a = 0; a < arguments.length; a++) {
+        var alvo = v2norm(arguments[a]);
+        for (var c = 0; c < cols.length; c++) if (cols[c].indexOf(alvo) !== -1) return c;
+      }
+      return -1;
+    };
+    var iId = idx('id do post'), iQdo = idx('publicado em'), iTipo = idx('tipo'), iLink = idx('link'),
+        iLeg = idx('legenda'), iViews = idx('visualizacoes'), iAlc = idx('alcance'), iCur = idx('curtidas'),
+        iCom = idx('comentarios'), iSal = idx('salvamentos'), iSha = idx('compartilhamentos'),
+        iFol = idx('seguidores ganhos'), iVis = idx('visitas ao perfil'),
+        iSegP = idx('seguidores no dia'), iSeg7 = idx('seguidores no 7'), iCres = idx('cresceu'),
+        iMed = idx('medido no 7');
+    // sem as colunas certas, o Google devolveu outra aba: a "Conteudo D7" ainda não existe
+    if (iQdo < 0 || iLink < 0) {
+      CD7.rows = []; CD7.carregado = true;
+      CD7.erro = 'a aba "Conteudo D7" ainda não existe na planilha';
+      return;
+    }
+    var cel = function(r, i) {
+      if (i < 0 || !r.c[i]) return '';
+      var c = r.c[i];
+      if (c.f !== undefined && c.f !== null) return String(c.f);
+      if (c.v !== undefined && c.v !== null) return String(c.v);
+      return '';
+    };
+    var num = function(v) { var n = parseFloat(String(v).replace(/\./g, '').replace(',', '.')); return isNaN(n) ? null : n; };
+    var linhas = [];
+    (res.table.rows || []).forEach(function(r) {
+      var q = cel(r, iQdo).trim(); if (!q) return;
+      var m = q.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\D+(\d{1,2}):(\d{2}))?/);
+      var d = m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)) : null;
+      if (!d || isNaN(d.getTime())) return;
+      linhas.push({ id: cel(r, iId).trim(), quando: d, tipo: cel(r, iTipo).trim(), link: cel(r, iLink).trim(),
+        legenda: cel(r, iLeg).trim(), views: num(cel(r, iViews)), alcance: num(cel(r, iAlc)),
+        curtidas: num(cel(r, iCur)), comentarios: num(cel(r, iCom)), salvos: num(cel(r, iSal)),
+        compart: num(cel(r, iSha)), follows: num(cel(r, iFol)), visitas: num(cel(r, iVis)),
+        segPost: num(cel(r, iSegP)), seg7: num(cel(r, iSeg7)), cresceu: num(cel(r, iCres)),
+        medido: cel(r, iMed).trim() });
+    });
+    linhas.sort(function(a, b){ return b.quando - a.quando; });
+    CD7.rows = linhas; CD7.carregado = true; CD7.erro = '';
+  } catch (e) { CD7.erro = String(e && e.message || e); CD7.carregado = true; }
+  try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e2) {}
+};
+// leads que chegaram na janela do post (do dia da publicação até 7 dias depois)
+function cd7Leads(ini, fim) {
+  var r = { rec: 0, mql: 0, ag: 0, comp: 0, vd: 0 };
+  var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x){ tcPor[x.t8] = x; }); } catch (e) {}
+  var vistos = {};
+  (LD.rows || []).forEach(function(l) {
+    var tc = l.tel8 ? tcPor[l.tel8] : null;
+    var t = (tc && tc.chegou) ? tc.chegou : (l.date ? l.date.getTime() : null);
+    if (t == null || t < ini || t >= fim) return;
+    if (l.tel8) { if (vistos[l.tel8]) return; vistos[l.tel8] = 1; }
+    r.rec++;
+    if (l.faixa === 'alta' || l.faixa === 'media') r.mql++;
+    var sit = null; try { sit = ldSituacao(l); } catch (e) {}
+    if (sit) { r.ag++; if (sit.re || sit.vd) r.comp++; if (sit.vd) r.vd++; }
+  });
+  return r;
+}
+// número comum, com ponto de milhar (v2mil é dinheiro e não serve aqui)
+function cd7Fmt(n) { return Math.round(Number(n) || 0).toLocaleString('pt-BR'); }
+function cd7Num(v) { return (v === null || v === undefined || v === '') ? '—' : cd7Fmt(v); }
+function cd7Bloco(per) {
+  if (telaVisivel('s-anuncios')) carregarConteudoD7();
+  var h = '<div style="margin-top:34px;padding-top:22px;border-top:2px solid rgba(255,255,255,.14);">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">'
+    +   '<h3 style="font-size:1rem;font-weight:800;margin:0;">📆 Conteúdo — como ficou no 7º dia</h3>'
+    +   '<span class="hint" style="margin:0;">cada post medido 7 dias depois de publicado · ao lado, os leads que chegaram nesses 7 dias</span>'
+    +   '<button class="btn" style="margin-left:auto;padding:5px 12px;font-size:.7rem;" onclick="carregarConteudoD7(true)">🔄 atualizar</button>'
+    + '</div>';
+  if (CD7.buscando && !CD7.rows.length) return h + '<div class="hint">⏳ lendo a planilha…</div></div>';
+  if (CD7.erro) {
+    return h + '<div class="hint" style="color:#ffd166;">' + CD7.erro.replace(/</g, '&lt;')
+      + ' — o robô cria essa aba sozinho na primeira vez que roda (todo dia às 6h).</div></div>';
+  }
+  var lista = CD7.rows.filter(function(x) {
+    if (per && per.ini && x.quando.getTime() < per.ini) return false;
+    if (per && per.fim && x.quando.getTime() >= per.fim) return false;
+    return true;
+  });
+  if (!lista.length) {
+    return h + '<div class="hint">Nenhum post com 7 dias completos neste período'
+      + (CD7.rows.length ? ' (a planilha tem ' + CD7.rows.length + ' no total).' : '.') + '</div></div>';
+  }
+  var somaV = 0, somaC = 0, somaSeg = 0, temSeg = false;
+  lista.forEach(function(x) {
+    somaV += x.views || 0; somaC += x.comentarios || 0;
+    if (x.cresceu !== null) { somaSeg += x.cresceu; temSeg = true; }
+  });
+  h += '<div class="ag-stats" style="margin:10px 0 12px;">'
+    + '<div class="g-stat"><b>' + lista.length + '</b><span>Posts no período</span></div>'
+    + '<div class="g-stat"><b style="color:#6ea8ff;">' + cd7Fmt(somaV) + '</b><span>Visualizações</span></div>'
+    + '<div class="g-stat"><b style="color:#b98aff;">' + cd7Fmt(somaC) + '</b><span>Comentários</span></div>'
+    + '<div class="g-stat"><b style="color:#3ddc97;">' + (temSeg ? (somaSeg >= 0 ? '+' : '') + cd7Fmt(somaSeg) : '—') + '</b><span>Seguidores no período</span></div>'
+    + '</div>';
+  h += '<div style="overflow-x:auto;"><table class="cd7-tab" style="width:100%;border-collapse:collapse;min-width:920px;">'
+    + '<tr>'
+    + '<th style="text-align:left;">Post</th><th>Visualiz.</th><th>Alcance</th><th>Comentários</th>'
+    + '<th>Salvos</th><th>Seguidores</th><th>Leads</th><th>MQL</th><th>Marcaram</th><th>Compareceram</th>'
+    + '</tr>';
+  lista.slice(0, CD7_QUANTOS).forEach(function(x) {
+    var ini = new Date(x.quando.getFullYear(), x.quando.getMonth(), x.quando.getDate()).getTime();
+    var lds = cd7Leads(ini, ini + 7 * 864e5);
+    var seg = x.follows !== null ? ('+' + cd7Fmt(x.follows)) : (x.cresceu !== null ? ((x.cresceu >= 0 ? '+' : '') + cd7Fmt(x.cresceu) + ' <small style="opacity:.6;">no perfil</small>') : '—');
+    var tipo = /REEL/i.test(x.tipo) ? '🎬 reel' : /CAROUSEL/i.test(x.tipo) ? '🖼️ carrossel' : /VIDEO/i.test(x.tipo) ? '🎬 vídeo' : '🖼️ imagem';
+    h += '<tr>'
+      + '<td style="text-align:left;max-width:330px;">'
+      +   '<a href="' + (x.link || '#') + '" target="_blank" rel="noopener" style="color:#6ea8ff;font-weight:700;">'
+      +   x.quando.toLocaleDateString('pt-BR') + '</a> <span class="ld-tag">' + tipo + '</span>'
+      +   (x.medido && x.medido.indexOf('nao') === 0 ? ' <span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;">fora do 7º dia</span>' : '')
+      +   '<div class="hint" style="margin:3px 0 0;white-space:normal;">' + (x.legenda || '').replace(/</g, '&lt;').slice(0, 90) + '</div></td>'
+      + '<td><b>' + cd7Num(x.views) + '</b></td><td>' + cd7Num(x.alcance) + '</td>'
+      + '<td><b style="color:#b98aff;">' + cd7Num(x.comentarios) + '</b></td><td>' + cd7Num(x.salvos) + '</td>'
+      + '<td style="color:#3ddc97;font-weight:700;">' + seg + '</td>'
+      + '<td><b>' + lds.rec + '</b></td><td>' + lds.mql + '</td><td>' + lds.ag + '</td>'
+      + '<td style="color:' + (lds.comp ? '#3ddc97' : 'var(--muted)') + ';font-weight:700;">' + lds.comp + '</td>'
+      + '</tr>';
+  });
+  h += '</table></div>';
+  if (lista.length > CD7_QUANTOS) {
+    h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="CD7_QUANTOS += 15; renderAnuncios();">▼ mostrar mais ' + Math.min(15, lista.length - CD7_QUANTOS) + ' (de ' + lista.length + ')</button></div>';
+  } else if (CD7_QUANTOS > 15) {
+    h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="CD7_QUANTOS = 15; renderAnuncios();">▲ mostrar menos</button></div>';
+  }
+  h += '<div class="hint" style="margin-top:10px;">Os leads da linha são todos os que chegaram nos 7 dias seguintes ao post, de qualquer origem. Servem para ver o movimento em volta da publicação, não para dizer que o post trouxe cada um deles.</div>';
+  return h + '</div>';
+}
 function renderAnuncios() {
   var el = document.getElementById('an-corpo');
   if (!el) return;
@@ -8524,6 +8766,13 @@ function renderAnuncios() {
       + (META.buscando ? 'Buscando investimento e imagens no Facebook…' : 'Facebook ainda não conectado' + (META.erro ? ' (' + META.erro + ')' : '') + ' — falta a chave META_TOKEN no robô. Os números de leads/reuniões/vendas abaixo já funcionam.')
       + '</div>';
   }
+  // as imagens não vieram porque o robô estava ocupado (15/09/2026)
+  if (META_CRI.pausado && !Object.keys(META_CRI.porId).length) {
+    h += '<div class="hint" style="margin-top:9px;color:#ffd166;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '🖼️ As imagens dos anúncios não vieram agora — o robô estava ocupado. Os números abaixo estão certos.'
+      + '<button class="btn" style="padding:5px 12px;font-size:.7rem;" onclick="criTentarDeNovo()">🔄 Tentar de novo</button>'
+      + '<span style="opacity:.7;">Ele tenta sozinho a cada 2 minutos.</span></div>';
+  }
   // O cadastro de postagem fica só na ficha do lead (pedido do Bruno 19/08/2026):
   // aqui a aba só MOSTRA os posts junto com os anúncios, com os números de cada um.
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
@@ -8628,6 +8877,7 @@ function renderAnuncios() {
       + '<button class="btn" onclick="AN_QUANTOS = 40; renderAnuncios();">▲ mostrar menos</button></div>';
   }
   h += '</div>';
+  try { h += cd7Bloco(per); } catch (eCd) { }   // 17/09/2026: conteúdo no 7º dia, no fim da aba
   el.innerHTML = h;
 }
 // valor da venda pelo telefone (para somar faturamento por anúncio)
@@ -8678,6 +8928,16 @@ function guardarCriativos() {
   }, 3000);
 }
 var _criEmVoo = 0;
+// robô estava ocupado e as imagens não vieram: recomeça a busca
+function criTentarDeNovo(automatico) {
+  clearTimeout(META_CRI._retomar);
+  META_CRI.pausado = false;
+  META_CRI.fim = false;
+  META_CRI.tentativas = {};
+  if (!Object.keys(META_CRI.porId).length) META_CRI.pagina = 0;
+  if (!automatico) { META_CRI.buscandoAgora = true; try { renderAnuncios(); } catch (e) {} }
+  carregarCriativos();
+}
 function carregarCriativos() {
   if (META_CRI.fim) return;
   // primeira vez na sessão: tenta a memória do navegador antes de pedir ao robô
@@ -8715,11 +8975,22 @@ function buscarPaginaCriativos(pag) {
       META_CRI.fim = true;
       try { pedirCriativosQueFaltam(); } catch (eF2) {}
     } else {
-      // sem resposta (robô lento): tenta a mesma página mais duas vezes, depois desiste dela
+      // sem resposta (robô ocupado): tenta a mesma página de novo, esperando cada vez mais.
+      // 15/09/2026 — antes, se nada tivesse chegado, o dash desistia para sempre e TODOS os
+      // criativos ficavam "sem imagem" para quem abria naquele momento (quem já tinha as
+      // imagens guardadas no navegador continuava vendo — por isso "só aparece para mim").
       META_CRI.tentativas = META_CRI.tentativas || {};
       META_CRI.tentativas[pag] = (META_CRI.tentativas[pag] || 0) + 1;
-      if (META_CRI.tentativas[pag] <= 2) setTimeout(function(){ buscarPaginaCriativos(pag); }, 15000);
-      else if (!Object.keys(META_CRI.porId).length) META_CRI.fim = true;
+      var _n = META_CRI.tentativas[pag];
+      if (_n <= 3) setTimeout(function(){ buscarPaginaCriativos(pag); }, _n * 15000);
+      else if (!Object.keys(META_CRI.porId).length) {
+        // nada carregou: avisa na tela e volta a tentar sozinho daqui a 2 minutos
+        META_CRI.pausado = true;
+        META_CRI.pagina = Math.max(0, pag - 1);
+        try { renderAnuncios(); } catch (eR) {}
+        clearTimeout(META_CRI._retomar);
+        META_CRI._retomar = setTimeout(function(){ criTentarDeNovo(true); }, 120000);
+      }
     }
   };
   window[nome] = fim;
@@ -13525,23 +13796,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyWmirA4Hq-tQkLFX1OJvSU99-W7f1gX6CDpdxtRItI-_6haz2TT0xo_JOJWnBcghs/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycfTSzhDB1hlbDKz_BLRR71Vtkzi6PRsv1SzFFF8YcmgV9GrOalvIh6wdXT72ZCRs/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
