@@ -269,6 +269,11 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .tl-agora { position:absolute; left:0; right:0; border-top:2px solid #ff6b6b; z-index:6; pointer-events:none; }
 .tl-agora::before { content:''; position:absolute; left:-1px; top:-5px; width:8px; height:8px; border-radius:50%; background:#ff6b6b; }
 /* visão "Os dois" lado a lado (Bruno 10/09/2026) — cada agenda rola de lado se faltar espaço */
+.crm-ficha { display:flex; flex-wrap:wrap; gap:4px 8px; margin:6px 0 4px; padding:6px 8px; border-radius:10px; background:rgba(255,255,255,.04); border:1px dashed rgba(255,255,255,.12); cursor:pointer; font-size:.66rem; }
+.crm-ficha:hover { background:rgba(255,255,255,.07); }
+.crm-ficha.vazia { color:var(--muted); justify-content:center; }
+.crm-fc { white-space:nowrap; color:var(--text2); font-weight:700; }
+.crm-fobs { flex-basis:100%; color:var(--text2); font-style:italic; font-weight:500; line-height:1.3; }
 .cd7-tab th { font-size:.6rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--text2); padding:7px 8px; border-bottom:1px solid rgba(255,255,255,.14); text-align:center; white-space:nowrap; }
 .cd7-tab td { padding:9px 8px; border-bottom:1px solid rgba(255,255,255,.07); font-size:.8rem; text-align:center; font-variant-numeric:tabular-nums; vertical-align:top; }
 .cd7-tab tr:hover td { background:rgba(255,255,255,.03); }
@@ -2348,7 +2353,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-17-1816';
+var VERSAO_DASH = '2026-09-18-1307';
 var _versaoNova = null;
 
 // =====================================================================
@@ -7977,6 +7982,7 @@ var CRM_ETAPAS = [
   { k: 'chamar',   nome: 'A chamar',      ico: '📞', cor: '#f6a350' },
   { k: 'chamei',   nome: 'Chamei',        ico: '💬', cor: '#6ea8ff' },
   { k: 'respondeu',nome: 'Qualificando',  ico: '🎯', cor: '#ffd166' },
+  { k: 'pre',      nome: 'Pré-agendamento', ico: '📲', cor: '#3ddc97' },   // 18/09/2026: o lead foi para o WhatsApp da Sarah
   { k: 'agendou',  nome: 'Agendou',       ico: '📅', cor: '#b98aff' },
   { k: 'vendido',  nome: 'Vendido',       ico: '💰', cor: '#3ddc97' },
   { k: 'semint',   nome: 'Sem interesse', ico: '🚪', cor: '#8b8fa3' },
@@ -7985,6 +7991,8 @@ var CRM_ETAPAS = [
 function crmEtapaDe(x) {
   var e = v2norm(x.etapa || '');
   if (!e) return 'chamar';
+  if (e.indexOf('pre') === 0 && e.indexOf('agend') !== -1) return 'pre';   // "pré-agendamento", "pre agendamento"
+  if (e === 'whatsapp' || e === 'no whatsapp') return 'pre';
   for (var i = 0; i < CRM_ETAPAS.length; i++) {
     if (v2norm(CRM_ETAPAS[i].nome) === e || CRM_ETAPAS[i].k === e) return CRM_ETAPAS[i].k;
   }
@@ -8092,11 +8100,23 @@ function carregarComentarios() {
     // as colunas novas (Etiquetas, Produto) são achadas pelo NOME no cabeçalho —
     // o robô cria cada uma na primeira coluna livre, então a posição varia
     var cab = linhas[0] || [], iEtq = -1, iProd = -1;
+    // colunas da ficha do social selling (18/09/2026) — também pelo nome
+    var iTemp = -1, iPAc = -1, iPCt = -1, iObsF = -1, iTelF = -1, iOriF = -1, iPreEm = -1, iAgEm = -1, iEtEm = -1;
     for (var c0 = 0; c0 < cab.length; c0++) {
       var hN = v2norm(cab[c0] || '');
       if (hN === 'etiquetas') iEtq = c0;
       if (hN === 'produto') iProd = c0;
+      if (hN === 'temperatura') iTemp = c0;
+      if (hN === 'proxima acao') iPAc = c0;
+      if (hN === 'proximo contato') iPCt = c0;
+      if (hN === 'observacao') iObsF = c0;
+      if (hN === 'telefone') iTelF = c0;
+      if (hN === 'origem') iOriF = c0;
+      if (hN === 'pre agendamento em') iPreEm = c0;
+      if (hN === 'agendou em') iAgEm = c0;
+      if (hN === 'etapa em') iEtEm = c0;
     }
+    var colF = function(l, i) { return i >= 0 ? (l[i] || '').trim() : ''; };
     for (var i = 1; i < linhas.length; i++) {
       var nome = (linhas[i][0] || '').trim();
       var insta = (linhas[i][1] || '').trim().replace(/^@/, '');
@@ -8109,7 +8129,14 @@ function carregarComentarios() {
         etapa: _mk.etapa !== undefined ? _mk.etapa : (linhas[i][7] || '').trim(),
         nota: _mk.nota !== undefined ? _mk.nota : (linhas[i][8] || '').trim(),
         etiquetas: _mk.etiquetas !== undefined ? _mk.etiquetas : (iEtq >= 0 ? (linhas[i][iEtq] || '').trim() : ''),
-        produto: _mk.produto !== undefined ? _mk.produto : (iProd >= 0 ? (linhas[i][iProd] || '').trim() : '') });
+        produto: _mk.produto !== undefined ? _mk.produto : (iProd >= 0 ? (linhas[i][iProd] || '').trim() : ''),
+        temperatura: _mk.temperatura !== undefined ? _mk.temperatura : colF(linhas[i], iTemp),
+        proximaAcao: _mk.proximaAcao !== undefined ? _mk.proximaAcao : colF(linhas[i], iPAc),
+        proximoContato: _mk.proximoContato !== undefined ? _mk.proximoContato : colF(linhas[i], iPCt),
+        observacao: _mk.observacao !== undefined ? _mk.observacao : colF(linhas[i], iObsF),
+        telefone: _mk.telefone !== undefined ? _mk.telefone : colF(linhas[i], iTelF),
+        origem: _mk.origem !== undefined ? _mk.origem : colF(linhas[i], iOriF),
+        preEm: ldData(colF(linhas[i], iPreEm)), agendouEm: ldData(colF(linhas[i], iAgEm)), etapaEm: ldData(colF(linhas[i], iEtEm)) });
     }
     rows.sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
     var jaTinha = COMENT.carregado;
@@ -9944,6 +9971,8 @@ function comentComApi() {
       tag: mk.tag !== undefined ? mk.tag : '', tipo: mk.tipo !== undefined ? mk.tipo : '',
       etapa: mk.etapa !== undefined ? mk.etapa : '', nota: mk.nota !== undefined ? mk.nota : '',
       etiquetas: mk.etiquetas !== undefined ? mk.etiquetas : '', produto: mk.produto !== undefined ? mk.produto : '',
+      temperatura: mk.temperatura || '', proximaAcao: mk.proximaAcao || '', proximoContato: mk.proximoContato || '',
+      observacao: mk.observacao || '', telefone: mk.telefone || '', origem: mk.origem || '',
       daApi: true });
   });
   var lista = base.concat(extras);
@@ -9974,6 +10003,151 @@ function comentFiltrados() {
 }
 // em qual bloco o comentarista entra: falta marcar (por dia) ou já marcado
 // na lista, mostra em que etapa do CRM a pessoa está (e deixa trocar por ali)
+// ===== 📝 FICHA DO SOCIAL SELLING (Bruno 18/09/2026: "quero isso no dash") =====
+// Os campos que a Sarah controlava fora do dash: temperatura, próxima ação, data do
+// próximo contato, origem, telefone (quando o lead vai para o WhatsApp) e observação.
+// Ficam na aba dos comentários, gravados pelo robô (v140), e aparecem no cartão.
+var CRM_TEMPS = [
+  { v: 'Quente', ico: '🔥', cor: '#ff6b6b' },
+  { v: 'Morno',  ico: '🌤️', cor: '#f6a350' },
+  { v: 'Frio',   ico: '❄️', cor: '#6ea8ff' }
+];
+var CRM_ACOES = ['Aguardando resposta', 'Mandar mensagem', 'Mandar áudio', 'Enviar case', 'Ligar', 'Marcar reunião', 'Confirmar reunião', 'Follow-up'];
+var CRM_ORIGENS = ['Comentário no post', 'DM direta', 'Story', 'Seguidor novo', 'Indicação', 'Outro'];
+function crmEsc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+// "18/09/2026", "2026-09-18" ou o que o Sheets devolver -> Date à meia-noite (ou null)
+function crmDataContato(v) {
+  var t = String(v || '').trim(); if (!t) return null;
+  var m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) { var y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[2] - 1, +m[1]); }
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  var d = new Date(t); if (isNaN(d)) return null; d.setHours(0, 0, 0, 0); return d;
+}
+function crmTempDe(x) { var k = v2norm(x && x.temperatura || ''); return CRM_TEMPS.filter(function(o){ return v2norm(o.v) === k; })[0] || null; }
+function crmFichaResumo(x) {
+  var t = crmTempDe(x);
+  var d = crmDataContato(x.proximoContato), hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+  var atras = d && d.getTime() < hoje0.getTime(), ehHoje = d && d.getTime() === hoje0.getTime();
+  var partes = [];
+  if (t) partes.push('<span class="crm-fc" style="color:' + t.cor + ';">' + t.ico + ' ' + t.v + '</span>');
+  if (x.proximaAcao) partes.push('<span class="crm-fc">📌 ' + crmEsc(x.proximaAcao) + '</span>');
+  if (d) partes.push('<span class="crm-fc" style="color:' + (atras ? '#ff6b6b' : ehHoje ? '#ffd166' : 'var(--text2)') + ';font-weight:800;">📅 '
+    + (ehHoje ? 'hoje' : (atras ? 'atrasado · ' : '') + d.toLocaleDateString('pt-BR').slice(0, 5)) + '</span>');
+  if (x.telefone) partes.push('<span class="crm-fc" style="color:#3ddc97;">📲 WhatsApp</span>');
+  var obs = x.observacao ? '<div class="crm-fobs">' + crmEsc(String(x.observacao).slice(0, 90)) + (String(x.observacao).length > 90 ? '…' : '') + '</div>' : '';
+  var abre = ' onclick="event.stopPropagation();crmFicha(\'' + (x.insta || '') + '\')" title="abrir a ficha (temperatura, próxima ação, data, telefone, observação)"';
+  if (!partes.length && !obs) return '<div class="crm-ficha vazia"' + abre + '>📝 preencher ficha</div>';
+  return '<div class="crm-ficha"' + abre + '>' + partes.join('') + obs + '</div>';
+}
+function crmFicha(insta) {
+  if (soOlhar()) return;
+  var x = _comDe(insta);
+  if (!x) return;
+  var ov = document.createElement('div');
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 330;
+  ov.id = 'ficha-overlay';
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  var cp = 'width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:9px;color:var(--text);padding:9px;margin:3px 0 10px;font-size:.82rem;';
+  var t = crmTempDe(x);
+  var dC = crmDataContato(x.proximoContato);
+  var dIso = dC ? (dC.getFullYear() + '-' + String(dC.getMonth() + 1).padStart(2, '0') + '-' + String(dC.getDate()).padStart(2, '0')) : '';
+  var acaoAtual = String(x.proximaAcao || '').trim();
+  var acaoNaLista = CRM_ACOES.some(function(a){ return v2norm(a) === v2norm(acaoAtual); });
+  var k = crmEtapaDe(x);
+  ov.innerHTML = '<div class="modal" style="width:min(460px,94vw);padding:18px;max-height:92vh;overflow:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.2rem;">📝</span>'
+    + '<b style="flex:1;">Ficha de ' + crmEsc(x.nome || '@' + x.insta) + '</b>'
+    + '<button class="close-x" onclick="document.getElementById(\'ficha-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:10px;">@' + crmEsc(x.insta) + ' · grava na planilha para todo mundo</div>'
+    + '<div class="crm-perfil-tit">temperatura</div><div id="cf-temps" style="display:flex;gap:6px;margin:4px 0 12px;">'
+    + CRM_TEMPS.map(function(o) {
+        var on = t && t.v === o.v;
+        return '<span class="crm-etq" data-v="' + o.v + '" style="cursor:pointer;font-size:.74rem;padding:6px 12px;background:' + o.cor + (on ? '33' : '14') + ';color:' + o.cor + ';border:1px solid ' + o.cor + (on ? '' : '44') + ';"'
+          + ' onclick="crmFichaTemp(this)">' + (on ? '✓ ' : '') + o.ico + ' ' + o.v + '</span>';
+      }).join('')
+    + '</div>'
+    + '<label class="hint">Próxima ação</label>'
+    + '<select id="cf-acao" style="' + cp + 'margin-bottom:4px;" onchange="document.getElementById(\'cf-acao-outra\').style.display = this.value === \'__outra\' ? \'\' : \'none\';">'
+    +   '<option value="">—</option>'
+    +   CRM_ACOES.map(function(a){ return '<option' + (v2norm(a) === v2norm(acaoAtual) ? ' selected' : '') + '>' + a + '</option>'; }).join('')
+    +   '<option value="__outra"' + (acaoAtual && !acaoNaLista ? ' selected' : '') + '>outra…</option>'
+    + '</select>'
+    + '<input id="cf-acao-outra" placeholder="qual?" value="' + crmEsc(acaoAtual && !acaoNaLista ? acaoAtual : '') + '" style="' + cp + (acaoAtual && !acaoNaLista ? '' : 'display:none;') + '">'
+    + '<div style="display:flex;gap:10px;"><div style="flex:1;"><label class="hint">Próximo contato</label><input id="cf-data" type="date" value="' + dIso + '" style="' + cp + '"></div>'
+    + '<div style="flex:1;"><label class="hint">Origem</label><select id="cf-origem" style="' + cp + '"><option value="">—</option>'
+    +   CRM_ORIGENS.map(function(o){ return '<option' + (v2norm(o) === v2norm(x.origem || '') ? ' selected' : '') + '>' + o + '</option>'; }).join('')
+    + '</select></div></div>'
+    + '<label class="hint">WhatsApp do lead <span style="opacity:.7;">(preencher = foi para o WhatsApp = pré-agendamento)</span></label>'
+    + '<input id="cf-tel" inputmode="tel" placeholder="(62) 9 9999-9999" value="' + crmEsc(x.telefone || '') + '" style="' + cp + '">'
+    + '<label class="hint">Etapa</label><select id="cf-etapa" style="' + cp + '">'
+    +   CRM_ETAPAS.map(function(o){ return '<option value="' + o.nome + '"' + (o.k === k ? ' selected' : '') + '>' + o.ico + ' ' + o.nome + '</option>'; }).join('')
+    + '</select>'
+    + '<label class="hint">Observação</label><textarea id="cf-obs" rows="3" style="' + cp + 'resize:vertical;">' + crmEsc(x.observacao || '') + '</textarea>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">'
+    + '<button class="btn" onclick="document.getElementById(\'ficha-overlay\').remove()">Cancelar</button>'
+    + '<button class="btn primary" onclick="crmFichaSalvar(\'' + crmEsc(x.insta) + '\', this)">💾 Salvar</button></div></div>';
+  document.body.appendChild(ov);
+}
+function crmFichaTemp(el) {
+  var caixa = document.getElementById('cf-temps'); if (!caixa) return;
+  var jaOn = el.getAttribute('data-on') === '1';
+  Array.prototype.forEach.call(caixa.children, function(c) {
+    var o = CRM_TEMPS.filter(function(z){ return z.v === c.getAttribute('data-v'); })[0];
+    var on = (c === el) && !jaOn;
+    c.setAttribute('data-on', on ? '1' : '0');
+    c.style.background = o.cor + (on ? '33' : '14'); c.style.border = '1px solid ' + o.cor + (on ? '' : '44');
+    c.textContent = (on ? '✓ ' : '') + o.ico + ' ' + o.v;
+  });
+}
+function crmFichaSalvar(insta, bt) {
+  var x = _comDe(insta); if (!x) return;
+  var g = function(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  var tempEl = Array.prototype.filter.call((document.getElementById('cf-temps') || {}).children || [], function(c){ return c.getAttribute('data-on') === '1' || (c.getAttribute('data-on') === null && c.textContent.indexOf('✓') === 0); })[0];
+  var novo = {
+    temperatura: tempEl ? tempEl.getAttribute('data-v') : '',
+    proximaAcao: g('cf-acao') === '__outra' ? g('cf-acao-outra') : g('cf-acao'),
+    proximoContato: (function(){ var v = g('cf-data'); var m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; })(),
+    origem: g('cf-origem'),
+    telefone: g('cf-tel'),
+    observacao: g('cf-obs'),
+    etapa: g('cf-etapa')
+  };
+  // colocou o WhatsApp e a etapa ainda era antes disso: o lead foi para o WhatsApp = pré-agendamento
+  var etapaAtualK = crmEtapaDe(x), etapaNovaK = crmEtapaDe({ etapa: novo.etapa });
+  if (novo.telefone && !x.telefone && ['chamar', 'chamei', 'respondeu'].indexOf(etapaNovaK) !== -1) {
+    novo.etapa = 'Pré-agendamento'; etapaNovaK = 'pre';
+  }
+  var mud = {}, algum = false;
+  ['temperatura', 'proximaAcao', 'proximoContato', 'origem', 'telefone', 'observacao'].forEach(function(c) {
+    if (String(x[c] || '') !== String(novo[c] || '')) { mud[c] = novo[c]; algum = true; }
+  });
+  if (etapaNovaK !== etapaAtualK) { mud.etapa = novo.etapa; algum = true; }
+  var ov = document.getElementById('ficha-overlay'); if (ov) ov.remove();
+  if (!algum) { avisoRapido('Nada mudou na ficha.'); return; }
+  // guarda na tela agora (a planilha é relida a cada 3 min)
+  var k = String(insta).toLowerCase();
+  COMENT_MARCA[k] = COMENT_MARCA[k] || {};
+  Object.keys(mud).forEach(function(c) { COMENT_MARCA[k][c] = mud[c]; });
+  guardarComentMarca();
+  for (var i = 0; i < COMENT.rows.length; i++) {
+    if (String(COMENT.rows[i].insta || '').toLowerCase() === k) Object.keys(mud).forEach(function(c) { COMENT.rows[i][c] = mud[c]; });
+  }
+  if (mud.etapa && etapaNovaK === 'pre' && !x.preEm) { for (var j = 0; j < COMENT.rows.length; j++) if (String(COMENT.rows[j].insta || '').toLowerCase() === k) COMENT.rows[j].preEm = new Date(); }
+  _comApiCache = null;
+  var pedido = { action: 'comentMarcar', insta: insta, quem: ldEu() || '' };
+  Object.keys(mud).forEach(function(c) { pedido[c] = mud[c]; });
+  if (!_comDe(insta) || x.daApi) { pedido.criar = true; pedido.nome = x.nome || ''; }
+  renderLeads();
+  avisoRapido('💾 Gravando a ficha de @' + insta + '…');
+  gasPedir(pedido, function(d) {
+    if (d && d.success) {
+      var faltou = Object.keys(mud).filter(function(c) { return c !== 'etapa' && (d.escritos || []).length && !(d.escritos || []).some(function(e){ return v2norm(e).indexOf(v2norm(c).slice(0, 6)) === 0; }); });
+      avisoRapido(faltou.length ? '⚠️ Etapa gravada, mas a ficha completa precisa do robô v140 — avise o Bruno.' : '✓ Ficha de @' + insta + ' salva' + (mud.etapa ? ' · ' + mud.etapa : ''));
+    } else avisoRapido('⚠️ Não consegui gravar a ficha agora (robô ocupado). O que você marcou fica na tela; tente de novo em instantes.');
+  }, 40000);
+}
 function seloEtapaCrm(x) {
   var k = crmEtapaDe(x);
   var e = CRM_ETAPAS.filter(function(y){ return y.k === k; })[0] || CRM_ETAPAS[0];
@@ -10114,10 +10288,12 @@ function crmQuadro(lista) {
             })()
         + '</div>'
         + blocoEtq
+        + crmFichaResumo(x)   // 18/09/2026: temperatura · próxima ação · data · WhatsApp · observação
         // trocar a etapa sem arrastar (pedido do Bruno 30/08/2026 — no celular arrastar é ruim)
         + '<div class="crm-etapa" onclick="event.stopPropagation();">' + seloEtapaCrm(x) + '</div>'
         + respostas
         + '<div class="crm-acoes">'
+        +   (x.insta ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();crmFicha(\'' + x.insta + '\');" title="temperatura, próxima ação, data do próximo contato, WhatsApp e observação">📝 ficha</a>' : '')
         +   (x.insta ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();crmVerPerfil(\'' + x.insta + '\');" title="ver o perfil aqui dentro do dash">📷 perfil</a>' : '')
         +   (lead ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();verFichaPendente(\'' + (lead.tel8 || '') + '\');">👤 ficha</a>'
                   : '<a href="#" onclick="event.preventDefault();event.stopPropagation();criarComentaristaNaClint(\'' + (x.insta || '') + '\', this);">➕ Clint</a>')
@@ -11155,8 +11331,10 @@ function comentSecaoHtml() {
       }
       if (window._comQuadro) {
         // ===== filtros do quadro: etiquetas, produto e "planilha não bate" =====
-        var FQ = window._crmFiltro = window._crmFiltro || { etq: '', prod: '', nb: false, pot: false, perf: '' };
+        var FQ = window._crmFiltro = window._crmFiltro || { etq: '', prod: '', nb: false, pot: false, perf: '', hoje: false, temp: '' };
         if (FQ.perf === undefined) FQ.perf = '';
+        if (FQ.hoje === undefined) FQ.hoje = false;
+        if (FQ.temp === undefined) FQ.temp = '';
         var contE = {}, contP = {}, contPf = {}, contPot = 0;
         comLista.forEach(function(x) {
           etqDe(x).forEach(function(t){ var k = v2norm(t); if (!contE[k]) contE[k] = { n: 0, rot: t }; contE[k].n++; });
@@ -11171,6 +11349,22 @@ function comentSecaoHtml() {
           + (FQ.pot ? 'background:rgba(255,107,107,.2);color:#ff6b6b;border:1px solid rgba(255,107,107,.6);' : '')
           + '" title="10 mil+ seguidores, ou comentou 2 vezes ou mais, ou nota A/B da equipe — ordenado por seguidores"'
           + ' onclick="window._crmFiltro.pot=!window._crmFiltro.pot;renderLeads();">🔥 mais potenciais · ' + contPot + '</span>';
+        // 📅 para hoje (próximo contato hoje ou atrasado) e temperatura — ficha do social selling (18/09/2026)
+        var _h0 = new Date(); _h0.setHours(0, 0, 0, 0);
+        var contHoje = 0, contTemp = {};
+        comLista.forEach(function(x) {
+          var dk = crmDataContato(x.proximoContato), ek = crmEtapaDe(x);
+          if (dk && dk.getTime() <= _h0.getTime() && ['vendido', 'semint', 'desq'].indexOf(ek) === -1) contHoje++;
+          var tk = v2norm(x.temperatura || ''); if (tk) contTemp[tk] = (contTemp[tk] || 0) + 1;
+        });
+        chipsF += '<span class="ld-selo' + (FQ.hoje ? '' : ' morno') + '" style="cursor:pointer;' + (FQ.hoje ? 'background:rgba(255,209,102,.2);color:#ffd166;border:1px solid rgba(255,209,102,.6);' : '')
+          + '" title="próximo contato marcado para hoje ou atrasado" onclick="window._crmFiltro.hoje=!window._crmFiltro.hoje;renderLeads();">📅 para hoje · ' + contHoje + '</span>';
+        CRM_TEMPS.forEach(function(tq) {
+          var n = contTemp[v2norm(tq.v)] || 0, on = v2norm(FQ.temp) === v2norm(tq.v);
+          if (!n && !on) return;
+          chipsF += '<span class="ld-selo' + (on ? '' : ' morno') + '" style="cursor:pointer;' + (on ? 'color:' + tq.cor + ';border:1px solid ' + tq.cor + ';' : '')
+            + '" onclick="window._crmFiltro.temp=' + (on ? "''" : JSON.stringify(tq.v).replace(/"/g, '&quot;')) + ';renderLeads();">' + tq.ico + ' ' + tq.v + ' · ' + n + '</span>';
+        });
         CRM_PERFIS.forEach(function(p) {
           if (!p.v) return;
           var kf = v2norm(p.v), n = contPf[kf] || 0;
@@ -11208,8 +11402,11 @@ function comentSecaoHtml() {
             + ((FQ.etq || FQ.prod || FQ.nb || FQ.pot || FQ.perf) ? '<span class="ld-selo" style="cursor:pointer;background:rgba(255,107,107,.15);color:#ff6b6b;" onclick="window._crmFiltro={etq:\'\',prod:\'\',nb:false,pot:false,perf:\'\'};renderLeads();">✕ limpar</span>' : '')
             + '</div>';
         }
+        var _h0f = new Date(); _h0f.setHours(0, 0, 0, 0);
         var listaQuadro = comLista.filter(function(x) {
           if (FQ.pot && !crmPotencial(x)) return false;
+          if (FQ.hoje) { var dh = crmDataContato(x.proximoContato); if (!dh || dh.getTime() > _h0f.getTime()) return false; }
+          if (FQ.temp && v2norm(x.temperatura || '') !== v2norm(FQ.temp)) return false;
           if (FQ.perf && v2norm(x.tag || '') !== v2norm(FQ.perf)) return false;
           if (FQ.etq && etqDe(x).map(v2norm).indexOf(v2norm(FQ.etq)) === -1) return false;
           if (FQ.prod && v2norm(x.produto || '') !== v2norm(FQ.prod)) return false;
@@ -17865,13 +18062,21 @@ function plPainelSdrs(p, d) {
       if (sit || lT < t30) return;
       if (l.faixa === 'alta' || (tc && (tc.nota === 'A' || tc.nota === 'B'))) { l._chegou = lT; quentes.push(l); }
     });
+    // 📲 pré-agendamento (Bruno 18/09/2026): quem foi para o WhatsApp da social seller no período — vem do quadro de comentários
+    if (pn === plPxPrimeiro(DONO_COMENTARIOS)) {
+      funil.pre = (COMENT.rows || []).filter(function(c) { return c.preEm && c.preEm.getTime() >= p.ini && c.preEm.getTime() < p.fim; })
+        .map(function(c) { return { nome: c.nome || ('@' + c.insta), insta: c.insta, date: c.preEm, _chegou: c.preEm.getTime(), origem: c.origem || 'Instagram', tel8: ldTel8(c.telefone || '') }; });
+      _pxListas['f_pre_' + chave] = { t: 'Foram para o WhatsApp (pré-agendamento) ' + rotP + ' · ' + x.nome, l: funil.pre };
+    }
     _pxListas['f_rec_' + chave] = { t: 'Leads recebidos ' + rotP + ' · ' + x.nome, l: funil.rec };
     _pxListas['f_mql_' + chave] = { t: 'MQL (declararam investimento) ' + rotP + ' · ' + x.nome, l: funil.mql };
     _pxListas['f_ag_' + chave] = { t: 'Leads do período que marcaram reunião · ' + x.nome, l: funil.ag };
     _pxListas['f_comp_' + chave] = { t: 'Leads do período que compareceram · ' + x.nome, l: funil.comp };
-    var topo = Math.max(funil.rec.length, 1), pct = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
+    var topo = Math.max(funil.rec.length, funil.pre ? funil.pre.length : 0, 1), pct = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
     var linhaF = function(k, rot, cor, ant) { var n = funil[k].length; return '<div class="px-fn"><span class="lab">' + rot + '</span><span class="bar"><i style="--w:' + Math.max(Math.round(n / topo * 100), n ? 4 : 0) + '%;--c:' + cor + ';"></i><b onclick="plPxAbrirLista(\'f_' + k + '_' + chave + '\')">' + n + '</b></span><span class="pct">' + (ant ? pct(n, funil[ant].length) : '') + '</span></div>'; };
-    var funilHtml = '<div class="px-funil">' + linhaF('rec', 'Recebeu', '#6ea8ff', null) + linhaF('mql', 'MQL', '#f6a350', 'rec') + linhaF('ag', 'Marcou', '#ffd166', 'mql') + linhaF('comp', 'Compareceu', '#3ddc97', 'ag') + '</div>';
+    var funilHtml = '<div class="px-funil">' + linhaF('rec', 'Recebeu', '#6ea8ff', null) + linhaF('mql', 'MQL', '#f6a350', 'rec')
+      + (funil.pre ? linhaF('pre', 'Pré-agendamento', '#3ddc97', null) : '')
+      + linhaF('ag', 'Marcou', '#ffd166', funil.pre ? 'pre' : 'mql') + linhaF('comp', 'Compareceu', '#3ddc97', 'ag') + '</div>';
     quentes.sort(function(a, b) { return plPxCalorDe(b, tcPor[b.tel8]).pts - plPxCalorDe(a, tcPor[a.tel8]).pts || (b._chegou || 0) - (a._chegou || 0); });
     _pxListas['q_' + chave] = { t: 'Leads quentes sem reunião (últimos 30 dias) · ' + x.nome, l: quentes };
     _pxListas['p_' + chave] = { t: 'Leads perdidos que chegaram ' + rotP + ' · ' + x.nome, l: perdidos };
@@ -17881,7 +18086,7 @@ function plPainelSdrs(p, d) {
       + '<div class="px-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span><div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>SDR</span></div></div>'
       + '<div class="px-row"><div class="px-k">Reuniões marcadas ' + rotP + '<small>pela hora em que marcou · comparado com o período anterior</small></div><div class="px-v">' + plPxNum(x.marc, 'sdr', chave, 'marc', '#ffd166') + plPxAntes(x.marc, ant ? ant.marc : null) + '</div></div>'
       + '<div class="px-row" style="display:block;"><div class="px-k">Funil ' + rotP + '<small>leads que chegaram no período e são deste SDR na Clint · % em relação à etapa anterior</small></div>' + funilHtml + '</div>'
-      + '<div class="px-row"><div class="px-k">Espaços × leads quentes<small>horários livres (Bruno + Tony) · quentes deste SDR sem reunião, últimos 30 dias</small></div><div class="px-v">' + espTxt + '<br><b class="n" style="color:#3ddc97;" onclick="plPxAbrirLista(\'q_' + chave + '\')">' + quentes.length + '</b><small>quentes agora</small></div></div>'
+      + '<div class="px-row"><div class="px-k">Espaços × leads quentes<small>horários livres (' + closerNomes().map(function(n){ return n.split(' ')[0]; }).join(' + ') + ') · quentes deste SDR sem reunião, últimos 30 dias</small></div><div class="px-v">' + espTxt + '<br><b class="n" style="color:#3ddc97;" onclick="plPxAbrirLista(\'q_' + chave + '\')">' + quentes.length + '</b><small>quentes agora</small></div></div>'
       + '<div class="px-row"><div class="px-k">Direto × resgate<small>das marcadas ' + rotP + ' · direto = até 24 h após chegar · resgate = 48 h ou mais</small></div><div class="px-v">' + plPxNum(x.l.direto.length, 'sdr', chave, 'direto', '#6ea8ff') + '<small>direto</small> ' + plPxNum(x.l.resgate.length, 'sdr', chave, 'resgate', '#b98aff') + '<small>resgate</small>'
       +   (x.l.meio.length ? ' ' + plPxNum(x.l.meio.length, 'sdr', chave, 'meio', '#9aa3b2') + '<small>1–2 dias</small>' : '') + (semForm ? '<br><small>' + semForm + ' sem chegada conhecida</small>' : '')
       +   '<br><span class="px-tag">pago ' + canal.pago + '</span><span class="px-tag g">orgânico ' + canal.organico + '</span></div></div>'
