@@ -2355,7 +2355,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-18-1731';
+var VERSAO_DASH = '2026-09-18-1750';
 var _versaoNova = null;
 
 // =====================================================================
@@ -2363,12 +2363,13 @@ var _versaoNova = null;
 // =====================================================================
 // Para acrescentar um closer: UMA linha aqui, a agenda dele no robô (CALENDARS,
 // no começo do Code.gs) e, se ele for entrar no dash, o PIN lá embaixo em ACESSOS.
-// grade = qual grade de horários ele usa: 'tony' (almoço 12:20–13:00) ou 'bruno' (12:20–14:00).
+// grade = qual grade de horários ele usa: 'tony' (almoço 12:20–13:00), 'bruno' (12:20–14:00),
+// 'hora' (de 1 em 1 hora, reunião de 60 min) ou 'tarde' (de 1 em 1 hora, só das 14h em diante, sem sábado).
 var CLOSERS = [
   { key: 'bruno',    nome: 'Bruno Pardim', grade: 'bruno' },
   { key: 'tony',     nome: 'Tony Londe',   grade: 'tony'  },
   { key: 'wesllene', nome: 'Wesllene',     grade: 'hora'  },
-  { key: 'sarah',    nome: 'Sarah',        grade: 'tony'  }    // 18/09/2026: a Sarah passa a atender reunião (agenda "Reuniões Sarah")
+  { key: 'sarah',    nome: 'Sarah',        grade: 'tarde' }    // 18/09/2026: a Sarah atende reunião SÓ depois das 14h (agenda "Reuniões Sarah")
 ];
 function closerKeys()  { return CLOSERS.map(function(c){ return c.key; }); }
 function closerNomes() { return CLOSERS.map(function(c){ return c.nome; }); }
@@ -2923,7 +2924,7 @@ function closerEscolhido() {
   var el = document.getElementById('ag-closer');
   return (el && el.value) || 'Bruno Pardim';
 }
-// a agenda de 1 em 1 hora (Wesllene) faz HT em 2 horas; as outras, 1h40
+// as agendas de 1 em 1 hora (Wesllene e Sarah) fazem reunião de 60 min; as outras, 1h40
 function agAjustarDuracao() {
   var d = document.getElementById('ag-duracao');
   if (!d) return;
@@ -2933,7 +2934,7 @@ function agAjustarDuracao() {
   if (op && op.value !== novo) {
     var eraHT = d.value === op.value;
     op.value = novo;
-    op.textContent = novo === '120' ? '2h (Spark/Growth)' : '1h40 (Spark/Growth)';
+    op.textContent = novo === '60' ? '1h (Spark/Growth)' : '1h40 (Spark/Growth)';
     if (eraHT) d.value = novo;
   }
 }
@@ -2990,7 +2991,7 @@ function atualizarHorarios() {
     horas = SLOTS_BRUNO.filter(function(s){ return s.end && !s.fixo; })
       .map(function(s){ return { h:s.start, lock:false }; });
   } else if (diaSem === 6) {
-    horas = SLOTS_SABADO.map(function(s){ return { h:s.start, lock:true }; });
+    horas = gradeSoTarde(key) ? [] : SLOTS_SABADO.map(function(s){ return { h:s.start, lock:true }; });
   } else {
     horas = slotsDo(key, dataEsc).filter(function(s){ return s.end && !s.fixo; })
       .map(function(s){ return { h:s.start, fim:s.end, lock:!!s.extra }; });
@@ -14206,7 +14207,18 @@ var SLOTS_HORA = [
   { start:'17:00', end:'18:00' },
   { start:'18:00', end:'19:00', extra:true }
 ];
+// 18/09/2026 (Bruno: "a Sarah deve ter somente opção de marcar depois das 14 horas"): só a tarde, de 1 em 1 hora, sem sábado
+var SLOTS_TARDE = [
+  { start:'14:00', end:'15:00' },
+  { start:'15:00', end:'16:00' },
+  { start:'16:00', end:'17:00' },
+  { start:'17:00', end:'18:00' },
+  { start:'18:00', end:'19:00', extra:true }
+];
 var GRADE_14_DESDE = new Date(2026, 8, 14);
+// agendas de 1 em 1 hora (Wesllene e Sarah): a reunião dura 60 min (Bruno 18/09/2026)
+function gradeDeHora(closer) { var g = gradeDoCloser(closer); return g === 'hora' || g === 'tarde'; }
+function gradeSoTarde(closer) { return gradeDoCloser(closer) === 'tarde'; }
 function gradeDoCloser(closer) {
   for (var i = 0; i < CLOSERS.length; i++) if (CLOSERS[i].key === closer) return CLOSERS[i].grade;
   return 'bruno';
@@ -14214,13 +14226,14 @@ function gradeDoCloser(closer) {
 function slotsDo(closer, dataRef){
   var grade = gradeDoCloser(closer);
   if (grade === 'hora') return SLOTS_HORA;             // grade de 1 em 1 hora: vale para qualquer semana
+  if (grade === 'tarde') return SLOTS_TARDE;
   var d = dataRef || AG.weekStart;
   if (d && d >= GRADE_14_DESDE) return grade === 'tony' ? SLOTS_TONY_14 : SLOTS_BRUNO_14;
   return SLOTS_TONY;
 }
 // quanto dura uma reunião HT (Spark/Growth) na agenda de cada closer
-function durHT(closer) { return gradeDoCloser(closer) === 'hora' ? 120 : 100; }
-function rotHT(closer) { return durHT(closer) === 120 ? '120 min (2h)' : '100 min (1h40)'; }
+function durHT(closer) { return gradeDeHora(closer) ? 60 : 100; }
+function rotHT(closer) { return durHT(closer) === 60 ? '60 min (1h)' : '100 min (1h40)'; }
 // a grade nova (Tony / sábado / reunião extra) vale SÓ DAQUI PARA FRENTE;
 // semanas até 02/08/2026 continuam no formato antigo
 var NOVA_GRADE_DESDE = new Date(2026, 7, 3);
@@ -14301,12 +14314,13 @@ function agAtualizarLegenda() {
   var el = document.getElementById('ag-legenda');
   if (!el) return;
   var fim = ' · 🔒 = precisa do OK do closer (horário extra do fim do dia, sábado de manhã e feriado) · Clique num horário livre para agendar';
-  if (AG.closer !== 'ambos' && gradeDoCloser(AG.closer) === 'hora') {
-    el.innerHTML = 'Agenda de ' + closerNomeDe(AG.closer) + ': blocos de 1 hora · almoço 12:00–13:00 · HT (Spark/Growth) ocupa 2 blocos · Legado = 50 min' + fim;
-  } else if (AG.closer === 'ambos' && CLOSERS.some(function(c){ return c.grade === 'hora'; })) {
+  if (AG.closer !== 'ambos' && gradeDeHora(AG.closer)) {
+    el.innerHTML = 'Agenda de ' + closerNomeDe(AG.closer) + ': blocos de 1 hora · reunião de 60 min (Legado = 50 min)'
+      + (gradeSoTarde(AG.closer) ? ' · só atende das 14h em diante, sem sábado' : ' · almoço 12:00–13:00') + fim;
+  } else if (AG.closer === 'ambos' && CLOSERS.some(function(c){ return gradeDeHora(c.key); })) {
     el.innerHTML = 'Bruno e Tony: blocos de 1h40 (Legado = 50 min, 2 por bloco) · '
-      + CLOSERS.filter(function(c){ return c.grade === 'hora'; }).map(function(c){ return c.nome; }).join(' e ')
-      + ': blocos de 1 hora (HT ocupa 2)' + fim;
+      + CLOSERS.filter(function(c){ return gradeDeHora(c.key); }).map(function(c){ return c.nome + (c.grade === 'tarde' ? ' (só depois das 14h)' : ''); }).join(' e ')
+      + ': blocos de 1 hora, reunião de 60 min' + fim;
   } else {
     el.innerHTML = 'Blocos de 1h40 · Legado = 50 min (2 por bloco)' + fim;
   }
@@ -14453,7 +14467,7 @@ function renderSemanaV2(calData) {
 
   // célula do SÁBADO: só os 2 horários da manhã, sempre com aprovação do closer
   function celSabado(n) {
-    if (!gradeNova || n < 0 || !dias[5]) return '<div class="sg-cell fora"></div>';
+    if (!gradeNova || n < 0 || !dias[5] || gradeSoTarde(CK)) return '<div class="sg-cell fora"></div>';
     var s = SLOTS_SABADO[n];
     var dStr = agDataStr(dias[5]);
     var passado = dias[5] < hoje;
@@ -14631,7 +14645,7 @@ function renderSemanaV2(calData) {
       htmlT += '<div class="tl-col' + (passadoDia ? ' passado' : '') + (ehHoje ? ' hoje' : '') + '" style="height:' + H + 'px;">';
       for (var ml = minG + 30; ml < maxG; ml += 30) htmlT += '<div class="tl-linha' + (ml % 60 ? ' meia' : '') + '" style="top:' + top(ml) + 'px;"></div>';
       // horários da grade por trás (sábado: só os da manhã, com 🔒; feriado: tudo com 🔒)
-      var slotsDia = sab ? (gradeNova ? SLOTS_SABADO.map(function(sl) { return { start: sl.start, end: sl.end, extra: true }; }) : []) : G;
+      var slotsDia = sab ? (gradeNova && !gradeSoTarde(CK) ? SLOTS_SABADO.map(function(sl) { return { start: sl.start, end: sl.end, extra: true }; }) : []) : G;
       var janelas = slotsDia.filter(function(sl) { return sl.end && !sl.fixo; });
       // no-show e remarcada nao seguram mais o horario (Bruno 10/09/2026: "posso marcar por cima de um no-show?") —
       // o cartao vira uma tira estreita ("fantasma") e o resto do horario volta a ficar livre, se ainda nao passou
@@ -15707,7 +15721,7 @@ function abrirTipoV2(e, dataStr, hora, ck) {
   var lbl = dp[2] + '/' + dp[1];
   var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
   var dHT = durHT(quem), rHT = rotHT(quem);
-  var rLG = gradeDoCloser(quem) === 'hora' ? '50 min · cabe no bloco' : '50 min · meio bloco';
+  var rLG = gradeDeHora(quem) ? '50 min · cabe no bloco' : '50 min · meio bloco';
   var m = document.getElementById('tipo-popup');
   m.innerHTML = '<div class="tipo-head"><span class="tipo-data">📅 ' + lbl + ' às ' + hora + (quem ? ' · ' + (closerNomeDe(quem) || '') : '') + '</span><div class="tipo-sub">Escolha o tipo de reunião</div></div>'
     + '<div class="tipo-op ht" onclick="fecharTipo();abrirAgendarCom(' + dHT + ',\'' + dataStr + '\',\'' + hora + '\',\'' + quem + '\');"><span class="tipo-ico">🎯</span><div class="tipo-txt"><b>HT — Spark/Growth</b><span>' + rHT + '</span></div><span class="tipo-seta">›</span></div>'
