@@ -2355,7 +2355,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-18-1750';
+var VERSAO_DASH = '2026-09-18-2151';
 var _versaoNova = null;
 
 // =====================================================================
@@ -8625,6 +8625,145 @@ function cd7Bloco(per) {
   h += '<div class="hint" style="margin-top:10px;">Os leads da linha são todos os que chegaram nos 7 dias seguintes ao post, de qualquer origem. Servem para ver o movimento em volta da publicação, não para dizer que o post trouxe cada um deles.</div>';
   return h + '</div>';
 }
+// =====================================================================
+// 📣 DISPAROS DE WHATSAPP — quem da lista voltou (Bruno 18/09/2026)
+// =====================================================================
+// "essa é a lista de leads que vou fazer disparo na segunda — como posso rastrear quais vieram desse disparo?"
+// A lista de cada disparo fica na aba "Disparos" da planilha (o robô grava: disparoRegistrar). Aqui a tela cruza
+// PELO TELEFONE: quem da lista preencheu o formulário de novo, agendou, compareceu e comprou nos DSP_JANELA dias
+// depois do disparo. Reunião marcada ANTES do disparo não conta (já estava andando sozinha).
+// Ocupa o lugar do bloco "Conteúdo no 7º dia" (pedido do Bruno); a planilha do 7º dia continua sendo alimentada.
+var DSP = { rows: [], carregado: false, buscando: false, erro: '', quando: 0, sel: '', todos: false };
+var DSP_JANELA = 14;
+var CD7_NA_TELA = false;   // true = volta a mostrar o bloco do conteúdo no 7º dia embaixo do disparo
+function carregarDisparos(forcar) {
+  if (DSP.buscando) return;
+  if (DSP.carregado && !forcar && Date.now() - DSP.quando < 5 * 60000) return;
+  DSP.buscando = true; DSP.erro = '';
+  var old = document.getElementById('dsp-gviz'); if (old) old.remove();
+  var sc = document.createElement('script');
+  sc.id = 'dsp-gviz';
+  sc.src = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET
+    + '/gviz/tq?tqx=out:json;responseHandler:__gvizDSP&sheet=' + encodeURIComponent('Disparos')
+    + '&headers=1&_t=' + Date.now();
+  sc.onerror = function() { DSP.buscando = false; DSP.erro = 'não consegui ler a planilha'; };
+  document.body.appendChild(sc);
+}
+window.__gvizDSP = function(res) {
+  DSP.buscando = false; DSP.quando = Date.now();
+  try {
+    var semAba = 'nenhum disparo registrado ainda (a aba "Disparos" é criada quando a primeira lista é guardada)';
+    if (!res || !res.table || res.status === 'error') { DSP.rows = []; DSP.erro = semAba; DSP.carregado = true; return; }
+    var cols = (res.table.cols || []).map(function(c){ return v2norm(c.label || ''); });
+    var idx = function(alvo) { alvo = v2norm(alvo); for (var c = 0; c < cols.length; c++) if (cols[c].indexOf(alvo) !== -1) return c; return -1; };
+    var iDsp = cols.indexOf('disparo'), iDia = idx('data do disparo'), iTel = idx('telefone'), iNome = cols.indexOf('nome');
+    // sem as colunas certas, o Google devolveu outra aba: a "Disparos" ainda não existe
+    if (iDsp < 0 || iDia < 0 || iTel < 0) { DSP.rows = []; DSP.erro = semAba; DSP.carregado = true; return; }
+    var cel = function(r, i) {
+      if (i < 0 || !r.c[i]) return '';
+      var c = r.c[i];
+      if (c.f !== undefined && c.f !== null) return String(c.f);
+      if (c.v !== undefined && c.v !== null) return String(c.v);
+      return '';
+    };
+    var linhas = [];
+    (res.table.rows || []).forEach(function(r) {
+      var nomeD = cel(r, iDsp).trim(), tel = cel(r, iTel).replace(/\D/g, '');
+      var m = cel(r, iDia).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (!nomeD || !m || tel.length < 8) return;
+      linhas.push({ disparo: nomeD, dia: new Date(+m[3], +m[2] - 1, +m[1]), tel: tel, tel8: ldTel8(tel), nome: cel(r, iNome).trim() });
+    });
+    DSP.rows = linhas; DSP.carregado = true; DSP.erro = '';
+  } catch (e) { DSP.erro = String(e && e.message || e); DSP.carregado = true; }
+  try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e2) {}
+};
+// o que aconteceu com UMA pessoa da lista depois do disparo
+function dspPessoa(c, ini, fim) {
+  var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
+  var o = { c: c, form: false, ag: false, comp: false, vd: false, valor: 0, antes: 0, reuniao: null };
+  var linhas = []; try { linhas = ldReunioes({ tel8: c.tel8 }); } catch (e) {}
+  linhas.forEach(function(r) {
+    var quando = r.carimboT || (r.date ? r.date.getTime() : 0);     // o momento em que MARCARAM (sem carimbo: o dia da reunião)
+    if (!quando) return;
+    if (quando < ini) { o.antes++; return; }
+    if (quando >= fim) return;
+    o.ag = true; o.reuniao = r;
+    if (REAL.indexOf(r.sn) !== -1) o.comp = true;
+    if (r.sn === 'vendido') { o.vd = true; o.valor += (r.valor || 0); }
+  });
+  (LD.rows || []).forEach(function(l) {
+    if (l.tel8 !== c.tel8 || !l.date) return;
+    var t = l.date.getTime();
+    if (t >= ini && t < fim) o.form = true;
+  });
+  o.nivel = o.vd ? 4 : o.comp ? 3 : o.ag ? 2 : o.form ? 1 : 0;
+  return o;
+}
+function dspBloco() {
+  if (telaVisivel('s-anuncios')) carregarDisparos();
+  var h = '<div style="margin-top:34px;padding-top:22px;border-top:2px solid rgba(255,255,255,.14);">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">'
+    +   '<h3 style="font-size:1rem;font-weight:800;margin:0;">📣 Disparos de WhatsApp — quem da lista voltou</h3>'
+    +   '<span class="hint" style="margin:0;">cruzado pelo telefone · conta o que aconteceu nos ' + DSP_JANELA + ' dias depois do disparo</span>'
+    +   '<button class="btn" style="margin-left:auto;padding:5px 12px;font-size:.7rem;" onclick="carregarDisparos(true)">🔄 atualizar</button>'
+    + '</div>';
+  if (DSP.buscando && !DSP.rows.length) return h + '<div class="hint">⏳ lendo a planilha…</div></div>';
+  if (DSP.erro) return h + '<div class="hint" style="color:#ffd166;">' + DSP.erro.replace(/</g, '&lt;') + '</div></div>';
+  if (!DSP.rows.length) return h + '<div class="hint">Nenhum disparo registrado ainda.</div></div>';
+  // um grupo por disparo, do mais novo para o mais antigo
+  var grupos = {}, ordem = [];
+  DSP.rows.forEach(function(x) {
+    if (!grupos[x.disparo]) { grupos[x.disparo] = { nome: x.disparo, dia: x.dia, lista: [] }; ordem.push(grupos[x.disparo]); }
+    grupos[x.disparo].lista.push(x);
+  });
+  ordem.sort(function(a, b){ return b.dia - a.dia; });
+  var g = grupos[DSP.sel] || ordem[0];
+  if (ordem.length > 1) {
+    h += '<div class="chart-chips" style="margin:8px 0 2px;">' + ordem.map(function(o) {
+      return '<span class="chart-chip' + (o === g ? ' on' : '') + '" style="cursor:pointer;" onclick="DSP.sel=\'' + o.nome.replace(/['\\]/g, '') + '\';DSP.todos=false;renderAnuncios();">'
+        + o.nome.replace(/</g, '&lt;') + ' · ' + o.lista.length + '</span>';
+    }).join('') + '</div>';
+  }
+  var ini = g.dia.getTime(), fim = ini + DSP_JANELA * 864e5, agora = Date.now();
+  var pessoas = g.lista.map(function(c){ return dspPessoa(c, ini, fim); });
+  var n = pessoas.length, nForm = 0, nAg = 0, nComp = 0, nVd = 0, valor = 0, nAntes = 0;
+  pessoas.forEach(function(o) { if (o.form) nForm++; if (o.ag) nAg++; if (o.comp) nComp++; if (o.vd) nVd++; valor += o.valor; if (o.antes) nAntes++; });
+  var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
+  var fimTxt = new Date(fim - 864e5).toLocaleDateString('pt-BR');
+  h += '<div class="hint" style="margin:6px 0 0;"><b style="color:var(--text);">' + g.nome.replace(/</g, '&lt;') + '</b> · enviado em ' + g.dia.toLocaleDateString('pt-BR')
+    + (agora < ini ? ' · <b style="color:#ffd166;">ainda não aconteceu</b> — os números começam a contar nesse dia'
+       : agora < fim ? ' · contando até ' + fimTxt : ' · janela fechada em ' + fimTxt) + '</div>';
+  h += '<div class="ag-stats" style="margin:10px 0 12px;">'
+    + '<div class="g-stat"><b>' + n + '</b><span>Enviados</span></div>'
+    + '<div class="g-stat"><b style="color:#6ea8ff;">' + nForm + '</b><span>Preencheram o formulário · ' + pc(nForm, n) + '</span></div>'
+    + '<div class="g-stat"><b style="color:#b98aff;">' + nAg + '</b><span>Agendaram · ' + pc(nAg, n) + '</span></div>'
+    + '<div class="g-stat"><b style="color:#3ddc97;">' + nComp + '</b><span>Compareceram · ' + pc(nComp, nAg) + ' de quem agendou</span></div>'
+    + '<div class="g-stat"><b style="color:#ffd166;">' + nVd + '</b><span>Compraram' + (valor ? ' · ' + v2mil(valor) : '') + '</span></div>'
+    + '</div>';
+  pessoas.sort(function(a, b){ return (b.nivel - a.nivel) || String(a.c.nome).localeCompare(String(b.c.nome)); });
+  var rot = ['sem movimento', '📝 preencheu o formulário', '📅 agendou', '✅ compareceu', '💰 comprou'];
+  var cor = ['var(--muted)', '#6ea8ff', '#b98aff', '#3ddc97', '#ffd166'];
+  var comMov = pessoas.filter(function(o){ return o.nivel > 0; }).length;
+  var mostrar = DSP.todos ? pessoas : pessoas.slice(0, Math.max(comMov, 10));
+  h += '<div style="overflow-x:auto;"><table class="cd7-tab" style="width:100%;border-collapse:collapse;min-width:720px;">'
+    + '<tr><th style="text-align:left;">Pessoa</th><th style="text-align:left;">O que aconteceu depois do disparo</th><th>Reunião</th><th>Closer</th><th>Antes do disparo</th></tr>';
+  mostrar.forEach(function(o) {
+    var r = o.reuniao, lk = ''; try { lk = clintLink({ tel: o.c.tel, tel8: o.c.tel8, nome: o.c.nome }) || ''; } catch (e) {}
+    h += '<tr><td style="text-align:left;"><b>' + String(o.c.nome || '—').replace(/</g, '&lt;') + '</b>'
+      + '<div class="hint" style="margin:2px 0 0;">📱 final ' + String(o.c.tel).slice(-4)
+      + (lk ? ' · <a href="' + lk + '" target="_blank" rel="noopener" style="color:#8f6bff;">abrir na Clint</a>' : '') + '</div></td>'
+      + '<td style="text-align:left;color:' + cor[o.nivel] + ';font-weight:700;">' + rot[o.nivel] + (o.vd && o.valor ? ' · ' + v2mil(o.valor) : '') + '</td>'
+      + '<td>' + (r && r.date ? r.date.toLocaleDateString('pt-BR') : '—') + '</td>'
+      + '<td>' + (r && r.closer ? String(r.closer).replace(/</g, '&lt;') : '—') + '</td>'
+      + '<td style="color:var(--muted);">' + (o.antes ? o.antes + (o.antes > 1 ? ' reuniões' : ' reunião') : '—') + '</td></tr>';
+  });
+  h += '</table></div>';
+  if (!DSP.todos && pessoas.length > mostrar.length) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=true;renderAnuncios();">▼ mostrar os ' + pessoas.length + ' da lista</button></div>';
+  else if (DSP.todos && pessoas.length > 10) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=false;renderAnuncios();">▲ mostrar menos</button></div>';
+  h += '<div class="hint" style="margin-top:10px;">Conta quem está na lista e se mexeu nos ' + DSP_JANELA + ' dias depois do disparo. Reunião marcada antes do disparo não entra'
+    + (nAntes ? ' (' + nAntes + ' pessoa' + (nAntes > 1 ? 's' : '') + ' da lista já tinha' + (nAntes > 1 ? 'm' : '') + ' reunião antes — aparece na última coluna)' : '') + '.</div>';
+  return h + '</div>';
+}
 function renderAnuncios() {
   var el = document.getElementById('an-corpo');
   if (!el) return;
@@ -8908,7 +9047,8 @@ function renderAnuncios() {
       + '<button class="btn" onclick="AN_QUANTOS = 40; renderAnuncios();">▲ mostrar menos</button></div>';
   }
   h += '</div>';
-  try { h += cd7Bloco(per); } catch (eCd) { }   // 17/09/2026: conteúdo no 7º dia, no fim da aba
+  try { h += dspBloco(); } catch (eDs) { }      // 18/09/2026: disparos de WhatsApp, no lugar do conteúdo no 7º dia (pedido do Bruno)
+  if (CD7_NA_TELA) { try { h += cd7Bloco(per); } catch (eCd) { } }
   el.innerHTML = h;
 }
 // valor da venda pelo telefone (para somar faturamento por anúncio)
@@ -13997,23 +14137,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwf14261fr4t31Ab2AIsEdHXIeNHVgdJE_Rq0ldTk1Z64ru7g6jItwJZHESF5sj41C/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -17364,7 +17504,7 @@ function plCalcular(p) {
   // closer (Bruno/Tony) NUNCA entra na coluna de SDRs, mesmo quando marca uma reuniao — a marcacao
   // conta no total do time, mas nao no ranking dos SDRs (Bruno 02/09/2026: "Bruno nao e SDR")
   var closersAtivos = plClosersAtivos();
-  var ehCloser = function(n){ var p = v2norm(n).split(' ')[0]; return !!p && closersAtivos.some(function(c){ return v2norm(c).split(' ')[0] === p; }); };
+  var ehCloser = function(n){ var p = v2norm(n).split(' ')[0]; return !!p && PL_CLOSER_E_SDR.indexOf(p) === -1 && closersAtivos.some(function(c){ return v2norm(c).split(' ')[0] === p; }); };
   var sd = function(n){ n = plPessoa(n); if (!n || ehCloser(n)) return null; var k = v2norm(n); if (!S[k]) S[k] = novo(n); return S[k]; };
   var cd = function(n){ n = plPessoa(n); if (!n) return null; var k = v2norm(n); if (!C[k]) C[k] = novo(n); return C[k]; };
   var no = function(t){ return t != null && t >= p.ini && t < p.fim; };
@@ -17456,10 +17596,12 @@ function plSdrsAtivos() {
 var _plClosersCache = { t: 0, lista: [] };
 function plEhCloser(n) {
   var p = v2norm(plPessoa(n)).split(' ')[0]; if (!p) return false;
+  if (PL_CLOSER_E_SDR.indexOf(p) !== -1) return false;
   if (Date.now() - _plClosersCache.t > 60000) { _plClosersCache = { t: Date.now(), lista: plClosersAtivos() }; }
   return _plClosersCache.lista.some(function(c){ return v2norm(c).split(' ')[0] === p; });
 }
 // closers ativos = tiveram reuniao (qualquer status) nos ultimos 30 dias
+// + quem está na lista CLOSERS do dash, mesmo sem reunião ainda (Bruno 18/09/2026: "cadê a Sarah no placar?")
 function plClosersAtivos() {
   var m = {}, corte = Date.now() - 30 * 864e5;
   (V2.rows || []).forEach(function(r) {
@@ -17467,8 +17609,17 @@ function plClosersAtivos() {
     var n = plPessoa(r.closer); if (!n) return;
     m[v2norm(n)] = n;
   });
+  try {
+    CLOSERS.forEach(function(c) {
+      var p1 = v2norm(c.nome).split(' ')[0];
+      if (!Object.keys(m).some(function(k){ return k.split(' ')[0] === p1; })) m[v2norm(c.nome)] = c.nome;
+    });
+  } catch (e) {}
   return Object.keys(m).map(function(k){ return m[k]; });
 }
+// quem é closer E TAMBÉM marca reunião para os outros (a Sarah faz social selling e atende à tarde):
+// continua contando do lado dos SDRs — a regra "closer não conta como SDR" é só para Bruno e Tony
+var PL_CLOSER_E_SDR = ['sarah'];
 // quem liderou as marcacoes em cada um dos ultimos dias (para a sequencia 🔥)
 function plSequencia(nome) {
   var dias = 0, hoje = new Date(); hoje.setHours(0, 0, 0, 0);
