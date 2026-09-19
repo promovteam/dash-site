@@ -2355,7 +2355,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-18-2151';
+var VERSAO_DASH = '2026-09-19-2049';
 var _versaoNova = null;
 
 // =====================================================================
@@ -8633,7 +8633,22 @@ function cd7Bloco(per) {
 // PELO TELEFONE: quem da lista preencheu o formulário de novo, agendou, compareceu e comprou nos DSP_JANELA dias
 // depois do disparo. Reunião marcada ANTES do disparo não conta (já estava andando sozinha).
 // Ocupa o lugar do bloco "Conteúdo no 7º dia" (pedido do Bruno); a planilha do 7º dia continua sendo alimentada.
-var DSP = { rows: [], carregado: false, buscando: false, erro: '', quando: 0, sel: '', todos: false };
+var DSP = { rows: [], carregado: false, buscando: false, erro: '', quando: 0, sel: '', todos: false, filtro: 'mov', conferindo: false, confMsg: '' };
+// pede ao robô para olhar na Clint quem respondeu (80 pessoas por vez; repete até acabar, no máximo 8 voltas)
+function dspConferirRespostas(nomeDisparo, volta) {
+  if (soOlhar && soOlhar()) return;
+  volta = volta || 1;
+  if (DSP.conferindo && volta === 1) return;
+  DSP.conferindo = true; DSP.confMsg = '⏳ olhando as conversas na Clint… (parte ' + volta + ')';
+  try { renderAnuncios(); } catch (e) {}
+  gasPedir({ action: 'disparoConferirRespostas', disparo: nomeDisparo, maximo: 80 }, function(d) {
+    if (!d || !d.success) { DSP.conferindo = false; DSP.confMsg = '⚠️ o robô não respondeu agora — ele continua conferindo sozinho a cada 15 min'; carregarDisparos(true); return; }
+    if (d.aindaNaoAconteceu && !d.nesteLote) { DSP.conferindo = false; DSP.confMsg = 'o disparo ainda não aconteceu — não há resposta para conferir'; try { renderAnuncios(); } catch (e) {} return; }
+    if (d.restam > 0 && volta < 8 && d.conferidos > 0) { dspConferirRespostas(nomeDisparo, volta + 1); return; }
+    DSP.conferindo = false; DSP.confMsg = '✓ conferido agora' + (d.restam ? ' (faltam ' + d.restam + ' — o robô termina sozinho)' : '');
+    carregarDisparos(true);
+  }, 170000);
+}
 var DSP_JANELA = 14;
 var CD7_NA_TELA = false;   // true = volta a mostrar o bloco do conteúdo no 7º dia embaixo do disparo
 function carregarDisparos(forcar) {
@@ -8657,6 +8672,7 @@ window.__gvizDSP = function(res) {
     var cols = (res.table.cols || []).map(function(c){ return v2norm(c.label || ''); });
     var idx = function(alvo) { alvo = v2norm(alvo); for (var c = 0; c < cols.length; c++) if (cols[c].indexOf(alvo) !== -1) return c; return -1; };
     var iDsp = cols.indexOf('disparo'), iDia = idx('data do disparo'), iTel = idx('telefone'), iNome = cols.indexOf('nome');
+    var iNossa = idx('nossa mensagem em'), iFalou = idx('lead falou em'), iTxt = idx('o que o lead falou'), iClint = cols.indexOf('clint'), iConf = idx('conferido em');
     // sem as colunas certas, o Google devolveu outra aba: a "Disparos" ainda não existe
     if (iDsp < 0 || iDia < 0 || iTel < 0) { DSP.rows = []; DSP.erro = semAba; DSP.carregado = true; return; }
     var cel = function(r, i) {
@@ -8671,16 +8687,17 @@ window.__gvizDSP = function(res) {
       var nomeD = cel(r, iDsp).trim(), tel = cel(r, iTel).replace(/\D/g, '');
       var m = cel(r, iDia).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       if (!nomeD || !m || tel.length < 8) return;
-      linhas.push({ disparo: nomeD, dia: new Date(+m[3], +m[2] - 1, +m[1]), tel: tel, tel8: ldTel8(tel), nome: cel(r, iNome).trim() });
+      linhas.push({ disparo: nomeD, dia: new Date(+m[3], +m[2] - 1, +m[1]), tel: tel, tel8: ldTel8(tel), nome: cel(r, iNome).trim(),
+        nossaEm: cel(r, iNossa).trim(), falouEm: cel(r, iFalou).trim(), falouTxt: cel(r, iTxt).trim(), clint: cel(r, iClint).trim(), confEm: cel(r, iConf).trim() });
     });
     DSP.rows = linhas; DSP.carregado = true; DSP.erro = '';
   } catch (e) { DSP.erro = String(e && e.message || e); DSP.carregado = true; }
   try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e2) {}
 };
 // o que aconteceu com UMA pessoa da lista depois do disparo
-function dspPessoa(c, ini, fim) {
+function dspPessoa(c, ini, fim, formPor) {
   var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
-  var o = { c: c, form: false, ag: false, comp: false, vd: false, valor: 0, antes: 0, reuniao: null };
+  var o = { c: c, recebeu: !!c.nossaEm, resp: !!c.falouEm, form: false, ag: false, comp: false, vd: false, valor: 0, antes: 0, reuniao: null };
   var linhas = []; try { linhas = ldReunioes({ tel8: c.tel8 }); } catch (e) {}
   linhas.forEach(function(r) {
     var quando = r.carimboT || (r.date ? r.date.getTime() : 0);     // o momento em que MARCARAM (sem carimbo: o dia da reunião)
@@ -8691,12 +8708,8 @@ function dspPessoa(c, ini, fim) {
     if (REAL.indexOf(r.sn) !== -1) o.comp = true;
     if (r.sn === 'vendido') { o.vd = true; o.valor += (r.valor || 0); }
   });
-  (LD.rows || []).forEach(function(l) {
-    if (l.tel8 !== c.tel8 || !l.date) return;
-    var t = l.date.getTime();
-    if (t >= ini && t < fim) o.form = true;
-  });
-  o.nivel = o.vd ? 4 : o.comp ? 3 : o.ag ? 2 : o.form ? 1 : 0;
+  ((formPor && formPor[c.tel8]) || []).forEach(function(t) { if (t >= ini && t < fim) o.form = true; });
+  o.nivel = o.vd ? 5 : o.comp ? 4 : o.ag ? 3 : o.form ? 2 : o.resp ? 1 : 0;
   return o;
 }
 function dspBloco() {
@@ -8725,41 +8738,66 @@ function dspBloco() {
     }).join('') + '</div>';
   }
   var ini = g.dia.getTime(), fim = ini + DSP_JANELA * 864e5, agora = Date.now();
-  var pessoas = g.lista.map(function(c){ return dspPessoa(c, ini, fim); });
-  var n = pessoas.length, nForm = 0, nAg = 0, nComp = 0, nVd = 0, valor = 0, nAntes = 0;
-  pessoas.forEach(function(o) { if (o.form) nForm++; if (o.ag) nAg++; if (o.comp) nComp++; if (o.vd) nVd++; valor += o.valor; if (o.antes) nAntes++; });
-  var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
+  // índice dos formulários por telefone, montado uma vez (a lista pode ter centenas de pessoas)
+  var naLista = {}, formPor = {};
+  g.lista.forEach(function(c){ naLista[c.tel8] = 1; });
+  (LD.rows || []).forEach(function(l) { if (l.tel8 && naLista[l.tel8] && l.date) (formPor[l.tel8] || (formPor[l.tel8] = [])).push(l.date.getTime()); });
+  var pessoas = g.lista.map(function(c){ return dspPessoa(c, ini, fim, formPor); });
+  var n = pessoas.length, nForm = 0, nAg = 0, nComp = 0, nVd = 0, valor = 0, nAntes = 0, nRec = 0, nResp = 0, nConf = 0, ultConf = '';
+  pessoas.forEach(function(o) {
+    if (o.form) nForm++; if (o.ag) nAg++; if (o.comp) nComp++; if (o.vd) nVd++; valor += o.valor; if (o.antes) nAntes++;
+    if (o.recebeu) nRec++; if (o.resp) nResp++; if (o.c.confEm) { nConf++; if (o.c.confEm > ultConf) ultConf = o.c.confEm; }
+  });
+  var pc = function(a, b) { if (!b) return '—'; var v = a / b * 100; return (a > 0 && v < 1) ? '<1%' : Math.round(v) + '%'; };
   var fimTxt = new Date(fim - 864e5).toLocaleDateString('pt-BR');
   h += '<div class="hint" style="margin:6px 0 0;"><b style="color:var(--text);">' + g.nome.replace(/</g, '&lt;') + '</b> · enviado em ' + g.dia.toLocaleDateString('pt-BR')
     + (agora < ini ? ' · <b style="color:#ffd166;">ainda não aconteceu</b> — os números começam a contar nesse dia'
        : agora < fim ? ' · contando até ' + fimTxt : ' · janela fechada em ' + fimTxt) + '</div>';
+  h += '<div class="hint" style="margin:4px 0 0;">💬 Respostas vistas na Clint: ' + (nConf ? nConf + ' de ' + n + ' pessoas conferidas' : 'ainda não conferidas')
+    + ' <button class="btn" style="padding:3px 10px;font-size:.66rem;margin-left:6px;"' + (DSP.conferindo ? ' disabled' : '') + ' onclick="dspConferirRespostas(\'' + g.nome.replace(/['\\]/g, '') + '\')">💬 conferir respostas agora</button>'
+    + (DSP.confMsg ? ' <span style="color:#ffd166;">' + DSP.confMsg + '</span>' : '') + '</div>';
   h += '<div class="ag-stats" style="margin:10px 0 12px;">'
     + '<div class="g-stat"><b>' + n + '</b><span>Enviados</span></div>'
+    + '<div class="g-stat"><b style="color:#9aa7bd;">' + nRec + '</b><span>Mensagem nossa na Clint · ' + pc(nRec, n) + '</span></div>'
+    + '<div class="g-stat"><b style="color:#5ad1e6;">' + nResp + '</b><span>Responderam · ' + (nRec ? pc(nResp, nRec) + ' de quem recebeu' : pc(nResp, n)) + '</span></div>'
     + '<div class="g-stat"><b style="color:#6ea8ff;">' + nForm + '</b><span>Preencheram o formulário · ' + pc(nForm, n) + '</span></div>'
     + '<div class="g-stat"><b style="color:#b98aff;">' + nAg + '</b><span>Agendaram · ' + pc(nAg, n) + '</span></div>'
     + '<div class="g-stat"><b style="color:#3ddc97;">' + nComp + '</b><span>Compareceram · ' + pc(nComp, nAg) + ' de quem agendou</span></div>'
     + '<div class="g-stat"><b style="color:#ffd166;">' + nVd + '</b><span>Compraram' + (valor ? ' · ' + v2mil(valor) : '') + '</span></div>'
     + '</div>';
   pessoas.sort(function(a, b){ return (b.nivel - a.nivel) || String(a.c.nome).localeCompare(String(b.c.nome)); });
-  var rot = ['sem movimento', '📝 preencheu o formulário', '📅 agendou', '✅ compareceu', '💰 comprou'];
-  var cor = ['var(--muted)', '#6ea8ff', '#b98aff', '#3ddc97', '#ffd166'];
-  var comMov = pessoas.filter(function(o){ return o.nivel > 0; }).length;
-  var mostrar = DSP.todos ? pessoas : pessoas.slice(0, Math.max(comMov, 10));
-  h += '<div style="overflow-x:auto;"><table class="cd7-tab" style="width:100%;border-collapse:collapse;min-width:720px;">'
-    + '<tr><th style="text-align:left;">Pessoa</th><th style="text-align:left;">O que aconteceu depois do disparo</th><th>Reunião</th><th>Closer</th><th>Antes do disparo</th></tr>';
+  var rot = ['sem movimento', '💬 respondeu', '📝 preencheu o formulário', '📅 agendou', '✅ compareceu', '💰 comprou'];
+  var cor = ['var(--muted)', '#5ad1e6', '#6ea8ff', '#b98aff', '#3ddc97', '#ffd166'];
+  var filtros = [['mov', 'Quem se mexeu', function(o){ return o.nivel > 0; }], ['fechou', '💰 Fecharam', function(o){ return o.vd; }],
+    ['ag', '📅 Agendaram', function(o){ return o.ag; }], ['resp', '💬 Responderam', function(o){ return o.resp; }],
+    ['semresp', 'Receberam e não responderam', function(o){ return o.recebeu && !o.resp && !o.ag; }], ['todos', 'Todos', function(){ return true; }]];
+  var fAtual = filtros.filter(function(f){ return f[0] === DSP.filtro; })[0] || filtros[0];
+  h += '<div class="chart-chips" style="margin:0 0 8px;">' + filtros.map(function(f) {
+    return '<span class="chart-chip' + (f === fAtual ? ' on' : '') + '" style="cursor:pointer;" onclick="DSP.filtro=\'' + f[0] + '\';DSP.todos=false;renderAnuncios();">' + f[1] + ' · ' + pessoas.filter(f[2]).length + '</span>';
+  }).join('') + '</div>';
+  var filtradas = pessoas.filter(fAtual[2]);
+  var mostrar = DSP.todos ? filtradas : filtradas.slice(0, 25);
+  h += '<div style="overflow-x:auto;"><table class="cd7-tab" style="width:100%;border-collapse:collapse;min-width:860px;">'
+    + '<tr><th style="text-align:left;">Pessoa</th><th style="text-align:left;">O que aconteceu depois do disparo</th><th style="text-align:left;">Na Clint</th><th>Reunião</th><th>Closer</th><th>Antes do disparo</th></tr>';
+  if (!mostrar.length) h += '<tr><td colspan="6" class="hint" style="text-align:left;">Ninguém nesta lista por enquanto.</td></tr>';
   mostrar.forEach(function(o) {
-    var r = o.reuniao, lk = ''; try { lk = clintLink({ tel: o.c.tel, tel8: o.c.tel8, nome: o.c.nome }) || ''; } catch (e) {}
+    var r = o.reuniao, lk = o.c.clint || ''; if (!lk) { try { lk = clintLink({ tel: o.c.tel, tel8: o.c.tel8, nome: o.c.nome }) || ''; } catch (e) {} }
     h += '<tr><td style="text-align:left;"><b>' + String(o.c.nome || '—').replace(/</g, '&lt;') + '</b>'
       + '<div class="hint" style="margin:2px 0 0;">📱 final ' + String(o.c.tel).slice(-4)
       + (lk ? ' · <a href="' + lk + '" target="_blank" rel="noopener" style="color:#8f6bff;">abrir na Clint</a>' : '') + '</div></td>'
       + '<td style="text-align:left;color:' + cor[o.nivel] + ';font-weight:700;">' + rot[o.nivel] + (o.vd && o.valor ? ' · ' + v2mil(o.valor) : '') + '</td>'
+      + '<td style="text-align:left;max-width:280px;white-space:normal;">'
+      +   (o.resp ? '<span style="color:#5ad1e6;font-weight:700;">respondeu ' + o.c.falouEm.replace(/\/\d{4}/, '') + '</span>'
+             + (o.c.falouTxt ? '<div class="hint" style="margin:2px 0 0;white-space:normal;">“' + o.c.falouTxt.replace(/</g, '&lt;').slice(0, 110) + '”</div>' : '')
+           : o.recebeu ? '<span style="color:var(--muted);">recebeu ' + o.c.nossaEm.replace(/\/\d{4}/, '') + ' · sem resposta</span>'
+           : o.c.confEm ? '<span style="color:var(--muted);">sem mensagem nossa na Clint</span>' : '<span style="color:var(--muted);">—</span>') + '</td>'
       + '<td>' + (r && r.date ? r.date.toLocaleDateString('pt-BR') : '—') + '</td>'
       + '<td>' + (r && r.closer ? String(r.closer).replace(/</g, '&lt;') : '—') + '</td>'
       + '<td style="color:var(--muted);">' + (o.antes ? o.antes + (o.antes > 1 ? ' reuniões' : ' reunião') : '—') + '</td></tr>';
   });
   h += '</table></div>';
-  if (!DSP.todos && pessoas.length > mostrar.length) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=true;renderAnuncios();">▼ mostrar os ' + pessoas.length + ' da lista</button></div>';
-  else if (DSP.todos && pessoas.length > 10) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=false;renderAnuncios();">▲ mostrar menos</button></div>';
+  if (!DSP.todos && filtradas.length > mostrar.length) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=true;renderAnuncios();">▼ mostrar os ' + filtradas.length + '</button></div>';
+  else if (DSP.todos && filtradas.length > 25) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=false;renderAnuncios();">▲ mostrar menos</button></div>';
   h += '<div class="hint" style="margin-top:10px;">Conta quem está na lista e se mexeu nos ' + DSP_JANELA + ' dias depois do disparo. Reunião marcada antes do disparo não entra'
     + (nAntes ? ' (' + nAntes + ' pessoa' + (nAntes > 1 ? 's' : '') + ' da lista já tinha' + (nAntes > 1 ? 'm' : '') + ' reunião antes — aparece na última coluna)' : '') + '.</div>';
   return h + '</div>';
@@ -14137,23 +14175,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxNCz20bWCJZv8tL9lgtXAoMJqT2iN2O_uJ_Ym7p9z7N7eU4aJmeJrMBfY226OaPDYw/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz99FdKg11AERm9RKxtD16cnPCma8EXa3cg1NzyrM4r9bLMkPaJsW4x81XrPh3P-D5z/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
