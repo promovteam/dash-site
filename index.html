@@ -2355,7 +2355,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-19-2055';
+var VERSAO_DASH = '2026-09-19-2341';
 var _versaoNova = null;
 
 // =====================================================================
@@ -8672,7 +8672,7 @@ window.__gvizDSP = function(res) {
     var cols = (res.table.cols || []).map(function(c){ return v2norm(c.label || ''); });
     var idx = function(alvo) { alvo = v2norm(alvo); for (var c = 0; c < cols.length; c++) if (cols[c].indexOf(alvo) !== -1) return c; return -1; };
     var iDsp = cols.indexOf('disparo'), iDia = idx('data do disparo'), iTel = idx('telefone'), iNome = cols.indexOf('nome');
-    var iNossa = idx('nossa mensagem em'), iFalou = idx('lead falou em'), iTxt = idx('o que o lead falou'), iClint = cols.indexOf('clint'), iConf = idx('conferido em');
+    var iNossa = idx('nossa mensagem em'), iFalou = idx('lead falou em'), iTxt = idx('o que o lead falou'), iClint = cols.indexOf('clint'), iConf = idx('conferido em'), iLink = idx('veio pelo link');
     // sem as colunas certas, o Google devolveu outra aba: a "Disparos" ainda não existe
     if (iDsp < 0 || iDia < 0 || iTel < 0) { DSP.rows = []; DSP.erro = semAba; DSP.carregado = true; return; }
     var cel = function(r, i) {
@@ -8688,7 +8688,7 @@ window.__gvizDSP = function(res) {
       var m = cel(r, iDia).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       if (!nomeD || !m || tel.length < 8) return;
       linhas.push({ disparo: nomeD, dia: new Date(+m[3], +m[2] - 1, +m[1]), tel: tel, tel8: ldTel8(tel), nome: cel(r, iNome).trim(),
-        nossaEm: cel(r, iNossa).trim(), falouEm: cel(r, iFalou).trim(), falouTxt: cel(r, iTxt).trim(), clint: cel(r, iClint).trim(), confEm: cel(r, iConf).trim() });
+        nossaEm: cel(r, iNossa).trim(), falouEm: cel(r, iFalou).trim(), falouTxt: cel(r, iTxt).trim(), clint: cel(r, iClint).trim(), confEm: cel(r, iConf).trim(), linkEm: cel(r, iLink).trim() });
     });
     DSP.rows = linhas; DSP.carregado = true; DSP.erro = '';
   } catch (e) { DSP.erro = String(e && e.message || e); DSP.carregado = true; }
@@ -8697,7 +8697,7 @@ window.__gvizDSP = function(res) {
 // o que aconteceu com UMA pessoa da lista depois do disparo
 function dspPessoa(c, ini, fim, formPor) {
   var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
-  var o = { c: c, recebeu: !!c.nossaEm, resp: !!c.falouEm, form: false, ag: false, comp: false, vd: false, valor: 0, antes: 0, reuniao: null };
+  var o = { c: c, recebeu: !!c.nossaEm, resp: !!c.falouEm, link: !!c.linkEm, form: false, ag: false, comp: false, vd: false, valor: 0, antes: 0, reuniao: null };
   var linhas = []; try { linhas = ldReunioes({ tel8: c.tel8 }); } catch (e) {}
   linhas.forEach(function(r) {
     var quando = r.carimboT || (r.date ? r.date.getTime() : 0);     // o momento em que MARCARAM (sem carimbo: o dia da reunião)
@@ -8743,10 +8743,10 @@ function dspBloco() {
   g.lista.forEach(function(c){ naLista[c.tel8] = 1; });
   (LD.rows || []).forEach(function(l) { if (l.tel8 && naLista[l.tel8] && l.date) (formPor[l.tel8] || (formPor[l.tel8] = [])).push(l.date.getTime()); });
   var pessoas = g.lista.map(function(c){ return dspPessoa(c, ini, fim, formPor); });
-  var n = pessoas.length, nForm = 0, nAg = 0, nComp = 0, nVd = 0, valor = 0, nAntes = 0, nRec = 0, nResp = 0, nConf = 0, ultConf = '';
+  var n = pessoas.length, nForm = 0, nAg = 0, nComp = 0, nVd = 0, valor = 0, nAntes = 0, nRec = 0, nResp = 0, nLink = 0, nConf = 0, ultConf = '';
   pessoas.forEach(function(o) {
     if (o.form) nForm++; if (o.ag) nAg++; if (o.comp) nComp++; if (o.vd) nVd++; valor += o.valor; if (o.antes) nAntes++;
-    if (o.recebeu) nRec++; if (o.resp) nResp++; if (o.c.confEm) { nConf++; if (o.c.confEm > ultConf) ultConf = o.c.confEm; }
+    if (o.recebeu) nRec++; if (o.resp) nResp++; if (o.link) nLink++; if (o.c.confEm) { nConf++; if (o.c.confEm > ultConf) ultConf = o.c.confEm; }
   });
   var pc = function(a, b) { if (!b) return '—'; var v = a / b * 100; return (a > 0 && v < 1) ? '<1%' : Math.round(v) + '%'; };
   var fimTxt = new Date(fim - 864e5).toLocaleDateString('pt-BR');
@@ -8758,8 +8758,8 @@ function dspBloco() {
     + (DSP.confMsg ? ' <span style="color:#ffd166;">' + DSP.confMsg + '</span>' : '') + '</div>';
   h += '<div class="ag-stats" style="margin:10px 0 12px;">'
     + '<div class="g-stat"><b>' + n + '</b><span>Enviados</span></div>'
-    + '<div class="g-stat"><b style="color:#9aa7bd;">' + nRec + '</b><span>Mensagem nossa na Clint · ' + pc(nRec, n) + '</span></div>'
-    + '<div class="g-stat"><b style="color:#5ad1e6;">' + nResp + '</b><span>Responderam · ' + (nRec ? pc(nResp, nRec) + ' de quem recebeu' : pc(nResp, n)) + '</span></div>'
+    + '<div class="g-stat"><b style="color:#ff9a5a;">' + nLink + '</b><span>Vieram pelo link do disparo · ' + pc(nLink, n) + '</span></div>'
+    + '<div class="g-stat"><b style="color:#5ad1e6;">' + nResp + '</b><span>Falaram com a gente na Clint · ' + pc(nResp, n) + '</span></div>'
     + '<div class="g-stat"><b style="color:#6ea8ff;">' + nForm + '</b><span>Preencheram o formulário · ' + pc(nForm, n) + '</span></div>'
     + '<div class="g-stat"><b style="color:#b98aff;">' + nAg + '</b><span>Agendaram · ' + pc(nAg, n) + '</span></div>'
     + '<div class="g-stat"><b style="color:#3ddc97;">' + nComp + '</b><span>Compareceram · ' + pc(nComp, nAg) + ' de quem agendou</span></div>'
@@ -8769,7 +8769,7 @@ function dspBloco() {
   var rot = ['sem movimento', '💬 respondeu', '📝 preencheu o formulário', '📅 agendou', '✅ compareceu', '💰 comprou'];
   var cor = ['var(--muted)', '#5ad1e6', '#6ea8ff', '#b98aff', '#3ddc97', '#ffd166'];
   var filtros = [['mov', 'Quem se mexeu', function(o){ return o.nivel > 0; }], ['fechou', '💰 Fecharam', function(o){ return o.vd; }],
-    ['ag', '📅 Agendaram', function(o){ return o.ag; }], ['resp', '💬 Responderam', function(o){ return o.resp; }],
+    ['ag', '📅 Agendaram', function(o){ return o.ag; }], ['link', '🔗 Vieram pelo link', function(o){ return o.link; }], ['resp', '💬 Falaram na Clint', function(o){ return o.resp; }],
     ['semresp', 'Receberam e não responderam', function(o){ return o.recebeu && !o.resp && !o.ag; }], ['todos', 'Todos', function(){ return true; }]];
   var fAtual = filtros.filter(function(f){ return f[0] === DSP.filtro; })[0] || filtros[0];
   h += '<div class="chart-chips" style="margin:0 0 8px;">' + filtros.map(function(f) {
@@ -8787,6 +8787,7 @@ function dspBloco() {
       + (lk ? ' · <a href="' + lk + '" target="_blank" rel="noopener" style="color:#8f6bff;">abrir na Clint</a>' : '') + '</div></td>'
       + '<td style="text-align:left;color:' + cor[o.nivel] + ';font-weight:700;">' + rot[o.nivel] + (o.vd && o.valor ? ' · ' + v2mil(o.valor) : '') + '</td>'
       + '<td style="text-align:left;max-width:280px;white-space:normal;">'
+      +   (o.link ? '<span class="ld-tag" style="background:rgba(255,154,90,.16);color:#ff9a5a;">🔗 veio pelo link</span> ' : '')
       +   (o.resp ? '<span style="color:#5ad1e6;font-weight:700;">respondeu ' + o.c.falouEm.replace(/\/\d{4}/, '') + '</span>'
              + (o.c.falouTxt ? '<div class="hint" style="margin:2px 0 0;white-space:normal;">“' + o.c.falouTxt.replace(/</g, '&lt;').slice(0, 110) + '”</div>' : '')
            : o.recebeu ? '<span style="color:var(--muted);">recebeu ' + o.c.nossaEm.replace(/\/\d{4}/, '') + ' · sem resposta</span>'
