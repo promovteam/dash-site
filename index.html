@@ -1238,7 +1238,7 @@ img { max-width:100%; height:auto; }
       </div>
       <span style="flex:1;"></span>
       <span class="eu-sel" title="Seu nome fica salvo neste computador e é usado quando você assume um lead">👤 Você:<select id="ld-eu" onchange="salvarEuLeads(this.value)"></select></span>
-      <button class="btn btn-som-leads" onclick="alternarSomLeads(this)" title="Sirene e aviso do sistema quando chegar lead novo">🔔 Alerta ligado</button>
+      <button class="btn btn-som-leads" onclick="alternarSomLeads(this)" title="Som de caixa (dinheiro) e aviso do sistema quando chegar lead novo">🔔 Alerta ligado</button>
       <button class="btn" id="ld-btn-filtros" onclick="alternarFiltrosLeads()">⚙ Filtros</button>
       <input class="search-input" style="flex:1;min-width:200px;max-width:320px;margin-bottom:0;" placeholder="🔍  Buscar lead por nome ou telefone..." oninput="LD_BUSCA=this.value;renderLeads()">
     </div>
@@ -2355,7 +2355,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-19-2343';
+var VERSAO_DASH = '2026-09-21-1644';
 var _versaoNova = null;
 
 // =====================================================================
@@ -12300,7 +12300,7 @@ function renderAvisoNovos() {
     + '<div class="nb-txt">'
     + '<b>' + titulo + '!</b>'
     + '<div class="nb-pills">' + pills + '</div></div>'
-    + '<button class="btn btn-som-leads" style="padding:9px 14px;font-size:.7rem;white-space:nowrap;" onclick="alternarSomLeads(this)" title="Sirene e aviso do sistema quando chegar lead novo">🔔 Alerta ligado</button>'
+    + '<button class="btn btn-som-leads" style="padding:9px 14px;font-size:.7rem;white-space:nowrap;" onclick="alternarSomLeads(this)" title="Som de caixa (dinheiro) e aviso do sistema quando chegar lead novo">🔔 Alerta ligado</button>'
     + '<button class="btn primary" style="padding:9px 16px;font-size:.72rem;white-space:nowrap;" onclick="verLeadsNovos(\'\')">Ver leads →</button>'
     + '<button class="close-x" title="Esconder até recarregar a página" onclick="window._nbEscondido=true;marcarLeadsVistos()">✕</button>'
     + '</div>';
@@ -12437,11 +12437,80 @@ function verComentariosHoje() {
     if (alvo) alvo.scrollIntoView({ block: 'center' });
   }, 150);
 }
-// ===== SIRENE + NOTIFICAÇÃO QUANDO CHEGA LEAD =====
+// ===== SOM + NOTIFICAÇÃO QUANDO CHEGA LEAD =====
 var _audioCtx = null;
 function ldSomLigado() { return localStorage.getItem('v2LeadSom') !== 'off'; }
-// sirene feita na hora pelo navegador (não depende de arquivo de som)
-function tocarSirene(forte) {
+// 💰 som de dinheiro (Bruno 21/09/2026: "quando chega o lead é uma sirene; poderia ser o barulho de um caixa com dinheiro"):
+// notas sendo contadas (trrrr) → gaveta abrindo → "cha-ching" do sino → moedas caindo. Feito na hora pelo navegador,
+// sem arquivo de som. Lead quente = dois "ching" e mais moedas.
+function somCaixaEm(ctx, saida, t0, forte) {
+  var mestre = ctx.createGain();
+  mestre.gain.value = forte ? 0.95 : 0.8;
+  mestre.connect(saida);
+  var nb = ctx.createBuffer(1, Math.floor(ctx.sampleRate), ctx.sampleRate), ch = nb.getChannelData(0);
+  for (var i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  function ruido(ini, dur, tipo, freq, q, vol) {
+    var s = ctx.createBufferSource(); s.buffer = nb;
+    var f = ctx.createBiquadFilter(); f.type = tipo; f.frequency.value = freq; f.Q.value = q;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, ini);
+    g.gain.exponentialRampToValueAtTime(vol, ini + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, ini + dur);
+    s.connect(f); f.connect(g); g.connect(mestre);
+    s.start(ini, Math.random() * 0.4, dur + 0.03);
+  }
+  function sino(ini, base, dur, vol) {   // parciais "tortas" = som de sino de metal, não de apito
+    [[1, 1], [2.0, 0.42], [2.76, 0.3], [4.07, 0.14]].forEach(function(pr) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = base * pr[0];
+      g.gain.setValueAtTime(0.0001, ini);
+      g.gain.exponentialRampToValueAtTime(vol * pr[1], ini + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, ini + dur / (0.6 + pr[0] * 0.4));   // os agudos somem antes
+      o.connect(g); g.connect(mestre);
+      o.start(ini); o.stop(ini + dur + 0.05);
+    });
+  }
+  function moeda(ini) {
+    var o = ctx.createOscillator(), g = ctx.createGain(), f0 = 3200 + Math.random() * 3000;
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f0, ini); o.frequency.exponentialRampToValueAtTime(f0 * 0.93, ini + 0.08);
+    g.gain.setValueAtTime(0.0001, ini);
+    g.gain.exponentialRampToValueAtTime(0.13, ini + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, ini + 0.05 + Math.random() * 0.06);
+    o.connect(g); g.connect(mestre); o.start(ini); o.stop(ini + 0.14);
+  }
+  // 1) notas sendo contadas: batidinhas rápidas de papel + motorzinho baixo
+  for (var n = 0; n < 12; n++) ruido(t0 + n * 0.032, 0.022, 'bandpass', 950 + (n % 3) * 220, 1.2, 0.85);
+  var mot = ctx.createOscillator(), gm = ctx.createGain(), fm = ctx.createBiquadFilter();
+  mot.type = 'sawtooth'; mot.frequency.value = 96; fm.type = 'lowpass'; fm.frequency.value = 420;
+  gm.gain.setValueAtTime(0.0001, t0); gm.gain.exponentialRampToValueAtTime(0.07, t0 + 0.03);
+  gm.gain.setValueAtTime(0.07, t0 + 0.36); gm.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+  mot.connect(fm); fm.connect(gm); gm.connect(mestre); mot.start(t0); mot.stop(t0 + 0.45);
+  // 2) "cha": a alavanca + sininho curto · 3) gaveta batendo · 4) "ching": o sino que fica soando
+  var c = t0 + 0.48;
+  ruido(c, 0.035, 'highpass', 2500, 0.7, 0.55);
+  sino(c + 0.02, 1568, 0.28, 0.4);
+  ruido(c + 0.14, 0.13, 'lowpass', 190, 0.8, 0.9);
+  sino(c + 0.17, 2093, 1.7, 0.5);
+  if (forte) sino(c + 0.49, 2349, 1.8, 0.5);
+  // 5) moedas caindo
+  var qtd = forte ? 12 : 7, m0 = c + 0.24;
+  for (var k = 0; k < qtd; k++) moeda(m0 + k * (forte ? 0.075 : 0.07) + Math.random() * 0.03);
+}
+function tocarCaixa(forte) {
+  if (!ldSomLigado()) return;
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    _audioCtx = _audioCtx || new AC();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    somCaixaEm(_audioCtx, _audioCtx.destination, _audioCtx.currentTime + 0.02, !!forte);
+  } catch (e) {}
+}
+// todos os avisos do dash (lead novo, conversa esperando, reunião nova, comentário) chamam tocarSirene: agora toca o caixa.
+// A sirene antiga ficou guardada logo abaixo; para voltar, basta trocar por: return tocarSireneAntiga(forte);
+function tocarSirene(forte) { return tocarCaixa(forte); }
+function tocarSireneAntiga(forte) {
   if (!ldSomLigado()) return;
   try {
     var AC = window.AudioContext || window.webkitAudioContext;
@@ -12511,7 +12580,7 @@ function toastLeadNovo(lista) {
   var quentes = novos.filter(function(l){ return l.faixa === 'alta'; });
   var alvo = quentes[0] || novos[0];
   var q = LD_QUALI[alvo.faixa] || LD_QUALI.sem;
-  // 🚨 sirene + aviso do sistema
+  // 💰 som de caixa + aviso do sistema
   tocarSirene(quentes.length > 0);
   notificarLead(
     quentes.length ? '🔥 Lead perfil HT chegou!' : (novos.length === 1 ? '📥 Lead novo chegou!' : '📥 ' + novos.length + ' leads novos!'),
@@ -14176,23 +14245,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwfNGcP_V-wAnJTvRWD1w5469VgTkXoZXbKZV1NV6sKU3qWUCTTy3QNwjQP7hcIwKkP/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZ2ozQ4dDlbFeAo200qJVjNE6ibsJS0aGtI_WHeqeQZF8eKTah7TTiNgAedoo8d4BO/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
