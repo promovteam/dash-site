@@ -1495,7 +1495,7 @@ img { max-width:100%; height:auto; }
     <div class="dtl-card">
       <div class="g-label">💼 Comercial</div>
       <div class="ag-campo"><label>Produto</label>
-        <select class="edit-in edit-sel ag-in" id="ag-prod" onchange="produtoMudou(this.value)"><option>Programa Spark Anual</option><option>Programa Spark Semestral</option><option>Programa Growth</option><option>Mentoria Legado Digital</option></select>
+        <select class="edit-in edit-sel ag-in" id="ag-prod" onchange="produtoMudou(this.value)"><option>Programa Spark Anual</option><option>Programa Spark Semestral</option><option>Programa Growth</option><option>Mentoria Legado Digital</option><option>Entrevista WLD João Stecca</option></select>
       </div>
       <div class="ag-campo"><label>SDR</label>
         <select class="edit-in edit-sel ag-in" id="ag-sdr"><option>—</option></select>
@@ -1601,6 +1601,11 @@ Instagram: @pr.joaosilva</div>
   <div class="tipo-op lg" onclick="fecharTipo();abrirAgendar(50);">
     <span class="tipo-ico">⚡</span>
     <div class="tipo-txt"><b>Legado</b><span>50 min · meio bloco</span></div>
+    <span class="tipo-seta">›</span>
+  </div>
+  <div class="tipo-op lg" onclick="fecharTipo();window._agTipoReuniao='entrevista';abrirAgendar(50);">
+    <span class="tipo-ico">🎤</span>
+    <div class="tipo-txt"><b>Entrevista WLD João Stecca</b><span>50 min · meio bloco</span></div>
     <span class="tipo-seta">›</span>
   </div>
 </div>
@@ -2189,11 +2194,12 @@ function produtoMudou(prod) {
   if (d) {
     try { agAjustarDuracao(); } catch (eD) {}
     var quemP = (typeof closerChaveDe === 'function' ? closerChaveDe(closerEscolhido()) : '') || 'bruno';
-    d.value = v2norm(prod).indexOf('legado') !== -1 ? '50' : String(durHT(quemP));
+    d.value = (v2norm(prod).indexOf('legado') !== -1 || v2norm(prod).indexOf('entrevista') !== -1) ? '50' : String(durHT(quemP));
   }
   var vi = document.getElementById('ag-valor');
   var preco = precoDoProduto(prod);
   if (vi && preco !== null) vi.value = fmtValor(preco);
+  if (vi && v2norm(prod).indexOf('entrevista') !== -1) vi.value = '';   // entrevista não tem valor de programa
   if (typeof atualizarFila === 'function') atualizarFila();
   // a lista de horários segue o produto: Spark/Growth = horário inteiro; só Legado tem 1ª/2ª metade (Bruno 10/09/2026)
   if (typeof atualizarHorarios === 'function') { try { atualizarHorarios(); } catch (eH) {} }
@@ -2207,14 +2213,16 @@ function abrirAgendar(dur, ck){
   agAjustarDuracao();   // a agenda de 1 em 1 hora usa 2h no HT; as outras, 1h40
   var d = document.getElementById('ag-duracao');
   var lbl = document.getElementById('ag-tipo-lbl');
-  if (lbl) lbl.textContent = dur === 50 ? '· Legado (50 min)' : dur === 120 ? '· HT (2h)' : dur === 100 ? '· HT (1h40)' : '';
-  // se abriu como Legado, já seleciona o produto Legado; senão mantém o escolhido
+  var ehEntrevista = window._agTipoReuniao === 'entrevista';
+  if (lbl) lbl.textContent = ehEntrevista ? '· Entrevista WLD (50 min)' : dur === 50 ? '· Legado (50 min)' : dur === 120 ? '· HT (2h)' : dur === 100 ? '· HT (1h40)' : '';
+  // se abriu como Legado (ou Entrevista), já seleciona o produto; senão mantém o escolhido
   var ps = document.getElementById('ag-prod');
   if (ps && dur === 50) {
+    var alvoProd = ehEntrevista ? 'entrevista' : 'legado';
     for (var i = 0; i < ps.options.length; i++) {
-      if (v2norm(ps.options[i].text).indexOf('legado') !== -1) { ps.selectedIndex = i; break; }
+      if (v2norm(ps.options[i].text).indexOf(alvoProd) !== -1) { ps.selectedIndex = i; break; }
     }
-  } else if (ps && dur && v2norm(ps.value).indexOf('legado') !== -1) {
+  } else if (ps && dur && (v2norm(ps.value).indexOf('legado') !== -1 || v2norm(ps.value).indexOf('entrevista') !== -1)) {
     // clicou em HT com o produto Legado sobrando do agendamento anterior: volta ao primeiro produto
     ps.selectedIndex = 0;
   }
@@ -2355,7 +2363,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-22-0741';
+var VERSAO_DASH = '2026-09-22-0902';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3090,7 +3098,7 @@ function montarOpcoesAgenda() {
     el.innerHTML = (comVazio ? '<option>—</option>' : '') + vals.map(function(v){ return '<option>' + v + '</option>'; }).join('');
     if (atual && vals.indexOf(atual) !== -1) el.value = atual;
   }
-  fill('ag-prod', v2usados('produto'));
+  fill('ag-prod', v2mais(v2usados('produto'), ['Entrevista WLD João Stecca']));   // a entrevista entra mesmo antes de aparecer 5 vezes na planilha
   // a lista deixa de ser fixa: quem aparece na planilha entra sozinho
   // (era por isso que o Ismael não aparecia — ele estava na planilha, não no código)
   fill('ag-sdr', v2mais(OPCOES_PLANILHA.sdr, v2usados('sdr', 1)), true);
@@ -15073,7 +15081,7 @@ function _remarcarPlanilhaOk(r, dataStr, hora) {
     var lR = (LD.rows || []).filter(function(x){ return x.tel8 === ldTel8(r.telefone); })[0];
     var agendaKey = closerChaveDe(r.closer) || (AG.closer !== 'ambos' ? AG.closer : 'bruno');
     sendToGAS({ action: 'addCalendarOnly', calendar: {
-      agenda: agendaKey, data: dataBr, hora: hora, duracao: /legado/i.test(r.produto || '') ? 50 : durHT(agendaKey),
+      agenda: agendaKey, data: dataBr, hora: hora, duracao: /legado|entrevista/i.test(r.produto || '') ? 50 : durHT(agendaKey),
       nome: r.nome, sdr: r.sdr || '', telefone: r.telefone || '',
       instagram: lR && lR.insta ? '@' + String(lR.insta).replace(/^@/, '') : '',
       clint: clintLink({ tel: r.telefone, nome: r.nome }) || '',
@@ -15905,12 +15913,14 @@ function abrirTipoV2(e, dataStr, hora, ck) {
   var m = document.getElementById('tipo-popup');
   m.innerHTML = '<div class="tipo-head"><span class="tipo-data">📅 ' + lbl + ' às ' + hora + (quem ? ' · ' + (closerNomeDe(quem) || '') : '') + '</span><div class="tipo-sub">Escolha o tipo de reunião</div></div>'
     + '<div class="tipo-op ht" onclick="fecharTipo();abrirAgendarCom(' + dHT + ',\'' + dataStr + '\',\'' + hora + '\',\'' + quem + '\');"><span class="tipo-ico">🎯</span><div class="tipo-txt"><b>HT — Spark/Growth</b><span>' + rHT + '</span></div><span class="tipo-seta">›</span></div>'
-    + '<div class="tipo-op lg" onclick="fecharTipo();abrirAgendarCom(50,\'' + dataStr + '\',\'' + hora + '\',\'' + quem + '\');"><span class="tipo-ico">⚡</span><div class="tipo-txt"><b>Legado</b><span>' + rLG + '</span></div><span class="tipo-seta">›</span></div>';
+    + '<div class="tipo-op lg" onclick="fecharTipo();abrirAgendarCom(50,\'' + dataStr + '\',\'' + hora + '\',\'' + quem + '\');"><span class="tipo-ico">⚡</span><div class="tipo-txt"><b>Legado</b><span>' + rLG + '</span></div><span class="tipo-seta">›</span></div>'
+    + '<div class="tipo-op lg" onclick="fecharTipo();abrirAgendarCom(50,\'' + dataStr + '\',\'' + hora + '\',\'' + quem + '\',\'entrevista\');"><span class="tipo-ico">🎤</span><div class="tipo-txt"><b>Entrevista WLD João Stecca</b><span>' + rLG + '</span></div><span class="tipo-seta">›</span></div>';
   m.classList.add('open');
   m.style.left = Math.min(e.clientX, window.innerWidth - 270) + 'px';
   m.style.top = Math.min(e.clientY + 8, window.innerHeight - 230) + 'px';
 }
-function abrirAgendarCom(dur, dataStr, hora, ck) {
+function abrirAgendarCom(dur, dataStr, hora, ck, tipo) {
+  window._agTipoReuniao = tipo || '';   // 'entrevista' = Entrevista WLD João Stecca (Bruno 22/09/2026); vazio = HT/Legado
   // no modo REMARCAR (Bruno 10/09/2026: "não está dando para remarcar, aparece como se eu estivesse agendando outra"),
   // qualquer clique num horário — inclusive o pedaço "+ Legado" da linha do tempo — é o horário NOVO da mesma reunião
   if (window._agRemarcando && dataStr && hora) { remarcarNoSlot(dataStr, hora); return; }
@@ -16732,7 +16742,9 @@ function agendarReuniao(btn) {
       instagram: insta,
       clint: clint,
       obs: document.getElementById('ag-obs').value.trim(),
-      titulo: nome + (sdr ? ' | Equipe ' + sdr : '')
+      titulo: nome + (sdr ? ' | Equipe ' + sdr : ''),
+      // robô v149: o evento nasce "Entrevista WLD João Stecca - Nome | Equipe João Stecca (SDR)" em vez de "Diagnostico - …"
+      prefixoTitulo: /entrevista/i.test(prod || '') ? 'Entrevista WLD João Stecca' : ''
     }
   };
   var _depoisDeGravar = function() {
@@ -18408,8 +18420,10 @@ function plPainelClosers(p, d) {
   var dAnt = plPxAnterior(p);
   var porTel = {}; (LD.rows || []).forEach(function(l) { if (l.tel8 && !porTel[l.tel8]) porTel[l.tel8] = l; });
   var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
-  var closers = (d.closers || []).slice();
-  plClosersAtivos().forEach(function(n) { if (!closers.some(function(c) { return plPxPrimeiro(c.nome) === plPxPrimeiro(n); })) { var novo = { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }; closers.push(novo); d.closers.push(novo); } });
+  // só quem está configurado como closer no dash (CLOSERS); um nome solto na planilha (caso Matheus, 16/09/2026,
+  // "tirar Matheus" — Bruno 22/09/2026) não vira cartão de acompanhamento. O ranking do Placar continua igual.
+  var closers = (d.closers || []).filter(function(c) { return !!closerChaveDe(c.nome); });
+  plClosersAtivos().forEach(function(n) { if (!closerChaveDe(n)) return; if (!closers.some(function(c) { return plPxPrimeiro(c.nome) === plPxPrimeiro(n); })) { var novo = { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }; closers.push(novo); d.closers.push(novo); } });
   closers.sort(function(a, b) { return b.vdV - a.vdV; });
   var cards = closers.map(function(x) {
     var chave = v2norm(x.nome), pn = plPxPrimeiro(x.nome), agKey = closerChaveDe(x.nome) || 'bruno';
