@@ -2355,7 +2355,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-21-1703';
+var VERSAO_DASH = '2026-09-22-0741';
 var _versaoNova = null;
 
 // =====================================================================
@@ -18051,7 +18051,7 @@ function plVer(tipo, chave, met, _denovo) {
     });
   }
   var um = rows.length === 1;
-  var rotPx = { direto: 'marcadas DIRETO (até 24 h após chegar)', resgate: 'marcadas por RESGATE (48 h ou mais)', meio: 'marcadas entre 1 e 2 dias', perNovas: 'reuniões NOVAS no período', perRet: 'RETORNOS no período', perRe: 'realizadas no período', perVd: 'fechamentos no período', perEnt: 'entradas/bloqueios no período', perNao: 'não vendidos no período', perNs: 'no-shows no período', perPend: 'reuniões sem resultado', fup: 'follow-ups que vencem no período' };
+  var rotPx = { direto: 'marcadas DIRETO (até 24 h após chegar)', resgate: 'marcadas por RESGATE (48 h ou mais)', meio: 'marcadas entre 1 e 2 dias', perNovas: 'reuniões NOVAS no período', perRet: 'RETORNOS no período', perRe: 'realizadas no período', perVd: 'fechamentos no período', perEnt: 'entradas/bloqueios no período', perNao: 'não vendidos no período', perNs: 'no-shows no período', perPend: 'reuniões sem resultado', fup: 'follow-ups que vencem no período', mgRecuperar: 'para RECUPERAR — no-show ou não vendido há 7+ dias, sem retorno depois', mgRecuperados: 'RECUPERADOS — voltaram a marcar ou compraram', mgFalhaMql: 'MQL que NÃO COMPARECERAM', mgFalhaNao: 'reuniões realizadas que NÃO FECHARAM' };
   var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', todas: um ? 'REUNIÃO no período' : 'REUNIÕES no período', pend: um ? 'reunião AINDA SEM RESULTADO' : 'reuniões AINDA SEM RESULTADO' }[met] || rotPx[met] || met;
   var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + lista.nome.replace(/</g, '&lt;') + ' — ' + rows.length + ' ' + rot + '</b>'
@@ -18225,6 +18225,92 @@ function plPxCalorDe(l, tc) {
   return { pts: pts, por: por };
 }
 function plPxRotPeriodo(p) { return p.per === 'hoje' ? 'hoje' : p.per === 'ontem' ? 'ontem' : p.per === 'semana' ? 'na semana' : p.per === 'mes' ? 'no mês' : 'no período'; }
+// ===== 🎯 METAS DA CONSULTORIA (referências da Thalita/Gaku, set/2026) =====
+// Bruno 21/09/2026: "mais completo, assertivo e claro" — cada meta com o número, a meta e o veredito na cara.
+var MG_META = { marc: 30, ns: 15, recup: 30 };   // lead→marcação ≥ 30% · no-show ≤ 15% · perdidos recuperados ≈ 30%
+function mgVer(ok, semDados) {
+  if (ok === null) return '<span class="mg-ver z">⚪ SEM DADOS' + (semDados ? ' · ' + semDados : '') + '</span>';
+  return ok ? '<span class="mg-ver ok">✅ NA META</span>' : '<span class="mg-ver nao">❌ ABAIXO DA META</span>';
+}
+function mgPill(rot, pct, meta, menorMelhor) {
+  if (pct === null) return '<span class="mg-pill">' + rot + ' —</span>';
+  var ok = menorMelhor ? pct <= meta : pct >= meta;
+  return '<span class="mg-pill ' + (ok ? 'ok' : 'nao') + '">' + rot + ' ' + pct + '% ' + (ok ? '✅' : '❌') + '<small>meta ' + (menorMelhor ? '≤' : '≥') + ' ' + meta + '%</small></span>';
+}
+function mgMed(arr) { if (!arr.length) return null; arr = arr.slice().sort(function(a, b) { return a - b; }); return arr[Math.floor(arr.length / 2)]; }
+function plMetasGaku(p, d) {
+  var t = d.tot, rotP = plPxRotPeriodo(p), hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
+  var porTel = {}; (LD.rows || []).forEach(function(l) { if (l.tel8 && !porTel[l.tel8]) porTel[l.tel8] = l; });
+  // 1) LEAD → MARCAÇÃO: quem chegou no período e (em qualquer data) marcou reunião
+  var rec = [], ag = [], vistos = {}, tAg = [], tPe = [];
+  (LD.rows || []).forEach(function(l) {
+    var tc = l.tel8 ? tcPor[l.tel8] : null, lT = (tc && tc.chegou) ? tc.chegou : (l.date ? l.date.getTime() : null);
+    if (lT == null || lT < p.ini || lT >= p.fim) return;
+    if (l.tel8) { if (vistos[l.tel8]) return; vistos[l.tel8] = 1; }
+    l._chegou = lT; rec.push(l);
+    var sit = null; try { sit = ldSituacao(l); } catch (e) {}
+    if (sit) ag.push(l);
+    if (tc && tc.humano && tc.chegou) (tc.reuniao ? tAg : tPe).push(tc.humano - tc.chegou);
+  });
+  _pxListas.mg_rec = { t: 'Leads que chegaram ' + rotP, l: rec };
+  _pxListas.mg_ag = { t: 'Leads que chegaram ' + rotP + ' e marcaram reunião', l: ag };
+  var pM = rec.length ? Math.round(t.marc / rec.length * 100) : null;   // marcações do período ÷ leads que chegaram no período (conta da Thalita: 240 leads → ~50 marcações)
+  var faltamM = rec.length ? Math.max(0, Math.ceil(rec.length * MG_META.marc / 100) - t.marc) : 0;
+  // 2) NO-SHOW: sobre as reuniões que já tiveram resultado, com a abertura por origem e por SDR
+  var base = t.re + t.ns, pN = base ? Math.round(t.ns / base * 100) : null;
+  var nsOrig = { pago: 0, organico: 0, sem: 0 }, nsSdr = {};
+  (t.l.ns || []).forEach(function(r) {
+    var l = porTel[ldTel8(r.telefone)];
+    if (l) nsOrig[ldTipoTrafego(l) === 'pago' ? 'pago' : 'organico']++; else nsOrig.sem++;
+    var s = plPxPrimeiro(plPessoa(r.sdr) || r.sdr || ''); if (s && s.length >= 3) nsSdr[s] = (nsSdr[s] || 0) + 1;
+  });
+  var topSdr = Object.keys(nsSdr).sort(function(a, b) { return nsSdr[b] - nsSdr[a]; }).slice(0, 3);
+  var sobram = base ? Math.max(0, t.ns - Math.floor(base * MG_META.ns / 100)) : 0;
+  // 3) TEMPO ATÉ UM HUMANO FALAR (relógio 1: chegou → primeira mensagem de gente)
+  var mAg = mgMed(tAg), mPe = mgMed(tPe);
+  // 4) RECUPERAÇÃO DE PERDIDOS: no-show ou não vendido há 7+ dias (até 60) — voltou a marcar ou comprou = recuperado
+  var d7 = hoje.getTime() - 7 * 864e5, d60 = hoje.getTime() - 60 * 864e5, paraRec = [], recup = [], vistosR = {};
+  (V2.rows || []).forEach(function(r) {
+    if (r.sn !== 'no show' && r.sn !== 'nao vendido') return;
+    var dT = r.date ? r.date.getTime() : null; if (dT == null || dT < d60 || dT > d7) return;
+    var t8 = ldTel8(r.telefone), k = t8 || ('n:' + v2nomeChave(r.nome)); if (vistosR[k]) return; vistosR[k] = 1;
+    var sit = (t8 && _ldIdx) ? _ldIdx[t8] : null;
+    var depois = !!(sit && sit.linhas.some(function(x) { return x !== r && x.date && x.date.getTime() > dT; }));
+    if ((sit && sit.vd) || depois) recup.push(r); else paraRec.push(r);
+  });
+  paraRec.sort(function(a, b) { return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); });
+  t.l.mgRecuperar = paraRec; t.l.mgRecuperados = recup;
+  var candR = paraRec.length + recup.length, pR = candR ? Math.round(recup.length / candR * 100) : null;
+  // 5) FALHAS DO PERÍODO: MQL que não compareceu · reunião realizada que não fechou
+  var falhaMql = (t.l.ns || []).filter(function(r) { var l = porTel[ldTel8(r.telefone)]; return l && (l.faixa === 'alta' || l.faixa === 'media'); });
+  var falhaNao = (t.l.re || []).filter(function(r) { return r.sn === 'nao vendido'; });
+  t.l.mgFalhaMql = falhaMql; t.l.mgFalhaNao = falhaNao;
+  var pF = t.re ? Math.round(t.vd / t.re * 100) : null;
+  var hojeAviso = p.fim > Date.now() ? '<div class="mg-txt" style="color:var(--muted);">período ainda em andamento: os leads mais recentes ainda estão sendo trabalhados</div>' : '';
+  var tile = function(rot, num, cor, meta, ver, txt, onclick) {
+    return '<div class="mg-tile"><small>' + rot + '</small><b class="big"' + (onclick ? ' onclick="' + onclick + '"' : '') + ' style="color:' + cor + ';">' + num + '</b><div class="mg-meta">' + meta + '</div>' + ver + '<div class="mg-txt">' + txt + '</div></div>';
+  };
+  var h = '<div class="mg-wrap"><div class="px-titulo"><h3>🎯 Metas da consultoria</h3><span class="hint">' + p.rot.replace(/</g, '&lt;') + ' · referências combinadas com a Thalita (set/2026) · clique nos números para ver quem são</span></div><div class="mg-grid">';
+  h += tile('Lead → marcação', pM === null ? '—' : pM + '%', pM === null ? '#9aa3b2' : (pM >= MG_META.marc ? '#3ddc97' : '#ff6b6b'), 'meta ≥ ' + MG_META.marc + '% dos leads que chegam',
+    mgVer(pM === null ? null : pM >= MG_META.marc, 'nenhum lead chegou ' + rotP),
+    '<b class="n" onclick="plVer(\'time\',\'\',\'marc\')">' + t.marc + '</b> marcaç' + (t.marc === 1 ? 'ão' : 'ões') + ' para <b class="n" onclick="plPxAbrirLista(\'mg_rec\')">' + rec.length + '</b> leads que chegaram' + (faltamM ? ' · <b style="color:#ffd166;">faltam ' + faltamM + '</b> para bater a meta' : '') + '<br>dos que chegaram ' + rotP + ', <b class="n" onclick="plPxAbrirLista(\'mg_ag\')">' + ag.length + '</b> já marcaram' + hojeAviso, 'plVer(\'time\',\'\',\'marc\')');
+  h += tile('No-show', pN === null ? '—' : pN + '%', pN === null ? '#9aa3b2' : (pN <= MG_META.ns ? '#3ddc97' : '#ff6b6b'), 'meta ≤ ' + MG_META.ns + '% das reuniões com resultado',
+    mgVer(pN === null ? null : pN <= MG_META.ns, 'nenhuma reunião com resultado ' + rotP),
+    '<b class="n" onclick="plVer(\'time\',\'\',\'ns\')">' + t.ns + '</b> faltaram em ' + base + (sobram ? ' · <b style="color:#ffd166;">' + sobram + ' a mais</b> do que a meta permite' : '')
+    + '<br><span class="px-tag">pago ' + nsOrig.pago + '</span><span class="px-tag g">orgânico ' + nsOrig.organico + '</span>' + (nsOrig.sem ? '<span class="px-tag">sem origem ' + nsOrig.sem + '</span>' : '')
+    + (topSdr.length ? '<br>por SDR: ' + topSdr.map(function(s) { return '<b>' + s.charAt(0).toUpperCase() + s.slice(1) + '</b> ' + nsSdr[s]; }).join(' · ') : ''), 'plVer(\'time\',\'\',\'ns\')');
+  h += tile('Tempo até um humano falar', mAg !== null ? tcTempoTxt(mAg) : (mPe !== null ? tcTempoTxt(mPe) : '—'), mAg !== null ? '#3ddc97' : '#9aa3b2', 'relógio 1: lead chegou → primeira mensagem de gente (mediana)',
+    (mAg === null && mPe === null) ? mgVer(null, 'medição do robô ainda não cobre este período') : (mAg !== null && mPe !== null ? (mAg <= mPe ? '<span class="mg-ver ok">✅ QUEM AGENDOU FOI ATENDIDO ANTES</span>' : '<span class="mg-ver nao">❌ QUEM NÃO AGENDOU FOI ATENDIDO ANTES</span>') : '<span class="mg-ver z">⚪ SÓ UM LADO MEDIDO</span>'),
+    (mAg !== null ? 'quem agendou: <b>' + tcTempoTxt(mAg) + '</b>' : '') + (mPe !== null ? (mAg !== null ? ' · ' : '') + 'quem não agendou: <b style="color:#ff6b6b;">' + tcTempoTxt(mPe) + '</b>' : '') + '<br><span style="color:var(--muted);">relógio 2 (última fala do lead → humano): depende do robô, ainda não medido</span>');
+  h += tile('Recuperar perdidos · 7+ dias', paraRec.length, paraRec.length ? '#ffd166' : '#3ddc97', 'meta ≈ ' + MG_META.recup + '% recuperados · no-show ou não vendido entre 7 e 60 dias atrás',
+    mgVer(pR === null ? null : pR >= MG_META.recup, 'ninguém a recuperar'),
+    '<b class="n" onclick="plVer(\'time\',\'\',\'mgRecuperar\')">' + paraRec.length + '</b> esperando um retorno seu · <span class="px-tag r">no-show ' + paraRec.filter(function(r) { return r.sn === 'no show'; }).length + '</span><span class="px-tag o">não vendido ' + paraRec.filter(function(r) { return r.sn === 'nao vendido'; }).length + '</span><br>recuperados nos últimos 60 dias: <b class="n" onclick="plVer(\'time\',\'\',\'mgRecuperados\')">' + recup.length + '</b> de ' + candR + (pR !== null ? ' (' + pR + '%)' : ''), 'plVer(\'time\',\'\',\'mgRecuperar\')');
+  h += tile('Falhas ' + rotP, falhaMql.length + falhaNao.length, (falhaMql.length + falhaNao.length) ? '#ff6b6b' : '#3ddc97', 'relatório para a reunião com a Thalita',
+    (t.re || t.ns) ? '<span class="mg-ver ' + ((falhaMql.length + falhaNao.length) ? 'nao' : 'ok') + '">' + ((falhaMql.length + falhaNao.length) ? '❌ REVISAR UMA A UMA' : '✅ NENHUMA FALHA') + '</span>' : mgVer(null, 'sem reuniões ' + rotP),
+    '<b class="n" onclick="plVer(\'time\',\'\',\'mgFalhaMql\')">' + falhaMql.length + '</b> MQL que não compareceram · <b class="n" onclick="plVer(\'time\',\'\',\'mgFalhaNao\')">' + falhaNao.length + '</b> reuniões que não fecharam' + (pF !== null ? '<br>fechamento ' + rotP + ': <b>' + pF + '%</b> (' + t.vd + ' de ' + t.re + ')' : ''), 'plVer(\'time\',\'\',\'mgFalhaNao\')');
+  return h + '</div></div>';
+}
 function plPainelSdrs(p, d) {
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   var agora = Date.now(), rotP = plPxRotPeriodo(p);
@@ -18301,6 +18387,7 @@ function plPainelSdrs(p, d) {
     var mAg = med(tAg), mPe = med(tPerd), rp = resp[pn];
     return '<div class="px-card">'
       + '<div class="px-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span><div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>SDR</span></div></div>'
+      + '<div class="mg-linha">' + ((funil.rec.length >= 10 && x.marc <= funil.rec.length) ? mgPill('MARCAÇÃO', Math.round(x.marc / funil.rec.length * 100), MG_META.marc, false) : '<span class="mg-pill">MARCAÇÃO —<small>leads fora do formulário</small></span>') + mgPill('NO-SHOW', (x.re + x.ns) ? Math.round(x.ns / (x.re + x.ns) * 100) : null, MG_META.ns, true) + '</div>'
       + '<div class="px-row"><div class="px-k">Reuniões marcadas ' + rotP + '<small>pela hora em que marcou · comparado com o período anterior</small></div><div class="px-v">' + plPxNum(x.marc, 'sdr', chave, 'marc', '#ffd166') + plPxAntes(x.marc, ant ? ant.marc : null) + '</div></div>'
       + '<div class="px-row" style="display:block;"><div class="px-k">Funil ' + rotP + '<small>leads que chegaram no período e são deste SDR na Clint · % em relação à etapa anterior</small></div>' + funilHtml + '</div>'
       + '<div class="px-row"><div class="px-k">Espaços × leads quentes<small>horários livres (' + closerNomes().map(function(n){ return n.split(' ')[0]; }).join(' + ') + ') · quentes deste SDR sem reunião, últimos 30 dias</small></div><div class="px-v">' + espTxt + '<br><b class="n" style="color:#3ddc97;" onclick="plPxAbrirLista(\'q_' + chave + '\')">' + quentes.length + '</b><small>quentes agora</small></div></div>'
@@ -18353,6 +18440,7 @@ function plPainelClosers(p, d) {
     var conv = x.l.perRe.length ? Math.round(x.l.perVd.length / x.l.perRe.length * 100) : null;
     return '<div class="px-card">'
       + '<div class="px-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span><div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>CLOSER</span></div></div>'
+      + '<div class="mg-linha">' + (conv !== null ? '<span class="mg-pill" style="color:#fff;">FECHAMENTO ' + conv + '%<small>' + x.l.perVd.length + ' de ' + x.l.perRe.length + ' realizadas</small></span>' : '<span class="mg-pill">FECHAMENTO —</span>') + mgPill('NO-SHOW', (x.l.perRe.length + x.l.perNs.length) ? Math.round(x.l.perNs.length / (x.l.perRe.length + x.l.perNs.length) * 100) : null, MG_META.ns, true) + (x.l.perPend.length ? '<span class="mg-pill nao">' + x.l.perPend.length + ' SEM RESULTADO ❌<small>lançar hoje</small></span>' : '') + '</div>'
       + '<div class="px-row"><div class="px-k">Reuniões ' + rotP + '<small>novas × retornos (2ª reunião, remarcada, follow-up)</small></div><div class="px-v">' + plPxNum(x.l.perNovas.length, 'closer', chave, 'perNovas', '#6ea8ff') + '<small>novas</small> ' + plPxNum(x.l.perRet.length, 'closer', chave, 'perRet', '#b98aff') + '<small>retornos</small></div></div>'
       + '<div class="px-row"><div class="px-k">Mais quentes' + ((p.per === 'hoje' || p.per === 'ontem') ? ' do dia' : ' ainda por acontecer ' + rotP) + '<small>investimento declarado, nota da IA, seguidores, origem</small></div><div class="px-v"></div></div>'
       + (quentes.length ? quentes.map(function(q, i) { var iR = -1; try { iR = v2reg(q.r); } catch (e) {} return '<div class="px-quente"><i>' + ['🔥', '🌶', '✨'][i] + '</i><b onclick="abrirLead(' + iR + ')">' + (q.r.nome || '').replace(/</g, '&lt;') + '</b><span class="hint">' + (q.r.date ? q.r.date.toLocaleDateString('pt-BR').slice(0, 5) + ' · ' : '') + (q.por.length ? q.por.join(' · ') : 'sem dados do formulário') + '</span></div>'; }).join('') : '<div class="px-falta">nenhuma</div>')
@@ -18423,6 +18511,7 @@ function renderPlacar() {
     + coluna('🏆 Closers', 'ordem: valor vendido · depois nº de vendas', d.closers, 'closer', topC, 'Nenhuma reunião realizada neste período ainda')
     + '</div>';
   h += plDiaADia() + plRecordes();
+  try { h += plMetasGaku(p, d); } catch (eMg) { try { console.warn('metas da consultoria', eMg); } catch (e3) {} }
   try { h += plPainelSdrs(p, d) + plPainelClosers(p, d); } catch (ePx) { try { console.warn('painéis SDR/closer', ePx); } catch (e2) {} }
   el.innerHTML = h;
   try { plAnimarNumeros(el); } catch (eAn) {}
@@ -18685,6 +18774,20 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 .px-barra b { min-width:18px; text-align:right; }
 
 .px-funil { margin:6px 0 2px; }
+/* 🎯 metas da consultoria (Bruno 21/09/2026: assertivo e claro) */
+.mg-wrap { margin-top:26px; }
+.mg-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(215px, 1fr)); gap:12px; }
+.mg-tile { background:var(--panel); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:14px 16px; display:flex; flex-direction:column; gap:5px; }
+.mg-tile small { font-size:.66rem; font-weight:800; letter-spacing:.8px; color:var(--muted); text-transform:uppercase; }
+.mg-tile b.big { font-size:2.1rem; font-weight:900; line-height:1; font-variant-numeric:tabular-nums; cursor:pointer; }
+.mg-meta { font-size:.7rem; color:var(--text2); font-weight:700; }
+.mg-ver { display:inline-block; align-self:flex-start; font-size:.66rem; font-weight:900; letter-spacing:.6px; padding:3px 9px; border-radius:99px; margin:2px 0; }
+.mg-ver.ok { background:rgba(61,220,151,.16); color:#3ddc97; } .mg-ver.nao { background:rgba(255,107,107,.16); color:#ff6b6b; } .mg-ver.z { background:rgba(255,255,255,.07); color:var(--muted); }
+.mg-txt { font-size:.74rem; color:var(--text2); line-height:1.4; } .mg-txt b { color:#fff; } .mg-txt b.n { cursor:pointer; border-bottom:1px dashed rgba(255,255,255,.3); }
+.mg-linha { display:flex; gap:6px; flex-wrap:wrap; margin:-4px 0 8px; }
+.mg-pill { font-size:.66rem; font-weight:900; letter-spacing:.3px; padding:3px 9px; border-radius:99px; background:rgba(255,255,255,.07); color:var(--text2); }
+.mg-pill small { font-weight:700; opacity:.75; margin-left:5px; letter-spacing:0; }
+.mg-pill.ok { background:rgba(61,220,151,.16); color:#3ddc97; } .mg-pill.nao { background:rgba(255,107,107,.16); color:#ff6b6b; }
 .px-fn { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:.72rem; }
 .px-fn .lab { flex:0 0 92px; color:var(--text2); font-weight:700; }
 .px-fn .bar { flex:1; height:18px; border-radius:6px; background:rgba(255,255,255,.05); position:relative; overflow:hidden; }
