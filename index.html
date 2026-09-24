@@ -1109,6 +1109,24 @@ img { max-width:100%; height:auto; }
 .grav-acoes a, .grav-acoes button { padding:6px 11px; font-size:.68rem; text-decoration:none; }
 .grav-vazio { padding:26px; text-align:center; color:var(--text2); font-size:.8rem; }
 .grav-row { cursor:pointer; }
+/* cards com pré-visualização (Bruno 24/09/2026: "gravações e reuniões em formato de card com pré-visualização") */
+.grav-grade { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
+.grav-card { background:var(--panel2); border:1px solid var(--border); border-radius:16px; overflow:hidden; cursor:pointer; display:flex; flex-direction:column; transition:transform .15s, border-color .15s, box-shadow .15s; }
+.grav-card:hover, .grav-card:focus-visible { transform:translateY(-2px); border-color:rgba(246,163,80,.45); box-shadow:0 10px 26px rgba(0,0,0,.35); outline:none; }
+.grav-capa { position:relative; aspect-ratio:16/9; background:linear-gradient(135deg,#1c2230,#11151d); overflow:hidden; }
+.grav-capa img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.grav-capa .gc-ini { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:800; color:rgba(255,255,255,.18); letter-spacing:.04em; }
+.grav-capa .gc-play { position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px; border-radius:50%; background:rgba(12,14,18,.72); border:1px solid rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; color:#fff; font-size:.95rem; padding-left:3px; box-sizing:border-box; transition:background .15s, transform .15s; }
+.grav-card:hover .gc-play { background:var(--accent); color:#191204; transform:scale(1.06); }
+.grav-capa .grav-pill { position:absolute; top:8px; left:8px; backdrop-filter:blur(4px); }
+.grav-capa .gc-hora { position:absolute; bottom:8px; right:8px; font-size:.64rem; font-weight:800; color:#fff; background:rgba(0,0,0,.65); padding:2px 8px; border-radius:6px; font-variant-numeric:tabular-nums; }
+.grav-capa .gc-doc { position:absolute; bottom:8px; left:8px; font-size:.62rem; font-weight:700; color:#fff; background:rgba(0,0,0,.55); padding:2px 8px; border-radius:6px; }
+.grav-info { padding:11px 13px 13px; display:flex; flex-direction:column; gap:4px; min-width:0; }
+.grav-info b { font-size:.84rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.grav-info small { font-size:.66rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.grav-info .gi-pe { display:flex; align-items:center; gap:6px; margin-top:4px; }
+.grav-info .gi-pe .btn { padding:4px 10px; font-size:.64rem; margin-left:auto; }
+@media (prefers-reduced-motion:reduce) { .grav-card, .gc-play { transition:none; } .grav-card:hover { transform:none; } }
 /* 🎬 sala da gravação: vídeo + resumo à esquerda, conversa à direita */
 .gv-over { position:fixed; inset:0; z-index:9000; background:rgba(6,7,10,.82); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:24px; }
 .gv { width:min(1440px,100%); height:min(920px,100%); background:var(--bg); border:1px solid var(--border); border-radius:22px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.55); }
@@ -1296,10 +1314,8 @@ img { max-width:100%; height:auto; }
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;" id="ag-contadores"></div>
 
-    <div class="panel">
-      <h3>⚡ Pendências</h3>
-      <div id="v2-pend"></div>
-    </div>
+    <!-- ⚡ Pendências saiu daqui (Bruno 24/09/2026: "essa parte deve ir para outro lugar, pode tirar daqui"):
+         agora é a faixa "reuniões sem atualização de status" na Visão Geral -->
 
     <!-- 🎬 Gravações das reuniões: tudo o que foi gravado nas agendas dos closers, com busca (Bruno 24/09/2026) -->
     <div class="panel" id="grav-painel" style="margin-top:16px;">
@@ -2474,7 +2490,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-24-1717';
+var VERSAO_DASH = '2026-09-24-1915';
 var _versaoNova = null;
 
 // =====================================================================
@@ -9274,9 +9290,49 @@ function carregarCriativos() {
     META_CRI.tentouCache = true;
     if (criativosDaMemoria()) { renderAnuncios(); }
   }
+  // 24/09/2026 (Bruno: "não está mostrando as imagens na parte de criativos em outros notebooks ou pc, ou está
+  // demorando muito"): primeiro pede a lista INTEIRA de uma vez (robô v156 guarda num arquivo). As 25 páginas de
+  // antes ficam só para robô antigo — num computador novo elas levavam minutos e saturavam o robô.
+  if (!META_CRI.tentouTodos) { META_CRI.tentouTodos = true; buscarCriativosTodos(0); return; }
+  if (META_CRI.todosOk || META_CRI.esperandoTodos) return;
   if (_criEmVoo >= 4 || META_CRI.pagina >= 25) return;   // até 4 páginas ao mesmo tempo
   var quantas = Math.min(4 - _criEmVoo, 25 - META_CRI.pagina);
   for (var n = 0; n < quantas; n++) buscarPaginaCriativos(++META_CRI.pagina);
+}
+function buscarCriativosTodos(tentativa, silencioso) {
+  META_CRI.esperandoTodos = true;
+  var nome = 'criTodos_' + Math.random().toString(36).slice(2, 7), sc = document.createElement('script'), pronto = false;
+  var fim = function(d) {
+    if (pronto) return; pronto = true;
+    try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    META_CRI.esperandoTodos = false;
+    if (d && d.success && d.itens && d.itens.length) {
+      d.itens.forEach(function(it) { if (it.id) META_CRI.porId[it.id] = it; if (it.nome) META_CRI.porNome[_chaveAnuncio(it.nome)] = it; });
+      META_CRI.todosOk = true; META_CRI.fim = true; META_CRI.pausado = false;
+      try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (eR) {}
+      guardarCriativos();
+      try { pedirCriativosQueFaltam(); } catch (eF) {}
+      // fotos do Meta vencem: lista com mais de 6 h → pede ao robô uma montagem nova e, quando acabar, busca de novo
+      if (d.velho && !silencioso) {
+        var n2 = 'criMontar_' + Math.random().toString(36).slice(2, 7), s2 = document.createElement('script');
+        window[n2] = function(m) { try { s2.remove(); delete window[n2]; } catch (e) {} if (m && m.success && m.total) buscarCriativosTodos(0, true); };
+        s2.src = APPS_SCRIPT_URL + '?callback=' + n2 + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'metaCriativosMontar' }));
+        document.body.appendChild(s2);
+      }
+      return;
+    }
+    if (silencioso) return;
+    // outro computador está montando a lista agora: espera e pede de novo (em vez de cair nas 25 páginas)
+    if (d && d.error && /montagem|rodando/i.test(d.error) && (tentativa || 0) < 5) { setTimeout(function() { buscarCriativosTodos((tentativa || 0) + 1); }, 45000); return; }
+    // robô antigo (não conhece a ação) ou falhou: volta ao jeito antigo, por páginas
+    META_CRI.todosOk = false;
+    carregarCriativos();
+  };
+  window[nome] = fim;
+  sc.onerror = function() { fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'metaCriativosTodos' }));
+  document.body.appendChild(sc);
+  setTimeout(function() { fim(null); }, 240000);   // a 1ª montagem pode levar alguns minutos
 }
 function buscarPaginaCriativos(pag) {
   _criEmVoo++;
@@ -14296,23 +14352,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyhlfHrbed8aDVP9eKJXW0tt4aOvHrvFDdW6UpjqMAwVvbTfvabNYLZrcbxIfIJlAYP/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyjImKy4_HN48f1eIKco0dODl1gPrrEDoA_FIgfCkfm7Ei---NdeeuGx27ZO0m6uuP-/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -14614,6 +14670,25 @@ function gravFicha(tel, d) {
   });
   if (melhor) abrirLead(v2reg(melhor)); else avisoRapido('Não achei essa pessoa na planilha pelo telefone');
 }
+// card com a capa do vídeo (miniatura do Drive) — clique abre a sala da gravação dentro do dash
+function gravCard(x, iV) {
+  var p = gravPartes(x.t), st = GRAV_ST[String(x.s || 'agendada').toLowerCase()] || GRAV_ST.agendada;
+  var vid = (x.rec || [])[0], doc = (x.doc || [])[0];
+  var ini = String(p.nome || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(function(w) { return w[0]; }).join('').toUpperCase();
+  var meta = [p.tipo, p.lid, p.sdr ? 'SDR ' + p.sdr : ''].filter(Boolean).join(' · ');
+  return '<div class="grav-card" tabindex="0" role="button" onclick="gravAbrir(' + iV + ')" onkeydown="if(event.key===\'Enter\')gravAbrir(' + iV + ')" aria-label="Abrir a gravação de ' + gravEsc(p.nome) + '">'
+    + '<div class="grav-capa"><span class="gc-ini">' + gravEsc(ini) + '</span>'
+    +   (vid ? '<img loading="lazy" alt="" src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w640" onerror="this.remove()">' : '')
+    +   '<span class="grav-pill" style="color:' + st.c + ';background:' + st.b.replace('.14)', '.28)').replace('.16)', '.3)') + ';">' + st.t + '</span>'
+    +   (vid ? '<span class="gc-play" aria-hidden="true">▶</span>' : '<span class="gc-play" aria-hidden="true" style="padding-left:0;">📝</span>')
+    +   (doc && vid ? '<span class="gc-doc">📝 transcrição</span>' : (!vid ? '<span class="gc-doc">só anotações</span>' : ''))
+    +   '<span class="gc-hora">' + gravEsc((x.d || '').slice(11, 16)) + '</span>'
+    + '</div>'
+    + '<div class="grav-info"><b title="' + gravEsc(x.t) + '">' + gravEsc(p.nome) + '</b><small>' + gravEsc(meta || 'reunião') + '</small>'
+    +   '<div class="gi-pe"><span class="grav-closer">' + gravEsc(GRAV.closers[x.k] || x.k) + '</span>'
+    +   (x.tel ? '<button class="btn" onclick="event.stopPropagation();gravFicha(\'' + gravEsc(x.tel) + '\',\'' + gravEsc(x.d || '') + '\')">👤 Ficha</button>' : '')
+    +   '</div></div></div>';
+}
 function gravDesenhar() {
   var box = document.getElementById('grav-lista'); if (!box) return;
   var chips = document.getElementById('grav-closers');
@@ -14642,23 +14717,14 @@ function gravDesenhar() {
   lista.slice(0, GRAV.mostrar).forEach(function(x, iV) {
     var k = (x.d || '').slice(0, 10);
     if (k !== diaAtual) {
+      if (diaAtual) h += '</div>';
       diaAtual = k;
       var dt = k ? new Date(k + 'T12:00:00') : null;
-      h += '<div class="grav-dia">' + (dt ? semana[dt.getDay()] + ', ' + k.slice(8, 10) + '/' + k.slice(5, 7) + '/' + k.slice(0, 4) : 'sem data') + '<small>' + porDia[k] + (porDia[k] === 1 ? ' reunião' : ' reuniões') + '</small></div>';
+      h += '<div class="grav-dia">' + (dt ? semana[dt.getDay()] + ', ' + k.slice(8, 10) + '/' + k.slice(5, 7) + '/' + k.slice(0, 4) : 'sem data') + '<small>' + porDia[k] + (porDia[k] === 1 ? ' reunião' : ' reuniões') + '</small></div><div class="grav-grade">';
     }
-    var p = gravPartes(x.t), st = GRAV_ST[String(x.s || 'agendada').toLowerCase()] || GRAV_ST.agendada;
-    var meta = [p.tipo, p.lid, p.sdr ? 'SDR ' + p.sdr : ''].filter(Boolean).join(' · ');
-    var vid = (x.rec || [])[0], doc = (x.doc || [])[0];
-    h += '<div class="grav-row" onclick="gravAbrir(' + iV + ')" title="Abrir a gravação com a transcrição">'
-      + '<span class="grav-h">' + gravEsc((x.d || '').slice(11, 16)) + '</span>'
-      + '<div class="grav-nome"><b title="' + gravEsc(x.t) + '">' + gravEsc(p.nome) + '</b><small>' + gravEsc(meta) + '</small></div>'
-      + '<span class="grav-closer">' + gravEsc(GRAV.closers[x.k] || x.k) + '</span>'
-      + '<span class="grav-pill" style="color:' + st.c + ';background:' + st.b + ';">' + st.t + '</span>'
-      + '<div class="grav-acoes">'
-      + '<button class="btn primary" onclick="event.stopPropagation();gravAbrir(' + iV + ')">' + (vid ? '▶ Assistir' : '📝 Ler') + (doc && vid ? ' + transcrição' : '') + '</button>'
-      + (x.tel ? '<button class="btn" onclick="event.stopPropagation();gravFicha(\'' + gravEsc(x.tel) + '\',\'' + gravEsc(x.d || '') + '\')">👤 Ficha</button>' : '')
-      + '</div></div>';
+    h += gravCard(x, iV);
   });
+  if (diaAtual) h += '</div>';
   if (lista.length > GRAV.mostrar) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="GRAV.mostrar+=150;gravDesenhar();">Mostrar mais ' + Math.min(150, lista.length - GRAV.mostrar) + ' de ' + (lista.length - GRAV.mostrar) + ' restantes</button></div>';
   box.innerHTML = h;
 }
@@ -14678,7 +14744,7 @@ function gvComTs(txt) {
   return gravEsc(txt).replace(/\(?\[?(\d{2}:\d{2}:\d{2})\]?\)?/g, function(_, t) { return gvTsBtn(t); });
 }
 function gvParseObs(txt) {
-  var linhas = String(txt || '').split(/\n/).map(function(l) { return l.replace(/\s+$/, ''); });
+  var linhas = String(txt || '').split(/\r\n|\r|\n/).map(function(l) { return l.replace(/\s+$/, ''); });
   var sec = null, out = { resumo: [], passos: [], detalhes: [] };
   linhas.forEach(function(l) {
     var t = l.trim(); if (!t) return;
@@ -14692,7 +14758,7 @@ function gvParseObs(txt) {
   return out;
 }
 function gvParseTrans(txt, p) {
-  var linhas = String(txt || '').split(/\n/), itens = [], atual = null, comecou = false, fim = '';
+  var linhas = String(txt || '').split(/\r\n|\r|\n/), itens = [], atual = null, comecou = false, fim = '';
   linhas.forEach(function(l) {
     var t = l.trim(); if (!t) return;
     var mTs = t.match(/^(\d{2}:\d{2}:\d{2})$/);
@@ -17328,7 +17394,7 @@ function montarContAgenda() {
 }
 function montarPendencias() {
   var box = document.getElementById('v2-pend');
-  if (!box || !V2.carregado) return;
+  if (!V2.carregado) return;
   var hoje = new Date(); hoje.setHours(0,0,0,0);
   var pend = V2.rows.filter(function(r){ return r.date && r.date < hoje && isFut(r.sn); })
     .sort(function(a,b){ return b.date - a.date; });
@@ -17349,7 +17415,8 @@ function montarPendencias() {
       + '<span class="pill w">Faltando dados</span></div>';
   }
   if (!h) h = '<div style="color:var(--muted);font-size:.8rem;">🎉 Nenhuma pendência — tudo em dia!</div>';
-  box.innerHTML = h;
+  if (box) box.innerHTML = h;
+  window._pendSemNome = semNome;
   try { renderAvisoPend(pend); } catch (eAv) {}
 }
 // ===== ⚠️ FAIXA NA VISÃO GERAL: reuniões que já passaram e seguem "Reunião agendada" (Bruno 24/09/2026: "coloca essa
@@ -17358,33 +17425,36 @@ function renderAvisoPend(pend) {
   var el = document.getElementById('v2-pend-aviso');
   if (!el) return;
   if (window._pendAvisoEscondido || !pend || !pend.length) { el.innerHTML = ''; return; }
-  var pills = pend.slice(0, 10).map(function(r) {
+  var pills = pend.slice(0, 40).map(function(r) {
     var i = v2reg(r);
     var cl = String(r.closer || '').split(' ')[0];
     return '<span class="nb-pill" style="background:rgba(255,107,107,.14);color:#ff8f8f;border:1px solid rgba(255,107,107,.45);" onclick="abrirLead(' + i + ')" title="abrir a reunião e lançar o resultado">'
       + String(r.nome || 'Sem nome').replace(/</g, '&lt;').split(' ').slice(0, 2).join(' ')
       + (r.date ? ' · ' + r.date.toLocaleDateString('pt-BR').slice(0, 5) : '') + (cl ? ' · ' + cl.replace(/</g, '&lt;') : '') + '</span>';
-  }).join('') + (pend.length > 10 ? '<span class="nb-pill f" onclick="irParaPendencias()">+ ' + (pend.length - 10) + '</span>' : '');
+  }).join('');
   var aberto = !!window._pendAvisoAberto;
   el.innerHTML = '<div class="novo-box" style="border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.07);padding:' + (aberto ? '' : '9px 14px;') + '">'
     + '<span class="nb-ico" style="' + (aberto ? '' : 'font-size:1.1rem;') + '">⚠️</span>'
     + '<div class="nb-txt" style="cursor:pointer;" onclick="window._pendAvisoAberto=!window._pendAvisoAberto;renderAvisoPend(window._pendUltima)" title="clique para ' + (aberto ? 'recolher' : 'ver os nomes') + '">'
     + '<b style="font-size:.82rem;">' + pend.length + (pend.length === 1 ? ' reunião sem atualização de status' : ' reuniões sem atualização de status')
     + ' <span class="hint">' + (aberto ? '▴' : '▾ ver nomes') + '</span></b>'
-    + (aberto ? '<div class="hint" style="margin-top:2px;">A data já passou e ainda está como “Reunião agendada”. Clique num nome para lançar o resultado.</div><div class="nb-pills">' + pills + '</div>' : '')
+    + (aberto ? '<div class="hint" style="margin-top:2px;">A data já passou e ainda está como “Reunião agendada”. Clique num nome para lançar o resultado.'
+        + (window._pendSemNome ? ' · ' + window._pendSemNome + ' reuniã' + (window._pendSemNome > 1 ? 'ões' : 'o') + ' sem nome do cliente na planilha.' : '') + '</div><div class="nb-pills">' + pills + '</div>' : '')
     + '</div>'
-    + '<button class="btn primary" style="padding:8px 14px;font-size:.7rem;white-space:nowrap;" onclick="irParaPendencias()">Resolver →</button>'
+    + '<button class="btn primary" style="padding:8px 14px;font-size:.7rem;white-space:nowrap;" onclick="window._pendAvisoAberto=!window._pendAvisoAberto;renderAvisoPend(window._pendUltima)">' + (aberto ? 'Fechar' : 'Resolver →') + '</button>'
     + '<button class="close-x" title="Esconder até recarregar a página" onclick="window._pendAvisoEscondido=true;renderAvisoPend(window._pendUltima)">✕</button>'
     + '</div>';
   window._pendUltima = pend;
 }
 function irParaPendencias() {
-  var nav = document.querySelector('.nav-item[data-s="agenda"]');
+  var nav = document.querySelector('.nav-item[data-s="visao"]');
   if (nav) nav.click();
-  setTimeout(function() { try { verPendencias(); } catch (e) {} }, 350);
+  window._pendAvisoEscondido = false; window._pendAvisoAberto = true;
+  try { renderAvisoPend(window._pendUltima); } catch (e) {}
+  setTimeout(function() { var el = document.getElementById('v2-pend-aviso'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300);
 }
 function verPendencias() {
-  document.getElementById('v2-pend').scrollIntoView({ behavior:'smooth', block:'center' });
+  irParaPendencias();   // o painel saiu da Agenda (24/09/2026): mostra a faixa da Visão Geral aberta
 }
 
 // ---------- acesso por pessoa (tela de entrada) ----------
