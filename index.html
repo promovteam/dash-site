@@ -1233,6 +1233,12 @@ img { max-width:100%; height:auto; }
 .gv-momento b { color:var(--blue); font-size:.8rem; font-variant-numeric:tabular-nums; }
 .gv-momento .btn { padding:5px 10px; font-size:.66rem; text-decoration:none; }
 .gv-momento span { flex:1; min-width:140px; }
+.gv-ajuda { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; font-size:.68rem; color:var(--muted); }
+.gv-ajuda .btn { padding:4px 10px; font-size:.64rem; text-decoration:none; }
+.gv-ajuda-t { margin-right:2px; }
+.gv-ajuda.alerta { padding:10px 12px; border-radius:12px; background:rgba(255,209,102,.08); border:1px solid rgba(255,209,102,.35); color:var(--text2); line-height:1.5; }
+.gv-ajuda.alerta .gv-ajuda-t { flex:1 1 100%; } .gv-ajuda.alerta b { color:#ffd166; }
+.grav-capa .gc-aviso { background:rgba(255,209,102,.92); color:#1a1300; }
 .gv-caps { margin-top:12px; }
 .gv-caps h4 { margin:0 0 8px; font-size:.64rem; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); }
 .gv-caps-l { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; scrollbar-width:thin; }
@@ -2580,7 +2586,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-25-1611';
+var VERSAO_DASH = '2026-09-25-1640';
 var _versaoNova = null;
 
 // =====================================================================
@@ -2735,10 +2741,17 @@ var _BOOT_DB = null;
 function _bootDb(cb) {
   if (_BOOT_DB) return cb(_BOOT_DB);
   try {
-    var rq = indexedDB.open('promovDash', 1);
+    var rq = indexedDB.open('promovDash', 1), feito = false;
+    var fim = function(db) { if (feito) return; feito = true; cb(db); };
     rq.onupgradeneeded = function() { try { rq.result.createObjectStore('boot'); } catch (e) {} };
-    rq.onsuccess = function() { _BOOT_DB = rq.result; cb(_BOOT_DB); };
-    rq.onerror = function() { cb(null); };
+    rq.onsuccess = function() {
+      _BOOT_DB = rq.result;
+      _BOOT_DB.onversionchange = function() { try { _BOOT_DB.close(); } catch (e) {} _BOOT_DB = null; };   // nunca prende outra aba
+      fim(_BOOT_DB);
+    };
+    rq.onerror = function() { fim(null); };
+    rq.onblocked = function() { fim(null); };
+    setTimeout(function() { fim(null); }, 3000);   // o navegador não respondeu: segue sem a memória
   } catch (e) { cb(null); }
 }
 function _v2LerBoot(cb) {
@@ -8676,8 +8689,96 @@ function anRotuloChave(k) { return anEhOrigem(k) ? '🧲 ' + String(k).replace(/
 function anChaveDoLead(l) {
   var bruto = (l.tel8 && ANUNCIO_MARCA[l.tel8]) ? ANUNCIO_MARCA[l.tel8] : l.anuncio;
   var nome = (String(bruto || '').indexOf('POST:') === 0) ? bruto : ldAnuncioLimpo(bruto);
-  if (nome && nome !== '(sem anúncio)') return nome;
+  if (nome && nome !== '(sem anúncio)' && nome !== '(link)' && String(nome).indexOf('⚠️') !== 0) return nome;
   return 'ORIGEM:' + anRotuloOrigem(l.origem, l.fonte || l.utm);
+}
+// ===== 💰 TODAS AS VENDAS, UMA POR PESSOA, COM O LEAD DE ONDE VEIO (Bruno 25/09/2026: "faça análise de todas as vendas
+// pois quero que atualize os criativos de onde veio") =====
+// Antes a aba Criativos só enxergava a venda pela linha "Vendido" da aba Vendas com o MESMO telefone do lead:
+// quem pagou pelo formulário com outro número (ou sem reunião na aba) sumia dos criativos.
+// Agora: vendas = linhas "Vendido" + formulários de pagamento (uma por pessoa); o lead é achado por telefone
+// (da reunião ou do formulário), e-mail ou @ — e, por último, pelo NOME COMPLETO igual com o lead chegando antes
+// da venda (nome de uma palavra só nunca). Com mais de um cadastro, vale o anúncio mais recente antes da venda.
+var _anVendasMemo = null;
+function anVendasTodas() {
+  var V = V2.rows || [], P = PAG.rows || [], LR = LD.rows || [];
+  if (_anVendasMemo && _anVendasMemo.v === V && _anVendasMemo.p === P && _anVendasMemo.l === LR && _anVendasMemo.n === V.length + P.length + LR.length) return _anVendasMemo.lista;
+  var pTel = {}, pMail = {}, pIg = {}, pNome = {};
+  var pos = function(m, k, l) { if (k) (m[k] = m[k] || []).push(l); };
+  LR.forEach(function(l) {
+    pos(pTel, l.tel8, l); pos(pMail, idEmail(l.email), l); pos(pIg, idInsta(l.insta), l);
+    var n = v2nomeChave(l.nome); if (n && n.split(' ').length >= 2) pos(pNome, n, l);
+  });
+  // entre os cadastros da pessoa: o mais recente antes da venda que tem anúncio; senão o mais recente antes; senão o primeiro
+  var escolher = function(ls, t) {
+    if (!ls || !ls.length) return null;
+    var antes = ls.filter(function(l) { return !t || !l.date || l.date.getTime() <= t + 864e5; });
+    var base = antes.length ? antes : ls;
+    var ord = base.slice().sort(function(a, b) { return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); });
+    var comAn = ord.filter(function(l) { return !anEhOrigem(anChaveDoLead(l)); });
+    return comAn[0] || ord[0];
+  };
+  var acharLead = function(tels, email, insta, nome, t) {
+    var junta = [];
+    tels.forEach(function(t8) { if (t8 && pTel[t8]) junta = junta.concat(pTel[t8]); });
+    if (junta.length) return { l: escolher(junta, t), como: 'telefone' };
+    var e = idEmail(email); if (e && pMail[e]) return { l: escolher(pMail[e], t), como: 'e-mail' };
+    var g = idInsta(insta); if (g && pIg[g]) return { l: escolher(pIg[g], t), como: '@ do Instagram' };
+    var n = v2nomeChave(nome);
+    if (n && n.split(' ').length >= 2 && pNome[n] && t) {
+      var c = pNome[n].filter(function(l) { return l.date && l.date.getTime() <= t + 864e5 && t - l.date.getTime() < 366 * 864e5; });
+      var pessoas = {}; c.forEach(function(l) { pessoas[l.tel8 || v2nomeChave(l.nome)] = 1; });
+      if (c.length && Object.keys(pessoas).length === 1) return { l: escolher(c, t), como: 'nome completo' };
+    }
+    return { l: null, como: '' };
+  };
+  var porPessoa = {}, ordem = [];
+  var chaveDe = function(t8, nome) { return t8 || ('n:' + v2nomeChave(nome)); };
+  V.forEach(function(r) {
+    if (r.sn !== 'vendido') return;
+    var t8 = ldTel8(r.telefone), k = chaveDe(t8, r.nome);
+    var t = plDataVenda(r);
+    var x = porPessoa[k];
+    if (!x) { x = porPessoa[k] = { nome: r.nome, tel8: t8, tels: [t8], r: r, pg: null, t: t, valor: r.valor || 0, origem: r.origem || '' }; ordem.push(k); }
+    else if (t && (!x.t || t > x.t)) { x.r = r; x.t = t; }
+  });
+  // formulário com outro telefone: é a mesma venda se o nome bate (igual, um dentro do outro com 2+ palavras,
+  // ou 2 palavras em comum) e as datas ficam a até 45 dias uma da outra
+  var nomeParecido = function(a, b) {
+    a = v2nomeChave(a); b = v2nomeChave(b); if (!a || !b) return false;
+    if (a === b) return a.split(' ').length >= 2;
+    var ta = a.split(' '), tb = b.split(' ');
+    if (ta[0] !== tb[0]) return false;
+    if ((a.indexOf(b) !== -1 && tb.length >= 2) || (b.indexOf(a) !== -1 && ta.length >= 2)) return true;
+    return ta.filter(function(w) { return w.length > 2 && tb.indexOf(w) !== -1; }).length >= 2;
+  };
+  var daPlanilha = ordem.slice();
+  P.forEach(function(pg) {
+    var t8 = ldTel8(pg.celular), kT = t8 && porPessoa[t8] ? t8 : null, kN = 'n:' + v2nomeChave(pg.nome);
+    var tF = pg.date ? pg.date.getTime() : null;
+    var kP = null;
+    if (!kT && !porPessoa[kN]) {
+      var cs = daPlanilha.filter(function(kk) { var y = porPessoa[kk]; return !y.pg && (!tF || !y.t || Math.abs(y.t - tF) <= 45 * 864e5) && nomeParecido(y.nome, pg.nome); });
+      if (cs.length === 1) kP = cs[0];
+    }
+    var k = kT || (porPessoa[kN] ? kN : (kP || chaveDe(t8, pg.nome)));
+    var x = porPessoa[k];
+    if (!x) { x = porPessoa[k] = { nome: pg.nome, tel8: t8, tels: [t8], r: null, pg: pg, t: tF, valor: pg.valor || 0, origem: '' }; ordem.push(k); return; }
+    if (!x.pg) x.pg = pg;
+    if (t8 && x.tels.indexOf(t8) === -1) x.tels.push(t8);
+    if (pg.valor && !x.valor) x.valor = pg.valor;
+    if (!x.t) x.t = tF;
+  });
+  var lista = ordem.map(function(k) {
+    var x = porPessoa[k];
+    if (x.r && x.tel8) x.valor = _valorDoTel(x.tel8) || x.valor;
+    var a = acharLead(x.tels, x.pg && x.pg.email, x.pg && x.pg.insta, x.nome, x.t);
+    x.lead = a.l; x.como = a.como;
+    x.chave = x.lead ? anChaveDoLead(x.lead) : 'ORIGEM:' + anRotuloOrigem(x.origem, '');
+    return x;
+  });
+  _anVendasMemo = { v: V, p: P, l: LR, n: V.length + P.length + LR.length, lista: lista };
+  return lista;
 }
 // a venda deste lead: quando foi (carimbo da venda > formulário > dia da reunião) e quanto
 function anVendaDoLead(l, st) {
@@ -8686,6 +8787,67 @@ function anVendaDoLead(l, st) {
   var linhas = (st.linhas || []).filter(function(r){ return r.sn === 'vendido'; });
   var r = linhas[0];
   return { t: r ? plDataVenda(r) : (l.date ? l.date.getTime() : null), valor: _valorDoTel(l.tel8) || (r ? r.valor : 0) || 0 };
+}
+// 💰 quadro "De onde vieram as vendas" (topo da aba Criativos): cada venda do período no seu grupo e na lista
+var AN_VD_GRUPO = '', AN_VD_ABERTO = false;
+function anVendaGrupo(v) {
+  if (!v.lead) return 'sem';
+  if (anEhOrigem(v.chave)) return 'org';
+  return tipoDoAnuncio(v.chave, ldTipoTrafego(v.lead)) === 'pago' ? 'pago' : 'link';
+}
+var AN_VD_ROT = {
+  pago: { i: '📣', t: 'Anúncio pago', d: 'o lead clicou num anúncio', c: '#f6a350' },
+  link: { i: '🔗', t: 'Link orgânico', d: 'bio, ManyChat, site, stories', c: '#3ddc97' },
+  org:  { i: '🌱', t: 'Orgânico sem link', d: 'o lead veio sem anúncio marcado', c: '#6ea8ff' },
+  sem:  { i: '❔', t: 'Sem cadastro de lead', d: 'não passou pelo formulário do diagnóstico', c: '#9aa3b2' }
+};
+function anVendasPainel(per) {
+  var noPer = function(t) { return t != null && !((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)); };
+  var vs = anVendasTodas().filter(function(v) { return noPer(v.t); }).sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
+  if (!vs.length) return '';
+  var g = { pago: [], link: [], org: [], sem: [] };
+  vs.forEach(function(v) { g[anVendaGrupo(v)].push(v); });
+  var soma = function(a) { return a.reduce(function(s2, v) { return s2 + (v.valor || 0); }, 0); };
+  var mil = function(v) { return v >= 1000 ? 'R$ ' + Math.round(v / 1000).toLocaleString('pt-BR') + ' mil' : 'R$ ' + Math.round(v).toLocaleString('pt-BR'); };
+  // de onde vieram as vendas sem cadastro (origem da reunião na planilha)
+  var semO = {}; g.sem.forEach(function(v) { var o = v.origem || 'sem origem na planilha'; semO[o] = (semO[o] || 0) + 1; });
+  var semTxt = Object.keys(semO).sort(function(a, b) { return semO[b] - semO[a]; }).slice(0, 4).map(function(o) { return o + ' ' + semO[o]; }).join(' · ');
+  var h = '<div class="panel" style="margin-bottom:18px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">💰 De onde vieram as vendas</h3>'
+    + '<span class="hint">' + vs.length + ' venda' + (vs.length === 1 ? '' : 's') + ' · ' + mil(soma(vs)) + ' · planilha + formulário de pagamento, uma por pessoa</span>'
+    + '<span style="flex:1;"></span><span class="hint" style="color:#f6a350;font-weight:700;">' + per.label + '</span></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px;">';
+  ['pago', 'link', 'org', 'sem'].forEach(function(k) {
+    var R = AN_VD_ROT[k], on = AN_VD_GRUPO === k, pct = Math.round(g[k].length / vs.length * 100);
+    h += '<div class="glass click" style="padding:14px 16px;--halo:' + R.c + '33;' + (on ? 'border-color:' + R.c + ';' : '') + '" onclick="AN_VD_GRUPO=AN_VD_GRUPO===\'' + k + '\'?\'\':\'' + k + '\';AN_VD_ABERTO=true;renderAnuncios();">'
+      + '<div class="g-label" style="margin-bottom:4px;">' + R.i + ' ' + R.t + '</div>'
+      + '<div class="g-value" style="font-size:1.6rem;color:' + R.c + ';">' + g[k].length + '</div>'
+      + '<div class="g-sub">' + pct + '% · ' + mil(soma(g[k])) + '</div>'
+      + '<div class="hint" style="margin-top:6px;color:var(--muted);font-weight:600;">' + (k === 'sem' && semTxt ? semTxt : R.d) + '</div></div>';
+  });
+  h += '</div>';
+  var lista = AN_VD_GRUPO ? g[AN_VD_GRUPO] : vs;
+  h += '<div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+    + '<button class="btn" style="padding:6px 12px;font-size:.7rem;" onclick="AN_VD_ABERTO=!AN_VD_ABERTO;renderAnuncios();">' + (AN_VD_ABERTO ? '▴ esconder' : '▾ ver') + ' as ' + lista.length + ' vendas uma a uma' + (AN_VD_GRUPO ? ' (' + AN_VD_ROT[AN_VD_GRUPO].t.toLowerCase() + ')' : '') + '</button>'
+    + (AN_VD_GRUPO ? '<button class="btn" style="padding:6px 12px;font-size:.7rem;" onclick="AN_VD_GRUPO=\'\';renderAnuncios();">mostrar todas</button>' : '')
+    + '<span class="hint">clique num grupo para ver só ele</span></div>';
+  if (AN_VD_ABERTO) {
+    var esc = function(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    h += '<div style="overflow-x:auto;margin-top:10px;"><table style="width:100%;border-collapse:collapse;font-size:.78rem;">'
+      + '<tr><th style="text-align:left;padding:7px 8px;">Data</th><th style="text-align:left;padding:7px 8px;">Cliente</th><th style="text-align:right;padding:7px 8px;">Valor</th><th style="text-align:left;padding:7px 8px;">De onde veio</th><th style="text-align:left;padding:7px 8px;">Como liguei ao lead</th></tr>'
+      + lista.map(function(v) {
+          var k = anVendaGrupo(v), R = AN_VD_ROT[k];
+          var onde = v.lead ? (anEhOrigem(v.chave) ? v.chave.replace(/^ORIGEM:/, '') : anRotuloChave(v.chave)) : (v.origem || 'sem origem na planilha');
+          return '<tr style="border-top:1px solid rgba(255,255,255,.06);">'
+            + '<td style="padding:7px 8px;white-space:nowrap;color:var(--text2);">' + (v.t ? new Date(v.t).toLocaleDateString('pt-BR') : '—') + '</td>'
+            + '<td style="padding:7px 8px;"><b>' + esc(v.nome) + '</b>' + (!v.r ? ' <span class="hint" title="só no formulário de pagamento">· só formulário</span>' : '') + '</td>'
+            + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;">' + (v.valor ? 'R$ ' + Math.round(v.valor).toLocaleString('pt-BR') : '—') + '</td>'
+            + '<td style="padding:7px 8px;"><span style="color:' + R.c + ';font-weight:700;">' + R.i + '</span> ' + esc(onde) + '</td>'
+            + '<td style="padding:7px 8px;color:var(--muted);">' + (v.como || '—') + '</td></tr>';
+        }).join('')
+      + '</table></div>';
+  }
+  return h + '</div>';
 }
 function anColetar(per, tipoFiltro) {
   var an = {}, fora = {};
@@ -8705,13 +8867,7 @@ function anColetar(per, tipoFiltro) {
     if (!noPer(t)) {
       // fora do período: fica registrado para avisar (card zerado não é marcação perdida)
       if (!anEhOrigem(nome)) { var ff = fora[nome] || (fora[nome] = { n: 0, re: 0, vd: 0 }); ff.n++; if (st) { if (st.re) ff.re++; if (st.vd) ff.vd++; } }
-      // …mas a VENDA conta no período em que aconteceu, mesmo o lead sendo de antes
-      var vF = anVendaDoLead(l, st);
-      if (vF && noPer(vF.t) && passa(tipo) && !vendasContadas[chaveV]) {
-        vendasContadas[chaveV] = true;
-        var aF = novoA(nome, tipo, l.campanha); aF.vd++; aF.fat += vF.valor; aF.quem.vd.push(l); aF._vendasDeLeadAntigo = (aF._vendasDeLeadAntigo || 0) + 1;
-      }
-      return;
+      return;   // (a venda de lead antigo conta lá embaixo, no período em que aconteceu)
     }
     if (!passa(tipo)) return;
     var a = novoA(nome, tipo, l.campanha);
@@ -8721,26 +8877,22 @@ function anColetar(per, tipoFiltro) {
     if (st) {
       a.ag++; a.quem.ag.push(l);
       if (st.re) { a.re++; a.quem.re.push(l); }
-      if (st.vd) {
-        var v1 = anVendaDoLead(l, st), tV = (v1 && v1.t != null) ? v1.t : t;
-        if (noPer(tV) && !vendasContadas[chaveV]) { vendasContadas[chaveV] = true; a.vd++; a.fat += (v1 ? v1.valor : (_valorDoTel(l.tel8) || 0)); a.quem.vd.push(l); }
-      }
     }
   });
-  // vendas do período SEM lead na base (workshop, indicação…): entram pela ORIGEM da linha da aba Vendas
-  (V2.rows || []).forEach(function(r) {
-    if (r.sn !== 'vendido') return;
-    var t8 = ldTel8(r.telefone), kNome = v2nomeChave(r.nome);
-    if ((t8 && porTelLead[t8]) || (kNome && nomesLead[kNome])) return;   // tem lead (pelo telefone ou pelo nome): já foi tratado acima
-    var vT = plDataVenda(r); if (!noPer(vT)) return;
-    var chaveV = t8 || ('n:' + v2nomeChave(r.nome)); if (vendasContadas[chaveV]) return;
-    var tipoO = /\[ads\]|\bads\b|pago/i.test(String(r.origem || '')) ? 'pago' : 'organico';
-    if (!passa(tipoO)) return;
-    vendasContadas[chaveV] = true;
-    var aO = novoA('ORIGEM:' + anRotuloOrigem(r.origem, ''), tipoO, '');
-    var falso = { nome: r.nome, tel: r.telefone, telefone: r.telefone, tel8: t8, email: '', insta: '', dataTxt: r.date ? r.date.toLocaleDateString('pt-BR') : '',
-                  faixa: 'sem', obj: '', renda: '', invest: '', seg: '', score: 0, origem: r.origem || '', _semLead: true };
-    aO.vd++; aO.fat += (r.valor || 0); aO.quem.vd.push(falso);
+  // 💰 VENDAS do período (linhas "Vendido" + formulários de pagamento, uma por pessoa), cada uma no criativo de onde veio;
+  // sem lead na base (workshop, indicação…) → cartão da ORIGEM da reunião
+  anVendasTodas().forEach(function(v) {
+    if (!noPer(v.t)) return;
+    var k = v.chave, l = v.lead, tipoV;
+    if (l) tipoV = anEhOrigem(k) ? ldTipoTrafego(l) : tipoDoAnuncio(k, ldTipoTrafego(l));
+    else tipoV = /\[ads\]|\bads\b|pago/i.test(String(v.origem || '')) ? 'pago' : 'organico';
+    if (!passa(tipoV)) return;
+    var aV = novoA(k, tipoV, l ? l.campanha : '');
+    var quem = l || { nome: v.nome, tel: (v.r && v.r.telefone) || (v.pg && v.pg.celular) || '', telefone: (v.r && v.r.telefone) || (v.pg && v.pg.celular) || '', tel8: v.tel8,
+      email: (v.pg && v.pg.email) || '', insta: (v.pg && v.pg.insta) || '', dataTxt: v.t ? new Date(v.t).toLocaleDateString('pt-BR') : '',
+      faixa: 'sem', obj: '', renda: '', invest: '', seg: '', score: 0, origem: v.origem || '', _semLead: true };
+    aV.vd++; aV.fat += (v.valor || 0); aV.quem.vd.push(quem);
+    if (l && (!l.date || !noPer(l.date.getTime()))) aV._vendasDeLeadAntigo = (aV._vendasDeLeadAntigo || 0) + 1;
   });
   return { an: an, fora: fora };
 }
@@ -9150,6 +9302,7 @@ function renderAnuncios() {
 
   var h = '';
   if (faltando.length) h += '<div class="hint" style="margin-bottom:10px;color:#f6a350;">⏳ ainda chegando: ' + faltando.join(' e ') + ' — os números abaixo completam em instantes</div>';
+  try { h += anVendasPainel(per); } catch (eVp) {}
   h += '<div class="panel" style="margin-bottom:18px;">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">🧲 Detalhamento por origem</h3>'
     + '<span class="hint">clique nos números para ver quem são</span>'
@@ -14502,23 +14655,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw01x-RrMNb9xucHlcK-5qOu3DbCpWI48UyHf8gArNYhuxJA0tUUP-47dqoT5f9cgd9/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwhJJrhf_xm--28I7BAvoxdJtQbNVtdCSJ428stJDCQcgisFzBiRpxZo3ce0cEgEOan/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -14806,6 +14959,7 @@ function gravGuardar(dias, d) {
 }
 function gravCarregar(fresco) {
   if (GRAV.carregando) return;
+  if (!_gcDisco) { gravCapasDoDisco(function() { gravCarregar(fresco); }); return; }
   GRAV.carregando = true;
   var dias = +((document.getElementById('grav-dias') || {}).value || 60);
   var res = document.getElementById('grav-resumo');
@@ -14880,6 +15034,98 @@ function gravDur(seg) {
   var m = Math.round(seg / 60);
   return m >= 60 ? Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0') : m + ' min';
 }
+// 🖼️ CAPAS (Bruno 25/09/2026: "por que não está aparecendo"): a miniatura direta do Drive só abre para quem está
+// logado no Google com acesso ao vídeo — e o navegador ainda barra esse login vindo de outro site. Quando ela falha,
+// o robô (que tem acesso a tudo) manda a capa pronta, 12 por vez, só das que estão na tela; fica guardada no navegador.
+GRAV.capas = GRAV.capas || {};
+function gravCapaModoRobo() { try { return localStorage.getItem('v2GravCapaRobo') === '1'; } catch (e) { return false; } }
+function gravCapaImg(vid) {
+  var c = GRAV.capas[vid];
+  if (c) return '<img alt="" data-vid="' + gravEsc(vid) + '" data-pede="1">';   // (a imagem guardada entra pelo gravCapaVigiar — não vai no texto da página)
+  if (c === '') return '';   // o robô já disse que este vídeo não tem capa
+  if (gravCapaModoRobo()) return '<img alt="" data-vid="' + gravEsc(vid) + '" data-pede="1">';
+  return '<img loading="lazy" alt="" data-vid="' + gravEsc(vid) + '" src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w640" onerror="gravCapaFalhou(this)">';
+}
+function gravCapaFalhou(img) {
+  if (img._robo || !img.getAttribute('data-vid')) { img.remove(); return; }
+  img._robo = true;
+  try { localStorage.setItem('v2GravCapaRobo', '1'); } catch (e) {}
+  img.removeAttribute('src'); img.setAttribute('data-pede', '1');
+  gravCapaVigiar();
+}
+var _gcFila = [], _gcT = null, _gcAndando = 0, _gcIO = null;
+function gravCapaVigiar() {
+  if (!('IntersectionObserver' in window)) return;
+  if (!_gcIO) _gcIO = new IntersectionObserver(function(ents) {
+    ents.forEach(function(e) {
+      if (!e.isIntersecting) return;
+      _gcIO.unobserve(e.target);
+      var v = e.target.getAttribute('data-vid');
+      if (v && GRAV.capas[v] === undefined && _gcFila.indexOf(v) === -1) _gcFila.push(v);
+    });
+    clearTimeout(_gcT); _gcT = setTimeout(gravCapaPedir, 200);
+  }, { rootMargin: '300px' });
+  document.querySelectorAll('.grav-capa img[data-pede]').forEach(function(im) {
+    var v = im.getAttribute('data-vid');
+    if (GRAV.capas[v]) { im.src = GRAV.capas[v]; im.removeAttribute('data-pede'); return; }
+    _gcIO.observe(im);
+  });
+}
+function gravCapaPedir() {
+  if (GRAV._semCapasRobo) { _gcFila = []; return; }   // robô antigo (sem gravCapas): não fica perguntando
+  if (_gcAndando >= 2 || !_gcFila.length) return;
+  var ids = _gcFila.splice(0, 12);
+  _gcAndando++;
+  fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'gravCapas', ids: ids })), { redirect: 'follow' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var cs = (d && d.success && d.capas) || null;
+      if (!cs) { if (d && d.success) GRAV._semCapasRobo = true; return; }   // robô antigo (sem gravCapas): fica o fundo com as iniciais
+      Object.keys(cs).forEach(function(id) {
+        GRAV.capas[id] = cs[id] || '';
+        gravCapaGuardar(id, cs[id] || '');
+        document.querySelectorAll('.grav-capa img[data-vid="' + id + '"]').forEach(function(im) {
+          if (cs[id]) { im.removeAttribute('data-pede'); im.src = cs[id]; } else im.remove();
+        });
+        var poster = document.querySelector('#gv .gv-video[data-vid="' + id + '"]');
+        if (poster && cs[id]) poster.style.backgroundImage = 'url(' + cs[id] + ')';
+      });
+    })
+    .catch(function() {})
+    .then(function() { _gcAndando--; if (_gcFila.length) setTimeout(gravCapaPedir, 50); });
+  if (_gcFila.length) setTimeout(gravCapaPedir, 50);
+}
+var _CAPAS_DB = null;
+function _capasDb(cb) {   // banco separado (não mexe no da abertura do dash)
+  if (_CAPAS_DB) return cb(_CAPAS_DB);
+  var feito = false, fim = function(db) { if (feito) return; feito = true; cb(db); };
+  try {
+    var rq = indexedDB.open('promovCapas', 1);
+    rq.onupgradeneeded = function() { try { rq.result.createObjectStore('capas'); } catch (e) {} };
+    rq.onsuccess = function() { _CAPAS_DB = rq.result; _CAPAS_DB.onversionchange = function() { try { _CAPAS_DB.close(); } catch (e) {} _CAPAS_DB = null; }; fim(_CAPAS_DB); };
+    rq.onerror = function() { fim(null); };
+    rq.onblocked = function() { fim(null); };
+    setTimeout(function() { fim(null); }, 1500);
+  } catch (e) { fim(null); }
+}
+function gravCapaGuardar(id, uri) {
+  _capasDb(function(db) { if (!db) return; try { db.transaction('capas', 'readwrite').objectStore('capas').put(uri, id); } catch (e) {} });
+}
+var _gcDisco = false;
+function gravCapasDoDisco(cb) {   // capas já guardadas neste navegador entram antes de desenhar
+  if (_gcDisco) { cb(); return; }
+  _gcDisco = true;
+  var feito = false, fim = function() { if (feito) return; feito = true; cb(); };
+  setTimeout(fim, 1500);   // a lista nunca espera o disco mais que isso
+  _capasDb(function(db) {
+    if (!db) { fim(); return; }
+    try {
+      var st = db.transaction('capas', 'readonly').objectStore('capas'), rq = st.openCursor();
+      rq.onsuccess = function() { var c = rq.result; if (c) { if (GRAV.capas[c.key] === undefined) GRAV.capas[c.key] = c.value; c.continue(); } else fim(); };
+      rq.onerror = function() { fim(); };
+    } catch (e) { fim(); }
+  });
+}
 function gravCard(x, iV) {
   var p = gravPartes(x.t), st = GRAV_ST[String(x.s || 'agendada').toLowerCase()] || GRAV_ST.agendada;
   var vid = (x.rec || [])[0], doc = (x.doc || [])[0];
@@ -14890,11 +15136,11 @@ function gravCard(x, iV) {
   var meta = [p.tipo, p.lid, p.sdr ? 'SDR ' + p.sdr : '', org ? '🧲 ' + org : ''].filter(Boolean).join(' · ');
   return '<div class="grav-card' + (vista ? ' vista' : '') + '" tabindex="0" role="button" onclick="gravAbrir(' + iV + ')" onmouseenter="gravPre(' + iV + ')" onfocus="gravPre(' + iV + ')" onkeydown="if(event.key===\'Enter\')gravAbrir(' + iV + ')" aria-label="Abrir a gravação de ' + gravEsc(p.nome) + '">'
     + '<div class="grav-capa"><span class="gc-ini">' + gravEsc(ini) + '</span>'
-    +   (vid ? '<img loading="lazy" alt="" src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w640" onerror="this.remove()">' : '')
+    +   (vid ? gravCapaImg(vid) : '')
     +   '<span class="grav-pill" style="color:' + st.c + ';background:' + st.b.replace('.14)', '.28)').replace('.16)', '.3)') + ';">' + st.t + '</span>'
     +   (vid ? '<span class="gc-play" aria-hidden="true">▶</span>' : '<span class="gc-play" aria-hidden="true" style="padding-left:0;">📝</span>')
     +   (dataCurta ? '<span class="gc-data">' + gravEsc(dataCurta) + ' · ' + gravEsc((x.d || '').slice(11, 16)) + '</span>' : '')
-    +   (vid ? (dur ? '<span class="gc-dur">⏱ ' + dur + '</span>' : '') : '<span class="gc-doc">só anotações</span>')
+    +   (vid ? (dur ? '<span class="gc-dur">⏱ ' + dur + '</span>' : (x.vs ? '<span class="gc-dur gc-aviso" title="' + (x.vs === 'acesso' ? 'A reunião foi criada por outra conta: o robô não tem acesso a este vídeo' : 'O Google Drive ainda não preparou este vídeo para tocar (ou falhou ao preparar)') + '">' + (x.vs === 'acesso' ? '🔒 sem acesso' : '⏳ vídeo em preparo') + '</span>' : '')) : '<span class="gc-doc">só anotações</span>')
     +   (vista ? '<span class="gc-vista">✓ assistida</span>' : '')
     +   (x.rx ? '<span class="gc-doc" style="left:auto;right:8px;bottom:' + (vid && dur ? '34px' : '8px') + ';background:rgba(185,138,255,.85);color:#1a1030;">🧠 ficha</span>' : '')
     + '</div>'
@@ -14955,6 +15201,7 @@ function gravDesenhar() {
   h += '</div>';
   if (lista.length > GRAV.mostrar) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="GRAV.mostrar+=150;gravDesenhar();">Mostrar mais ' + Math.min(150, lista.length - GRAV.mostrar) + ' de ' + (lista.length - GRAV.mostrar) + ' restantes</button></div>';
   box.innerHTML = h;
+  try { gravCapaVigiar(); } catch (eCv) {}
 }
 // ----- 🎬 SALA DA GRAVAÇÃO: vídeo + resumo do Gemini + conversa (Bruno 24/09/2026: "coloca em um formato incrível
 // que mostre a transcrição e a gravação juntas") -----
@@ -15025,6 +15272,23 @@ function gvTocarEm(seg, origemEl) {
   if (origemEl && origemEl.classList) origemEl.classList.add('tocando');
   var pal = document.querySelector('#gv .gv-palco');
   if (pal && window.innerWidth <= 980) pal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+// vídeo que não abre (Bruno 25/09/2026: "tem alguns que não abrem"): diz o motivo quando o robô sabe e dá as saídas
+function gvAjudaVideo(x, vid) {
+  var ab = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view', bx = 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(vid);
+  var aviso = x.vs === 'acesso' ? '🔒 <b>Esta reunião foi criada por outra conta</b> e o robô não tem acesso ao vídeo. Abra no Drive logado na conta que criou a reunião.'
+    : x.vs === 'proc' ? '⏳ <b>O Google Drive ainda não preparou este vídeo</b> para tocar aqui dentro (acontece com gravação recém-terminada, muito longa ou que deu problema). Tente recarregar mais tarde ou baixe o arquivo.'
+    : '';
+  return '<div class="gv-ajuda' + (aviso ? ' alerta' : '') + '">' + (aviso ? '<span class="gv-ajuda-t">' + aviso + '</span>' : '<span class="gv-ajuda-t">Vídeo não abriu?</span>')
+    + '<button class="btn" onclick="gvRecarregarVideo()">↻ Recarregar</button>'
+    + '<a class="btn" href="' + ab + '" target="_blank" rel="noopener">↗ Abrir no Drive</a>'
+    + '<a class="btn" href="' + bx + '" target="_blank" rel="noopener">⬇ Baixar</a></div>';
+}
+function gvRecarregarVideo() {
+  var f = document.getElementById('gv-frame'); if (!f) return;
+  var src = f.src; f.classList.remove('ok'); f.src = 'about:blank';
+  setTimeout(function() { f.src = src; }, 60);
+  setTimeout(function() { f.classList.add('ok'); }, 6000);
 }
 function gvCopiarMomento() {
   var x = GRAV._aberto && GRAV._aberto.x, vid = x && (x.rec || [])[0]; if (!vid) return;
@@ -15105,10 +15369,10 @@ function gravAbrir(i, foco) {
     +     (vid ? '<button class="btn" id="gv-cine" onclick="gvCinema()" title="Vídeo maior, conversa ao lado">' + (cine ? '🗗 Sair do cinema' : '⛶ Modo cinema') + '</button>' : '')
     +     '<button class="btn gv-x" onclick="gravFechar()" aria-label="Fechar">✕</button></div></header>'
     + '<div class="gv-corpo">'
-    +   '<section class="gv-esq"><div class="gv-palco"><div class="gv-video"' + (vid ? ' style="background-image:url(\'https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w1280\')"' : '') + '>'
+    +   '<section class="gv-esq"><div class="gv-palco"><div class="gv-video"' + (vid ? ' data-vid="' + gravEsc(vid) + '" style="background-image:url(\'' + (GRAV.capas[vid] || 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w1280') + '\')"' : '') + '>'
     +     (vid ? '<iframe id="gv-frame" src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview" allow="autoplay; fullscreen" allowfullscreen title="Gravação" onload="this.classList.add(\'ok\')"></iframe><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
              : '<div class="gv-sem"><b>Sem vídeo desta reunião</b><span>ficaram só as anotações do Gemini</span></div>')
-    +   '</div>' + (vid ? '<div class="gv-momento" id="gv-momento"></div>' : '') + '</div>'
+    +   '</div>' + (vid ? gvAjudaVideo(x, vid) + '<div class="gv-momento" id="gv-momento"></div>' : '') + '</div>'
     +   (vid ? '<div class="gv-caps" id="gv-caps"></div>' : '')
     +   '<div id="gv-resumo">' + (doc ? '<div class="gv-card"><h4>Resumo do Gemini</h4><div class="gv-sk" style="width:80%"></div><div class="gv-sk"></div><div class="gv-sk" style="width:60%"></div></div>' : '') + '</div>'
     +   (doc ? '<div class="gv-rx" id="gv-rx"><h4>🧠 Raio-X do cliente<small>perfil · produtos · público · dores</small></h4><div class="rx-acoes"><button class="btn primary" onclick="gvRaioX(\'' + gravEsc(doc) + '\')">Gerar raio-X com a IA</button><span class="hint">lê a transcrição e monta a ficha do cliente (uma vez por reunião)</span></div></div>' : '')
