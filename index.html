@@ -1324,6 +1324,7 @@ img { max-width:100%; height:auto; }
   <div class="nav-item" data-s="gravacoes"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5l6-3.5v10l-6-3.5z"/></svg></span><span class="nav-label">Gravações</span></div>
   <div class="nav-item" data-s="leads"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2.4-7.2A2.5 2.5 0 0 1 7.8 4h8.4a2.5 2.5 0 0 1 2.4 1.8L21 13v5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18v-5z"/><path d="M3 13h5l1.5 3h5l1.5-3h5"/></svg></span><span class="nav-label">Leads</span></div>
   <div class="nav-item" data-s="anuncios"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 15.5l-4.5-4.5L7 20.5"/></svg></span><span class="nav-label">Criativos</span></div>
+  <div class="nav-item" data-s="disparos"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 2.5L10.8 13.2"/><path d="M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9 19-6.8z"/></svg></span><span class="nav-label">Disparos</span></div>
   <div class="nav-item" data-s="pesquisa"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg></span><span class="nav-label">Pesquisa</span></div>
   <div class="nav-item" data-s="pagamentos"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg></span><span class="nav-label">Pagamentos</span></div>
   <div class="nav-item" data-s="contratos"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span><span class="nav-label">Contratos</span><span id="ctr-alerta" style="display:none;margin-left:auto;background:#ff6b6b;color:#fff;border-radius:99px;font-size:.62rem;font-weight:800;padding:2px 7px;line-height:1.3;" title="Vendas com contrato ainda não assinado"></span></div>
@@ -1489,6 +1490,8 @@ img { max-width:100%; height:auto; }
   </section>
 
   <!-- ============ PESQUISA ============ -->
+  <!-- ============ 📣 DISPAROS DE WHATSAPP (aba própria — Bruno 25/09/2026) ============ -->
+  <section class="screen" id="s-disparos"><div id="dsp-corpo"><div class="panel dsp-vazio"><span class="mv-brilho-txt">Carregando os disparos…</span></div></div></section>
   <section class="screen" id="s-pesquisa">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
       <input class="search-input" style="flex:1;min-width:220px;margin-bottom:0;" placeholder="🔍  Buscar por nome, telefone ou CPF..." oninput="setFiltroPesq('txt', this.value)">
@@ -1965,7 +1968,7 @@ Instagram: @pr.joaosilva</div>
 <script>
 var titulos = {
   visao:'Visão Geral', placar:'Placar do Dia', agenda:'Agenda', leads:'Leads', pendencias:'Pendências', pesquisa:'Pesquisa',
-  pagamentos:'Pagamentos', contratos:'Contratos', registro:'Registro', regras:'Regras', anuncios:'Criativos e Origens', gravacoes:'Gravações'
+  pagamentos:'Pagamentos', contratos:'Contratos', registro:'Registro', regras:'Regras', anuncios:'Criativos e Origens', gravacoes:'Gravações', disparos:'Disparos de WhatsApp'
 };
 // ===== Gráfico com abas: métrica x período =====
 var DIAS_MES = 31, HOJE = 16;
@@ -2574,6 +2577,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     // ⚡ a tela troca primeiro e o cálculo dos criativos vem logo depois (antes o clique congelava a tela quase 1 s)
     if (s === 'anuncios' && typeof renderAnuncios === 'function') { setTimeout(function(){ try { renderAnuncios(); } catch (eRa) {} }, 30); setTimeout(function(){ try { aplicarCapasIG(); pedirCapasIG(); } catch (eCp) {} }, 1500); }
     if (s === 'contratos' && typeof renderContratos === 'function') renderContratos();
+    if (s === 'disparos' && typeof renderDisparos === 'function') { try { renderDisparos(); } catch (eDsp) {} }
     if (s === 'gravacoes' && typeof gravCarregar === 'function' && !GRAV.carregado && !GRAV.carregando) { try { gravCarregar(); } catch (eGv) {} }
     // a tela que precisa dos bloqueios os busca na hora (se ainda não vieram)
     if (typeof BLQ !== 'undefined' && !BLQ.carregado && !BLQ.buscando) { try { carregarBloqueios(); } catch (e) {} }
@@ -2592,7 +2596,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-25-1712';
+var VERSAO_DASH = '2026-09-25-1751';
 var _versaoNova = null;
 
 // =====================================================================
@@ -9078,16 +9082,17 @@ function dspConferirRespostas(nomeDisparo, volta) {
   volta = volta || 1;
   if (DSP.conferindo && volta === 1) return;
   DSP.conferindo = true; DSP.confMsg = '⏳ olhando as conversas na Clint… (parte ' + volta + ')';
-  try { renderAnuncios(); } catch (e) {}
+  dspRedesenhar();
   gasPedir({ action: 'disparoConferirRespostas', disparo: nomeDisparo, maximo: 80 }, function(d) {
     if (!d || !d.success) { DSP.conferindo = false; DSP.confMsg = '⚠️ o robô não respondeu agora — ele continua conferindo sozinho a cada 15 min'; carregarDisparos(true); return; }
-    if (d.aindaNaoAconteceu && !d.nesteLote) { DSP.conferindo = false; DSP.confMsg = 'o disparo ainda não aconteceu — não há resposta para conferir'; try { renderAnuncios(); } catch (e) {} return; }
+    if (d.aindaNaoAconteceu && !d.nesteLote) { DSP.conferindo = false; DSP.confMsg = 'o disparo ainda não aconteceu — não há resposta para conferir'; dspRedesenhar(); return; }
     if (d.restam > 0 && volta < 8 && d.conferidos > 0) { dspConferirRespostas(nomeDisparo, volta + 1); return; }
     DSP.conferindo = false; DSP.confMsg = '✓ conferido agora' + (d.restam ? ' (faltam ' + d.restam + ' — o robô termina sozinho)' : '');
     carregarDisparos(true);
   }, 170000);
 }
 var DSP_JANELA = 14;
+function dspRedesenhar() { try { if (telaVisivel('s-disparos')) renderDisparos(); } catch (e) {} }
 var CD7_NA_TELA = false;   // true = volta a mostrar o bloco do conteúdo no 7º dia embaixo do disparo
 function carregarDisparos(forcar) {
   if (DSP.buscando) return;
@@ -9130,7 +9135,7 @@ window.__gvizDSP = function(res) {
     });
     DSP.rows = linhas; DSP.carregado = true; DSP.erro = '';
   } catch (e) { DSP.erro = String(e && e.message || e); DSP.carregado = true; }
-  try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e2) {}
+  try { dspRedesenhar(); } catch (e2) {}
 };
 // o que aconteceu com UMA pessoa da lista depois do disparo
 function dspPessoa(c, ini, fim, formPor) {
@@ -9150,97 +9155,189 @@ function dspPessoa(c, ini, fim, formPor) {
   o.nivel = o.vd ? 5 : o.comp ? 4 : o.ag ? 3 : o.form ? 2 : o.resp ? 1 : 0;
   return o;
 }
-function dspBloco() {
-  if (telaVisivel('s-anuncios')) carregarDisparos();
-  var h = '<div style="margin-top:34px;padding-top:22px;border-top:2px solid rgba(255,255,255,.14);">'
-    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">'
-    +   '<h3 style="font-size:1rem;font-weight:800;margin:0;">📣 Disparos de WhatsApp — quem da lista voltou</h3>'
-    +   '<span class="hint" style="margin:0;">cruzado pelo telefone · conta o que aconteceu nos ' + DSP_JANELA + ' dias depois do disparo</span>'
-    +   '<button class="btn" style="margin-left:auto;padding:5px 12px;font-size:.7rem;" onclick="carregarDisparos(true)">🔄 atualizar</button>'
-    + '</div>';
-  if (DSP.buscando && !DSP.rows.length) return h + '<div class="hint">⏳ lendo a planilha…</div></div>';
-  if (DSP.erro) return h + '<div class="hint" style="color:#ffd166;">' + DSP.erro.replace(/</g, '&lt;') + '</div></div>';
-  if (!DSP.rows.length) return h + '<div class="hint">Nenhum disparo registrado ainda.</div></div>';
+// =====================================================================
+// 📣 ABA DISPAROS (Bruno 25/09/2026: "deixe o lugar dos disparos bem visual e bonito e fácil de ver" e
+// "uma mensagem para chegar na Clint que seja impossível não saber que veio ou não do disparo")
+// Antes o painel ficava escondido no fim da aba Criativos. Agora é uma aba própria:
+//   cartões dos disparos → funil grande do disparo escolhido → dia a dia → preparo (mensagem + link com código) → pessoas
+// Como o dash SABE que veio do disparo: o link da mensagem abre o WhatsApp da Clint com uma frase pronta que termina
+// com o CÓDIGO do disparo (D + dia + mês: 28/09 = D2809). O robô procura o código (ou "quero reservar meu horário")
+// nas conversas da Clint e marca "Veio pelo link em" na aba Disparos. Quem responde direto na conversa do disparo
+// (se ele sair do número da Clint) também conta, como "falou com a gente na Clint".
+// =====================================================================
+var DSP_CLINT_NUM = '';   // número do WhatsApp da Clint (com 55 + DDD). Vazio = o dash pede na tela e guarda no navegador.
+function dspClintNumero() {
+  var n = DSP_CLINT_NUM; if (!n) { try { n = localStorage.getItem('v2ClintNumero') || ''; } catch (e) {} }
+  return String(n || '').replace(/\D/g, '');
+}
+function dspSalvarNumero(v) {
+  var n = String(v || '').replace(/\D/g, '');
+  if (n && n.length <= 11) n = '55' + n;   // digitou só DDD + número: põe o 55 do Brasil
+  try { localStorage.setItem('v2ClintNumero', n); } catch (e) {}
+  renderDisparos();
+}
+function dspCodigo(dia) { return 'D' + ('0' + dia.getDate()).slice(-2) + ('0' + (dia.getMonth() + 1)).slice(-2); }
+// a mensagem que CHEGA na Clint quando a pessoa toca no link (Bruno 25/09/2026: "a mensagem que ele vai chegar, não a do disparo"):
+// começa dizendo que veio do disparo (é o que aparece na lista de conversas da Clint), tem "quero reservar meu horário"
+// e o código — o robô reconhece as duas coisas e marca "🔗 veio pelo link"
+function dspFrasePronta(dia) { return 'Vim pela mensagem de vocês 📩 Quero reservar meu horário do diagnóstico! (código ' + dspCodigo(dia) + ')'; }
+function dspLink(dia) {
+  var n = dspClintNumero();
+  return 'https://wa.me/' + (n || 'NUMERODACLINT') + '?text=' + encodeURIComponent(dspFrasePronta(dia));
+}
+function dspMensagem(dia) {
+  return 'Oi, {primeiro_nome}! Tudo bem? 👋\n\n'
+    + 'Aqui é da equipe do João Stecca. Separamos alguns horários para o *Diagnóstico de Perfil gratuito*: '
+    + 'uma conversa individual para olhar o seu Instagram e mostrar o caminho para transformar a sua mensagem em renda.\n\n'
+    + 'As vagas são poucas. Para garantir a sua, toque no link e envie a mensagem que já vem pronta 👇\n'
+    + dspLink(dia) + '\n\n'
+    + 'Se preferir, é só responder: *QUERO RESERVAR MEU HORÁRIO*';
+}
+function dspCopiar(qual, diaMs) {
+  var dia = new Date(+diaMs), txt = qual === 'link' ? dspLink(dia) : dspMensagem(dia);
+  if (!dspClintNumero()) { alert('Falta o número do WhatsApp da Clint — preencha no quadro "Preparo do disparo" e copie de novo.'); return; }
+  try { navigator.clipboard.writeText(txt); avisoRapido(qual === 'link' ? '🔗 Link copiado' : '📋 Mensagem copiada — é só colar na ferramenta do disparo'); }
+  catch (e) { prompt('Copie:', txt); }
+}
+function dspEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function renderDisparos() {
+  var el = document.getElementById('dsp-corpo'); if (!el) return;
+  carregarDisparos();
+  var h = '<div class="dsp-topo"><div><p>quem da lista voltou — cruzado pelo telefone, nos ' + DSP_JANELA + ' dias depois de cada disparo</p></div>'
+    + '<button class="btn" onclick="carregarDisparos(true)">🔄 Atualizar</button></div>';
+  if (DSP.buscando && !DSP.rows.length) { el.innerHTML = h + '<div class="panel dsp-vazio"><span class="mv-brilho-txt">Lendo a planilha dos disparos…</span></div>'; return; }
+  if (DSP.erro && !DSP.rows.length) { el.innerHTML = h + '<div class="panel dsp-vazio">' + dspEsc(DSP.erro) + '</div>'; return; }
+  if (!DSP.rows.length) { el.innerHTML = h + '<div class="panel dsp-vazio">Nenhum disparo registrado ainda.</div>'; return; }
+  if (!V2.carregado || !LD.carregado) setTimeout(renderDisparos, 1500);
   // um grupo por disparo, do mais novo para o mais antigo
   var grupos = {}, ordem = [];
   DSP.rows.forEach(function(x) {
     if (!grupos[x.disparo]) { grupos[x.disparo] = { nome: x.disparo, dia: x.dia, lista: [] }; ordem.push(grupos[x.disparo]); }
     grupos[x.disparo].lista.push(x);
   });
-  ordem.sort(function(a, b){ return b.dia - a.dia; });
-  var g = grupos[DSP.sel] || ordem[0];
-  if (ordem.length > 1) {
-    h += '<div class="chart-chips" style="margin:8px 0 2px;">' + ordem.map(function(o) {
-      return '<span class="chart-chip' + (o === g ? ' on' : '') + '" style="cursor:pointer;" onclick="DSP.sel=\'' + o.nome.replace(/['\\]/g, '') + '\';DSP.todos=false;renderAnuncios();">'
-        + o.nome.replace(/</g, '&lt;') + ' · ' + o.lista.length + '</span>';
-    }).join('') + '</div>';
-  }
-  var ini = g.dia.getTime(), fim = ini + DSP_JANELA * 864e5, agora = Date.now();
-  // índice dos formulários por telefone, montado uma vez (a lista pode ter centenas de pessoas)
-  var naLista = {}, formPor = {};
-  g.lista.forEach(function(c){ naLista[c.tel8] = 1; });
-  (LD.rows || []).forEach(function(l) { if (l.tel8 && naLista[l.tel8] && l.date) (formPor[l.tel8] || (formPor[l.tel8] = [])).push(l.date.getTime()); });
-  var pessoas = g.lista.map(function(c){ return dspPessoa(c, ini, fim, formPor); });
-  var n = pessoas.length, nForm = 0, nAg = 0, nComp = 0, nVd = 0, valor = 0, nAntes = 0, nRec = 0, nResp = 0, nLink = 0, nConf = 0, ultConf = '';
-  pessoas.forEach(function(o) {
-    if (o.form) nForm++; if (o.ag) nAg++; if (o.comp) nComp++; if (o.vd) nVd++; valor += o.valor; if (o.antes) nAntes++;
-    if (o.recebeu) nRec++; if (o.resp) nResp++; if (o.link) nLink++; if (o.c.confEm) { nConf++; if (o.c.confEm > ultConf) ultConf = o.c.confEm; }
-  });
-  var pc = function(a, b) { if (!b) return '—'; var v = a / b * 100; return (a > 0 && v < 1) ? '<1%' : Math.round(v) + '%'; };
-  var fimTxt = new Date(fim - 864e5).toLocaleDateString('pt-BR');
-  h += '<div class="hint" style="margin:6px 0 0;"><b style="color:var(--text);">' + g.nome.replace(/</g, '&lt;') + '</b> · enviado em ' + g.dia.toLocaleDateString('pt-BR')
-    + (agora < ini ? ' · <b style="color:#ffd166;">ainda não aconteceu</b> — os números começam a contar nesse dia'
-       : agora < fim ? ' · contando até ' + fimTxt : ' · janela fechada em ' + fimTxt) + '</div>';
-  h += '<div class="hint" style="margin:4px 0 0;">💬 Respostas vistas na Clint: ' + (nConf ? nConf + ' de ' + n + ' pessoas conferidas' : 'ainda não conferidas')
-    + ' <button class="btn" style="padding:3px 10px;font-size:.66rem;margin-left:6px;"' + (DSP.conferindo ? ' disabled' : '') + ' onclick="dspConferirRespostas(\'' + g.nome.replace(/['\\]/g, '') + '\')">💬 conferir respostas agora</button>'
-    + (DSP.confMsg ? ' <span style="color:#ffd166;">' + DSP.confMsg + '</span>' : '') + '</div>';
-  h += '<div class="ag-stats" style="margin:10px 0 12px;">'
-    + '<div class="g-stat"><b>' + n + '</b><span>Enviados</span></div>'
-    + '<div class="g-stat"><b style="color:#ff9a5a;">' + nLink + '</b><span>Vieram pelo link do disparo · ' + pc(nLink, n) + '</span></div>'
-    + '<div class="g-stat"><b style="color:#5ad1e6;">' + nResp + '</b><span>Falaram com a gente na Clint · ' + pc(nResp, n) + '</span></div>'
-    + '<div class="g-stat"><b style="color:#6ea8ff;">' + nForm + '</b><span>Preencheram o formulário · ' + pc(nForm, n) + '</span></div>'
-    + '<div class="g-stat"><b style="color:#b98aff;">' + nAg + '</b><span>Agendaram · ' + pc(nAg, n) + '</span></div>'
-    + '<div class="g-stat"><b style="color:#3ddc97;">' + nComp + '</b><span>Compareceram · ' + pc(nComp, nAg) + ' de quem agendou</span></div>'
-    + '<div class="g-stat"><b style="color:#ffd166;">' + nVd + '</b><span>Compraram' + (valor ? ' · ' + v2mil(valor) : '') + '</span></div>'
-    + '</div>';
-  pessoas.sort(function(a, b){ return (b.nivel - a.nivel) || String(a.c.nome).localeCompare(String(b.c.nome)); });
-  var rot = ['sem movimento', '💬 respondeu', '📝 preencheu o formulário', '📅 agendou', '✅ compareceu', '💰 comprou'];
-  var cor = ['var(--muted)', '#5ad1e6', '#6ea8ff', '#b98aff', '#3ddc97', '#ffd166'];
-  var filtros = [['mov', 'Quem se mexeu', function(o){ return o.nivel > 0; }], ['fechou', '💰 Fecharam', function(o){ return o.vd; }],
-    ['ag', '📅 Agendaram', function(o){ return o.ag; }], ['link', '🔗 Vieram pelo link', function(o){ return o.link; }], ['resp', '💬 Falaram na Clint', function(o){ return o.resp; }],
-    ['semresp', 'Receberam e não responderam', function(o){ return o.recebeu && !o.resp && !o.ag; }], ['todos', 'Todos', function(){ return true; }]];
-  var fAtual = filtros.filter(function(f){ return f[0] === DSP.filtro; })[0] || filtros[0];
-  h += '<div class="chart-chips" style="margin:0 0 8px;">' + filtros.map(function(f) {
-    return '<span class="chart-chip' + (f === fAtual ? ' on' : '') + '" style="cursor:pointer;" onclick="DSP.filtro=\'' + f[0] + '\';DSP.todos=false;renderAnuncios();">' + f[1] + ' · ' + pessoas.filter(f[2]).length + '</span>';
+  ordem.sort(function(a, b) { return b.dia - a.dia; });
+  var agora = Date.now(), hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+  var calc = function(g) {
+    var ini = g.dia.getTime(), fim = ini + DSP_JANELA * 864e5, naLista = {}, formPor = {};
+    g.lista.forEach(function(c) { naLista[c.tel8] = 1; });
+    (LD.rows || []).forEach(function(l) { if (l.tel8 && naLista[l.tel8] && l.date) (formPor[l.tel8] || (formPor[l.tel8] = [])).push(l.date.getTime()); });
+    var ps = g.lista.map(function(c) { return dspPessoa(c, ini, fim, formPor); });
+    var r = { g: g, ini: ini, fim: fim, ps: ps, n: ps.length, rec: 0, link: 0, resp: 0, form: 0, ag: 0, comp: 0, vd: 0, valor: 0, antes: 0, conf: 0 };
+    ps.forEach(function(o) {
+      if (o.recebeu) r.rec++; if (o.link) r.link++; if (o.resp) r.resp++; if (o.form) r.form++; if (o.ag) r.ag++;
+      if (o.comp) r.comp++; if (o.vd) r.vd++; r.valor += o.valor; if (o.antes) r.antes++; if (o.c.confEm) r.conf++;
+    });
+    r.fase = agora < ini ? 'antes' : agora < fim ? 'rodando' : 'fim';
+    r.diaN = Math.min(DSP_JANELA, Math.floor((hoje0.getTime() - ini) / 864e5) + 1);
+    return r;
+  };
+  var todos = ordem.map(calc), sel = todos.filter(function(r) { return r.g.nome === DSP.sel; })[0] || todos[0];
+  var semana = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  var faseTxt = function(r) {
+    if (r.fase === 'antes') { var faltam = Math.round((r.ini - hoje0.getTime()) / 864e5); return '<span class="dsp-fase antes">🗓️ ' + semana[r.g.dia.getDay()] + ', ' + r.g.dia.toLocaleDateString('pt-BR').slice(0, 5) + (faltam > 0 ? ' · em ' + faltam + (faltam === 1 ? ' dia' : ' dias') : ' · hoje') + '</span>'; }
+    if (r.fase === 'rodando') return '<span class="dsp-fase rodando">● contando · dia ' + r.diaN + ' de ' + DSP_JANELA + '</span>';
+    return '<span class="dsp-fase fim">✔ encerrado</span>';
+  };
+  // --- cartões dos disparos ---
+  h += '<div class="dsp-cartoes">' + todos.map(function(r) {
+    var pct = r.fase === 'antes' ? 0 : r.fase === 'fim' ? 100 : Math.round(r.diaN / DSP_JANELA * 100);
+    return '<button class="dsp-cartao' + (r === sel ? ' on' : '') + '" onclick="DSP.sel=\'' + r.g.nome.replace(/['\\]/g, '') + '\';DSP.todos=false;renderDisparos();">'
+      + '<div class="dsp-c1"><b>' + dspEsc(r.g.nome) + '</b>' + faseTxt(r) + '</div>'
+      + '<div class="dsp-c2"><span><i>' + r.n + '</i> pessoas</span><span><i>' + r.resp + '</i> responderam</span><span><i>' + r.ag + '</i> agendaram</span><span><i>' + r.vd + '</i> compraram</span></div>'
+      + '<div class="dsp-c3"><em style="width:' + pct + '%"></em></div>'
+      + '<div class="dsp-c4">código <b>' + dspCodigo(r.g.dia) + '</b></div></button>';
   }).join('') + '</div>';
-  var filtradas = pessoas.filter(fAtual[2]);
-  var mostrar = DSP.todos ? filtradas : filtradas.slice(0, 25);
-  h += '<div style="overflow-x:auto;"><table class="cd7-tab" style="width:100%;border-collapse:collapse;min-width:860px;">'
-    + '<tr><th style="text-align:left;">Pessoa</th><th style="text-align:left;">O que aconteceu depois do disparo</th><th style="text-align:left;">Na Clint</th><th>Reunião</th><th>Closer</th><th>Antes do disparo</th></tr>';
-  if (!mostrar.length) h += '<tr><td colspan="6" class="hint" style="text-align:left;">Ninguém nesta lista por enquanto.</td></tr>';
-  mostrar.forEach(function(o) {
-    var r = o.reuniao, lk = o.c.clint || ''; if (!lk) { try { lk = clintLink({ tel: o.c.tel, tel8: o.c.tel8, nome: o.c.nome }) || ''; } catch (e) {} }
-    h += '<tr><td style="text-align:left;"><b>' + String(o.c.nome || '—').replace(/</g, '&lt;') + '</b>'
-      + '<div class="hint" style="margin:2px 0 0;">📱 final ' + String(o.c.tel).slice(-4)
-      + (lk ? ' · <a href="' + lk + '" target="_blank" rel="noopener" style="color:#8f6bff;">abrir na Clint</a>' : '') + '</div></td>'
-      + '<td style="text-align:left;color:' + cor[o.nivel] + ';font-weight:700;">' + rot[o.nivel] + (o.vd && o.valor ? ' · ' + v2mil(o.valor) : '') + '</td>'
-      + '<td style="text-align:left;max-width:280px;white-space:normal;">'
-      +   (o.link ? '<span class="ld-tag" style="background:rgba(255,154,90,.16);color:#ff9a5a;">🔗 veio pelo link</span> ' : '')
-      +   (o.resp ? '<span style="color:#5ad1e6;font-weight:700;">respondeu ' + o.c.falouEm.replace(/\/\d{4}/, '') + '</span>'
-             + (o.c.falouTxt ? '<div class="hint" style="margin:2px 0 0;white-space:normal;">“' + o.c.falouTxt.replace(/</g, '&lt;').slice(0, 110) + '”</div>' : '')
-           : o.recebeu ? '<span style="color:var(--muted);">recebeu ' + o.c.nossaEm.replace(/\/\d{4}/, '') + ' · sem resposta</span>'
-           : o.c.confEm ? '<span style="color:var(--muted);">sem mensagem nossa na Clint</span>' : '<span style="color:var(--muted);">—</span>') + '</td>'
-      + '<td>' + (r && r.date ? r.date.toLocaleDateString('pt-BR') : '—') + '</td>'
-      + '<td>' + (r && r.closer ? String(r.closer).replace(/</g, '&lt;') : '—') + '</td>'
-      + '<td style="color:var(--muted);">' + (o.antes ? o.antes + (o.antes > 1 ? ' reuniões' : ' reunião') : '—') + '</td></tr>';
+  // --- funil do disparo escolhido ---
+  var r = sel, pc = function(a, b) { if (!b) return '—'; var v = a / b * 100; return (a > 0 && v < 1) ? '<1%' : Math.round(v) + '%'; };
+  var etapas = [
+    ['📤', 'Enviados', r.n, '#9aa3b2', 'pessoas na lista'],
+    ['📥', 'Chegou na Clint', r.rec, '#8f6bff', 'nossa mensagem apareceu na conversa'],
+    ['🔗', 'Vieram pelo link', r.link, '#ff9a5a', 'chegaram com o código ' + dspCodigo(r.g.dia) + ' — com certeza do disparo'],
+    ['💬', 'Falaram com a gente', r.resp, '#5ad1e6', 'responderam na Clint depois do disparo'],
+    ['📝', 'Preencheram o formulário', r.form, '#6ea8ff', 'diagnóstico do site'],
+    ['📅', 'Agendaram', r.ag, '#b98aff', 'reunião marcada depois do disparo'],
+    ['✅', 'Compareceram', r.comp, '#3ddc97', pc(r.comp, r.ag) + ' de quem agendou'],
+    ['💰', 'Compraram', r.vd, '#ffd166', r.valor ? v2mil(r.valor) + ' vendidos' : 'nenhuma venda ainda']
+  ];
+  var maxN = Math.max(1, r.n);
+  h += '<div class="dsp-principal"><div class="panel dsp-funil"><div class="dsp-ftit"><h3>' + dspEsc(r.g.nome) + '</h3>' + faseTxt(r)
+    + '<span class="hint" style="margin:0 0 0 auto;">' + (r.fase === 'antes' ? 'os números começam a contar no dia do disparo' : 'janela: ' + new Date(r.ini).toLocaleDateString('pt-BR').slice(0, 5) + ' a ' + new Date(r.fim - 864e5).toLocaleDateString('pt-BR').slice(0, 5)) + '</span></div>';
+  etapas.forEach(function(e) {
+    var w = e[2] ? Math.max(2.5, e[2] / maxN * 100) : 0;
+    h += '<div class="dsp-et"><span class="dsp-eti">' + e[0] + '</span><div class="dsp-etx"><b>' + e[1] + '</b><small>' + e[4] + '</small></div>'
+      + '<div class="dsp-barra"><i style="width:' + w.toFixed(1) + '%;background:' + e[3] + ';"></i></div>'
+      + '<div class="dsp-num"><b style="color:' + e[3] + ';">' + e[2] + '</b><small>' + (e[1] === 'Enviados' ? '100%' : pc(e[2], r.n)) + '</small></div></div>';
   });
-  h += '</table></div>';
-  if (!DSP.todos && filtradas.length > mostrar.length) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=true;renderAnuncios();">▼ mostrar os ' + filtradas.length + '</button></div>';
-  else if (DSP.todos && filtradas.length > 25) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=false;renderAnuncios();">▲ mostrar menos</button></div>';
-  h += '<div class="hint" style="margin-top:10px;">Conta quem está na lista e se mexeu nos ' + DSP_JANELA + ' dias depois do disparo. Reunião marcada antes do disparo não entra'
-    + (nAntes ? ' (' + nAntes + ' pessoa' + (nAntes > 1 ? 's' : '') + ' da lista já tinha' + (nAntes > 1 ? 'm' : '') + ' reunião antes — aparece na última coluna)' : '') + '.</div>';
-  return h + '</div>';
+  h += '<div class="dsp-conf">💬 Respostas conferidas na Clint: <b>' + (r.conf ? r.conf + ' de ' + r.n : 'ainda não') + '</b> · o robô confere sozinho a cada 15 min'
+    + ' <button class="btn" style="padding:4px 10px;font-size:.66rem;"' + (DSP.conferindo ? ' disabled' : '') + ' onclick="dspConferirRespostas(\'' + r.g.nome.replace(/['\\]/g, '') + '\')">conferir agora</button>'
+    + (DSP.confMsg ? ' <span style="color:#ffd166;">' + dspEsc(DSP.confMsg) + '</span>' : '') + '</div></div>';
+  // --- preparo do disparo: mensagem + link com o código ---
+  var num = dspClintNumero(), diaMs = r.g.dia.getTime();
+  h += '<div class="panel dsp-prep"><h3>🧾 Preparo do disparo</h3>'
+    + '<ul class="dsp-check">'
+    + '<li class="ok">✅ Lista guardada: <b>' + r.n + ' contatos</b></li>'
+    + '<li class="' + (num ? 'ok' : 'falta') + '">' + (num ? '✅ WhatsApp da Clint: <b>+' + num + '</b> <a href="#" onclick="event.preventDefault();localStorage.removeItem(\'v2ClintNumero\');renderDisparos();">trocar</a>'
+        : '⚠️ Número do WhatsApp da Clint: <input class="edit-in" id="dsp-num" placeholder="DDD + número" style="width:150px;padding:5px 8px;font-size:.74rem;" onkeydown="if(event.key===\'Enter\')dspSalvarNumero(this.value)"> <button class="btn" style="padding:4px 10px;font-size:.66rem;" onclick="dspSalvarNumero(document.getElementById(\'dsp-num\').value)">salvar</button>') + '</li>'
+    + '<li class="ok">✅ Código deste disparo: <b class="dsp-cod">' + dspCodigo(r.g.dia) + '</b></li></ul>'
+    + '<div class="dsp-msg">' + dspEsc(dspMensagem(r.g.dia).replace(dspLink(r.g.dia), '§LINK§')).replace(/\n/g, '<br>').replace(/\*([^*]+)\*/g, '<b>$1</b>')
+        .replace(/\{primeiro_nome\}/g, '<span class="dsp-var">{primeiro_nome}</span>')
+        .replace('§LINK§', '<span class="dsp-linkchip" title="' + dspEsc(dspFrasePronta(r.g.dia)) + '">🔗 link para o WhatsApp da Clint · frase pronta com o código ' + dspCodigo(r.g.dia) + '</span>') + '</div>'
+    + '<div class="dsp-acoes"><button class="btn primary" onclick="dspCopiar(\'msg\',' + diaMs + ')">📋 Copiar mensagem</button>'
+    + '<button class="btn" onclick="dspCopiar(\'link\',' + diaMs + ')">🔗 Copiar só o link</button>'
+    + (num ? '<a class="btn" href="' + dspEsc(dspLink(r.g.dia)) + '" target="_blank" rel="noopener">▶ Testar o link</a>' : '') + '</div>'
+    + '<div class="dsp-como"><b>Por que dá para saber quem veio do disparo:</b> o link abre o WhatsApp da Clint com a frase pronta terminando em <b>' + dspCodigo(r.g.dia) + '</b>. '
+    + 'Quem chega com esse código (ou escreve “quero reservar meu horário”) ganha o selo <span class="dsp-selo">🔗 veio pelo link</span>. '
+    + 'Use <b>{primeiro_nome}</b> como campo da ferramenta de disparo. Não mude a frase do link.</div></div></div>';
+  // --- dia a dia ---
+  if (r.fase !== 'antes') {
+    var dias = [], maxD = 1;
+    for (var d = 0; d < DSP_JANELA; d++) dias.push({ link: 0, resp: 0, ag: 0 });
+    var diaDe = function(txt) { var m = String(txt || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? Math.floor((new Date(+m[3], +m[2] - 1, +m[1]).getTime() - r.ini) / 864e5) : -1; };
+    r.ps.forEach(function(o) {
+      var a = diaDe(o.c.linkEm); if (a >= 0 && a < DSP_JANELA) dias[a].link++;
+      var b = diaDe(o.c.falouEm); if (b >= 0 && b < DSP_JANELA) dias[b].resp++;
+      if (o.ag && o.reuniao) { var t = o.reuniao.carimboT || (o.reuniao.date ? o.reuniao.date.getTime() : 0), c = Math.floor((t - r.ini) / 864e5); if (c >= 0 && c < DSP_JANELA) dias[c].ag++; }
+    });
+    dias.forEach(function(x) { maxD = Math.max(maxD, x.link, x.resp, x.ag); });
+    h += '<div class="panel dsp-dias"><div class="dsp-ftit"><h3>📆 Dia a dia depois do disparo</h3><span class="dsp-leg"><i style="background:#5ad1e6"></i>responderam <i style="background:#ff9a5a"></i>pelo link <i style="background:#b98aff"></i>agendaram</span></div><div class="dsp-grade">'
+      + dias.map(function(x, k) {
+          var dt = new Date(r.ini + k * 864e5), fut = dt.getTime() > agora;
+          var alt = function(v) { return v ? Math.max(6, v / maxD * 100) : 0; };
+          return '<div class="dsp-dia' + (fut ? ' fut' : '') + '"><div class="bars"><i class="bar" style="height:' + alt(x.resp) + '%;background:#5ad1e6;" title="' + x.resp + ' responderam"></i><i class="bar" style="height:' + alt(x.link) + '%;background:#ff9a5a;" title="' + x.link + ' pelo link"></i><i class="bar" style="height:' + alt(x.ag) + '%;background:#b98aff;" title="' + x.ag + ' agendaram"></i></div>'
+            + '<small>' + ('0' + dt.getDate()).slice(-2) + '/' + ('0' + (dt.getMonth() + 1)).slice(-2) + '</small></div>';
+        }).join('') + '</div></div>';
+  }
+  // --- as pessoas ---
+  var ps = r.ps.slice().sort(function(a, b) { return (b.nivel - a.nivel) || String(a.c.nome).localeCompare(String(b.c.nome)); });
+  var rot = ['sem movimento', 'respondeu', 'preencheu o formulário', 'agendou', 'compareceu', 'comprou'];
+  var cor = ['var(--muted)', '#5ad1e6', '#6ea8ff', '#b98aff', '#3ddc97', '#ffd166'];
+  var filtros = [['mov', 'Quem se mexeu', function(o) { return o.nivel > 0 || o.link; }], ['fechou', '💰 Compraram', function(o) { return o.vd; }],
+    ['ag', '📅 Agendaram', function(o) { return o.ag; }], ['link', '🔗 Vieram pelo link', function(o) { return o.link; }], ['resp', '💬 Falaram na Clint', function(o) { return o.resp; }],
+    ['semresp', 'Receberam e não responderam', function(o) { return o.recebeu && !o.resp && !o.ag; }], ['todos', 'Todos', function() { return true; }]];
+  var fA = filtros.filter(function(f) { return f[0] === DSP.filtro; })[0] || filtros[0];
+  var lista = ps.filter(fA[2]), mostrar = DSP.todos ? lista : lista.slice(0, 30);
+  h += '<div class="panel"><div class="dsp-ftit"><h3>👥 As pessoas da lista</h3><span class="hint" style="margin:0;">da que mais avançou para a que menos</span></div>'
+    + '<div class="chart-chips" style="margin:10px 0;">' + filtros.map(function(f) {
+      return '<span class="chart-chip' + (f === fA ? ' on' : '') + '" style="cursor:pointer;" onclick="DSP.filtro=\'' + f[0] + '\';DSP.todos=false;renderDisparos();">' + f[1] + ' · ' + ps.filter(f[2]).length + '</span>';
+    }).join('') + '</div><div class="dsp-pessoas">';
+  if (!mostrar.length) h += '<div class="hint" style="padding:14px;">' + (r.fase === 'antes' ? 'O disparo ainda não aconteceu — as pessoas aparecem aqui conforme forem respondendo.' : 'Ninguém neste filtro por enquanto.') + '</div>';
+  mostrar.forEach(function(o) {
+    var rr = o.reuniao, lk = o.c.clint || ''; if (!lk) { try { lk = clintLink({ tel: o.c.tel, tel8: o.c.tel8, nome: o.c.nome }) || ''; } catch (e) {} }
+    var pontos = [o.resp || o.link, o.form, o.ag, o.comp, o.vd].map(function(v, k) { return '<i class="' + (v ? 'on' : '') + '" style="' + (v ? 'background:' + cor[k + 1] + ';' : '') + '"></i>'; }).join('');
+    h += '<div class="dsp-p"><div class="dsp-av" style="background:linear-gradient(135deg,' + v2grad(o.c.nome || '?') + ');">' + dspEsc(v2ini(o.c.nome || '?')) + '</div>'
+      + '<div class="dsp-pn"><b>' + dspEsc(o.c.nome || '—') + '</b><small>📱 final ' + String(o.c.tel).slice(-4) + (lk ? ' · <a href="' + lk + '" target="_blank" rel="noopener">abrir na Clint</a>' : '') + (o.antes ? ' · já tinha ' + o.antes + (o.antes > 1 ? ' reuniões' : ' reunião') + ' antes' : '') + '</small></div>'
+      + '<div class="dsp-pontos" title="respondeu · formulário · agendou · compareceu · comprou">' + pontos + '</div>'
+      + '<div class="dsp-pst"><b style="color:' + cor[o.nivel] + ';">' + rot[o.nivel] + (o.vd && o.valor ? ' · ' + v2mil(o.valor) : '') + '</b>'
+      + (o.link ? '<span class="dsp-selo">🔗 veio pelo link</span>' : '')
+      + (o.resp && o.c.falouTxt ? '<small>“' + dspEsc(o.c.falouTxt.slice(0, 90)) + '”</small>' : (o.recebeu && !o.resp ? '<small>recebeu ' + dspEsc(o.c.nossaEm.replace(/\/\d{4}/, '')) + ' · sem resposta</small>' : ''))
+      + (rr && rr.date ? '<small>📅 ' + rr.date.toLocaleDateString('pt-BR') + (rr.closer ? ' · ' + dspEsc(rr.closer) : '') + '</small>' : '') + '</div></div>';
+  });
+  h += '</div>';
+  if (!DSP.todos && lista.length > mostrar.length) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=true;renderDisparos();">▼ mostrar as ' + lista.length + '</button></div>';
+  h += '</div>';
+  el.innerHTML = h;
 }
+
 function renderAnuncios() {
   var el = document.getElementById('an-corpo');
   if (!el) return;
@@ -9530,7 +9627,7 @@ function renderAnuncios() {
       + '<button class="btn" onclick="AN_QUANTOS = 40; renderAnuncios();">▲ mostrar menos</button></div>';
   }
   h += '</div>';
-  try { h += dspBloco(); } catch (eDs) { }      // 18/09/2026: disparos de WhatsApp, no lugar do conteúdo no 7º dia (pedido do Bruno)
+  h += '<div class="an-dsp-aviso" onclick="var n=document.querySelector(\'.nav-item[data-s=disparos]\');if(n)n.click();">📣 <span><b>Os disparos de WhatsApp agora têm uma aba própria</b> — quem da lista voltou, agendou e comprou.</span><span style="margin-left:auto;color:#ff9a5a;font-weight:800;white-space:nowrap;">abrir Disparos →</span></div>';      // 18/09/2026: disparos de WhatsApp, no lugar do conteúdo no 7º dia (pedido do Bruno)
   if (CD7_NA_TELA) { try { h += cd7Bloco(per); } catch (eCd) { } }
   el.innerHTML = h;
 }
@@ -20243,7 +20340,7 @@ html, body { overflow-x:hidden; overflow-x:clip; }
 @keyframes mvEncheY { from { clip-path:inset(100% 0 0 0); } to { clip-path:inset(0 0 0 0); } }
 @keyframes mvGira { from { opacity:0; transform:rotate(-140deg) scale(.55); } to { opacity:1; transform:none; } }
 .mv-barras .bar, .mv-barras .spark i { animation:mvEncheY .9s var(--mv-ease) backwards; animation-delay:calc(var(--mv-d,0ms) + 140ms + var(--mv-i,0) * 45ms); }
-.mv-barras .rk-tubo > i, .mv-barras .rk-tubo > u, .mv-barras .meta-barra i, .mv-barras .px-fn .bar i, .mv-barras .px-barra i { animation:mvEncheX 1.2s var(--mv-ease) backwards; animation-delay:calc(var(--mv-d,0ms) + 220ms); }
+.mv-barras .rk-tubo > i, .mv-barras .rk-tubo > u, .mv-barras .meta-barra i, .mv-barras .px-fn .bar i, .mv-barras .px-barra i, .mv-barras .dsp-barra i, .mv-barras .dsp-c3 em { animation:mvEncheX 1.2s var(--mv-ease) backwards; animation-delay:calc(var(--mv-d,0ms) + 220ms); }
 .mv-barras .chart-line { animation:mvEncheX 1.3s var(--mv-ease) backwards; animation-delay:calc(var(--mv-d,0ms) + 260ms); }
 .mv-barras [style*="conic-gradient"] { animation:mvGira 1s var(--mv-mola) backwards; animation-delay:calc(var(--mv-d,0ms) + 160ms); }
 
@@ -20285,6 +20382,75 @@ html, body { overflow-x:hidden; overflow-x:clip; }
 ::selection { background:rgba(246,163,80,.32); color:#fff; }
 html { scrollbar-color:rgba(255,255,255,.16) transparent; }
 
+
+/* ===================== 📣 ABA DISPAROS (Bruno 25/09/2026: "bem visual e bonito e fácil de ver") ===================== */
+.dsp-topo { display:flex; align-items:flex-end; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.dsp-topo h2 { font-size:1.15rem; font-weight:900; margin:0; }
+.dsp-topo p { margin:3px 0 0; font-size:.74rem; color:var(--muted); font-weight:600; }
+.dsp-topo .btn { margin-left:auto; }
+.dsp-vazio { text-align:center; color:var(--muted); padding:40px 20px; }
+.dsp-cartoes { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; margin-bottom:16px; }
+.dsp-cartao { text-align:left; font-family:inherit; color:var(--text); cursor:pointer; padding:14px 16px; border-radius:18px; border:1px solid rgba(255,255,255,.1);
+  background:linear-gradient(150deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); display:flex; flex-direction:column; gap:10px;
+  transition:transform .25s var(--mv-ease), border-color .25s ease, box-shadow .25s ease, background .25s ease; }
+.dsp-cartao:hover { transform:translateY(-3px); border-color:rgba(246,163,80,.4); }
+.dsp-cartao.on { border-color:rgba(246,163,80,.75); box-shadow:0 0 0 1px rgba(246,163,80,.3), 0 14px 34px rgba(0,0,0,.35); background:linear-gradient(150deg, rgba(246,163,80,.15), rgba(255,255,255,.02)); }
+.dsp-c1 { display:flex; align-items:center; gap:8px; flex-wrap:wrap; } .dsp-c1 b { font-size:.95rem; font-weight:900; }
+.dsp-fase { font-size:.62rem; font-weight:800; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+.dsp-fase.antes { background:rgba(110,168,255,.15); color:#6ea8ff; }
+.dsp-fase.rodando { background:rgba(61,220,151,.15); color:#3ddc97; }
+.dsp-fase.fim { background:rgba(255,255,255,.07); color:var(--text2); }
+.dsp-c2 { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.dsp-c2 span { font-size:.6rem; color:var(--muted); font-weight:700; line-height:1.25; }
+.dsp-c2 i { display:block; font-style:normal; font-size:1.15rem; font-weight:900; color:var(--text); font-variant-numeric:tabular-nums; }
+.dsp-c3 { height:5px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; }
+.dsp-c3 em { display:block; height:100%; background:linear-gradient(90deg,#f6a350,#3ddc97); border-radius:99px; }
+.dsp-c4 { font-size:.64rem; color:var(--muted); font-weight:700; } .dsp-c4 b { color:#ff9a5a; letter-spacing:.5px; }
+.dsp-principal { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:16px; margin-bottom:16px; align-items:start; }
+@media (max-width:1100px) { .dsp-principal { grid-template-columns:1fr; } }
+.dsp-ftit { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; } .dsp-ftit h3 { margin:0; }
+.dsp-et { display:grid; grid-template-columns:30px minmax(150px,1.1fr) minmax(0,2fr) 64px; align-items:center; gap:10px; padding:8px 0; border-top:1px solid rgba(255,255,255,.05); }
+.dsp-ftit + .dsp-et { border-top:none; }
+.dsp-eti { font-size:1.1rem; text-align:center; }
+.dsp-etx b { display:block; font-size:.82rem; } .dsp-etx small { font-size:.64rem; color:var(--muted); font-weight:600; }
+.dsp-barra { height:14px; border-radius:99px; background:rgba(255,255,255,.05); overflow:hidden; }
+.dsp-barra i { display:block; height:100%; border-radius:99px; opacity:.9; }
+.dsp-num { text-align:right; } .dsp-num b { display:block; font-size:1.25rem; font-weight:900; line-height:1; font-variant-numeric:tabular-nums; }
+.dsp-num small { font-size:.62rem; color:var(--muted); font-weight:700; }
+.dsp-conf { margin-top:12px; font-size:.7rem; color:var(--text2); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.dsp-prep h3 { margin-bottom:10px; }
+.dsp-check { list-style:none; margin:0 0 12px; padding:0; display:flex; flex-direction:column; gap:7px; font-size:.76rem; color:var(--text2); }
+.dsp-check a { color:var(--muted); font-size:.66rem; } .dsp-check li.falta { color:#ffd166; }
+.dsp-cod { color:#ff9a5a; font-size:.9rem; letter-spacing:1px; background:rgba(255,154,90,.12); padding:1px 8px; border-radius:6px; }
+.dsp-msg { background:#0d1714; border:1px solid rgba(61,220,151,.25); border-radius:14px 14px 14px 4px; padding:12px 14px; font-size:.76rem; line-height:1.55; color:#e8f5ee; overflow-wrap:anywhere; }
+.dsp-var { color:#ffd166; font-weight:800; }
+.dsp-linkchip { display:inline-block; margin:4px 0; padding:4px 10px; border-radius:8px; background:rgba(110,168,255,.14); color:#8fbaff; font-weight:700; font-size:.72rem; }
+.dsp-acoes { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; } .dsp-acoes .btn { text-decoration:none; }
+.dsp-como { margin-top:12px; font-size:.68rem; line-height:1.55; color:var(--muted); } .dsp-como b { color:var(--text2); }
+.dsp-selo { display:inline-block; font-size:.62rem; font-weight:800; padding:2px 8px; border-radius:99px; background:rgba(255,154,90,.16); color:#ff9a5a; margin:2px 4px 0 0; }
+.dsp-dias { margin-bottom:16px; }
+.dsp-leg { margin-left:auto; display:flex; align-items:center; gap:4px; font-size:.64rem; color:var(--muted); font-weight:700; }
+.dsp-leg i { width:9px; height:9px; border-radius:3px; display:inline-block; margin-left:8px; }
+.dsp-grade { display:grid; grid-template-columns:repeat(14,1fr); gap:6px; }
+.dsp-dia { display:flex; flex-direction:column; align-items:center; gap:6px; } .dsp-dia.fut { opacity:.35; }
+.dsp-dia .bars { width:100%; height:90px; display:flex; align-items:flex-end; justify-content:center; gap:2px; background:rgba(255,255,255,.025); border-radius:8px; padding:4px 3px 0; }
+.dsp-dia .bar { flex:1; max-width:9px; border-radius:3px 3px 1px 1px; }
+.dsp-dia small { font-size:.58rem; color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums; }
+.dsp-pessoas { display:flex; flex-direction:column; gap:6px; }
+.dsp-p { display:grid; grid-template-columns:36px minmax(0,1.3fr) auto minmax(0,1.6fr); align-items:center; gap:12px; padding:9px 12px; border-radius:14px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); transition:border-color .2s, background .2s; }
+.dsp-p:hover { border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.05); }
+.dsp-av { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:800; color:#fff; }
+.dsp-pn b { display:block; font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dsp-pn small { font-size:.64rem; color:var(--muted); } .dsp-pn a { color:#8f6bff; }
+.dsp-pontos { display:flex; gap:4px; } .dsp-pontos i { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.1); display:block; }
+.dsp-pst b { font-size:.78rem; } .dsp-pst small { display:block; font-size:.64rem; color:var(--muted); margin-top:2px; }
+.an-dsp-aviso { display:flex; align-items:center; gap:12px; margin-top:24px; padding:14px 16px; border-radius:16px; border:1px dashed rgba(255,154,90,.4); background:rgba(255,154,90,.06); cursor:pointer; font-size:.8rem; color:var(--text2); flex-wrap:wrap; }
+.an-dsp-aviso:hover { border-color:rgba(255,154,90,.7); }
+@media (max-width:760px) {
+  .dsp-et { grid-template-columns:26px 1fr 56px; } .dsp-barra { grid-column:2 / 4; grid-row:2; }
+  .dsp-p { grid-template-columns:32px 1fr; } .dsp-pontos, .dsp-pst { grid-column:2; }
+  .dsp-grade { grid-template-columns:repeat(7,1fr); } .dsp-c2 { grid-template-columns:repeat(2,1fr); }
+}
 
 /* ===================== PARTE 2 (Bruno 25/09/2026: "mais fluido ainda e com animações em cada parte") ===================== */
 html { scroll-behavior:smooth; }
@@ -20357,11 +20523,11 @@ html { scroll-behavior:smooth; }
   var doc = document, root = doc.documentElement;
   var REDUZ = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   // o que entra em cascata (só o bloco de fora; o de dentro anda junto)
-  var BLOCO = '.hero-row > *, .kpis > *, .panel, .glass, .px-card, .mg-tile, .pl-col, .pl-kpi, .pl-linha, .alerta, .novo-box, .alerta-parado, .grav-card, .dtl-card';
+  var BLOCO = '.hero-row > *, .kpis > *, .panel, .glass, .px-card, .mg-tile, .pl-col, .pl-kpi, .pl-linha, .alerta, .novo-box, .alerta-parado, .grav-card, .dtl-card, .dsp-cartao';
   // itens de lista DENTRO de um bloco: entram logo depois dele, um a um
-  var FILHO = '.rk-card, .cliente-row, .grav-card, .px-card, .alerta, .pl-card, .pl-pd, .fs-et, .gm-card, .sg-col, .ld-row, .lead-card, tr, [style*="minmax(232px"] > *';   // (o último: cartões dos criativos)
+  var FILHO = '.rk-card, .cliente-row, .grav-card, .px-card, .alerta, .pl-card, .pl-pd, .fs-et, .gm-card, .sg-col, .ld-row, .lead-card, tr, .dsp-et, .dsp-p, [style*="minmax(232px"] > *';   // (o último: cartões dos criativos)
   // números que contam do zero
-  var NUM = '.g-value, .g-stat b, .proj-val, .rk-valor, .px-v, .mg-tile b.big, .pl-num b, .pl-kpi b, .mt-k b, .fs-num, .pl-pd .num, .gm-card b';
+  var NUM = '.g-value, .g-stat b, .proj-val, .rk-valor, .px-v, .mg-tile b.big, .pl-num b, .pl-kpi b, .mt-k b, .fs-num, .pl-pd .num, .gm-card b, .dsp-num b, .dsp-c2 i';
   // selos pequenos que "estouram" no lugar depois do bloco (reunião na agenda, medalha, veredito da meta)
   var POP = '.tl-ev, .rk-pos, .mg-ver, .nb-pill';
   var BARRAS = '.bar, .spark i';
