@@ -1240,6 +1240,11 @@ img { max-width:100%; height:auto; }
 .gv-ajuda.alerta .gv-ajuda-t { flex:1 1 100%; } .gv-ajuda.alerta b { color:#ffd166; }
 .grav-capa .gc-aviso { background:rgba(255,209,102,.92); color:#1a1300; }
 .grav-capa .grav-pill { background:rgba(10,12,16,.8) !important; box-shadow:0 2px 8px rgba(0,0,0,.35); }   /* legível em cima da capa */
+.gv-na-janela { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; text-align:center; padding:20px;
+  background:linear-gradient(180deg, rgba(8,10,14,.72), rgba(8,10,14,.9)); color:var(--text2); font-size:.76rem; }
+.gv-na-janela b { color:#fff; font-size:.95rem; }
+.gv-na-janela div { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+.gv-na-janela .btn { padding:7px 12px; font-size:.7rem; }
 .gv-caps { margin-top:12px; }
 .gv-caps h4 { margin:0 0 8px; font-size:.64rem; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); }
 .gv-caps-l { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; scrollbar-width:thin; }
@@ -2587,7 +2592,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-25-1652';
+var VERSAO_DASH = '2026-09-25-1712';
 var _versaoNova = null;
 
 // =====================================================================
@@ -15256,14 +15261,18 @@ function gvTocarEm(seg, origemEl) {
   if (!vid) return;
   var f = document.getElementById('gv-frame'); if (!f) return;
   seg = Math.max(0, Math.round(+seg || 0));
-  f.classList.remove('ok');
-  f.src = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?t=' + seg;
-  setTimeout(function() { f.classList.add('ok'); }, 6000);   // garantia: não fica escondido se o Drive demorar
+  var naJanela = gvJanelaAberta();
+  if (naJanela) gvJanela(seg);   // o vídeo está na janela ao lado: ela vai para o minuto
+  else {
+    f.classList.remove('ok');
+    f.src = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?t=' + seg;
+    setTimeout(function() { f.classList.add('ok'); }, 6000);   // garantia: não fica escondido se o Drive demorar
+  }
   GRAV._seg = seg;
   var link = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view?t=' + seg;
   var m = document.getElementById('gv-momento');
   if (m) {
-    m.innerHTML = '<b>▶ ' + gvHora(seg) + '</b><span>o vídeo foi para esse momento — é só dar o play</span>'
+    m.innerHTML = '<b>▶ ' + gvHora(seg) + '</b><span>' + (naJanela ? 'a janela do vídeo foi para esse momento' : 'o vídeo foi para esse momento — é só dar o play') + '</span>'
       + '<a class="btn" href="' + link + '" target="_blank" rel="noopener">↗ Abrir no Drive neste ponto</a>'
       + '<button class="btn" onclick="gvCopiarMomento()">🔗 Copiar link</button>';
     m.classList.remove('on'); void m.offsetWidth; m.classList.add('on');
@@ -15274,13 +15283,56 @@ function gvTocarEm(seg, origemEl) {
   var pal = document.querySelector('#gv .gv-palco');
   if (pal && window.innerWidth <= 980) pal.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+// 🪟 VÍDEO NA JANELA AO LADO (Bruno 25/09/2026: "corrija estes" — "Não foi possível carregar o vídeo" dentro do dash):
+// o player do Google embutido em OUTRO site depende de "cookies de terceiros"; quando o navegador barra, ele falha.
+// Na página do próprio Drive o mesmo vídeo toca. Aqui o vídeo abre numa janela do Drive e continua ligado à conversa:
+// clicar numa fala, num horário ou num momento leva essa janela até o minuto (/view?t=, que o Drive aceita).
+GRAV._janela = null;
+function gvJanelaAberta() { try { return !!(GRAV._janela && !GRAV._janela.closed); } catch (e) { return false; } }
+function gvJanela(seg) {
+  var x = GRAV._aberto && GRAV._aberto.x, vid = x && (x.rec || [])[0]; if (!vid) return;
+  var url = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view' + (seg ? '?t=' + Math.round(seg) : '');
+  var w = GRAV._janela;
+  if (!gvJanelaAberta()) {
+    var larg = Math.min(1100, Math.round((screen.availWidth || 1400) * 0.55)), alt = Math.min(720, Math.round((screen.availHeight || 900) * 0.75));
+    var esq = (screen.availLeft || 0) + (screen.availWidth || 1400) - larg - 10, topo = (screen.availTop || 0) + 40;
+    w = window.open('', 'promovVideo', 'width=' + larg + ',height=' + alt + ',left=' + esq + ',top=' + topo);
+    if (!w) { avisoRapido('⚠️ O navegador bloqueou a janela. Permita janelas (pop-ups) para este site e clique de novo.'); return; }
+    try { w.opener = null; } catch (eO) {}
+    GRAV._janela = w;
+  }
+  try { w.location.href = url; w.focus(); } catch (eL) { window.open(url, 'promovVideo'); }
+  gvModoJanela(true);
+}
+// com o vídeo na janela, o quadro de dentro para (não tocam dois ao mesmo tempo) e explica
+function gvModoJanela(on) {
+  var v = document.querySelector('#gv .gv-video'), f = document.getElementById('gv-frame'); if (!v || !f) return;
+  var aviso = v.querySelector('.gv-na-janela');
+  if (on) {
+    if (f.src !== 'about:blank') { f.setAttribute('data-src', f.src); f.src = 'about:blank'; }
+    f.classList.remove('ok');
+    if (!aviso) v.insertAdjacentHTML('beforeend', '<div class="gv-na-janela"><b>🪟 O vídeo está na janela ao lado</b><span>clique numa fala, num horário ou num momento e a janela vai até ele</span>'
+      + '<div><button class="btn primary" onclick="gvJanelaFrente()">Mostrar a janela do vídeo</button><button class="btn" onclick="gvVerAqui()">Ver aqui dentro</button></div></div>');
+  } else if (aviso) aviso.remove();
+}
+function gvJanelaFrente() { if (gvJanelaAberta()) { try { GRAV._janela.focus(); } catch (e) {} } else gvJanela(GRAV._seg || 0); }
+function gvVerAqui() {
+  try { if (GRAV._janela && !GRAV._janela.closed) GRAV._janela.close(); } catch (e) {}
+  GRAV._janela = null;
+  gvModoJanela(false);
+  var f = document.getElementById('gv-frame'); if (!f) return;
+  var x = GRAV._aberto && GRAV._aberto.x, vid = x && (x.rec || [])[0];
+  f.src = f.getAttribute('data-src') || ('https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview');
+  setTimeout(function() { f.classList.add('ok'); }, 6000);
+}
 // vídeo que não abre (Bruno 25/09/2026: "tem alguns que não abrem"): diz o motivo quando o robô sabe e dá as saídas
 function gvAjudaVideo(x, vid) {
   var ab = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view', bx = 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(vid);
   var aviso = x.vs === 'acesso' ? '🔒 <b>Esta reunião foi criada por outra conta</b> e o robô não tem acesso ao vídeo. Abra no Drive logado na conta que criou a reunião.'
     : x.vs === 'proc' ? '⏳ <b>O Google Drive ainda não preparou este vídeo</b> para tocar aqui dentro (acontece com gravação recém-terminada, muito longa ou que deu problema). Tente recarregar mais tarde ou baixe o arquivo.'
     : '';
-  return '<div class="gv-ajuda' + (aviso ? ' alerta' : '') + '">' + (aviso ? '<span class="gv-ajuda-t">' + aviso + '</span>' : '<span class="gv-ajuda-t">Vídeo não abriu?</span>')
+  return '<div class="gv-ajuda' + (aviso ? ' alerta' : '') + '">' + (aviso ? '<span class="gv-ajuda-t">' + aviso + '</span>' : '<span class="gv-ajuda-t">Vídeo não carregou aqui?</span>')
+    + '<button class="btn primary" onclick="gvJanela(GRAV._seg||0)" title="Abre o vídeo numa janela do Drive, ao lado — continua ligado à conversa">🪟 Assistir em janela ao lado</button>'
     + '<button class="btn" onclick="gvRecarregarVideo()">↻ Recarregar</button>'
     + '<a class="btn" href="' + ab + '" target="_blank" rel="noopener">↗ Abrir no Drive</a>'
     + '<a class="btn" href="' + bx + '" target="_blank" rel="noopener">⬇ Baixar</a></div>';
@@ -15393,8 +15445,9 @@ function gravAbrir(i, foco) {
   document.body.style.overflow = 'hidden';
   GRAV._aberto = { x: x, p: p };
   GRAV._seg = 0;
+  if (vid && gvJanelaAberta()) { gvJanela(0); }   // a janela ao lado acompanha a reunião nova
   if (vid) {
-    setTimeout(function() { var fr = document.getElementById('gv-frame'); if (fr) fr.classList.add('ok'); }, 8000);
+    setTimeout(function() { var fr = document.getElementById('gv-frame'); if (fr && !gvJanelaAberta()) fr.classList.add('ok'); }, 8000);
     clearTimeout(GRAV._tVista);
     if (!vistaJa) GRAV._tVista = setTimeout(function() { if (GRAV._aberto && GRAV._aberto.x === x) gravMarcarVista(x, true); }, 120000);
   }
