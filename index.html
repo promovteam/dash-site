@@ -2596,7 +2596,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-25-2000';
+var VERSAO_DASH = '2026-09-26-0811';
 var _versaoNova = null;
 
 // =====================================================================
@@ -9186,23 +9186,12 @@ function dspLink(dia) {
   var n = dspClintNumero();
   return 'https://wa.me/' + (n || 'NUMERODACLINT') + '?text=' + encodeURIComponent(dspFrasePronta(dia));
 }
-// a mensagem do DISPARO (Bruno 25/09/2026: "tira essa parte e melhore o restante"): saiu o "Se preferir, é só responder" —
-// o disparo sai de OUTRO número, então resposta direta não chega na Clint. Toca na dor do avatar (referência na vida
-// real, pequeno no Instagram) e termina no link, que é o único caminho.
-function dspMensagem(dia) {
-  return 'Oi, {primeiro_nome}! Tudo bem? 👋\n\n'
-    + 'Aqui é da equipe do João Stecca.\n\n'
-    + 'Muita gente que é referência no olho no olho ainda aparece pequena no Instagram. '
-    + 'Se isso também acontece com você, abrimos alguns horários esta semana para te ajudar.\n\n'
-    + 'É o *Diagnóstico de Perfil gratuito*: uma conversa individual em que olhamos o seu Instagram junto com você '
-    + 'e mostramos o caminho para transformar a sua mensagem em renda.\n\n'
-    + 'São poucas vagas. Para garantir a sua, toque no link e envie a mensagem que já aparece pronta 👇\n\n'
-    + dspLink(dia);
-}
-function dspCopiar(qual, diaMs) {
-  var dia = new Date(+diaMs), txt = qual === 'link' ? dspLink(dia) : dspMensagem(dia);
+// a mensagem do DISPARO saiu do dash (Bruno 25/09/2026: "tira essa parte" / "não quero que melhore, quero que tire"):
+// o texto do disparo é com ele; aqui fica só o link da Clint com a frase pronta.
+function dspCopiar(diaMs) {
+  var txt = dspLink(new Date(+diaMs));
   if (!dspClintNumero()) { alert('Falta o número do WhatsApp da Clint — preencha no quadro "Preparo do disparo" e copie de novo.'); return; }
-  try { navigator.clipboard.writeText(txt); avisoRapido(qual === 'link' ? '🔗 Link copiado' : '📋 Mensagem copiada — é só colar na ferramenta do disparo'); }
+  try { navigator.clipboard.writeText(txt); avisoRapido('🔗 Link copiado'); }
   catch (e) { prompt('Copie:', txt); }
 }
 function dspEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -9276,7 +9265,7 @@ function renderDisparos() {
   h += '<div class="dsp-conf">💬 Respostas conferidas na Clint: <b>' + (r.conf ? r.conf + ' de ' + r.n : 'ainda não') + '</b> · o robô confere sozinho a cada 15 min'
     + ' <button class="btn" style="padding:4px 10px;font-size:.66rem;"' + (DSP.conferindo ? ' disabled' : '') + ' onclick="dspConferirRespostas(\'' + r.g.nome.replace(/['\\]/g, '') + '\')">conferir agora</button>'
     + (DSP.confMsg ? ' <span style="color:#ffd166;">' + dspEsc(DSP.confMsg) + '</span>' : '') + '</div></div>';
-  // --- preparo do disparo: mensagem + link com a frase pronta ---
+  // --- preparo do disparo: link com a frase pronta ---
   var num = dspClintNumero(), diaMs = r.g.dia.getTime();
   h += '<div class="panel dsp-prep"><h3>🧾 Preparo do disparo</h3>'
     + '<ul class="dsp-check">'
@@ -9284,16 +9273,11 @@ function renderDisparos() {
     + '<li class="' + (num ? 'ok' : 'falta') + '">' + (num ? '✅ WhatsApp da Clint: <b>+' + num + '</b> <a href="#" onclick="event.preventDefault();localStorage.removeItem(\'v2ClintNumero\');renderDisparos();">trocar</a>'
         : '⚠️ Número do WhatsApp da Clint: <input class="edit-in" id="dsp-num" placeholder="DDD + número" style="width:150px;padding:5px 8px;font-size:.74rem;" onkeydown="if(event.key===\'Enter\')dspSalvarNumero(this.value)"> <button class="btn" style="padding:4px 10px;font-size:.66rem;" onclick="dspSalvarNumero(document.getElementById(\'dsp-num\').value)">salvar</button>') + '</li>'
     + '<li class="ok">✅ Chega na Clint: <b class="dsp-frase">' + dspEsc(dspFrasePronta(r.g.dia)) + '</b></li></ul>'
-    + '<div class="dsp-msg">' + dspEsc(dspMensagem(r.g.dia).replace(dspLink(r.g.dia), '§LINK§')).replace(/\n/g, '<br>').replace(/\*([^*]+)\*/g, '<b>$1</b>')
-        .replace(/\{primeiro_nome\}/g, '<span class="dsp-var">{primeiro_nome}</span>')
-        .replace('§LINK§', '<span class="dsp-linkchip" title="' + dspEsc(dspFrasePronta(r.g.dia)) + '">🔗 link para o WhatsApp da Clint · já vem com a frase pronta</span>') + '</div>'
-    + '<div class="dsp-acoes"><button class="btn primary" onclick="dspCopiar(\'msg\',' + diaMs + ')">📋 Copiar mensagem</button>'
-    + '<button class="btn" onclick="dspCopiar(\'link\',' + diaMs + ')">🔗 Copiar só o link</button>'
+    + '<div class="dsp-acoes"><button class="btn primary" onclick="dspCopiar(' + diaMs + ')">🔗 Copiar o link</button>'
     + (num ? '<a class="btn" href="' + dspEsc(dspLink(r.g.dia)) + '" target="_blank" rel="noopener">▶ Testar o link</a>' : '') + '</div>'
     + '<div class="dsp-como"><b>Por que dá para saber quem veio do disparo:</b> o link abre o WhatsApp da Clint com a frase pronta. '
     + 'Quem chega com “quero reservar meu horário” ganha o selo <span class="dsp-selo">🔗 veio pelo link</span>. '
-    + 'A mensagem não pede para responder porque o disparo sai de outro número — resposta direta não chega na Clint. '
-    + 'Use <b>{primeiro_nome}</b> como campo da ferramenta de disparo. Não mude a frase do link — é por ela que o robô reconhece.</div></div></div>';
+    + 'Não mude a frase do link — é por ela que o robô reconhece.</div></div></div>';
   // --- dia a dia ---
   if (r.fase !== 'antes') {
     var dias = [], maxD = 1;
