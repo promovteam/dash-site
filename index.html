@@ -2624,7 +2624,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1427';
+var VERSAO_DASH = '2026-09-27-1436';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3566,7 +3566,7 @@ function _ultCard(r) {
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b>'
     + '<span>' + [r.leadId, r.date.toLocaleDateString('pt-BR'), r.closer].filter(Boolean).join(' · ') + '</span></div>'
     + seloAnuncio(r, true) + igSeloLead(r, true)
-    + (function(){ var ig = crInstaDe(r, r); return ig ? '<a class="ld-wa" style="background:rgba(214,41,118,.14);border-color:rgba(214,41,118,.45);color:#ff8fc0;padding:5px 9px;" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + gravEsc(ig) + ' no Instagram">📸</a>' : ''; })()
+    + (function(){ var ig = crInstaDe(r, r); return ig ? '<a class="ld-wa" style="background:rgba(214,41,118,.10);border-color:rgba(214,41,118,.4);padding:4px 7px;display:inline-flex;align-items:center;" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + gravEsc(ig) + ' no Instagram" aria-label="Instagram">' + igLogo(false, 16) + '</a>' : ''; })()
     + (function(){   // 🟣 Clint aqui também (pedido do Bruno 24/08/2026 — no PC da Sarah só aparecia na aba Leads)
         var lk = '';
         try { lk = clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone), nome: r.nome }); } catch (e) { lk = ''; }
@@ -4935,7 +4935,18 @@ function avisoRapido(txt) {
 // 26/09/2026 (Bruno: "melhore essa experiência dentro dos cards" — print com o nome/detalhes espremidos numa coluna fina):
 // cartão em 3 partes — foto · nome + detalhes numa linha larga + etiquetas embaixo · valor e situação à direita com
 // os botões (Clint e WhatsApp) logo abaixo. Produto sem "Programa/Mentoria", data curta no ano corrente.
-// @ do Instagram do lead para o botão 📸: o que foi escrito ao marcar (Observação da planilha) ou o do formulário
+// logo do Instagram (Bruno 27/09/2026: "se puder no insta colocar a logo do insta") — desenho próprio, colorido; cinza = sem @
+var _igLogoN = 0;
+function igLogo(cinza, tam) {
+  var id = 'igG' + (++_igLogoN), t = tam || 15;
+  var fundo = cinza ? '#5b616e' : 'url(#' + id + ')';
+  return '<svg class="ig-logo" viewBox="0 0 24 24" width="' + t + '" height="' + t + '" aria-hidden="true" focusable="false">'
+    + (cinza ? '' : '<defs><radialGradient id="' + id + '" cx="30%" cy="107%" r="150%"><stop offset="0" stop-color="#fdf497"/><stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/><stop offset=".9" stop-color="#285aeb"/></radialGradient></defs>')
+    + '<rect x="1.5" y="1.5" width="21" height="21" rx="6.2" fill="' + fundo + '"/>'
+    + '<rect x="6" y="6" width="12" height="12" rx="3.8" fill="none" stroke="#fff" stroke-width="1.9"/>'
+    + '<circle cx="12" cy="12" r="2.95" fill="none" stroke="#fff" stroke-width="1.9"/><circle cx="16.7" cy="7.3" r="1.1" fill="#fff"/></svg>';
+}
+// @ do Instagram do lead para o botão do Instagram: o que foi escrito ao marcar (Observação da planilha) ou o do formulário
 function crInstaDe(r, rx) {
   var ig = '';
   try { ig = gvInstaLimpo((String((r && r.obs) || '').match(/Instagram:\s*([^|\n]+)/i) || [])[1]); } catch (e) {}
@@ -4945,8 +4956,8 @@ function crInstaDe(r, rx) {
 }
 function crInstaBotao(r, rx) {
   var ig = crInstaDe(r, rx);
-  return ig ? '<a class="ld-wa cr-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + gravEsc(ig) + ' no Instagram" aria-label="Abrir o Instagram de ' + gravEsc(r.nome || '') + '">📸 Instagram</a>'
-    : '<span class="ld-wa cr-ig cr-ig-off" title="Ninguém escreveu o Instagram desta pessoa">📸 sem @</span>';
+  return ig ? '<a class="ld-wa cr-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + gravEsc(ig) + ' no Instagram" aria-label="Abrir o Instagram de ' + gravEsc(r.nome || '') + '">' + igLogo() + ' Instagram</a>'
+    : '<span class="ld-wa cr-ig cr-ig-off" title="Ninguém escreveu o Instagram desta pessoa">' + igLogo(true) + ' sem @</span>';
 }
 function v2row(r) {
   var i = v2reg(r);
@@ -16061,7 +16072,7 @@ function gravAbrir(i, foco) {
     +   '<div class="gv-acoes">'
     +     '<button class="btn gv-vista' + (vistaJa ? ' on' : '') + '" id="gv-vista" onclick="gravAlternarVista()" title="Fica guardado neste aparelho">' + (vistaJa ? '✓ Assistida' : '👀 Marcar assistida') + '</button>'
     +     '<button class="btn" onclick="gvDir(\'quem\')" title="Quem é esse lead — o vídeo continua tocando">👤 Quem é</button>'
-    +     (gvInstaDe(x) ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(gvInstaDe(x)) + '" target="_blank" rel="noopener" title="@' + gravEsc(gvInstaDe(x)) + ' no Instagram">📸 Instagram</a>' : '')
+    +     (gvInstaDe(x) ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(gvInstaDe(x)) + '" target="_blank" rel="noopener" title="@' + gravEsc(gvInstaDe(x)) + ' no Instagram">' + igLogo() + ' Instagram</a>' : '')
     +     (x.tel ? '<button class="btn gq-cl" onclick="gvClint(event)" title="Abrir a conversa deste lead na Clint">🟣 Clint</button>' : '')
     +     (doc ? '<a class="btn" href="https://docs.google.com/document/d/' + encodeURIComponent(doc) + '/edit" target="_blank" rel="noopener" title="Anotações e transcrição do Gemini no Google Docs">📝 Docs</a>' : '')
     +     (vid ? '<a class="btn" href="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view" target="_blank" rel="noopener" title="Abrir o vídeo no Google Drive">↗ Drive</a>' : '') + outros
@@ -16403,7 +16414,7 @@ function gvQuemDesenhar() {
     + '<div class="gq-pills"><span class="gq-pill" style="color:' + st.c + ';background:' + st.b + ';">' + st.t + '</span>'
     + (r && r.produto ? '<span class="gq-pill">' + e(r.produto) + '</span>' : '') + (valor ? '<span class="gq-pill">' + e(valor) + '</span>' : '') + '</div></div></div>';
   h += '<div class="gq-acoes">'
-    + (ig ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" title="Abrir o perfil no Instagram">📸 @' + e(ig) + '</a>' : '<span class="btn gq-off" title="Ninguém escreveu o Instagram desta pessoa">📸 sem Instagram</span>')
+    + (ig ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" title="Abrir o perfil no Instagram">' + igLogo() + ' @' + e(ig) + '</a>' : '<span class="btn gq-off" title="Ninguém escreveu o Instagram desta pessoa">' + igLogo(true) + ' sem Instagram</span>')
     + (tel ? '<button class="btn gq-cl" onclick="gvClint(event)" title="Abrir a conversa na Clint">🟣 Conversa na Clint</button>' : '')
     + (tel ? '<a class="btn gq-wa" href="https://wa.me/55' + tel.slice(-11) + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '')
     + '<button class="btn" onclick="gvFichaCompleta()" title="A ficha inteira abre por cima — o vídeo continua">📋 Ficha completa</button>'
@@ -23016,6 +23027,8 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 .cr2 .cr-ig { display:inline-flex !important; align-items:center; gap:6px; height:32px; padding:0 13px !important; border-radius:999px !important; font-size:.72rem; font-weight:800; text-decoration:none;
   background:linear-gradient(135deg, rgba(254,218,117,.14), rgba(214,41,118,.22), rgba(79,91,213,.2)) !important; border-color:rgba(214,41,118,.5) !important; color:#fff !important; }
 .cr2 .cr-ig:hover { filter:brightness(1.2); }
+.ig-logo { flex:none; display:inline-block; vertical-align:-3px; }
+.btn .ig-logo, .ld-wa .ig-logo { margin-right:1px; }
 .cr2 .cr-ig.cr-ig-off { background:rgba(255,255,255,.04) !important; border-color:rgba(255,255,255,.1) !important; color:var(--muted) !important; cursor:default; }
 .cr2 .cr-ig.cr-ig-off:hover { filter:none; }
 @media (max-width:760px) {
