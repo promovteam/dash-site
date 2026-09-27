@@ -2582,7 +2582,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-26-2311';
+var VERSAO_DASH = '2026-09-26-2318';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3619,10 +3619,16 @@ function igSeloLead(l, mini) {
   if (!p) return '';
   var qd = p.quando ? new Date(p.quando) : null;
   var dia = (qd && !isNaN(qd)) ? qd.toLocaleDateString('pt-BR').slice(0, 5) : '';
-  var tit = 'pediu diagnóstico no Instagram' + (dia ? ' em ' + dia : '') + (p.texto ? ': "' + p.texto.replace(/"/g, "'") + '"' : '') + ' — clique para abrir o post';
+  // 26/09/2026 (Bruno: "mostre os criativos orgânicos na lista do lead"): o selo diz QUAL post trouxe (apelido do post
+  // na aba Criativos), como o 📣 dos anúncios pagos; sem apelido, fica o "📷 pediu" de antes
+  var po = null; try { po = POSTS_ORG.porLink[p.post] || POSTS_ORG.porCodigo[_igCodigoDash(p.post)] || null; } catch (ePo) {}
+  var apel = po && po.apelido ? String(po.apelido).trim() : '';
+  var tit = 'pediu diagnóstico no Instagram' + (apel ? ' no post "' + apel.replace(/"/g, "'") + '"' : '') + (dia ? ' em ' + dia : '') + (p.texto ? ': "' + p.texto.replace(/"/g, "'") + '"' : '') + ' — clique para abrir o post';
+  var corte = mini ? 20 : 30;
   return '<span class="ld-tag" title="' + tit + '" onclick="event.stopPropagation();window.open(' + JSON.stringify(p.post) + ',\'_blank\')"'
-    + ' style="background:rgba(61,220,151,.14);color:#3ddc97;cursor:pointer;">📷 pediu' + (p.vezes > 1 ? ' ' + p.vezes + 'x' : '')
-    + (mini ? '' : (dia ? ' · ' + dia : '')) + (p.seg != null ? ' · ' + (p.seg >= 1000 ? Math.round(p.seg / 1000) + 'k' : p.seg) + ' seg.' : '') + '</span>';
+    + ' style="background:rgba(61,220,151,.14);color:#3ddc97;cursor:pointer;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;">'
+    + (apel ? '📱 ' + (apel.length > corte ? apel.slice(0, corte) + '…' : apel) : '📷 pediu') + (p.vezes > 1 ? ' · ' + p.vezes + 'x' : '')
+    + (mini ? '' : (dia ? ' · ' + dia : '')) + (!apel && p.seg != null ? ' · ' + (p.seg >= 1000 ? Math.round(p.seg / 1000) + 'k' : p.seg) + ' seg.' : '') + '</span>';
 }
 function seloAnuncio(x, mini) {
   var a = anuncioDe(x);
@@ -4133,6 +4139,7 @@ function carregarPostsOrganicos() {
       (d.lista || []).forEach(function(p){ if (p.link && p.fotoId) { POSTS_ORG.porLink[p.link] = p; var c = _igCodigoDash(p.link); if (c) POSTS_ORG.porCodigo[c] = p; } });
       POSTS_ORG.carregado = true;
       try { aplicarCapasIG(); } catch (eC) {}
+      try { if (typeof renderLeadsLogo === 'function') renderLeadsLogo(); } catch (eRl) {}   // os selos 📱 ganham o nome do post
       setTimeout(function(){ try { pedirCapasIG(); } catch (eP) {} }, 800);
     }
   };
@@ -13883,9 +13890,12 @@ function abrirLead(i) {
   document.getElementById('fl-sub').innerHTML = [r.leadId ? '🆔 ' + r.leadId : '', r.status, r.origem, r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).map(_fsEsc).join(' · ') + ' ' + seloBloqueio(r.telefone, r.nome);
   var tel = (r.telefone || '').replace(/\D/g, '');
   var wa = tel ? 'https://wa.me/' + (tel.length <= 11 ? '55' + tel : tel) : '';
+  // 26/09/2026 (Bruno: "que não dê opção de mudar o número do lead, mas dê opção de mudar o nome"):
+  // o nome aparece para editar (só no modo edição — em cima ele já está no título); telefone e ID ficam travados
   _ficha = [
+    { ico:'👤', nome:'Nome do lead', valor: r.nome || '—', campo:'nome', soEdicao: true },
     { ico:'🆔', nome:'ID do lead', valor: r.leadId || '—' },
-    { ico:'📱', nome:'Telefone / WhatsApp', valor: r.telefone || '—', tipo: wa ? 'tel' : undefined, wa: wa, campo:'telefone' },
+    { ico:'📱', nome:'Telefone / WhatsApp', valor: r.telefone || '—', tipo: wa ? 'tel' : undefined, wa: wa, trava: true },
     { ico:'🎯', nome:'Produto', valor: r.produto || '—', campo:'produto',
       opcoes: v2usados('produto') },
     { ico:'📅', nome:'Reunião', valor: r.date ? r.date.toLocaleDateString('pt-BR') : '—', campo:'data' },
@@ -14158,6 +14168,19 @@ function copiarDadosPag(btn) {
   copiarTexto(linhas.join('\n'), btn);
 }
 
+// abre a sala do vídeo a partir de um link do Drive/Docs (ficha da reunião). Devolve true = seguir o link normal.
+function fichaAbrirSala(link, foco, ev) {
+  var m = String(link || '').match(/\/d\/([A-Za-z0-9_-]{10,})/) || String(link || '').match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  var id = m ? m[1] : '';
+  if (!id || typeof GRAV === 'undefined' || !GRAV.itens || !GRAV.itens.length) return true;
+  var k = -1;
+  for (var i = 0; i < GRAV.itens.length; i++) { var x = GRAV.itens[i]; if ((x.rec || []).indexOf(id) !== -1 || (x.doc || []).indexOf(id) !== -1) { k = i; break; } }
+  if (k === -1) return true;
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  GRAV.vis = GRAV.itens.slice();
+  gravAbrir(k, foco || '');
+  return false;
+}
 // busca no Google Calendar o evento deste lead e mostra Meet/gravação/transcrição na ficha
 function preencherGravacao(r) {
   var card = document.getElementById('card-gravacao');
@@ -14173,8 +14196,11 @@ function preencherGravacao(r) {
     r._ev = { id: ev.id, cal: ev._cal }; // vínculo planilha ↔ evento (para sincronizar edições)
     var links = [];
     if (ev.meetLink) links.push('<a class="btn" style="text-decoration:none;" href="' + ev.meetLink + '" target="_blank" rel="noopener">📹 Meet</a>');
-    if (ev.recordingLink) links.push('<a class="btn" style="text-decoration:none;" href="' + ev.recordingLink + '" target="_blank" rel="noopener">🎬 Gravação</a>');
-    if (ev.transcriptLink) links.push('<a class="btn" style="text-decoration:none;" href="' + ev.transcriptLink + '" target="_blank" rel="noopener">📝 Transcrição</a>');
+    // 26/09/2026 (Bruno: "e dentro da ficha melhore"): a gravação abre a SALA do dash (vídeo + conversa + resumo);
+    // se a reunião não está na lista carregada, segue para o Drive como antes
+    if (ev.recordingLink) links.push('<a class="btn primary" style="text-decoration:none;" href="' + ev.recordingLink + '" target="_blank" rel="noopener" onclick="return fichaAbrirSala(\'' + ev.recordingLink.replace(/'/g, '') + '\',\'\',event)">▶ Assistir a gravação</a>');
+    if (ev.transcriptLink) links.push('<a class="btn" style="text-decoration:none;" href="' + ev.transcriptLink + '" target="_blank" rel="noopener" onclick="return fichaAbrirSala(\'' + ev.transcriptLink.replace(/'/g, '') + '\',\'transcricao\',event)">💬 Ler a conversa</a>');
+    if ((ev.recordingLink || ev.transcriptLink) && typeof GRAV !== 'undefined' && !GRAV.carregado && !GRAV.carregando) { try { gravCarregar(); } catch (eGc) {} }
     if (!links.length) return;
     card.style.display = '';
     card.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
@@ -14193,6 +14219,11 @@ function preencherGravacao(r) {
 function desenharInfo() {
   var html = '';
   _ficha.forEach(function(c, i) {
+    if (c.soEdicao && !_modoEdicao) return;
+    if (_modoEdicao && (!c.campo || c.trava)) {   // campo que não se muda por aqui: aparece travado
+      html += '<div class="dtl-line fl-trava" title="não dá para mudar por aqui"><span>' + c.ico + ' ' + c.nome + ' 🔒</span><b>' + c.valor + '</b></div>';
+      return;
+    }
     if (_modoEdicao) {
       var campo;
       if (c.opcoes) {
@@ -14821,7 +14852,7 @@ function alternarEdicao() {
   var r = _v2reg[_fichaAtual];
   if (!r) return;
   var btn = document.getElementById('btn-editar');
-  if (!_modoEdicao) { _modoEdicao = true; desenharInfo(); return; }
+  if (!_modoEdicao) { if (typeof soOlhar === 'function' && soOlhar()) return; _modoEdicao = true; desenharInfo(); return; }
 
   // coleta mudanças
   var mudancas = [];
@@ -14843,10 +14874,17 @@ function alternarEdicao() {
   btn.disabled = true;
 
   // manda tudo (data por último, porque move a linha)
-  var normais = mudancas.filter(function(m){ return m.campo !== 'data'; });
+  // ordem: campos comuns (a planilha acha a linha pelo nome antigo) → NOME → data (que muda a linha de lugar)
+  var normais = mudancas.filter(function(m){ return m.campo !== 'data' && m.campo !== 'nome'; });
+  var deNome = mudancas.filter(function(m){ return m.campo === 'nome' && String(m.valor || '').trim().length >= 2; });
   var deData = mudancas.filter(function(m){ return m.campo === 'data'; });
   var fila = Promise.resolve();
   normais.forEach(function(m) { fila = fila.then(function(){ return v2salvarCampo(r, m.campo, m.valor); }); });
+  deNome.forEach(function(m) { fila = fila.then(function(){ return v2salvarCampo(r, 'nome', String(m.valor).trim()).then(function(res) {
+    if (res === false || (res && res.success === false)) return;
+    r.nome = String(m.valor).trim();
+    try { document.getElementById('fl-nome').textContent = r.nome; document.getElementById('fl-avatar').textContent = v2ini(r.nome); } catch (eN) {}
+  }); }); });
   deData.forEach(function(m) { fila = fila.then(function(){ return v2salvarCampo(r, m.campo, m.valor); }); });
 
   fila.then(function() {
@@ -21976,6 +22014,7 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 #lead-info .dtl-line[data-k="valor"] > b { color:var(--green); font-size:1.02rem; }
 #lead-info .dtl-line[data-k="valor"], #lead-info .dtl-line[data-k="status"] { border-color:rgba(61,220,151,.22); background:rgba(61,220,151,.05); }
 #lead-info .dtl-line[data-k="produto"], #lead-info .dtl-line[data-k="telefone"] { grid-column:1 / -1; }
+#lead-info .dtl-line.fl-trava { opacity:.6; border-style:dashed; }
 #fl-formulario .dtl-line { flex-direction:column; align-items:flex-start; gap:3px; }
 #fl-formulario .dtl-line > span:first-child { font-size:.62rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
 #fl-formulario .dtl-line > b { max-width:100% !important; text-align:left !important; font-size:.84rem; line-height:1.45; }
