@@ -1247,6 +1247,8 @@ img { max-width:100%; height:auto; }
   font-size:1.6rem; font-style:normal; padding-left:5px; box-shadow:0 10px 34px rgba(0,0,0,.55); transition:transform .15s ease; }
 .gv-tocar:active i, .cri-tocar:active i { transform:scale(.92); }
 .gv-tocar span, .cri-tocar span { text-shadow:0 2px 10px rgba(0,0,0,.8); letter-spacing:.2px; }
+a.gv-tocar { text-decoration:none; color:#fff; }
+.gv-tocar-sub { font-size:.66rem; font-weight:700; color:rgba(255,255,255,.85); text-shadow:0 2px 8px rgba(0,0,0,.9); margin-top:-4px; }
 @media (max-width:760px) { .gv-ajuda:not(.alerta) { display:none !important; } }
 html.vtela-on, html.vtela-on body { overflow:hidden !important; }
 #vtela { position:fixed; inset:0; z-index:100002; background:#000; display:flex; flex-direction:column; color:#fff;
@@ -2621,7 +2623,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1212';
+var VERSAO_DASH = '2026-09-27-1220';
 var _versaoNova = null;
 
 // =====================================================================
@@ -15825,7 +15827,9 @@ function gvTocarEm(seg, origemEl) {
   var naJanela = gvJanelaAberta(), fora = gvPipAberto();
   if (fora) gvForaDaTela(seg);   // o vídeo está fora da tela: ele vai para o minuto
   else if (naJanela) gvJanela(seg);   // o vídeo está na janela ao lado: ela vai para o minuto
-  else if (vtelaCelular()) gvTelaCheia(seg);   // celular: abre a tela cheia já no minuto
+  else if (vtelaCelular()) {   // celular: abre no app do Drive (27/09/2026 — o player dentro do Safari roda sem login e o Google corta: "atingiu o limite")
+    try { window.open('https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view?t=' + seg, '_blank', 'noopener'); } catch (eW) {}
+  }
   else {
     f.classList.remove('ok');
     f.src = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?autoplay=1&t=' + seg;
@@ -15835,7 +15839,7 @@ function gvTocarEm(seg, origemEl) {
   var link = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view?t=' + seg;
   var m = document.getElementById('gv-momento');
   if (m) {
-    m.innerHTML = '<b>▶ ' + gvHora(seg) + '</b><span>' + (fora ? 'o vídeo fora da tela foi para esse momento' : naJanela ? 'a janela do vídeo foi para esse momento' : 'o vídeo foi para esse momento') + '</span>'
+    m.innerHTML = '<b>▶ ' + gvHora(seg) + '</b><span>' + (fora ? 'o vídeo fora da tela foi para esse momento' : naJanela ? 'a janela do vídeo foi para esse momento' : vtelaCelular() ? 'abri no Drive — se o app começar do início, arraste até ' + gvHora(seg) : 'o vídeo foi para esse momento') + '</span>'
       + '<a class="btn" href="' + link + '" target="_blank" rel="noopener">↗ Abrir no Drive neste ponto</a>'
       + '<button class="btn" onclick="gvCopiarMomento()">🔗 Copiar link</button>';
     m.classList.remove('on'); void m.offsetWidth; m.classList.add('on');
@@ -15860,7 +15864,12 @@ function gvJanela(seg) {
     var larg = Math.min(1100, Math.round((screen.availWidth || 1400) * 0.55)), alt = Math.min(720, Math.round((screen.availHeight || 900) * 0.75));
     var esq = (screen.availLeft || 0) + (screen.availWidth || 1400) - larg - 10, topo = (screen.availTop || 0) + 40;
     w = window.open('', 'promovVideo', 'width=' + larg + ',height=' + alt + ',left=' + esq + ',top=' + topo);
-    if (!w) { avisoRapido('⚠️ O navegador bloqueou a janela. Permita janelas (pop-ups) para este site e clique de novo.'); return; }
+    if (!w) {
+      avisoRapido('⚠️ O navegador bloqueou a janela. Permita janelas (pop-ups) para este site e clique de novo.');
+      // enquanto isso, o vídeo toca aqui dentro (não fica um quadro preto)
+      try { var fB = document.getElementById('gv-frame'); if (fB && fB.src === 'about:blank' && fB.getAttribute('data-src')) { fB.src = fB.getAttribute('data-src'); setTimeout(function() { fB.classList.add('ok'); }, GV_MOSTRA_MS); } } catch (eB) {}
+      return;
+    }
     try { w.opener = null; } catch (eO) {}
     GRAV._janela = w;
   }
@@ -15874,7 +15883,7 @@ function gvModoJanela(on) {
   if (on) {
     if (f.src !== 'about:blank') { f.setAttribute('data-src', f.src); f.src = 'about:blank'; }
     f.classList.remove('ok');
-    if (!aviso) v.insertAdjacentHTML('beforeend', '<div class="gv-na-janela"><b>🪟 O vídeo está na janela ao lado</b><span>clique numa fala, num horário ou num momento e a janela vai até ele</span>'
+    if (!aviso) v.insertAdjacentHTML('beforeend', '<div class="gv-na-janela"><b>🪟 O vídeo está na janela do Drive, ao lado</b><span>com o seu login do Google — sem o limite do player de dentro. Clique numa fala, num horário ou num momento e a janela vai até ele.</span>'
       + '<div><button class="btn primary" onclick="gvJanelaFrente()">Mostrar a janela do vídeo</button><button class="btn" onclick="gvVerAqui()">Ver aqui dentro</button></div></div>');
   } else if (aviso) aviso.remove();
 }
@@ -15904,9 +15913,15 @@ function gvAjudaVideo(x, vid) {
 }
 // 26/09/2026 (Bruno: "sempre pede para os cookies"): navegador que bloqueia cookies de outro site (Safari, Brave, aba anônima)
 // faz o player do Drive pedir cookies dentro do dash. Em janela própria isso não acontece — a escolha fica guardada no navegador.
-function gvSempreJanela() { try { return localStorage.getItem('v2GvSempreJanela') === '1'; } catch (e) { return false; } }
+// 27/09/2026 (Bruno: "no computador também"): o player do Google DENTRO do dash roda sem login quando o navegador bloqueia
+// cookies de outro site — e o Google corta ("atingiu o limite para quem não fez login"). A janela do Drive usa o login da
+// pessoa e não tem limite: vira o PADRÃO no computador (chave nova, vale para todo mundo); quem desmarcar volta ao player de dentro.
+function gvSempreJanela() {
+  var v = null; try { v = localStorage.getItem('v2GvJanelaPadrao'); } catch (e) {}
+  return v !== '0';
+}
 function gvSempreJanelaTroca(on) {
-  try { localStorage.setItem('v2GvSempreJanela', on ? '1' : ''); } catch (e) {}
+  try { localStorage.setItem('v2GvJanelaPadrao', on ? '1' : '0'); } catch (e) {}
   if (on) gvJanela(GRAV._seg || 0); else gvVerAqui();
 }
 function gvRecarregarVideo() {
@@ -15975,7 +15990,9 @@ function gravAbrir(i, foco) {
   GRAV._foco = foco || '';
   var p = gravPartes(x.t), st = GRAV_ST[gravStatus(x)] || GRAV_ST.agendada;
   var vid = (x.rec || [])[0], doc = (x.doc || [])[0];
-  var cel = !!vid && vtelaCelular();   // celular: o vídeo abre em tela cheia (27/09/2026)
+  var cel = !!vid && vtelaCelular();   // celular: o vídeo abre no app do Drive (27/09/2026)
+  var toque = !!(window.matchMedia && matchMedia('(hover:none) and (pointer:coarse)').matches);
+  var naJan = !!vid && !cel && (gvJanelaAberta() || (gvSempreJanela() && !toque));   // computador: o vídeo vai para a janela do Drive
   var dt = x.d ? new Date(x.d.slice(0, 10) + 'T12:00:00') : null, semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   var meta = [p.tipo, p.lid, dt ? semana[dt.getDay()] + ' ' + x.d.slice(8, 10) + '/' + x.d.slice(5, 7) + ' · ' + x.d.slice(11, 16) : '',
               gravDur(x.dur) ? '⏱ ' + gravDur(x.dur) : '', 'Closer ' + (GRAV.closers[x.k] || x.k), p.sdr ? 'SDR ' + p.sdr : '', gravOrigem(x) ? '🧲 ' + gravOrigem(x) : ''].filter(Boolean).join(' · ');
@@ -16006,8 +16023,8 @@ function gravAbrir(i, foco) {
     + '<div class="gv-corpo">'
     +   '<section class="gv-esq"><div class="gv-palco"><div class="gv-video"' + (vid ? ' data-vid="' + gravEsc(vid) + '" style="background-image:url(\'' + (GRAV.capas[vid] || 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w1280') + '\')"' : '') + '>'
     +     (vid && cel ? '<iframe id="gv-frame" src="about:blank" data-src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview" title="Gravação" style="display:none"></iframe>'
-             + '<button type="button" class="gv-tocar" onclick="gvTelaCheia(GRAV._seg||0)" aria-label="Assistir a gravação em tela cheia"><i>▶</i><span>Assistir em tela cheia</span></button>'
-           : vid ? '<iframe id="gv-frame" src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Gravação" onload="this.classList.add(\'ok\')"></iframe><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
+             + '<a class="gv-tocar" href="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view" target="_blank" rel="noopener" aria-label="Assistir a gravação no app do Drive"><i>▶</i><span>Assistir no app do Drive</span><small class="gv-tocar-sub">abre com o seu login do Google — sem limite</small></a>'
+           : vid ? '<iframe id="gv-frame" ' + (naJan ? 'src="about:blank" data-src' : 'src') + '="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Gravação" onload="this.classList.add(\'ok\')"></iframe><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
              + '<button type="button" class="gv-fora-bt" onclick="gvForaDaTela()" title="O vídeo sai do dash e fica flutuando por cima de tudo — dá para mexer no dash, no Instagram, na Clint">⧉ Assistir fora da tela</button>'
              : '<div class="gv-sem"><b>Sem vídeo desta reunião</b><span>ficaram só as anotações do Gemini</span></div>')
     +   '</div>' + (vid ? gvAjudaVideo(x, vid) + '<div class="gv-momento" id="gv-momento"></div>' : '')
@@ -23201,7 +23218,7 @@ body:has(.modal-overlay.open) #gv { z-index:150; }   /* a gravação desce para 
   -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); opacity:.88; transition:opacity .2s ease, transform .2s ease, background .2s ease; }
 .gv-fora-bt:hover, .gv-fora-bt:focus-visible { opacity:1; background:rgba(246,163,80,.92); color:#1a1206; border-color:rgba(246,163,80,1); transform:translateY(-1px); }
 .gv-fora-bt:focus-visible { outline:2px solid #fff; outline-offset:2px; }
-.gv-video:has(.gv-fora-aviso) .gv-fora-bt { display:none; }
+.gv-video:has(.gv-fora-aviso) .gv-fora-bt, .gv-video:has(.gv-na-janela) .gv-fora-bt { display:none; }
 @media (max-width:760px) { .gv-fora-bt, .gv-ajuda .gv-fora-aj { display:none; } }
 .gv-ajuda .btn.gv-fora-aj { border-color:rgba(246,163,80,.55); color:var(--accent); }
 .gv-dtabs { display:flex; gap:6px; padding:12px 16px 0; }
