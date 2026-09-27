@@ -1233,6 +1233,14 @@ img { max-width:100%; height:auto; }
 .gv-carrega i { width:34px; height:34px; border-radius:50%; border:3px solid rgba(255,255,255,.25); border-top-color:var(--accent); animation:gvGira .8s linear infinite; }
 @keyframes gvGira { to { transform:rotate(360deg); } }
 .gv-video iframe.ok + .gv-carrega { opacity:0; }
+.cri-fb { position:relative; width:100%; max-width:500px; min-height:220px; margin:0 auto; border-radius:12px; overflow:hidden; background:#000 center / contain no-repeat; }
+.cri-fb iframe { position:relative; display:block; margin:0 auto; border:none; overflow:hidden; background:transparent; max-width:100%; }
+#modal-criativo > div > div:first-child > div:first-child { min-width:0; overflow-wrap:anywhere; }   /* nome/link comprido empurrava o ✕ para fora da tela */
+@media (max-width:760px) {
+  #modal-criativo { padding:10px !important; align-items:flex-start !important; }
+  #modal-criativo > div { padding:14px !important; max-height:94vh !important; border-radius:18px !important; }
+  #modal-criativo > div > div[style*="flex-wrap:wrap"] > div { min-width:0 !important; flex:1 1 100% !important; }
+}
 .gv-momento { display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding:9px 12px; border-radius:12px;
   background:rgba(110,168,255,.08); border:1px solid rgba(110,168,255,.25); font-size:.72rem; color:var(--text2); }
 .gv-momento.on { display:flex; animation:mvSurge .35s var(--mv-ease, ease); }
@@ -2582,7 +2590,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-0023';
+var VERSAO_DASH = '2026-09-27-0046';
 var _versaoNova = null;
 
 // =====================================================================
@@ -9647,7 +9655,7 @@ function renderAnuncios() {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {};
     var ehPost = String(k).indexOf('POST:') === 0;
     var cri = ehPost ? null : criativoDe(k, m.adId);
-    if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post }; }
+    if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post, video: cri.video }; }
     _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m, quem: a.quem, ig: a.ig || null };
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
     h += '<div class="click an-card" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
@@ -10285,7 +10293,7 @@ function abrirCriativo(nome, jaTocar, manterPer) {
     // veio da ficha de um lead, sem ter aberto a aba Anúncios: monta na hora
     var m = (META.dados || { anuncios: [] }).anuncios.filter(function(x){ return _chaveAnuncio(x.anuncio) === _chaveAnuncio(nome); })[0] || {};
     var cri = criativoDe(nome, m.adId);
-    if (cri) m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post };
+    if (cri) m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post, video: cri.video };
     if (!m.foto && !m.link && !m.post && String(nome).indexOf('POST:') !== 0) return;
     d = _anDados[nome] = { n: 0, q: 0, mql: 0, ag: 0, re: 0, vd: 0, fat: 0, camp: '', tipo: 'pago', meta: m };
   }
@@ -10319,15 +10327,12 @@ function abrirCriativo(nome, jaTocar, manterPer) {
     var pp = _lerPost(nome);
     var mi = String(pp.link).match(/instagram\.com\/(reel|p|tv)\/([^\/?]+)/i);
     if (mi) player = '<iframe src="https://www.instagram.com/' + mi[1] + '/' + mi[2] + '/embed/captioned/" width="400" height="560" scrolling="no" frameborder="0" style="border:none;border-radius:12px;background:#000;max-width:100%;"></iframe>';
-  } else if (m.post) {
-    var partes = String(m.post).split('_');
-    if (partes.length === 2) {
-      var urlPost = 'https://www.facebook.com/' + partes[0] + '/posts/' + partes[1];
-      player = '<iframe src="https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent(urlPost)
-        + '&show_text=false&width=500" width="500" height="580" style="border:none;overflow:hidden;border-radius:12px;background:#111;"'
-        + ' scrolling="no" frameborder="0" allowfullscreen="true"'
-        + ' allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>';
-    }
+  } else if (m.post && String(m.post).split('_').length === 2) {
+    // 27/09/2026 (Bruno: "olha a visualização" / "quero que ao clicar já abra"): o player tinha 500 px fixos e
+    // altura de post quadrado — no celular o vídeo em pé saía cortado. Agora é montado depois (criMontarPlayer)
+    // na largura da tela e na proporção do criativo; vídeo usa o player de vídeo do Facebook, que já tenta tocar
+    player = '<div class="cri-fb" data-post="' + String(m.post).replace(/"/g, '') + '" data-video="' + String(m.video || '').replace(/"/g, '') + '"'
+      + ' data-foto="' + String(m.foto || '').replace(/"/g, '&quot;') + '"' + (m.foto ? ' style="background-image:url(\'' + String(m.foto).replace(/'/g, '%27').replace(/"/g, '%22') + '\')"' : '') + '></div>';
   }
   var rs = function(v){ return 'R$ ' + Math.round(v||0).toLocaleString('pt-BR'); };
   var ehCatalogo = /^adv[-_]/i.test(nome) || /catalog|dpa|dinamic/i.test(nome);
@@ -10340,7 +10345,7 @@ function abrirCriativo(nome, jaTocar, manterPer) {
     + '</div>'
     + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
     +   '<div style="flex:1;min-width:300px;">'
-    +     (!ehPostOrg && m.foto ? '<img src="' + m.foto + '" style="width:100%;border-radius:12px;display:block;">' : '')
+    +     (!ehPostOrg && m.foto && !player ? '<img src="' + m.foto + '" style="width:100%;border-radius:12px;display:block;">' : '')   // com o player, a foto vira o fundo dele enquanto carrega
     +     (player
           ? '<div id="cri-post" style="margin-top:8px;">'
             + (ehCatalogo ? '<div class="hint">Anúncio de catálogo: a prévia do Facebook mostra etiquetas como {{product.name}} porque o texto é montado na hora da entrega.</div>' : '')
@@ -10401,6 +10406,7 @@ function abrirCriativo(nome, jaTocar, manterPer) {
     +   '</div>'
     + '</div></div>';
   cx.style.display = 'flex';
+  try { criMontarPlayer(cx); } catch (eCp) {}
   _anCalendario('cri-periodo', _criPer.de, _criPer.ate, function(de, ate){ _criPer = { modo: 'custom', de: de, ate: ate }; abrirCriativo(nome, false, true); });
 }
 function verPostCriativo() {
@@ -10565,6 +10571,33 @@ function baixarQuem(chave) {
   a.href = 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(linhas.join('\n'));
   a.download = (_anRotulo[chave] || 'leads') + ' - ' + String(_anAtual).replace(/[^\w.-]+/g, '_') + '.csv';
   a.click();
+}
+// monta o vídeo/post do Facebook na largura disponível e na proporção do criativo (a foto do anúncio diz se é em pé)
+function criMontarPlayer(cx) {
+  var box = cx.querySelector('.cri-fb'); if (!box) return;
+  var post = box.getAttribute('data-post') || '', vidId = box.getAttribute('data-video') || '', foto = box.getAttribute('data-foto') || '';
+  var partes = post.split('_'); if (partes.length !== 2) return;
+  var feito = false;
+  var montar = function(prop) {
+    if (feito) return; feito = true;
+    prop = Math.max(0.5, Math.min(2, prop || 1));
+    var larg = Math.floor(Math.min(500, box.clientWidth || (box.parentElement && box.parentElement.clientWidth) || 320));
+    var maxAlt = Math.round((window.innerHeight || 800) * 0.72), extra = vidId ? 0 : 64;   // o post mostra o nome da página em cima
+    var alt = Math.round(larg / prop) + extra;
+    if (alt > maxAlt) { larg = Math.max(200, Math.round((maxAlt - extra) * prop)); alt = maxAlt; }
+    var src = vidId
+      ? 'https://www.facebook.com/plugins/video.php?href=' + encodeURIComponent('https://www.facebook.com/' + partes[0] + '/videos/' + vidId + '/') + '&show_text=false&autoplay=true&width=' + larg
+      : 'https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent('https://www.facebook.com/' + partes[0] + '/posts/' + partes[1]) + '&show_text=false&width=' + larg;
+    box.style.height = alt + 'px';
+    box.innerHTML = '<iframe src="' + src + '" width="' + larg + '" height="' + alt + '" scrolling="no" frameborder="0" allowfullscreen="true"'
+      + ' allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" title="Criativo"></iframe>';
+  };
+  if (!foto) { montar(vidId ? 9 / 16 : 1); return; }
+  var im = new Image();
+  im.onload = function() { montar(im.naturalWidth && im.naturalHeight ? im.naturalWidth / im.naturalHeight : (vidId ? 9 / 16 : 1)); };
+  im.onerror = function() { montar(vidId ? 9 / 16 : 1); };
+  setTimeout(function() { montar(vidId ? 9 / 16 : 1); }, 1500);
+  im.src = foto;
 }
 function fecharCriativo() {
   var cx = document.getElementById('modal-criativo');
