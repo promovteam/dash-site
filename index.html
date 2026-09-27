@@ -2623,7 +2623,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1325';
+var VERSAO_DASH = '2026-09-27-1407';
 var _versaoNova = null;
 
 // =====================================================================
@@ -16044,7 +16044,7 @@ function gravAbrir(i, foco) {
            : vid ? '<iframe id="gv-frame" ' + (naJan ? 'src="about:blank" data-src' : 'src') + '="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Gravação" onload="this.classList.add(\'ok\')"></iframe><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
              + '<button type="button" class="gv-fora-bt" onclick="gvForaDaTela()" title="O vídeo sai do dash e fica flutuando por cima de tudo — dá para mexer no dash, no Instagram, na Clint">⧉ Assistir fora da tela</button>'
              : '<div class="gv-sem"><b>Sem vídeo desta reunião</b><span>ficaram só as anotações do Gemini</span></div>')
-    +   '</div>' + (vid ? gvAjudaVideo(x, vid) + '<div class="gv-momento" id="gv-momento"></div>' : '')
+    +   '</div>' + (dentro ? gvCtlHtml() : '') + (vid ? gvAjudaVideo(x, vid) + '<div class="gv-momento" id="gv-momento"></div>' : '')
     +   (doc ? '<div class="gv-abas" role="tablist"><button data-aba="res" onclick="gvAba(\'res\')">📋 Resumo</button><button data-aba="conv" onclick="gvAba(\'conv\')">💬 Conversa</button><button data-aba="rx" onclick="gvAba(\'rx\')">🧠 Ficha da IA</button><button data-aba="quem" onclick="gvAba(\'quem\')">👤 Quem é</button></div>' : '') + '</div>'
     +   (vid ? '<div class="gv-caps" id="gv-caps"></div>' : '')
     +   '<div id="gv-resumo">' + (doc ? '<div class="gv-card"><h4>Resumo do Gemini</h4><div class="gv-sk" style="width:80%"></div><div class="gv-sk"></div><div class="gv-sk" style="width:60%"></div></div>' : '') + '</div>'
@@ -16527,6 +16527,7 @@ function gvPlayerLigar(pl, x, vid) {
   });
   clearTimeout(pl._tDemora);
   pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok')) gvPlayerFalhou(pl, 'demora'); }, 25000);
+  try { gvCtlLigar(pl); } catch (eC) {}   // barra, velocidade (padrão 1,5x) e a fala de agora
   if (pl.readyState >= 2) pronto();   // veio já carregado (baixou enquanto o mouse estava em cima do cartão)
   try { var p = pl.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
 }
@@ -16540,12 +16541,15 @@ function gvPreVideo(iV) {
   clearTimeout(GRAV._preVT);
   GRAV._preVT = setTimeout(function () {
     if (document.getElementById('gv')) return;   // já tem gravação aberta
+    // no máximo um vídeo adiantado a cada 4 s: o Google bloqueia a internet que faz pedidos demais ("automated queries")
+    if (GRAV._preVUlt && Date.now() - GRAV._preVUlt < 4000) return;
+    GRAV._preVUlt = Date.now();
     gvPreVideoSoltar();
     var g = document.getElementById('gv-pre');
     if (!g) { g = document.createElement('div'); g.id = 'gv-pre'; g.setAttribute('aria-hidden', 'true'); document.body.appendChild(g); }
     var v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v._vid = vid;
     v.src = gvPlayerSrc(vid); g.appendChild(v); GRAV._preV = v;
-  }, 300);
+  }, 500);
 }
 function gvPreVideoSoltar() {
   var v = GRAV._preV; GRAV._preV = null; if (!v) return;
@@ -16651,6 +16655,101 @@ function gvPipGuardadoParar() {
   try { if (v) v.pause(); } catch (e) {}
   g.remove();
 }
+// ===== ⏯ CONTROLES DO PLAYER DO DASH (Bruno 27/09/2026: "que no dash mostre onde está o vídeo, que consiga colocar para frente
+// e acelerar o vídeo, que o padrão de velocidade seja 1.5") =====
+// barra com o ponto do vídeo (e os "momentos da reunião" marcados), voltar/adiantar, velocidade e a fala da conversa que está
+// passando fica acesa (e a conversa acompanha o vídeo).
+// Velocidades (Bruno 27/09/2026: "que tenha a opção 1.25, 1,5 fixado, 1,75, 2"): toda gravação ABRE em 1,5x; trocar vale só
+// para o vídeo aberto.
+var GV_VELS = [1.25, 1.5, 1.75, 2];
+function gvVel() { return 1.5; }
+function gvCtlHtml() {
+  var v = gvVel();
+  return '<div class="gv-ctl" id="gv-ctl">'
+    + '<div class="gv-ctl-barra" id="gv-ctl-barra" title="Clique para ir a esse ponto do vídeo"><i class="buf"></i><i class="ja"></i></div>'
+    + '<div class="gv-ctl-l">'
+    +   '<span class="gv-ctl-t" id="gv-ctl-t">0:00 / –</span>'
+    +   '<button type="button" class="btn" onclick="gvPular(-10)" title="Voltar 10 segundos (tecla J)">⏪ 10s</button>'
+    +   '<button type="button" class="btn gv-ctl-play" id="gv-ctl-play" onclick="gvPlayPausa()" title="Tocar / pausar (barra de espaço)" aria-label="Tocar ou pausar">▶</button>'
+    +   '<button type="button" class="btn" onclick="gvPular(10)" title="Adiantar 10 segundos (tecla L)">10s ⏩</button>'
+    +   '<button type="button" class="btn" onclick="gvPular(30)" title="Adiantar 30 segundos">30s ⏩</button>'
+    +   '<button type="button" class="btn" onclick="gvOndeEsta()" title="Mostra na conversa a fala deste momento do vídeo">📍 Fala de agora</button>'
+    +   '<span class="gv-vel" role="group" aria-label="Velocidade do vídeo">' + GV_VELS.map(function(x) {
+          return '<button type="button" data-v="' + x + '"' + (x === v ? ' class="on"' : '') + ' onclick="gvVelocidade(' + x + ')" title="Velocidade ' + String(x).replace('.', ',') + 'x">' + String(x).replace('.', ',') + 'x</button>';
+        }).join('') + '</span>'
+    + '</div></div>';
+}
+function gvPl() { var p = document.getElementById('gv-player'); return p && !p._falhou ? p : null; }
+function gvPular(s) { var p = gvPl(); if (!p) return; try { p.currentTime = Math.max(0, Math.min((p.duration || 1e9) - 1, p.currentTime + s)); } catch (e) {} }
+function gvPlayPausa() { var p = gvPl(); if (!p) return; if (p.paused) { var pp = p.play(); if (pp && pp.catch) pp.catch(function() {}); } else p.pause(); }
+function gvVelocidade(v) {
+  var p = document.getElementById('gv-player'); if (p) { p._vel = v; p.defaultPlaybackRate = v; p.playbackRate = v; }
+  gvVelMarcar(v);
+}
+function gvVelMarcar(v) { document.querySelectorAll('#gv-ctl .gv-vel button').forEach(function(b) { b.classList.toggle('on', Math.abs(+b.getAttribute('data-v') - v) < 0.01); }); }
+function gvCtlLigar(pl) {
+  if (!pl) return;
+  var v = gvVel(); pl.defaultPlaybackRate = v; pl.playbackRate = v;
+  pl.addEventListener('loadedmetadata', function() { var vv = pl._vel || gvVel(); pl.defaultPlaybackRate = vv; pl.playbackRate = vv; gvCtlAtualizar(); });
+  pl.addEventListener('ratechange', function() { if (pl.playbackRate) { pl._vel = pl.playbackRate; gvVelMarcar(pl.playbackRate); } });
+  var raf = 0, at = function() { if (raf) return; raf = requestAnimationFrame(function() { raf = 0; gvCtlAtualizar(); }); };
+  ['timeupdate', 'progress', 'durationchange', 'seeked', 'play', 'pause'].forEach(function(n) { pl.addEventListener(n, at); });
+  var barra = document.getElementById('gv-ctl-barra');
+  if (barra) barra.addEventListener('click', function(ev) {
+    var r = barra.getBoundingClientRect(), f = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+    if (pl.duration) pl.currentTime = f * pl.duration;
+  });
+  var conv = document.getElementById('gv-conv');   // mexeu na conversa: ela para de acompanhar o vídeo por 10 s
+  if (conv) ['wheel', 'touchmove'].forEach(function(n) { conv.addEventListener(n, function() { GRAV._seguirPausa = Date.now(); }, { passive: true }); });
+  gvCtlAtualizar();
+}
+function gvCtlAtualizar() {
+  var p = document.getElementById('gv-player'); if (!p) return;
+  var d = p.duration || 0, t = p.currentTime || 0;
+  var el = document.getElementById('gv-ctl-t'); if (el) el.textContent = gvHora(t) + ' / ' + (d && isFinite(d) ? gvHora(d) : '–');
+  var bp = document.getElementById('gv-ctl-play'); if (bp) bp.textContent = p.paused ? '▶' : '⏸';
+  var b = document.getElementById('gv-ctl-barra');
+  if (b && d && isFinite(d)) {
+    b.querySelector('.ja').style.width = (t / d * 100) + '%';
+    try { var bf = p.buffered, fim = 0; for (var i = 0; i < bf.length; i++) if (bf.start(i) <= t + 1) fim = Math.max(fim, bf.end(i)); b.querySelector('.buf').style.width = (fim / d * 100) + '%'; } catch (e) {}
+    if (!b._marcas) {   // os "momentos da reunião" viram tracinhos na barra
+      var caps = document.querySelectorAll('#gv .gv-cap[data-s]');
+      if (caps.length) {
+        b._marcas = true;
+        caps.forEach(function(c) {
+          var s = +c.getAttribute('data-s'); if (!(s >= 0 && s < d)) return;
+          b.insertAdjacentHTML('beforeend', '<i class="mk" style="left:' + (s / d * 100) + '%" title="' + gravEsc(gvHora(s) + ' · ' + ((c.querySelector('span') || {}).textContent || '')) + '"></i>');
+        });
+      }
+    }
+  }
+  gvFalaDeAgora(t, false, p);
+}
+function gvFalaDeAgora(t, rolar, p) {
+  var conv = document.getElementById('gv-conv'); if (!conv) return;
+  if (!conv._lista || conv._n !== conv.children.length) { conv._lista = Array.prototype.slice.call(conv.querySelectorAll('.gv-msg[data-s]')); conv._n = conv.children.length; }
+  var L = conv._lista, lo = 0, hi = L.length - 1, achou = -1;
+  while (lo <= hi) { var m = (lo + hi) >> 1; if (+L[m].getAttribute('data-s') <= t) { achou = m; lo = m + 1; } else hi = m - 1; }
+  var el = achou >= 0 ? L[achou] : null;
+  var mudou = conv._agora !== el;
+  if (mudou) { if (conv._agora) conv._agora.classList.remove('agora'); if (el) el.classList.add('agora'); conv._agora = el; }
+  var caps = document.querySelectorAll('#gv .gv-cap[data-s]'), capAt = null;
+  caps.forEach(function(c) { if (+c.getAttribute('data-s') <= t) capAt = c; });
+  caps.forEach(function(c) { c.classList.toggle('agora', c === capAt); });
+  if (!el) return;
+  var desk = window.matchMedia && matchMedia('(min-width:981px)').matches;
+  var pausado = GRAV._seguirPausa && Date.now() - GRAV._seguirPausa < 10000;
+  if (rolar || (mudou && desk && p && !p.paused && !pausado && conv.offsetParent)) {
+    try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+  }
+}
+function gvOndeEsta() {
+  var p = gvPl(); if (!p) return;
+  GRAV._seguirPausa = 0;
+  var d = document.querySelector('#gv .gv-dir.quem'); if (d) gvDir('conv');
+  if (window.matchMedia && matchMedia('(max-width:980px)').matches && document.querySelector('#gv .gv-abas')) gvAba('conv');
+  gvFalaDeAgora(p.currentTime || 0, true, p);
+}
 function gravFechar() {
   try { gvPipGuardar(); } catch (eG) {}
   var el = document.getElementById('gv'); if (el) el.remove();
@@ -16663,6 +16762,12 @@ document.addEventListener('keydown', function(ev) {
   var ae = document.activeElement, digitando = ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable);
   if (ev.key === 'Escape') { if (GRAV._modalNoEsc || document.querySelector('.modal-overlay.open')) return; gravFechar(); }
   else if (ev.key === '/' && !digitando) { ev.preventDefault(); try { document.getElementById('gv-q').focus(); } catch (e) {} }
+  else if (!digitando && gvPl() && !ev.metaKey && !ev.ctrlKey && !ev.altKey && /^( |k|K|j|J|l|L)$/.test(ev.key)) {
+    var alvoT = ev.target && ev.target.tagName;
+    if (alvoT === 'VIDEO' || (ev.key === ' ' && alvoT === 'BUTTON')) return;   // o próprio player/botão já trata
+    ev.preventDefault();
+    if (ev.key === ' ' || ev.key === 'k' || ev.key === 'K') gvPlayPausa(); else gvPular(/j/i.test(ev.key) ? -10 : 10);
+  }
   else if ((ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && !digitando && !ev.altKey && !ev.metaKey && !ev.ctrlKey) {
     var bts = document.querySelectorAll('#gv .gv-nav .btn'), bt = bts[ev.key === 'ArrowLeft' ? 0 : 1];
     if (bt && !bt.disabled) { ev.preventDefault(); bt.click(); }
@@ -20380,7 +20485,7 @@ function plInfoHtml(info) {
   if (!info || !info.lead) return '';
   var e = function(t) { return String(t || '').replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var sub = [info.quando, info.closer ? 'com ' + String(info.closer).split(' ')[0] : ''].filter(Boolean).join(' · ');
-  return '<div class="fx-info"><b>📅 ' + e(info.lead) + '</b>' + (sub ? '<span>' + e(sub) + '</span>' : '') + '</div>';
+  return '<div class="fx-info"><b>' + (info.ico || '📅') + ' ' + e(info.lead) + '</b>' + (sub ? '<span>' + e(sub) + '</span>' : '') + '</div>';
 }
 // a marcação que acabou de entrar na planilha (carimbo dos últimos 30 min) desta pessoa
 function plInfoMarcou(nome) {
@@ -20856,7 +20961,8 @@ function renderPlacar() {
     + '<div class="pl-chips">' + chip('hoje', '📆 Hoje') + chip('ontem', 'Ontem') + chip('semana', 'Semana') + chip('mes', 'Mês')
     + '<button class="pl-chip' + (PLACAR.per === 'datas' ? ' on' : '') + '" id="pl-chip-datas" onclick="plAbrirDatas(this)">📅 ' + (PLACAR.per === 'datas' && PLACAR.de && PLACAR.ate ? PLACAR.de.slice(8, 10) + '/' + PLACAR.de.slice(5, 7) + ' – ' + PLACAR.ate.slice(8, 10) + '/' + PLACAR.ate.slice(5, 7) : 'Período…') + ' ▾</button></div>'
     + (PLACAR.tv ? '' : '<a class="pl-tv" href="' + location.pathname + '#painel=placar" target="_blank" title="Abre numa aba limpa, letra grande, atualizando sozinho — para deixar num monitor">⛶ modo TV</a>'
-        + '<a class="pl-tv" href="javascript:void(0)" onclick="plTestarFesta()" title="Mostra como fica o aviso quando alguém marca ou vende">🎉 testar festa</a>')
+        + '<a class="pl-tv" href="javascript:void(0)" onclick="agSimular()" title="Mostra, só na sua tela, tudo o que acontece quando uma reunião é marcada — não grava nada">🎬 simular reunião marcada</a>'
+        + '<a class="pl-tv" href="javascript:void(0)" onclick="plSimularVenda()" title="Mostra, só na sua tela, a festa de uma venda — não grava nada">🎬 simular venda</a>')
     + '</div>';
   // a taxa de no-show e sobre as que JA TEM RESULTADO (compareceu + no-show): se entrassem as
   // pendentes, a taxa cairia sozinha durante o dia e subiria no fim, o que confunde
@@ -23424,6 +23530,24 @@ body:has(.modal-overlay.open) #gv { z-index:150; }   /* a gravação desce para 
 .gv-video video.gv-player.ok { opacity:1; }
 .gv-video:has(video.gv-player) .gv-carrega { z-index:2; }
 .gv-video .gv-falhou { z-index:4; background:rgba(8,10,14,.86); }
+.gv-ctl { display:flex; flex-direction:column; gap:9px; margin-top:10px; padding:10px 12px; border-radius:14px; background:rgba(255,255,255,.035); border:1px solid var(--border); }
+.gv-ctl-barra { position:relative; height:10px; border-radius:99px; background:rgba(255,255,255,.08); cursor:pointer; }
+.gv-ctl-barra:hover { height:12px; margin:-1px 0; }
+.gv-ctl-barra .buf, .gv-ctl-barra .ja { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:99px; pointer-events:none; }
+.gv-ctl-barra .buf { background:rgba(255,255,255,.13); }
+.gv-ctl-barra .ja { background:linear-gradient(90deg,#f6a350,#ffd166); box-shadow:0 0 10px rgba(246,163,80,.45); }
+.gv-ctl-barra .mk { position:absolute; top:-3px; bottom:-3px; width:3px; border-radius:2px; background:#6ea8ff; transform:translateX(-1px); opacity:.85; }
+.gv-ctl-l { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.gv-ctl-t { font-variant-numeric:tabular-nums; font-weight:800; font-size:.8rem; min-width:118px; }
+.gv-ctl .btn { padding:6px 10px; font-size:.72rem; }
+.gv-ctl .gv-ctl-play { min-width:40px; justify-content:center; }
+.gv-vel { display:inline-flex; gap:2px; padding:3px; border-radius:999px; background:rgba(255,255,255,.05); border:1px solid var(--border); margin-left:auto; }
+.gv-vel button { font:inherit; font-size:.7rem; font-weight:800; padding:5px 9px; border-radius:999px; border:0; background:transparent; color:var(--text2); cursor:pointer; font-variant-numeric:tabular-nums; }
+.gv-vel button:hover { color:var(--text); }
+.gv-vel button.on { background:#f6a350; color:#1a1206; }
+.gv-vel button:focus-visible, .gv-ctl .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.gv-msg.agora { box-shadow:0 0 0 2px rgba(246,163,80,.6); }
+@media (max-width:980px) { .gv-ctl { margin:8px 12px 0; } .gv-vel { margin-left:0; } .gv-ctl-t { min-width:0; } }
 #gv-pip-guarda, #gv-pre { position:fixed; left:-10px; bottom:0; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
 @media (max-width:760px) { .gv-fora-bt, .gv-ajuda .gv-fora-aj { display:none; } }
 .gv-ajuda .btn.gv-fora-aj { border-color:rgba(246,163,80,.55); color:var(--accent); }
@@ -23849,6 +23973,40 @@ function agFestaMarcou(ctx) {
     if (PL_PREV) PL_PREV[k] = Object.assign({ nome: plPessoa(ctx.sdr) }, PL_PREV[k] || {}, { marc: base + 1 });
   } catch (e) {}
   plComemorar('marcou', quem, 1, { lead: ctx.nome, quando: agQuandoTxt(ctx.dataBr, ctx.hora), closer: ctx.closerNome });
+}
+// 🎬 SIMULAÇÃO (Bruno 27/09/2026: "faça simulação no meu login de como será uma reunião marcada ou uma venda"): tudo o que a
+// pessoa vê ao marcar — agenda abrindo na semana, a reunião "⏳ gravando…", o cartão com planilha → agenda → Meet → avisos e a
+// festa em tela cheia — SÓ NA TELA DE QUEM CLICOU. Não chama o robô, não grava planilha nem agenda; a reunião de mentira some sozinha.
+function agSimular() {
+  var eu = ''; try { eu = localStorage.getItem('v2Login') || ''; } catch (e) {}
+  var quem = (typeof plPessoa === 'function' ? plPessoa(eu) : eu) || 'Você';
+  if (/^(adm|visitante)$/i.test(quem)) quem = 'Você';
+  var d = new Date(); d.setHours(0, 0, 0, 0);
+  do { d = new Date(d.getTime() + 864e5); } while (d.getDay() === 0 || d.getDay() === 6);   // próximo dia útil
+  var dataBr = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+  var ck = (CLOSERS.filter(function(c) { return c.key === 'tony'; })[0] || CLOSERS[0]);
+  var ctx = { nome: 'Cliente Teste (simulação)', dataBr: dataBr, hora: '17:00', dur: 60, agenda: ck.key, closerNome: ck.nome, sdr: quem };
+  try { if (AG.closer !== 'ambos' && AG.closer !== ck.key) mudarCloser(ck.key); } catch (e) {}
+  agIrPara(dataBr);
+  avisoRapido('🎬 Simulação — nada é gravado na planilha nem na agenda');
+  var wk = agDataStr(agSegunda(d)), t0 = Date.now();
+  (function esperar() {
+    if (!AG.cache[wk] && Date.now() - t0 < 12000) { setTimeout(esperar, 400); return; }
+    var P = null; try { P = agPendenteAdd(ctx, { calendar: {} }); } catch (e) {}
+    var el = agTarefaNova(ctx);
+    var sub = el.querySelector('.agt-txt > span'); if (sub) sub.textContent += ' · SIMULAÇÃO';
+    setTimeout(function() {
+      agPendenteConfirmar(P);
+      agTarefaOk(el, ctx);
+      try { plComemorar('marcou', quem, 1, { lead: ctx.nome, quando: agQuandoTxt(ctx.dataBr, ctx.hora), closer: ctx.closerNome }); } catch (e) {}
+      setTimeout(function() { agPendenteTirar(P); }, 20000);   // a reunião de mentira some
+    }, 7000);
+  })();
+}
+function plSimularVenda() {
+  var ck = (CLOSERS.filter(function(c) { return c.key === 'tony'; })[0] || CLOSERS[0]);
+  avisoRapido('🎬 Simulação — nada é gravado');
+  plComemorar('vendeu', ck.nome, 12000, { lead: 'Cliente Teste (simulação)', quando: 'venda do Spark · R$ 12.000', closer: ck.nome, ico: '💰' });
 }
 function agNaHora(pedido, ctx, depois) {
   try { fecharAgendar(); } catch (e) {}
