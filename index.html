@@ -1477,6 +1477,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
         <div class="chart-chips gx-closers" id="grav-closers"></div>
         <div class="gx-selects">
           <select class="edit-in" id="grav-origem" onchange="gravDesenhar()" aria-label="Origem"><option value="">Todas as origens</option></select>
+          <select class="edit-in" id="grav-produto" onchange="gravDesenhar()" aria-label="Produto"><option value="">Todos os produtos</option></select>
           <select class="edit-in" id="grav-dias" onchange="gravCarregar()" aria-label="Período">
             <option value="30">Últimos 30 dias</option><option value="60" selected>Últimos 60 dias</option><option value="120">Últimos 4 meses</option><option value="450">Tudo (desde 2025)</option>
           </select>
@@ -2623,7 +2624,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1407';
+var VERSAO_DASH = '2026-09-27-1427';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3565,6 +3566,7 @@ function _ultCard(r) {
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b>'
     + '<span>' + [r.leadId, r.date.toLocaleDateString('pt-BR'), r.closer].filter(Boolean).join(' · ') + '</span></div>'
     + seloAnuncio(r, true) + igSeloLead(r, true)
+    + (function(){ var ig = crInstaDe(r, r); return ig ? '<a class="ld-wa" style="background:rgba(214,41,118,.14);border-color:rgba(214,41,118,.45);color:#ff8fc0;padding:5px 9px;" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + gravEsc(ig) + ' no Instagram">📸</a>' : ''; })()
     + (function(){   // 🟣 Clint aqui também (pedido do Bruno 24/08/2026 — no PC da Sarah só aparecia na aba Leads)
         var lk = '';
         try { lk = clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone), nome: r.nome }); } catch (e) { lk = ''; }
@@ -4933,6 +4935,19 @@ function avisoRapido(txt) {
 // 26/09/2026 (Bruno: "melhore essa experiência dentro dos cards" — print com o nome/detalhes espremidos numa coluna fina):
 // cartão em 3 partes — foto · nome + detalhes numa linha larga + etiquetas embaixo · valor e situação à direita com
 // os botões (Clint e WhatsApp) logo abaixo. Produto sem "Programa/Mentoria", data curta no ano corrente.
+// @ do Instagram do lead para o botão 📸: o que foi escrito ao marcar (Observação da planilha) ou o do formulário
+function crInstaDe(r, rx) {
+  var ig = '';
+  try { ig = gvInstaLimpo((String((r && r.obs) || '').match(/Instagram:\s*([^|\n]+)/i) || [])[1]); } catch (e) {}
+  if (!ig) try { ig = gvInstaLimpo((rx && rx.insta) || (r && r.insta) || ''); } catch (e2) {}
+  if (!ig) try { var l = ldPorTel8(ldTel8((r && r.telefone) || '')); ig = gvInstaLimpo(l && l.insta); } catch (e3) {}
+  return ig;
+}
+function crInstaBotao(r, rx) {
+  var ig = crInstaDe(r, rx);
+  return ig ? '<a class="ld-wa cr-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + gravEsc(ig) + ' no Instagram" aria-label="Abrir o Instagram de ' + gravEsc(r.nome || '') + '">📸 Instagram</a>'
+    : '<span class="ld-wa cr-ig cr-ig-off" title="Ninguém escreveu o Instagram desta pessoa">📸 sem @</span>';
+}
 function v2row(r) {
   var i = v2reg(r);
   var anoAtual = new Date().getFullYear();
@@ -4948,9 +4963,10 @@ function v2row(r) {
   var rx = r;
   try { var ldx = ldPorTel8(ldTel8(r.telefone)); if (ldx && ldx.insta && !r.insta) rx = Object.assign({}, r, { insta: ldx.insta }); } catch (eLx) {}
   var tags = seloAnuncio(rx, true) + igSeloLead(rx, true);
+  var igBt = crInstaBotao(r, rx);
   // 26/09/2026 (Bruno: "link deve ser da Clint, não do WhatsApp"): o botão abre a conversa na Clint — se o endereço
   // ainda não é conhecido, o robô procura a pessoa (abrirAtendimentoClintPor) e abre a conversa ou o contato
-  var acts = (r.telefone || r.nome) ? '<a class="ld-wa cr-clint" href="' + (lkC || 'https://app.clint.digital/chat') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint" aria-label="Abrir na Clint">🟣 Clint</a>' : '';
+  var acts = igBt + ((r.telefone || r.nome) ? '<a class="ld-wa cr-clint" href="' + (lkC || 'https://app.clint.digital/chat') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint" aria-label="Abrir na Clint">🟣 Clint</a>' : '');
   return '<div class="cliente-row cr2" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);" title="' + String(r.nome || '').replace(/"/g, '&quot;') + '">' + (r.nome || 'Sem nome') + '</b>'
@@ -15459,6 +15475,11 @@ function gravLinha(x) {
   });
   x._r = melhor; return melhor;
 }
+// produto da reunião (da planilha, pelo telefone) — Bruno 27/09/2026: "mostre também o produto que o lead comprou" e "filtro por produto"
+function gravProduto(x) {
+  var r = null; try { r = gravLinha(x); } catch (e) {}
+  return r && r.produto ? String(r.produto).replace(/^(programa|mentoria)\s+/i, '').trim() : '';
+}
 function gravOrigem(x) {
   var r = gravLinha(x);
   var o = String((r && r.origem) || '').replace(/\s+/g, ' ').trim();
@@ -15667,6 +15688,8 @@ function gravCard(x, iV, prat) {
     + '<div class="grav-info"><b title="' + gravEsc(x.t) + '">' + gravEsc(p.nome) + '</b>'
     +   '<div class="gx-st"><i style="background:' + st.c + ';"></i><span style="color:' + st.c + ';">' + st.t + '</span>' + (quando ? '<span>' + gravEsc(quando) + '</span>' : '') + (dur ? '<span>' + dur + '</span>' : '') + (vista ? '<span class="ok">✓ assistida</span>' : '') + '</div>'
     +   '<div class="gx-quem">' + gravAvatar(closer) + '<span>' + gravEsc(closer) + '</span>' + (org ? '<span class="gx-org">🧲 ' + gravEsc(org) + '</span>' : '') + '</div>'
+    +   (function() { var pr = gravProduto(x); if (!pr) return ''; var vd = gravStatus(x) === 'vendido';
+          return '<div class="gx-prod' + (vd ? ' vd' : '') + '" title="' + (vd ? 'Comprou: ' : 'Produto da reunião: ') + gravEsc(pr) + '">' + (vd ? '💰 comprou ' : '📦 ') + gravEsc(pr) + '</div>'; })()
     +   (meta ? '<small>' + gravEsc(meta) + '</small>' : '')
     +   (prat ? '' : '<div class="gx-acts">'
     +     (doc ? '<button class="gx-a" onclick="event.stopPropagation();gravAbrir(' + iV + ',\'transcricao\')" title="Abrir direto na conversa">💬 Conversa</button>' : '')
@@ -15698,14 +15721,23 @@ function gravDesenhar() {
     var opts = '<option value="">Todas as origens</option>' + ordem.map(function(o) { return '<option value="' + gravEsc(o) + '"' + (o === oF ? ' selected' : '') + '>' + gravEsc(o) + ' · ' + contO[o] + '</option>'; }).join('');
     if (selO.innerHTML !== opts) { selO.innerHTML = opts; if (ordem.indexOf(oF) === -1) oF = ''; }
   }
+  // filtro de PRODUTO (Bruno 27/09/2026) — também vem da planilha
+  var selP = document.getElementById('grav-produto'), pF = selP ? selP.value : '';
+  if (selP && (V2.rows || []).length) {
+    var contP = {}; GRAV.itens.forEach(function(x) { var pr = gravProduto(x) || '— sem produto'; contP[pr] = (contP[pr] || 0) + 1; });
+    var ordemP = Object.keys(contP).sort(function(a, b) { return contP[b] - contP[a] || a.localeCompare(b); });
+    var optsP = '<option value="">Todos os produtos</option>' + ordemP.map(function(o) { return '<option value="' + gravEsc(o) + '"' + (o === pF ? ' selected' : '') + '>' + gravEsc(o) + ' · ' + contP[o] + '</option>'; }).join('');
+    if (selP.innerHTML !== optsP) { selP.innerHTML = optsP; if (ordemP.indexOf(pF) === -1) pF = ''; }
+  }
   var _vistas = gravVistas();
   // tudo menos o resultado: serve para contar cada atalho
   var base = GRAV.itens.filter(function(x) {
     if (GRAV.closer !== 'todos' && x.k !== GRAV.closer) return false;
     if (oF && (gravOrigem(x) || '— sem origem') !== oF) return false;
+    if (pF && (gravProduto(x) || '— sem produto') !== pF) return false;
     if (!q) return true;
     var p = gravPartes(x.t), dia = x.d ? x.d.slice(8, 10) + '/' + x.d.slice(5, 7) : '';
-    return v2norm([p.nome, p.lid, p.sdr, p.tipo, GRAV.closers[x.k] || '', dia, x.t, gravOrigem(x)].join(' ')).indexOf(q) !== -1;
+    return v2norm([p.nome, p.lid, p.sdr, p.tipo, GRAV.closers[x.k] || '', dia, x.t, gravOrigem(x), gravProduto(x)].join(' ')).indexOf(q) !== -1;
   });
   var pills = document.getElementById('grav-pills');
   if (pills) pills.innerHTML = GRAV_PILLS.map(function(pl) {
@@ -15725,7 +15757,7 @@ function gravDesenhar() {
   var prat = document.getElementById('grav-prateleiras');
   if (prat) {
     var hp = '';
-    if (!q && !stF && !oF && lista.length > 6) {
+    if (!q && !stF && !oF && !pF && lista.length > 6) {
       var ab = gravAbertas();
       var cont = lista.filter(function(x) { return ab[gravChave(x)] && !_vistas[gravChave(x)]; })
         .sort(function(a, b) { return ab[gravChave(b)] - ab[gravChave(a)]; }).slice(0, 10);
@@ -15735,7 +15767,7 @@ function gravDesenhar() {
     }
     prat.innerHTML = hp;
   }
-  if (!lista.length) { box.innerHTML = '<div class="grav-vazio">Nenhuma gravação com esse filtro.' + ((q || stF || oF) ? ' <button class="btn" onclick="gravLimpar()">Limpar filtros</button>' : '') + '</div>'; return; }
+  if (!lista.length) { box.innerHTML = '<div class="grav-vazio">Nenhuma gravação com esse filtro.' + ((q || stF || oF || pF) ? ' <button class="btn" onclick="gravLimpar()">Limpar filtros</button>' : '') + '</div>'; return; }
   var porDia = {};
   lista.forEach(function(x) { var k = (x.d || '').slice(0, 10), o = porDia[k] || (porDia[k] = { n: 0, vd: 0, nv: 0 }); o.n++; if (gravStatus(x) === 'vendido') o.vd++; if (!_vistas[gravChave(x)]) o.nv++; });
   var h = '', diaAtual = null;
@@ -15759,6 +15791,7 @@ function gravDesenhar() {
 function gravLimpar() {
   GRAV.st = ''; var b = document.getElementById('grav-busca'); if (b) b.value = '';
   var o = document.getElementById('grav-origem'); if (o) o.value = '';
+  var pS = document.getElementById('grav-produto'); if (pS) pS.value = '';
   gravDesenhar();
 }
 // ----- 🎬 SALA DA GRAVAÇÃO: vídeo + resumo do Gemini + conversa (Bruno 24/09/2026: "coloca em um formato incrível
@@ -20399,7 +20432,7 @@ function plDetectarNovidades(d) {
       if (!base[k] && !PL_PREV) return;
       var refMarc = Math.max(p.marc || 0, p2.marc || 0), refVd = Math.max(p.vd || 0, p2.vd || 0), refVdV = Math.max(p.vdV || 0, p2.vdV || 0);
       if (k.charAt(0) === 's' && a.marc > refMarc) plComemorar('marcou', a.nome, a.marc - refMarc, a.marc - refMarc === 1 ? plInfoMarcou(a.nome) : null);
-      if (k.charAt(0) === 'c' && a.vd > refVd) plComemorar('vendeu', a.nome, a.vdV - refVdV);
+      if (k.charAt(0) === 'c' && a.vd > refVd) plComemorar('vendeu', a.nome, a.vdV - refVdV, a.vd - refVd === 1 ? plInfoVendeu(a.nome) : null);
     });
   }
   PL_PREV = atual;
@@ -20497,6 +20530,20 @@ function plInfoMarcou(nome) {
   if (!melhor) return null;
   var sem = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], d = melhor.date;
   return { lead: melhor.nome, quando: d ? 'reunião ' + sem[d.getDay()] + ' ' + d.toLocaleDateString('pt-BR').slice(0, 5) : '', closer: melhor.closer };
+}
+// a venda que acabou de entrar desta pessoa (closer): o cliente e o produto — Bruno 27/09/2026: "no closer mostre quem foi o
+// cliente quando a pessoa comprar". Vale a mais recente das vendas com reunião hoje/ontem.
+function plInfoVendeu(nome) {
+  var k = v2norm(plPessoa(nome)).split(' ')[0], melhor = null, hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  (V2.rows || []).forEach(function(r) {
+    if (r.sn !== 'vendido' || !r.date || hoje - r.date > 864e5 * 1.5) return;
+    if (v2norm(plPessoa(r.closer || '')).split(' ')[0] !== k) return;
+    var t = r.carimboT || (r.date ? r.date.getTime() : 0);
+    if (!melhor || t > melhor._t) melhor = { r: r, _t: t };
+  });
+  if (!melhor) return null;
+  var r = melhor.r, pr = String(r.produto || '').replace(/^(programa|mentoria)\s+/i, '');
+  return { lead: r.nome, quando: [pr ? 'comprou ' + pr : '', r.valor > 0 ? v2moeda0(r.valor) : ''].filter(Boolean).join(' · '), ico: '💰' };
 }
 function plTestarFesta() { plComemorar('marcou', 'Sarah', 1, { lead: 'Maria Exemplo', quando: 'seg 28/09 às 16:00', closer: 'Sarah' }); plComemorar('vendeu', 'Tony Londe', 3596.4); }
 // quais reunioes entraram na conta de uma pessoa (100% conferivel — Bruno 02/09/2026)
@@ -22273,6 +22320,9 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .gx-quem .gx-av { width:18px; height:18px; font-size:.44rem; }
 .gx-quem span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .gx-quem .gx-org { color:var(--muted); font-weight:600; min-width:0; }
+.gx-prod { display:inline-flex; align-self:flex-start; max-width:100%; margin-top:6px; padding:3px 10px; border-radius:999px; font-size:.68rem; font-weight:800;
+  background:rgba(255,255,255,.06); color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gx-prod.vd { background:rgba(61,220,151,.14); color:#3ddc97; }
 .gx-card .grav-info small { font-size:.64rem; color:var(--muted); }
 .gx-acts { display:flex; gap:6px; margin-top:6px; }
 .gx-a { flex:1 1 auto; font:inherit; font-size:.66rem; font-weight:700; padding:7px 6px; border-radius:10px; border:1px solid var(--border);
@@ -22963,6 +23013,11 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 .cr2 .cr-clint { display:inline-flex !important; align-items:center; gap:6px; height:32px; padding:0 13px !important; border-radius:999px !important; font-size:.72rem; font-weight:800;
   background:rgba(108,71,255,.14) !important; border-color:rgba(108,71,255,.45) !important; color:#b9a6ff !important; text-decoration:none; }
 .cr2 .cr-clint:hover { background:rgba(108,71,255,.24) !important; }
+.cr2 .cr-ig { display:inline-flex !important; align-items:center; gap:6px; height:32px; padding:0 13px !important; border-radius:999px !important; font-size:.72rem; font-weight:800; text-decoration:none;
+  background:linear-gradient(135deg, rgba(254,218,117,.14), rgba(214,41,118,.22), rgba(79,91,213,.2)) !important; border-color:rgba(214,41,118,.5) !important; color:#fff !important; }
+.cr2 .cr-ig:hover { filter:brightness(1.2); }
+.cr2 .cr-ig.cr-ig-off { background:rgba(255,255,255,.04) !important; border-color:rgba(255,255,255,.1) !important; color:var(--muted) !important; cursor:default; }
+.cr2 .cr-ig.cr-ig-off:hover { filter:none; }
 @media (max-width:760px) {
   .cliente-row.cr2 { grid-template-columns:40px minmax(0,1fr); padding:12px; }
   .cr2 > .avatar { width:40px; height:40px; }
