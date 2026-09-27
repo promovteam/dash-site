@@ -2598,7 +2598,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-0119';
+var VERSAO_DASH = '2026-09-27-0130';
 var _versaoNova = null;
 
 // =====================================================================
@@ -2614,6 +2614,11 @@ var CLOSERS = [
   { key: 'wesllene', nome: 'Wesllene',     grade: 'hora'  },
   { key: 'sarah',    nome: 'Sarah',        grade: 'tarde' }    // 18/09/2026: a Sarah atende reunião SÓ depois das 14h (agenda "Reuniões Sarah")
 ];
+// 🚫 quem não aparece mais no dash (Bruno 27/09/2026: "tire matheus do dash" — aparecia em 1º no pódio do Placar com
+// 0 vendas, porque o nome está como closer em linhas da planilha). Some do Placar (closers e SDRs) e das listas de
+// closer/SDR; as linhas da planilha continuam contando no total do time.
+var FORA_DO_DASH = ['matheus'];
+function foraDoDash(n) { var p1 = v2norm(n || '').replace(/^(ss|sdr|closer)\s+/, '').split(' ')[0]; return !!p1 && FORA_DO_DASH.indexOf(p1) !== -1; }
 function closerKeys()  { return CLOSERS.map(function(c){ return c.key; }); }
 function closerNomes() { return CLOSERS.map(function(c){ return c.nome; }); }
 function closerNomeDe(k) {
@@ -2960,7 +2965,7 @@ function rankearPor(campo, rows) {
   var m = {};
   rows.forEach(function(r) {
     var k = (r[campo] || '').trim();
-    if (!k) return;
+    if (!k || ((campo === 'closer' || campo === 'sdr') && foraDoDash(k))) return;   // "tire matheus do dash" (27/09/2026)
     if (!m[k]) m[k] = { nome: k, vd: 0, vdV: 0, ps: 0, psV: 0, re: 0, ns: 0, feV: 0 };
     if (r.sn === 'vendido') { m[k].vd++; m[k].vdV += r.valor; }
     if (r.sn === 'entrada' || r.sn.indexOf('bloqueio') !== -1) { m[k].ps++; m[k].psV += r.valor; }
@@ -3375,7 +3380,7 @@ var OPCOES_PLANILHA = {
 // ===== Opções reais da planilha (usadas 5+ vezes; ignora sujeira de digitação) =====
 function v2usados(campo, minimo) {
   var m = {};
-  V2.rows.forEach(function(r){ var v = (r[campo] || '').trim(); if (v) m[v] = (m[v] || 0) + 1; });
+  V2.rows.forEach(function(r){ var v = (r[campo] || '').trim(); if (v && !((campo === 'closer' || campo === 'sdr') && foraDoDash(v))) m[v] = (m[v] || 0) + 1; });
   return Object.keys(m).filter(function(k){ return m[k] >= (minimo || 5); }).sort(function(a, b){ return m[b] - m[a]; });
 }
 // junta a lista base com o que veio da planilha, sem repetir nome trocando maiúscula/acento
@@ -4908,7 +4913,7 @@ function v2row(r) {
   var anoAtual = new Date().getFullYear();
   var dataTxt = r.date ? (r.date.getFullYear() === anoAtual ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : r.date.toLocaleDateString('pt-BR')) : '';
   var prod = String(r.produto || '').replace(/^(programa|mentoria)\s+/i, '');
-  var det = [r.leadId, prod, dataTxt, r.closer || ''].filter(Boolean).join(' · ');
+  var det = [r.leadId, prod, dataTxt].filter(Boolean).join(' · ') + (r.closer ? ' · ' + tmMini(r.closer) + r.closer : '');
   var detT = [r.leadId, r.produto, r.date ? r.date.toLocaleDateString('pt-BR') : '', r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).join(' · ');
   // link para a Clint direto na lista (Bruno 19/08/2026)
   var lkC = (function(){
@@ -5127,6 +5132,9 @@ function renderV2() {
   var METAS_RK = [{ k:'P', v:150000, cor:'#ff6b6b' }, { k:'M', v:250000, cor:'#f6a350' }, { k:'G', v:350000, cor:'#3ddc97' }];
   var fatorProj = pj ? (pj.uT / pj.uP) : null;
   function _rkAvatar(nome) {
+    // 27/09/2026 (Bruno: "coloque nos resultados também"): as fotos do time (TIME_FOTOS) entram aqui
+    var fotoT = ''; try { fotoT = timeFoto(nome); } catch (eF) {}
+    if (fotoT) return '<div class="avatar tem-foto" style="width:48px;height:48px;flex-shrink:0;border-radius:50%;background-image:url(' + fotoT + ');"></div>';
     var src = 'fotos/' + v2nomeChave(nome).replace(/\s+/g, '-') + '.jpg';
     window._fotoNo = window._fotoNo || {};   // foto que não existe: não pedir de novo a cada redesenho
     return '<div class="avatar" style="width:48px;height:48px;font-size:.8rem;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,' + v2grad(nome) + ');">' + v2ini(nome)
@@ -5542,8 +5550,9 @@ function abrirFunilSdr(nome) {
   FUNIL_SDR = { nome: nome, etapas: { ag: ag, re: re, vd: vd, sp: sp, gr: gr } };
   _fsEtapa = 'ag';
   var av = document.getElementById('fs-avatar');
-  av.textContent = v2ini(nome);
-  av.style.background = 'linear-gradient(135deg,' + v2grad(nome) + ')';
+  var fotoS = ''; try { fotoS = timeFoto(nome); } catch (eF) {}
+  av.textContent = fotoS ? '' : v2ini(nome);
+  av.style.background = fotoS ? 'center / cover no-repeat url(' + fotoS + ')' : 'linear-gradient(135deg,' + v2grad(nome) + ')';
   document.getElementById('fs-nome').textContent = nome;
   document.getElementById('fs-sub').textContent = '📞 SDR · ' + rotuloPeriodoV2();
   desenharFunilSdr();
@@ -6242,7 +6251,7 @@ function gmAbrirLista(k, manterFiltro) {
   };
   h += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 10px;"><span class="hint" style="margin-right:2px;">Dono:</span>'
     + chipD('', 'Todos', todas.length)
-    + donos.map(function(d){ return chipD(d, '👤 ' + d, contD[d]); }).join('')
+    + donos.map(function(d){ return chipD(d, (tmMini(d) || '👤 ') + d, contD[d]); }).join('')
     + (semDono ? chipD('sem', '🆓 sem dono', semDono) : '') + '</div>';
   rows.slice(0, 200).forEach(function(l){ h += ldRow(l, l.faixa === 'alta'); });
   if (!rows.length) h += '<div style="color:var(--muted);font-size:.8rem;">Nenhum' + (_gmNotaF || _gmVerbaF || _gmDonoF ? ' com esse filtro' : '') + '.</div>';
@@ -8339,7 +8348,7 @@ function montarFiltrosLeads() {
     + chip('dono', 'sem', '🆓 Sem responsável', LD_F.dono.indexOf('sem') !== -1)
     + ldDonosExistentes().slice(0, 14).map(function(d) {
         if (ldEu() && ldMesmoDono(d.nome, ldEu())) return '';   // já tem o "Meus leads"
-        return chip('dono', d.nome, '✋ ' + d.nome + ' (' + d.q + ')', LD_F.dono.indexOf(d.nome) !== -1);
+        return chip('dono', d.nome, tmMao(d.nome) + d.nome + ' (' + d.q + ')', LD_F.dono.indexOf(d.nome) !== -1);
       }).join('')
     + '</div></div>'
     + '<div class="filtro-inline"><span class="fi-label">🚦 Etapa' + (CLINT_PAINEL && CLINT_PAINEL.success ? ' (Clint)' : '') + ':</span><div class="chart-chips" style="margin:0;">'
@@ -8660,7 +8669,7 @@ function verAconteceu(qual) {
       + '<b style="font-size:.78rem;flex:1;min-width:140px;">' + (r.nome || 'Sem nome') + '</b>'
       + '<span class="hint">' + (isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR')) + '</span>'
       + (r.status ? '<span class="ld-tag" style="background:rgba(255,255,255,.07);color:var(--text-secondary);">' + r.status + '</span>' : '')
-      + (r.closer ? '<span class="dono-chip">✋ ' + r.closer + '</span>' : '')
+      + (r.closer ? '<span class="dono-chip">' + tmMao(r.closer) + r.closer + '</span>' : '')
       + (r.valor ? '<span class="ld-tag" style="background:rgba(61,220,151,.13);color:#3ddc97;">R$ ' + Math.round(r.valor).toLocaleString('pt-BR') + '</span>' : '')
       + '</div>';
   });
@@ -12503,7 +12512,7 @@ function ldRow(l, quente) {
   // coisa) — quando as duas etiquetas falam de agendamento, fica só a da Clint
   if (tags && infoC && infoC.etapa && v2norm(infoC.etapa).indexOf('agendad') !== -1 && tags.indexOf('Agendado') !== -1) tags = '';
   var donoNome = (infoC && infoC.dono) || l.dono || '';
-  var dono = donoNome ? '<span class="dono-chip" title="' + ((infoC && infoC.dono) ? 'Dono na Clint' : 'Assumido no dash') + '">✋ ' + donoNome + '</span>' : '';
+  var dono = donoNome ? '<span class="dono-chip" title="' + ((infoC && infoC.dono) ? 'Dono na Clint' : 'Assumido no dash') + '">' + tmMao(donoNome) + donoNome + '</span>' : '';
   // aviso: lead da pesquisa que NÃO está na Clint (não virou negócio)
   var foraClint = (CLINT_PAINEL && CLINT_PAINEL.success && l.tel8 && !CLINT_PAINEL.mapa[l.tel8] && !(CLINT[l.tel8] && CLINT[l.tel8].achou))
     ? '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;" title="Este telefone não tem negócio na Clint">⚠️ fora da Clint</span>'
@@ -12736,11 +12745,11 @@ function abrirFichaLead(i) {
     + (function() {
         var cc = CLINT[ldTel8(l.tel)];
         if (cc && cc.dono) {
-          return '<span class="dono-chip" style="background:rgba(108,71,255,.18);color:#8f6bff;border-color:rgba(108,71,255,.5);">✋ ' + cc.dono + ' <span style="opacity:.7;">(Clint)</span></span>';
+          return '<span class="dono-chip" style="background:rgba(108,71,255,.18);color:#8f6bff;border-color:rgba(108,71,255,.5);">' + tmMao(cc.dono) + cc.dono + ' <span style="opacity:.7;">(Clint)</span></span>';
         }
         var pode = ldPodeTrocarDono();   // so Bruno e Adm definem o responsavel (03/09/2026)
         return l.dono
-          ? '<span class="dono-chip">✋ ' + l.dono + (l.quando ? ' · ' + l.quando : '') + '</span>'
+          ? '<span class="dono-chip">' + tmMao(l.dono) + l.dono + (l.quando ? ' · ' + l.quando : '') + '</span>'
             + (pode ? '<button class="btn-assumir" onclick="ldAssumir(' + i + ')">🔄 Passar para mim</button>' : '')
           : (pode ? '<button class="btn-assumir" onclick="ldAssumir(' + i + ')">✋ Assumir este lead</button>'
                   : '<span class="hint">sem responsável · a Clint distribui; só Bruno/Adm definem pelo dash</span>');
@@ -13427,7 +13436,7 @@ function _renderLeadsCorpo(agora) {
       return '<a href="' + linkEsp + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;flex-wrap:wrap;">'
         + '<b style="font-size:.76rem;flex:1;min-width:110px;">' + (x.nome || ldNomePorTel8(x.tel8) || (x.tel8 ? '📱 final ' + x.tel8 : 'Sem nome')) + '</b>'
         + (x.texto ? '<span style="flex-basis:100%;order:9;font-size:.7rem;color:var(--muted);font-style:italic;padding-top:3px;">💬 “' + String(x.texto).replace(/</g, '&lt;') + '”</span>' : '')
-        + (x.dono ? '<span class="dono-chip">✋ ' + x.dono + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.15);color:#ff6b6b;">sem responsável</span>')
+        + (x.dono ? '<span class="dono-chip">' + tmMao(x.dono) + x.dono + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.15);color:#ff6b6b;">sem responsável</span>')
         + (x.naoLidas ? '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">📬 ' + x.naoLidas + '</span>' : '')
         + '<span style="font-size:.68rem;color:' + (x.horas >= 24 ? '#ff6b6b' : '#f6a350') + ';font-weight:800;">há ' + ldTempoTexto(x.horas) + '</span>'
         + '<span style="font-size:.66rem;color:#8f6bff;font-weight:800;">🟣 abrir ›</span></a>';
@@ -13513,7 +13522,7 @@ function _renderLeadsCorpo(agora) {
           h += '<a href="https://app.clint.digital/contacts/' + x.contatoId + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
             + '<b style="font-size:.76rem;flex:1;">' + (x.nome || ldNomePorTel8(x.tel8) || 'Sem nome') + '</b>'
             + '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">' + (x.tipo === 'qualificacao' ? 'Em qualificação' : 'Nutrição') + ' há ' + x.dias + ' dias</span>'
-            + (x.dono ? '<span class="dono-chip">✋ ' + x.dono + '</span>' : '')
+            + (x.dono ? '<span class="dono-chip">' + tmMao(x.dono) + x.dono + '</span>' : '')
             + '<span style="font-size:.66rem;color:#8f6bff;font-weight:800;">🟣 abrir ›</span></a>';
         });
         h += '</div>'
@@ -13544,7 +13553,7 @@ function _renderLeadsCorpo(agora) {
           h += '<a href="' + (clintLinkApp(l) || '#') + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(l.tel || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(l.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
             + '<b style="font-size:.76rem;flex:1;">' + (l.nome || 'Sem nome') + '</b>'
             + '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">' + (l.invest || '').replace(/\s*\(.*$/, '') + '</span>'
-            + ((infoQ && infoQ.dono) ? '<span class="dono-chip">✋ ' + infoQ.dono + '</span>' : '')
+            + ((infoQ && infoQ.dono) ? '<span class="dono-chip">' + tmMao(infoQ.dono) + infoQ.dono + '</span>' : '')
             + '<span style="font-size:.66rem;color:#8f6bff;font-weight:800;">🟣 abrir ›</span></a>';
         });
         if (desqPerfil.length > 120) h += '<div class="hint">… e mais ' + (desqPerfil.length - 120) + '</div>';
@@ -13587,7 +13596,7 @@ function _renderLeadsCorpo(agora) {
           + '<b style="font-size:.76rem;flex:1;min-width:130px;">' + (x.nome || 'Sem nome') + '</b>'
           + (mc
               ? '<span class="ld-tag" style="background:rgba(108,71,255,.16);color:#8f6bff;" title="Já está na Clint">🟣 ' + (etapaC || 'na Clint') + '</span>'
-                + (donoC ? '<span class="dono-chip">✋ ' + donoC + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.14);color:#ff6b6b;">sem responsável</span>')
+                + (donoC ? '<span class="dono-chip">' + tmMao(donoC) + donoC + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.14);color:#ff6b6b;">sem responsável</span>')
                 + (mc[2] ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="https://app.clint.digital/contacts/' + mc[2] + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir</a>' : '')
               : '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;" title="Não existe na Clint">⚠️ fora da Clint</span>'
                 + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarPendenteNaClint(' + JSON.stringify(x.tel8).replace(/"/g, '&quot;') + ', this);" title="Cria o contato na Clint, no funil (etapa Base IA)">➕ criar na Clint</button>')
@@ -15497,6 +15506,10 @@ function timeFoto(nome) {
   var t = v2norm(String(nome || '')).replace(/^(ss|sdr|closer)\s+/, '').trim().split(/\s+/)[0];
   return (t && TIME_FOTOS[t]) || '';
 }
+// fotinho ao lado do nome de quem é do time (Bruno 27/09/2026: "em tudo que tem a pessoa tenha a foto");
+// sem foto, volta o ✋ de antes
+function tmMini(nome) { var f = ''; try { f = timeFoto(nome); } catch (e) {} return f ? '<i class="tm-mini" style="background-image:url(' + f + ');"></i>' : ''; }
+function tmMao(nome) { return tmMini(nome) || '✋ '; }
 function plAvHtml(nome) {
   var f = timeFoto(nome);
   if (f) return '<span class="pl-av tem-foto" style="background-image:url(' + f + ');"></span>';
@@ -16626,7 +16639,7 @@ function renderSemanaV2(calData) {
   if (AG.closer === 'ambos') {
     // visão "Todas": uma coluna por closer, na ordem da lista CLOSERS
     var cols = CLOSERS.map(function(c) {
-      var g = desenha(evs.filter(function(e){ return e._cal === c.key; }), '👤 ' + c.nome, gradeNova ? slotsDo(c.key) : SLOTS_BRUNO, c.key);
+      var g = desenha(evs.filter(function(e){ return e._cal === c.key; }), (tmMini(c.nome) || '👤 ') + c.nome, gradeNova ? slotsDo(c.key) : SLOTS_BRUNO, c.key);
       return '<div class="sg-col">' + g + '</div>';
     }).join('');
     htmlFinal = '<div class="sg-duas' + (CLOSERS.length === 3 ? ' tres' : '') + (agLadoALado() ? '' : ' empilhado') + '">' + cols + '</div>';
@@ -19081,6 +19094,21 @@ body.placar-tv .pl-pd.p1 .num.longo { font-size:3rem; } body.placar-tv .pl-pd .n
 #pl-festa .fx-t1 { font-family:'Barlow Condensed', Inter, sans-serif; font-weight:900; font-size:3rem; letter-spacing:1px; text-transform:uppercase; color:#ffd166; margin-top:8px; line-height:1; }
 #pl-festa .fx-t2 { font-size:1.05rem; font-weight:700; color:#fff; margin-top:8px; }
 #pl-festa .fx-conf { position:absolute; top:-12px; width:10px; height:16px; border-radius:2px; animation:fxCai linear forwards; }
+#pl-festa .fx-foto { position:relative; width:120px; height:120px; margin:0 auto 4px; border-radius:50%; background:#1a1e26 center / cover no-repeat;
+  border:4px solid #ffd166; box-shadow:0 0 0 6px rgba(255,209,102,.18), 0 0 60px rgba(255,209,102,.45); animation:fxBate 1.2s ease-in-out infinite; }
+#pl-festa .fx-selo { position:absolute; right:-6px; bottom:-4px; width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:1.5rem; background:#0d0d1e; border:3px solid #ffd166; }
+#pl-festa .fx-foguete { position:absolute; bottom:-300px; z-index:1; width:120px; height:270px; animation:fxFoguete 3.4s cubic-bezier(.5,0,.25,1) .15s forwards;
+  filter:drop-shadow(0 0 22px var(--fx-cor)); }
+#pl-festa .fx-foguete.esq { left:max(4vw, 16px); } #pl-festa .fx-foguete.dir { right:max(4vw, 16px); }
+#pl-festa .fx-foguete svg { position:relative; z-index:2; display:block; }
+#pl-festa .fx-chama { transform-origin:60px 208px; animation:fxChama .12s ease-in-out infinite alternate; }
+#pl-festa .fx-fumaca { position:absolute; bottom:-10px; width:26px; height:26px; border-radius:50%; background:rgba(230,235,245,.55); opacity:0; animation:fxFumaca 1.4s ease-out forwards; }
+@keyframes fxFoguete { 0% { transform:translateY(0) rotate(0); } 12% { transform:translateY(-40px) rotate(-2deg); } 22% { transform:translateY(-70px) rotate(2deg); } 100% { transform:translateY(calc(-100vh - 340px)) rotate(-1deg); } }
+@keyframes fxChama { from { transform:scaleY(.82) scaleX(.95); } to { transform:scaleY(1.18) scaleX(1.05); } }
+@keyframes fxFumaca { 0% { opacity:0; transform:translateY(0) scale(.4); } 20% { opacity:.7; } 100% { opacity:0; transform:translateY(60px) scale(2.4); } }
+@media (max-width:760px) { #pl-festa .fx-foguete { width:84px; height:189px; } #pl-festa .fx-foguete svg { width:84px; height:189px; } #pl-festa .fx-foto { width:96px; height:96px; } }
+@media (prefers-reduced-motion: reduce) { #pl-festa .fx-foguete { display:none; } #pl-festa .fx-foto { animation:none; } }
 @keyframes fxPula { from { transform:scale(.4); opacity:0; } to { transform:scale(1); opacity:1; } }
 @keyframes fxBate { 0%,100% { transform:scale(1); } 50% { transform:scale(1.15); } }
 @keyframes fxCai { to { transform:translateY(110vh) rotate(720deg); opacity:.9; } }
@@ -19310,10 +19338,10 @@ function plCalcular(p) {
   // conta no total do time, mas nao no ranking dos SDRs (Bruno 02/09/2026: "Bruno nao e SDR")
   var closersAtivos = plClosersAtivos();
   var ehCloser = function(n){ var p = v2norm(n).split(' ')[0]; return !!p && PL_CLOSER_E_SDR.indexOf(p) === -1 && closersAtivos.some(function(c){ return v2norm(c).split(' ')[0] === p; }); };
-  var sd = function(n){ n = plPessoa(n); if (!n || ehCloser(n)) return null; var k = v2norm(n); if (!S[k]) S[k] = novo(n); return S[k]; };
+  var sd = function(n){ n = plPessoa(n); if (!n || ehCloser(n) || foraDoDash(n)) return null; var k = v2norm(n); if (!S[k]) S[k] = novo(n); return S[k]; };
   // "Wesllene" e "Wesllene Borba" na planilha são a mesma closer: vale o nome da lista CLOSERS (Bruno 24/09/2026)
   var cNome = function(n){ var ck = closerChaveDe(n); return (ck && closerNomeDe(ck)) || n; };
-  var cd = function(n){ n = plPessoa(n); if (!n) return null; n = cNome(n); var k = v2norm(n); if (!C[k]) C[k] = novo(n); return C[k]; };
+  var cd = function(n){ n = plPessoa(n); if (!n || foraDoDash(n)) return null; n = cNome(n); var k = v2norm(n); if (!C[k]) C[k] = novo(n); return C[k]; };
   var no = function(t){ return t != null && t >= p.ini && t < p.fim; };
   var ano = new Date().getFullYear();
   (V2.rows || []).forEach(function(r) {
@@ -19396,7 +19424,7 @@ function plSdrsAtivos() {
   (V2.rows || []).forEach(function(r) {
     var mT = plDataMarcacao(r);
     if (mT == null || mT < corte || r.sn === 'remarcada') return;
-    var n = plPessoa(r.sdr); if (!n) return;
+    var n = plPessoa(r.sdr); if (!n || foraDoDash(n)) return;
     var k = v2norm(n); if (!m[k]) m[k] = { nome: n, q: 0 }; m[k].q++;
   });
   return Object.keys(m).filter(function(k){ return m[k].q >= 2; }).map(function(k){ return m[k].nome; });
@@ -19416,7 +19444,7 @@ function plClosersAtivos() {
   var m = {}, corte = Date.now() - 30 * 864e5;
   (V2.rows || []).forEach(function(r) {
     if (!r.date || r.date.getTime() < corte) return;
-    var n = plPessoa(r.closer); if (!n) return;
+    var n = plPessoa(r.closer); if (!n || foraDoDash(n)) return;
     m[v2norm(n)] = n;
   });
   try {
@@ -19744,6 +19772,30 @@ function plDetectarNovidades(d) {
   if (visto) Object.keys(visto).forEach(function(k) { if (!guardar[k]) guardar[k] = visto[k]; });
   try { localStorage.setItem(_plVistoChave(), JSON.stringify(guardar)); } catch (e) {}
 }
+// 🚀 foguete da comemoração: desenho próprio (igual em qualquer aparelho), com a foto da pessoa na janela
+// (sem foto: as iniciais). Sobe de baixo para cima pelo lado da tela, soltando fumaça.
+function plFoguete(nome, foto, tipo) {
+  var id = 'fxj' + Math.random().toString(36).slice(2, 7), lado = Math.random() < 0.5 ? 'esq' : 'dir';
+  var ini = ''; try { ini = v2ini(nome); } catch (e) { ini = String(nome || '?').slice(0, 2).toUpperCase(); }
+  var cor = tipo === 'vendeu' ? '#3ddc97' : '#6ea8ff';
+  var janela = foto
+    ? '<image href="' + foto + '" x="28" y="66" width="64" height="64" clip-path="url(#' + id + ')" preserveAspectRatio="xMidYMid slice"/>'
+    : '<text x="60" y="108" text-anchor="middle" font-size="26" font-weight="900" fill="#fff" font-family="Inter, sans-serif">' + String(ini).replace(/</g, '') + '</text>';
+  var fumaca = '';
+  for (var i = 0; i < 7; i++) fumaca += '<i class="fx-fumaca" style="animation-delay:' + (0.25 + i * 0.22).toFixed(2) + 's;left:' + (44 + (i % 3) * 8) + 'px;"></i>';
+  return '<div class="fx-foguete ' + lado + '" style="--fx-cor:' + cor + ';">' + fumaca
+    + '<svg viewBox="0 0 120 270" width="120" height="270" aria-hidden="true">'
+    +   '<defs><clipPath id="' + id + '"><circle cx="60" cy="98" r="30"/></clipPath>'
+    +   '<linearGradient id="' + id + 'c" x1="0" x2="1"><stop offset="0" stop-color="#cfd6e3"/><stop offset=".5" stop-color="#ffffff"/><stop offset="1" stop-color="#aab3c4"/></linearGradient></defs>'
+    +   '<g class="fx-chama"><path d="M40 208 Q60 272 80 208 Z" fill="#ffd166"/><path d="M47 208 Q60 250 73 208 Z" fill="#ff6b3d"/></g>'
+    +   '<path d="M32 150 L8 206 L36 200 Z" fill="' + cor + '"/><path d="M88 150 L112 206 L84 200 Z" fill="' + cor + '"/>'
+    +   '<path d="M60 6 C97 44 97 150 89 208 L31 208 C23 150 23 44 60 6 Z" fill="url(#' + id + 'c)" stroke="#7c8596" stroke-width="1.5"/>'
+    +   '<path d="M60 6 C72 18 80 32 84 46 L36 46 C40 32 48 18 60 6 Z" fill="' + cor + '"/>'
+    +   '<path d="M57 208 L57 172 L63 172 L63 208 Z" fill="' + cor + '" opacity=".85"/>'
+    +   '<circle cx="60" cy="98" r="34" fill="#141a26" stroke="#ffd166" stroke-width="5"/>' + janela
+    +   '<circle cx="60" cy="98" r="34" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5"/>'
+    + '</svg></div>';
+}
 function plComemorar(tipo, nome, q) {
   PL_FILA.push({ tipo: tipo, nome: nome, q: q });
   if (!PL_FESTANDO) plProximaFesta();
@@ -19762,7 +19814,13 @@ function plProximaFesta() {
   var ico = f.tipo === 'vendeu' ? '💰' : '📅';
   var t1 = f.tipo === 'vendeu' ? 'VENDEU!' : (f.q > 1 ? 'MARCOU ' + f.q + '!' : 'MARCOU!');
   var t2 = f.tipo === 'vendeu' ? (f.nome + ' fechou ' + (f.q >= 1000 ? v2mil(f.q) : 'uma venda') + ' 🎉') : (f.nome + ' acabou de marcar ' + (f.q > 1 ? f.q + ' reuniões' : 'uma reunião') + ' 🎉');
-  el.innerHTML = conf + '<div class="fx-caixa"><div class="fx-ico">' + ico + '</div><div class="fx-t1">' + f.nome.split(' ')[0].replace(/</g, '&lt;') + ' ' + t1 + '</div><div class="fx-t2">' + t2.replace(/</g, '&lt;') + '</div></div>';
+  // 27/09/2026 (Bruno: "quando marcar a reunião ou vender aparece a foto também e uma foto em um foguete subindo no dash"):
+  // a caixa mostra a FOTO de quem marcou/vendeu (com o 📅/💰 no canto) e um foguete com a foto na janela sobe pela tela
+  var foto = ''; try { foto = timeFoto(f.nome); } catch (eF) {}
+  var cabeca = foto
+    ? '<div class="fx-foto" style="background-image:url(' + foto + ');"><span class="fx-selo">' + ico + '</span></div>'
+    : '<div class="fx-ico">' + ico + '</div>';
+  el.innerHTML = conf + plFoguete(f.nome, foto, f.tipo) + '<div class="fx-caixa">' + cabeca + '<div class="fx-t1">' + f.nome.split(' ')[0].replace(/</g, '&lt;') + ' ' + t1 + '</div><div class="fx-t2">' + t2.replace(/</g, '&lt;') + '</div></div>';
   el.style.display = 'flex';
   try { plSomFesta(f.tipo); } catch (e) {}
   setTimeout(plProximaFesta, 6500);
@@ -20158,7 +20216,7 @@ function plPainelSdrs(p, d) {
     var med = function(arr) { if (!arr.length) return null; arr = arr.slice().sort(function(a, b) { return a - b; }); return arr[Math.floor(arr.length / 2)]; };
     var mAg = med(tAg), mPe = med(tPerd), rp = resp[pn];
     return '<div class="px-card">'
-      + '<div class="px-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span><div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>SDR</span></div></div>'
+      + '<div class="px-head">' + plAvHtml(x.nome).replace('pl-av', 'sg-avatar') + '<div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>SDR</span></div></div>'
       + '<div class="mg-linha">' + ((funil.rec.length >= 10 && x.marc <= funil.rec.length) ? mgPill('MARCAÇÃO', Math.round(x.marc / funil.rec.length * 100), MG_META.marc, false) : '<span class="mg-pill">MARCAÇÃO —<small>leads fora do formulário</small></span>') + mgPill('NO-SHOW', (x.re + x.ns) ? Math.round(x.ns / (x.re + x.ns) * 100) : null, MG_META.ns, true) + '</div>'
       + '<div class="px-row"><div class="px-k">Reuniões marcadas ' + rotP + '<small>pela hora em que marcou · comparado com o período anterior</small></div><div class="px-v">' + plPxNum(x.marc, 'sdr', chave, 'marc', '#ffd166') + plPxAntes(x.marc, ant ? ant.marc : null) + '</div></div>'
       + '<div class="px-row" style="display:block;"><div class="px-k">Funil ' + rotP + '<small>leads que chegaram no período e são deste SDR na Clint · % em relação à etapa anterior</small></div>' + funilHtml + '</div>'
@@ -20214,7 +20272,7 @@ function plPainelClosers(p, d) {
     var topM = Object.keys(motivos).map(function(k) { return motivos[k]; }).sort(function(a, b) { return b.n - a.n; }).slice(0, 4), maxM = topM.length ? topM[0].n : 1;
     var conv = x.l.perRe.length ? Math.round(x.l.perVd.length / x.l.perRe.length * 100) : null;
     return '<div class="px-card">'
-      + '<div class="px-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(x.nome) + ');">' + plIni(x.nome) + '</span><div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>CLOSER</span></div></div>'
+      + '<div class="px-head">' + plAvHtml(x.nome).replace('pl-av', 'sg-avatar') + '<div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>CLOSER</span></div></div>'
       + '<div class="mg-linha">' + (conv !== null ? '<span class="mg-pill" style="color:#fff;">FECHAMENTO ' + conv + '%<small>' + x.l.perVd.length + ' de ' + x.l.perRe.length + ' realizadas</small></span>' : '<span class="mg-pill">FECHAMENTO —</span>') + mgPill('NO-SHOW', (x.l.perRe.length + x.l.perNs.length) ? Math.round(x.l.perNs.length / (x.l.perRe.length + x.l.perNs.length) * 100) : null, MG_META.ns, true) + (x.l.perPend.length ? '<span class="mg-pill nao">' + x.l.perPend.length + ' SEM RESULTADO ❌<small>lançar hoje</small></span>' : '') + (x.l.semForm.length ? '<span class="mg-pill nao" style="cursor:pointer;" onclick="plVer(\'closer\',\'' + chave + '\',\'semForm\')" title="Estão Vendido na planilha, mas o formulário de pagamento não foi preenchido — não contam no placar">' + x.l.semForm.length + ' VENDIDO SEM FORMULÁRIO 💳<small>não conta — preencher</small></span>' : '') + '</div>'
       + '<div class="px-row"><div class="px-k">Reuniões ' + rotP + '<small>novas × retornos (2ª reunião, remarcada, follow-up)</small></div><div class="px-v">' + plPxNum(x.l.perNovas.length, 'closer', chave, 'perNovas', '#6ea8ff') + '<small>novas</small> ' + plPxNum(x.l.perRet.length, 'closer', chave, 'perRet', '#b98aff') + '<small>retornos</small></div></div>'
       + '<div class="px-row"><div class="px-k">Mais quentes' + ((p.per === 'hoje' || p.per === 'ontem') ? ' do dia' : ' ainda por acontecer ' + rotP) + '<small>investimento declarado, nota da IA, seguidores, origem</small></div><div class="px-v"></div></div>'
@@ -22196,6 +22254,10 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
 .ac-pop.on { display:block; }
 .ac-pop .ac-topo { display:flex; align-items:center; gap:12px; }
 .ac-pop .ac-av { width:44px; height:44px; font-size:.9rem; }
+.tm-mini { display:inline-block; width:16px; height:16px; border-radius:50%; background:center / cover no-repeat; vertical-align:-3px; margin-right:5px;
+  box-shadow:0 0 0 1.5px rgba(255,255,255,.22); flex:none; font-style:normal; }
+.dono-chip .tm-mini, .chart-chip .tm-mini { width:18px; height:18px; vertical-align:-4px; }
+.sg-titulo .tm-mini { width:26px; height:26px; vertical-align:-7px; margin-right:7px; }
 .tem-foto { background-size:cover !important; background-position:center !important; background-repeat:no-repeat !important; color:transparent !important; font-size:0 !important; }
 .ac-pop .ac-topo b { display:block; font-size:.92rem; }
 .ac-pop .ac-topo span { display:block; font-size:.7rem; color:var(--text2); font-weight:600; margin-top:2px; }
@@ -22418,6 +22480,34 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
   #grav-lista .grav-dia { position:sticky; top:70px; z-index:4; margin:12px -10px 8px !important; padding:9px 12px;
     background:color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter:blur(14px) saturate(1.3); backdrop-filter:blur(14px) saturate(1.3); }
 }
+
+/* ---------- 🎛️ LISTAS DE ESCOLHER NO VISUAL DO DASH (Bruno 27/09/2026) ---------- */
+.sx-pop { position:fixed; z-index:100000; display:flex; flex-direction:column; min-width:190px; max-width:min(440px, calc(100vw - 16px)); padding:6px;
+  border-radius:14px; background:linear-gradient(180deg, var(--panel2), var(--panel)); border:1px solid rgba(255,255,255,.13);
+  box-shadow:0 24px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); font-size:.8rem; color:var(--text); outline:none; }
+.sx-busca { flex:none; margin:2px 2px 6px; padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05);
+  color:var(--text); font:inherit; font-size:.78rem; outline:none; }
+.sx-busca:focus { border-color:rgba(246,163,80,.55); box-shadow:0 0 0 3px rgba(246,163,80,.12); }
+.sx-lista { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:1px; }
+.sx-grupo { padding:9px 10px 4px; font-size:.6rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.sx-op { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:9px; cursor:pointer; font-weight:600; color:var(--text2); white-space:nowrap; }
+.sx-op span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.sx-op.ativo { background:rgba(255,255,255,.07); color:var(--text); }
+.sx-op.on { color:var(--text); background:rgba(246,163,80,.13); }
+.sx-op.on.ativo { background:rgba(246,163,80,.2); }
+.sx-op.cor.on { background:color-mix(in srgb, var(--sx-cor) 17%, transparent); }
+.sx-op.cor.on.ativo, .sx-op.cor.ativo { background:color-mix(in srgb, var(--sx-cor) 22%, transparent); color:var(--text); }
+.sx-op.off { opacity:.35; cursor:default; }
+.sx-op.vazio span { color:var(--muted); font-style:italic; }
+.sx-dot { width:10px; height:10px; border-radius:50%; flex:none; background:var(--sx-cor); box-shadow:0 0 0 3px color-mix(in srgb, var(--sx-cor) 22%, transparent); }
+.sx-ok { flex:none; color:var(--accent); font-size:.82rem; }
+.sx-op.cor .sx-ok { color:var(--sx-cor); }
+@media (prefers-reduced-motion:no-preference) {
+  .sx-pop.baixo { animation:sxAbreB .16s var(--mv-ease, ease); transform-origin:top center; }
+  .sx-pop.cima { animation:sxAbreC .16s var(--mv-ease, ease); transform-origin:bottom center; }
+  @keyframes sxAbreB { from { opacity:0; transform:translateY(-5px) scale(.98); } to { opacity:1; transform:none; } }
+  @keyframes sxAbreC { from { opacity:0; transform:translateY(5px) scale(.98); } to { opacity:1; transform:none; } }
+}
 </style>
 <script>
 // 🃏 CARTÕES E ACESSO (Bruno 26/09/2026)
@@ -22604,6 +22694,166 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
   }
   if (mq.addEventListener) mq.addEventListener('change', function () { try { funilMini(); } catch (e) {} });
   setTimeout(function () { try { funilMini(); tiraAvisos(); } catch (e) {} }, 2500);
+})();
+</script>
+
+<script>
+// 🎛️ LISTAS DE ESCOLHER NO VISUAL DO DASH (Bruno 27/09/2026: print da lista de status — "melhore essa visualização" / "de todos"):
+// no computador, a lista que abria era a cinza do sistema, sem cor. Agora todo <select> abre uma lista do próprio dash:
+// status com a cor de cada resultado, a opção atual marcada, busca quando tem mais de 8 opções e teclado (↑ ↓ Enter Esc).
+// O <select> continua sendo quem guarda o valor: escolher aqui dispara o mesmo "change" de antes (nada muda no que grava).
+// No celular/tablet fica a lista do aparelho (melhor para o dedo). Ano/mês dos calendários ficam com a lista do sistema.
+(function () {
+  if (!(window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches)) return;
+  var POP = null, SEL = null, ITENS = [], ATIVO = -1, BUSCA = '', tBusca = 0;
+  var norm = function (t) { try { return v2norm(t); } catch (e) { return String(t || '').toLowerCase(); } };
+  function corDe(txt) {
+    var t = norm(txt);
+    if (/^estorno/.test(t)) return '#ff6b6b';
+    if (/nao vendido/.test(t)) return '#ff6b6b';
+    if (/^vendido$/.test(t)) return '#3ddc97';
+    if (/^entrada$/.test(t)) return '#ffd166';
+    if (/^bloqueio/.test(t)) return '#b98aff';
+    if (/^no.?show$/.test(t)) return '#9aa3b2';
+    if (/^remarcad/.test(t)) return '#ff9a5a';
+    if (/^reuniao agendada$|^agendada$/.test(t)) return '#6ea8ff';
+    return '';
+  }
+  function pode(s) {
+    return s && s.tagName === 'SELECT' && !s.multiple && !(s.size > 1) && !s.disabled && !s.hasAttribute('data-nativo')
+      && !(s.closest && s.closest('#cal-pop, #pl-range'));
+  }
+  function fechar(devolverFoco) {
+    if (!POP) return;
+    var s = SEL;
+    try { POP.remove(); } catch (e) {}
+    POP = null; SEL = null; ITENS = []; ATIVO = -1;
+    document.removeEventListener('mousedown', foraClique, true);
+    window.removeEventListener('scroll', aoRolar, true);
+    window.removeEventListener('resize', fecharJa);
+    window.removeEventListener('blur', fecharJa);
+    if (devolverFoco && s && document.contains(s)) { try { s.focus({ preventScroll: true }); } catch (e) {} }
+  }
+  function fecharJa() { fechar(false); }
+  function foraClique(e) { if (POP && !POP.contains(e.target) && e.target !== SEL) fechar(false); }
+  function aoRolar(e) { if (POP && !(e.target && e.target.nodeType === 1 && POP.contains(e.target))) fechar(false); }
+  function escolher(k) {
+    var it = ITENS[k]; if (!it || it.op.disabled) return;
+    var s = SEL, mudou = s.selectedIndex !== it.idx;
+    fechar(true);
+    if (!mudou) return;
+    s.selectedIndex = it.idx;
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  function marcar(k) {
+    ATIVO = k;
+    ITENS.forEach(function (it, j) { it.el.classList.toggle('ativo', j === k); });
+    var it = ITENS[k]; if (it && it.el.scrollIntoView) it.el.scrollIntoView({ block: 'nearest' });
+  }
+  function visiveis() {
+    var v = [];
+    ITENS.forEach(function (it, j) { if (it.el.style.display !== 'none' && !it.op.disabled) v.push(j); });
+    return v;
+  }
+  function mover(d) {
+    var v = visiveis(); if (!v.length) return;
+    var p = v.indexOf(ATIVO);
+    p = p === -1 ? (d > 0 ? 0 : v.length - 1) : Math.max(0, Math.min(v.length - 1, p + d));
+    marcar(v[p]);
+  }
+  function teclas(e) {
+    if (!POP) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); mover(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); mover(-1); }
+    else if (e.key === 'Home') { e.preventDefault(); var v = visiveis(); if (v.length) marcar(v[0]); }
+    else if (e.key === 'End') { e.preventDefault(); var v2 = visiveis(); if (v2.length) marcar(v2[v2.length - 1]); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (ATIVO >= 0) escolher(ATIVO); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(true); }
+    else if (e.key === 'Tab') { fechar(false); }
+    else if (e.key.length === 1 && !e.target.classList.contains('sx-busca') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // sem caixa de busca: digitar pula para a opção que começa com o que foi digitado
+      clearTimeout(tBusca); BUSCA += norm(e.key); tBusca = setTimeout(function () { BUSCA = ''; }, 700);
+      for (var j = 0; j < ITENS.length; j++) if (!ITENS[j].op.disabled && ITENS[j].txt.indexOf(BUSCA) === 0) { marcar(j); break; }
+    }
+  }
+  function abrir(s) {
+    fechar(false);
+    SEL = s;
+    var pop = document.createElement('div'); pop.className = 'sx-pop'; pop.setAttribute('role', 'listbox'); pop.tabIndex = -1;
+    var lista = document.createElement('div'); lista.className = 'sx-lista';
+    var ultGrupo = null, n = 0;
+    Array.prototype.forEach.call(s.options, function (op, idx) {
+      if (op.hidden) return;
+      var gp = op.parentNode && op.parentNode.tagName === 'OPTGROUP' ? op.parentNode : null;
+      if (gp && gp !== ultGrupo) { ultGrupo = gp; var g = document.createElement('div'); g.className = 'sx-grupo'; g.textContent = gp.label; lista.appendChild(g); }
+      var txt = (op.textContent || op.label || op.value || '').trim(), on = idx === s.selectedIndex, cor = corDe(txt);
+      var el = document.createElement('div');
+      el.className = 'sx-op' + (on ? ' on' : '') + (op.disabled ? ' off' : '') + (!op.value ? ' vazio' : '') + (cor ? ' cor' : '');
+      el.setAttribute('role', 'option'); el.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (cor) el.style.setProperty('--sx-cor', cor);
+      el.innerHTML = (cor ? '<i class="sx-dot"></i>' : '') + '<span></span>' + (on ? '<b class="sx-ok">✓</b>' : '');
+      el.querySelector('span').textContent = txt || '—';
+      var k = ITENS.length;
+      el.addEventListener('mousedown', function (e) { e.preventDefault(); e.stopPropagation(); });
+      el.addEventListener('click', function (e) { e.stopPropagation(); escolher(k); });
+      el.addEventListener('mousemove', function () { if (ATIVO !== k) marcar(k); });
+      ITENS.push({ el: el, op: op, idx: idx, txt: norm(txt) });
+      lista.appendChild(el); n++;
+    });
+    var busca = null;
+    if (n > 8) {
+      busca = document.createElement('input'); busca.className = 'sx-busca'; busca.type = 'search'; busca.placeholder = '🔎 Procurar…';
+      busca.setAttribute('aria-label', 'Procurar na lista');
+      busca.addEventListener('input', function () {
+        var q = norm(busca.value);
+        ITENS.forEach(function (it) { it.el.style.display = !q || it.txt.indexOf(q) !== -1 ? '' : 'none'; });
+        lista.querySelectorAll('.sx-grupo').forEach(function (g) { g.style.display = q ? 'none' : ''; });
+        var v = visiveis(); marcar(v.length ? v[0] : -1);
+      });
+      busca.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+      pop.appendChild(busca);
+    }
+    pop.appendChild(lista);
+    pop.addEventListener('keydown', teclas);
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.body.appendChild(pop);
+    POP = pop;
+    // embaixo do campo; se não couber, em cima
+    var r = s.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    pop.style.minWidth = Math.max(r.width, 190) + 'px';
+    var embaixo = vh - r.bottom - 10, emcima = r.top - 10;
+    pop.style.maxHeight = Math.min(380, Math.max(150, Math.max(embaixo, emcima))) + 'px';
+    var alt = pop.offsetHeight, larg = pop.offsetWidth;
+    var paraCima = alt > embaixo && emcima > embaixo;
+    var top = paraCima ? r.top - 6 - alt : r.bottom + 6;
+    pop.style.top = Math.max(8, top) + 'px';
+    pop.style.left = Math.max(8, Math.min(r.left, vw - larg - 8)) + 'px';
+    pop.classList.add(paraCima ? 'cima' : 'baixo');
+    var atual = -1; ITENS.forEach(function (it, j) { if (it.idx === s.selectedIndex) atual = j; });
+    marcar(atual >= 0 ? atual : (visiveis()[0] === undefined ? -1 : visiveis()[0]));
+    try { (busca || pop).focus({ preventScroll: true }); } catch (e) {}
+    setTimeout(function () {
+      document.addEventListener('mousedown', foraClique, true);
+      window.addEventListener('scroll', aoRolar, true);
+      window.addEventListener('resize', fecharJa);
+      window.addEventListener('blur', fecharJa);
+    }, 0);
+  }
+  document.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    var s = e.target && e.target.closest ? e.target.closest('select') : null;
+    if (!pode(s)) return;
+    e.preventDefault();
+    if (POP && SEL === s) { fechar(true); return; }
+    try { s.focus({ preventScroll: true }); } catch (x) {}
+    abrir(s);
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    var s = document.activeElement;
+    if (POP || !pode(s)) return;
+    if (e.key === ' ' || e.key === 'Enter' || (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp'))) { e.preventDefault(); abrir(s); }
+  }, true);
 })();
 </script>
 
