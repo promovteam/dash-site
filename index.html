@@ -2581,7 +2581,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-26-2149';
+var VERSAO_DASH = '2026-09-26-2215';
 var _versaoNova = null;
 
 // =====================================================================
@@ -21693,7 +21693,7 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
   function montarMais() {
     var s0 = telaAtiva(), h = '';
     Array.prototype.forEach.call(doc.querySelectorAll('.sidebar > .nav-item[data-s]'), function (it) {
-      var s = it.getAttribute('data-s'); if (naBarra(s)) return;
+      var s = it.getAttribute('data-s'); if (naBarra(s) || getComputedStyle(it).display === 'none') return;
       var bd = it.querySelector('.gm-badge, #ctr-alerta'), n = bd && bd.offsetParent !== null ? (bd.textContent || '').trim() : '';
       h += '<button type="button" class="tb-tile' + (s === s0 ? ' on' : '') + '" data-s="' + s + '" style="--i:' + (h.split('tb-tile').length - 1) + '"><span class="tb-ic">' + iconeDe(s) + '</span><span>' + rotuloDe(s) + '</span>' + (n ? '<em>' + n + '</em>' : '') + '</button>';
     });
@@ -21862,6 +21862,220 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
       if (bt && !bt.disabled) { vibrar(); bt.click(); }
     }, { passive: true });
   })();
+})();
+</script>
+
+<style>
+/* =====================================================================================================
+   🃏 CARTÕES E ACESSO (Bruno 26/09/2026: "onde mostra em qual acesso está?" → "melhore a experiência de cada card
+   e do site todo" → "pode aplicar"): etiqueta de quem está usando no topo · cartões que cabem no celular ·
+   dedo acerta os botões · teclado abre os cartões
+   ===================================================================================================== */
+/* etiqueta de acesso */
+.ac-chip { display:inline-flex !important; align-items:center; gap:9px; padding:4px 13px 4px 4px !important; border-radius:999px !important; }
+.ac-av { width:30px; height:30px; border-radius:50%; flex:none; display:inline-flex; align-items:center; justify-content:center; font-style:normal;
+  font-size:.64rem; font-weight:900; color:#fff; letter-spacing:0; text-shadow:0 1px 2px rgba(0,0,0,.35); box-shadow:inset 0 1px 0 rgba(255,255,255,.25); }
+.ac-txt { display:flex; flex-direction:column; align-items:flex-start; line-height:1.15; }
+.ac-txt b { font-size:.74rem; font-weight:800; color:var(--text); white-space:nowrap; }
+.ac-txt small { font-size:.58rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+.ac-chip.adm .ac-txt small { color:var(--accent); }
+.ac-pop { position:fixed; z-index:320; width:260px; padding:16px; border-radius:20px; background:linear-gradient(180deg,#1a1e26,#14171d);
+  border:1px solid rgba(255,255,255,.12); box-shadow:0 26px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); display:none; }
+.ac-pop.on { display:block; }
+.ac-pop .ac-topo { display:flex; align-items:center; gap:12px; }
+.ac-pop .ac-av { width:44px; height:44px; font-size:.9rem; }
+.ac-pop .ac-topo b { display:block; font-size:.92rem; }
+.ac-pop .ac-topo span { display:block; font-size:.7rem; color:var(--text2); font-weight:600; margin-top:2px; }
+.ac-pop .ac-papel { margin-top:12px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid var(--border); font-size:.72rem; color:var(--text2); line-height:1.45; }
+.ac-pop .btn { width:100%; margin-top:12px; justify-content:center; padding:10px 14px; font-size:.76rem; }
+@media (max-width:760px) {
+  .ac-chip { padding:3px !important; }
+  .ac-txt { display:none; }
+  .ac-pop { left:10px !important; right:10px; width:auto; }
+}
+
+/* 🔒 visitante não vê Pagamentos nem Contratos (Bruno 26/09/2026) */
+html.visitante .nav-item[data-s="pagamentos"], html.visitante .nav-item[data-s="contratos"],
+html.visitante #s-pagamentos, html.visitante #s-contratos { display:none !important; }
+/* teclado: cartão clicável ganha foco visível */
+.glass.click:focus-visible, .pcard:focus-visible, .cliente-row:focus-visible, .lead-card:focus-visible, .px-card:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+
+/* toque: retorno ao apertar e alvos do tamanho do dedo */
+@media (hover:none) and (pointer:coarse) {
+  .glass.click:active, .pcard:active, .cliente-row:active, .lead-card:active, .px-card:active, .pl-card:active, .grav-card:active { transform:scale(.985); transition:transform .1s; }
+  .pl-chip, .gx-pill, .chart-chip.sm { min-height:34px; }
+  .or-n { min-height:34px; min-width:40px; }
+  .ld-selo[onclick] { min-height:30px; display:inline-flex; align-items:center; }
+}
+
+/* ---------- 📱 cartões no celular ---------- */
+@media (max-width:760px) {
+  /* listas de reunião: o nome ocupa a linha de cima inteira; etiquetas descem (antes o nome virava uma coluna fina) */
+  .cliente-row > .lead-info { flex:1 1 calc(100% - 52px) !important; min-width:0; }
+  .cliente-row > .lead-info + :not(.valor):not([style*="margin-left:auto"]) { margin-left:46px; }
+  .cliente-row > .lead-info b { white-space:normal; }
+  /* Pesquisar reuniões e Pagamentos: cartão vira linha compacta (foto à esquerda) */
+  .pcard { display:grid !important; grid-template-columns:46px minmax(0,1fr); column-gap:12px; row-gap:3px; align-items:center; justify-items:start;
+    text-align:left !important; padding:12px 14px !important; }
+  .pcard > * { grid-column:2; margin:0 !important; max-width:100%; }
+  .pcard > .avatar { grid-column:1; grid-row:1 / span 4; width:46px !important; height:46px !important; font-size:.9rem !important; }
+  .pcard b { font-size:.86rem; }
+  #pesq-cards, #pag-cards { gap:8px !important; }
+  /* grades de 2 colunas: o último cartão sozinho ocupa a linha toda (sem buraco ao lado) */
+  .kpis:not(#pag-kpis) > :last-child:nth-child(odd):not(:first-child) { grid-column:1 / -1; }
+  #pag-kpis { grid-template-columns:1fr 1fr !important; }
+  #pag-kpis > :first-child { grid-column:1 / -1; }
+  /* "vendas sem dados": botão menor, não cobre a tela */
+  #vsf-btn[data-n] { font-size:0 !important; padding:0 14px !important; height:38px; display:flex !important; align-items:center; }
+  #vsf-btn[data-n]::before { content:'💰 ' attr(data-n) ' sem dados'; font-size:.72rem; font-weight:800; }
+  /* Leads: funil recolhido e avisos numa faixa que rola de lado */
+  #ld-funil.ld-mini { max-height:300px; overflow:hidden; -webkit-mask-image:linear-gradient(#000 62%, transparent); mask-image:linear-gradient(#000 62%, transparent); }
+  .ld-funil-bt { display:flex !important; width:100%; justify-content:center; margin:-6px 0 14px; padding:10px; font-size:.76rem; }
+  .ld-tira { display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; margin:0 -11px 14px; padding:2px 11px 6px; scroll-padding:0 11px; }
+  .ld-tira::-webkit-scrollbar { display:none; }
+  .ld-tira > .alerta-parado { flex:0 0 86%; scroll-snap-align:start; margin:0 !important; }
+  .ld-tira-n { font-size:.66rem; font-weight:800; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin:0 2px 8px; }
+}
+@media (max-width:700px) {
+  .pl-resumo > :last-child:nth-child(odd):not(:first-child) { grid-column:1 / -1; }
+}
+.ld-funil-bt { display:none !important; }
+@media (max-width:760px) { .ld-funil-bt { display:flex !important; } }
+@media (min-width:761px) { .ld-tira { display:contents; } .ld-tira-n { display:none; } }
+@media (prefers-reduced-motion:no-preference) {
+  .ac-pop.on { animation:appSurge .25s var(--mv-ease, ease); }
+}
+</style>
+<script>
+// 🃏 CARTÕES E ACESSO (Bruno 26/09/2026)
+(function () {
+  var doc = document;
+  function papelDe(login) {
+    if (login === null) return { k: 'local', t: 'uso local', d: 'Aberto neste computador sem login — entra direto.' };
+    if (login === 'Visitante') return { k: 'olha', t: 'só olha', d: 'Vê tudo, mas não mexe em nada.' };
+    var adm = false, ctr = false; try { adm = ehAdm(); } catch (e) {} try { ctr = ehContratos(); } catch (e) {}
+    if (adm) return { k: 'adm', t: 'admin', d: 'Pode tudo, inclusive corrigir e excluir e trocar o “Você” livremente.' };
+    if (ctr) return { k: 'ctr', t: 'contratos', d: 'Envia e acompanha contratos (Clicksign).' };
+    return { k: 'equipe', t: 'equipe', d: 'Marca reuniões, atende leads e registra vendas.' };
+  }
+  function dados() {
+    var login = null; try { login = localStorage.getItem('v2Login'); } catch (e) {}
+    var nome = login === null ? 'Uso local' : String(login);
+    var ini = '👤', grad = 'rgba(255,255,255,.1),rgba(255,255,255,.04)';
+    if (login !== null) { try { ini = v2ini(nome); grad = v2grad(nome); } catch (e) { ini = nome.slice(0, 2).toUpperCase(); } }
+    return { login: login, nome: nome, primeiro: nome.split(/\s+/)[0], ini: ini, grad: grad, papel: papelDe(login) };
+  }
+  var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var chip = doc.createElement('button');
+  chip.type = 'button'; chip.className = 'btn ac-chip'; chip.id = 'ac-chip'; chip.setAttribute('aria-haspopup', 'dialog');
+  var pop = doc.createElement('div'); pop.className = 'ac-pop'; pop.id = 'ac-pop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Seu acesso');
+  doc.body.appendChild(pop);
+  function desenhar() {
+    var d = dados();
+    chip.className = 'btn ac-chip' + (d.papel.k === 'adm' ? ' adm' : '');
+    chip.title = 'Você está como ' + d.nome + ' (' + d.papel.t + ') — toque para trocar';
+    chip.setAttribute('aria-label', 'Acesso: ' + d.nome + ', ' + d.papel.t);
+    chip.innerHTML = '<i class="ac-av" style="background:linear-gradient(135deg,' + d.grad + ');">' + esc(d.ini) + '</i><span class="ac-txt"><b>' + esc(d.primeiro) + '</b><small>' + esc(d.papel.t) + '</small></span>';
+    pop.innerHTML = '<div class="ac-topo"><i class="ac-av" style="background:linear-gradient(135deg,' + d.grad + ');">' + esc(d.ini) + '</i><div><b>' + esc(d.nome) + '</b><span>acesso: ' + esc(d.papel.t) + '</span></div></div>'
+      + '<div class="ac-papel">' + esc(d.papel.d) + '</div>'
+      + '<button type="button" class="btn" data-acao="trocar">⇄ Trocar de acesso</button>';
+  }
+  var dir = doc.querySelector('.topbar-right');
+  if (dir) { var f = doc.getElementById('btn-filtros'); dir.insertBefore(chip, f || dir.firstChild); }
+  desenhar();
+  function abrir() {
+    desenhar();
+    var r = chip.getBoundingClientRect();
+    pop.style.top = Math.round(r.bottom + 8) + 'px';
+    pop.style.left = Math.max(10, Math.round(Math.min(r.right - 260, window.innerWidth - 270))) + 'px';
+    pop.classList.add('on');
+  }
+  function fechar() { pop.classList.remove('on'); }
+  chip.addEventListener('click', function (e) { e.stopPropagation(); if (pop.classList.contains('on')) fechar(); else abrir(); });
+  pop.addEventListener('click', function (e) { e.stopPropagation(); if (e.target.closest && e.target.closest('[data-acao="trocar"]')) { fechar(); try { trocarAcesso(); } catch (x) {} } });
+  doc.addEventListener('click', fechar);
+  doc.addEventListener('keydown', function (e) { if (e.key === 'Escape') fechar(); });
+  window.addEventListener('scroll', fechar, { passive: true });
+  // 🔒 VISITANTE (Bruno 26/09/2026: "que os visitantes não consigam ter acesso aos pagamentos nem contratos"):
+  // as duas telas somem do menu, do "Mais" e do trilho, e nenhum atalho abre (os dados seguem carregando por trás
+  // porque a ficha do lead e a situação das vendas dependem deles)
+  var TELAS_FECHADAS = ['pagamentos', 'contratos'];
+  function ehVisitante() { try { return localStorage.getItem('v2Login') === 'Visitante'; } catch (e) { return false; } }
+  function aplicarRestricoes() {
+    var v = ehVisitante();
+    doc.documentElement.classList.toggle('visitante', v);
+    if (!v) return;
+    var at = doc.querySelector('.screen.active');
+    if (at && TELAS_FECHADAS.indexOf(at.id.replace(/^s-/, '')) !== -1) { var ini = doc.querySelector('.nav-item[data-s="visao"]'); if (ini) ini.click(); }
+  }
+  doc.addEventListener('click', function (e) {
+    if (!ehVisitante()) return;
+    var it = e.target && e.target.closest ? e.target.closest('.nav-item[data-s], .tb-tile[data-s]') : null;
+    if (!it || TELAS_FECHADAS.indexOf(it.getAttribute('data-s')) === -1) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    try { avisoRapido('🔒 Acesso de visitante não abre ' + (it.getAttribute('data-s') === 'contratos' ? 'Contratos' : 'Pagamentos')); } catch (x) {}
+  }, true);
+  aplicarRestricoes();
+  if (typeof window.mostrarAcessoAtual === 'function') {
+    var _maa = window.mostrarAcessoAtual;
+    window.mostrarAcessoAtual = function () { var r = _maa.apply(this, arguments); try { desenhar(); aplicarRestricoes(); } catch (e) {} return r; };
+  }
+
+  // cartões clicáveis também abrem pelo teclado (Tab + Enter)
+  var SEL_CARTAO = '.glass.click, .pcard, .cliente-row, .lead-card';
+  function marcarCartoes() {
+    var t = doc.querySelector('.screen.active'); if (!t) return;
+    Array.prototype.forEach.call(t.querySelectorAll(SEL_CARTAO), function (c) {
+      if (c.hasAttribute('tabindex')) return;
+      c.setAttribute('tabindex', '0'); if (!c.getAttribute('role')) c.setAttribute('role', 'button');
+    });
+  }
+  doc.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var c = e.target; if (!c || !c.matches || !c.matches(SEL_CARTAO)) return;
+    e.preventDefault(); c.click();
+  });
+  setInterval(marcarCartoes, 3000);
+  setTimeout(marcarCartoes, 1500);
+
+  // "vendas sem dados": o número vai para o botão compacto do celular
+  setInterval(function () {
+    var b = doc.getElementById('vsf-btn'); if (!b) return;
+    var n = ((b.textContent || '').match(/\d+/) || [])[0];
+    if (n && b.getAttribute('data-n') !== n) b.setAttribute('data-n', n);
+  }, 1200);
+
+  // Leads no celular: funil recolhido (com botão) e avisos numa faixa de lado
+  var mq = window.matchMedia ? matchMedia('(max-width:760px)') : { matches: false };
+  function funilMini() {
+    var f = doc.getElementById('ld-funil'); if (!f) return;
+    var aberto = false; try { aberto = localStorage.getItem('v2LdFunilAberto') === '1'; } catch (e) {}
+    f.classList.toggle('ld-mini', mq.matches && !aberto);
+    var bt = doc.getElementById('ld-funil-bt');
+    if (!bt) {
+      bt = doc.createElement('button'); bt.type = 'button'; bt.id = 'ld-funil-bt'; bt.className = 'btn ld-funil-bt';
+      bt.onclick = function () { var a = false; try { a = localStorage.getItem('v2LdFunilAberto') === '1'; localStorage.setItem('v2LdFunilAberto', a ? '' : '1'); } catch (e) {} funilMini(); };
+      f.parentNode.insertBefore(bt, f.nextSibling);
+    }
+    bt.textContent = f.classList.contains('ld-mini') ? 'Ver o funil completo ▾' : 'Recolher o funil ▴';
+    bt.style.visibility = f.innerHTML.trim() ? '' : 'hidden';
+  }
+  function tiraAvisos() {
+    var c = doc.getElementById('ld-corpo'); if (!c || c.querySelector(':scope > .ld-tira')) return;
+    var avisos = [];
+    for (var el = c.firstElementChild; el && el.classList.contains('alerta-parado'); el = el.nextElementSibling) avisos.push(el);
+    if (avisos.length < 2) return;
+    var tira = doc.createElement('div'); tira.className = 'ld-tira';
+    var n = doc.createElement('div'); n.className = 'ld-tira-n'; n.textContent = avisos.length + ' avisos · deslize para o lado';
+    c.insertBefore(n, avisos[0]); c.insertBefore(tira, avisos[0]);
+    avisos.forEach(function (a) { tira.appendChild(a); });
+  }
+  if (typeof window.renderLeads === 'function') {
+    var _rl = window.renderLeads;
+    window.renderLeads = function () { var r = _rl.apply(this, arguments); try { funilMini(); tiraAvisos(); } catch (e) {} return r; };
+  }
+  if (mq.addEventListener) mq.addEventListener('change', function () { try { funilMini(); } catch (e) {} });
+  setTimeout(function () { try { funilMini(); tiraAvisos(); } catch (e) {} }, 2500);
 })();
 </script>
 
