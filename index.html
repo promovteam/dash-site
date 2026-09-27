@@ -1469,6 +1469,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
           <button class="btn gx-bt" onclick="gravCarregar(true)" title="Buscar as gravações de novo">↻<span>Atualizar</span></button>
         </div>
       </div>
+      <div id="grav-aovivo" class="av-box" aria-live="polite"></div>
       <div class="gx-busca">
         <input class="edit-in" id="grav-busca" type="search" placeholder="Buscar pessoa, L-000, SDR, origem ou dia (24/09)" oninput="gravDesenhar()" aria-label="Buscar gravação">
       </div>
@@ -2624,7 +2625,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1436';
+var VERSAO_DASH = '2026-09-27-1454';
 var _versaoNova = null;
 
 // =====================================================================
@@ -15715,6 +15716,7 @@ function gravPrateleira(tit, sub, itens, lista, rot) {
     + '<div class="gx-prat-l">' + itens.map(function(x) { return gravCard(x, lista.indexOf(x), { rot: rot ? rot(x) : '' }); }).join('') + '</div></section>';
 }
 function gravDesenhar() {
+  try { avAtualizar(false); } catch (eAv) {}   // 🔴 ao vivo, em cima da lista
   var box = document.getElementById('grav-lista'); if (!box) return;
   var chips = document.getElementById('grav-closers');
   var conta = {}; GRAV.itens.forEach(function(x) { conta[x.k] = (conta[x.k] || 0) + 1; });
@@ -16794,6 +16796,82 @@ function gvOndeEsta() {
   if (window.matchMedia && matchMedia('(max-width:980px)').matches && document.querySelector('#gv .gv-abas')) gvAba('conv');
   gvFalaDeAgora(p.currentTime || 0, true, p);
 }
+// ===== 🔴 AO VIVO (Bruno 27/09/2026: "teria como assistir reuniões ao vivo no dash?" → "uma parte na aba de gravações") =====
+// As reuniões que estão acontecendo AGORA nas agendas dos closers: quem atende, com quem, há quanto tempo, e o botão para entrar
+// no Meet. O Google não deixa mostrar o Meet dentro de outro site — quem entra aparece na lista de participantes.
+function avEventosAgora() {
+  if (typeof AG === 'undefined' || !AG.cache) return null;
+  var hoje = new Date(), wk = agDataStr(agSegunda(hoje)), data = AG.cache[wk]; if (!data) return null;
+  var dia = agDataStr(hoje), agora = hoje.getHours() * 60 + hoje.getMinutes(), vivos = [], prox = [];
+  closerKeys().forEach(function(ck) {
+    (data[ck] || []).forEach(function(e) {
+      if (e.date !== dia || e._pend) return;
+      if (/no.?show|remarcad/.test(v2norm(e.status || ''))) return;
+      if (/reuni[aã]o\s+comercial/i.test(e.title || '')) return;   // a reunião interna do time
+      try {
+        if (agEhCompromisso({ title: e.title, status: e._st0 !== undefined ? e._st0 : e.status, meetLink: e.meetLink, leadTag: e.leadTag, tel8: e.tel8,
+          recordingLink: e.recordingLink, transcriptLink: e.transcriptLink, instagram: e.instagram, clint: e.clint, email: e.email })) return;
+      } catch (eC) {}
+      var ini = agMin(String(e.startTime || '').slice(0, 5)), fim = agMin(String(e.endTime || '').slice(0, 5));
+      if (!(fim > ini)) fim = ini + (e.duration || 60);
+      var o = { e: e, ck: ck, ini: ini, fim: fim };
+      if (ini <= agora && agora < fim) vivos.push(o);
+      else if (ini > agora && ini - agora <= 90) prox.push(o);
+    });
+  });
+  vivos.sort(function(a, b) { return a.ini - b.ini; }); prox.sort(function(a, b) { return a.ini - b.ini; });
+  return { vivos: vivos, prox: prox, agora: agora };
+}
+function avHora(m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); }
+function avDesenhar() {
+  var box = document.getElementById('grav-aovivo'); if (!box) return;
+  var r = avEventosAgora(), e = gravEsc;
+  if (!r) { box.innerHTML = '<div class="av-vazio"><i class="av-ponto cinza"></i>Ao vivo: lendo as agendas…</div>'; return; }
+  if (!r.vivos.length) {
+    var p0 = r.prox[0];
+    box.innerHTML = '<div class="av-vazio"><i class="av-ponto cinza"></i><b>Nenhuma reunião ao vivo agora</b>'
+      + (p0 ? '<span>· próxima às <b>' + avHora(p0.ini) + '</b>: ' + e(agNomeDoEvento(p0.e.title)) + ' com ' + e(String(closerNomeDe(p0.ck) || p0.ck).split(' ')[0]) + '</span>' : '') + '</div>';
+    GRAV._avLista = [];
+    return;
+  }
+  GRAV._avLista = r.vivos;
+  var h = '<div class="av-topo"><i class="av-ponto"></i><b>AO VIVO AGORA</b><span>' + r.vivos.length + (r.vivos.length === 1 ? ' reunião' : ' reuniões') + '</span>'
+    + '<small>Para assistir, entre no Meet com câmera e microfone desligados — o Google não deixa mostrar a reunião aqui dentro, e quem entra aparece na lista de participantes.</small></div><div class="av-grade">';
+  r.vivos.forEach(function(o, i) {
+    var ev = o.e, nome = agNomeDoEvento(ev.title), closer = closerNomeDe(o.ck) || o.ck, pt = gravPartes(ev.title);
+    var passou = r.agora - o.ini, total = Math.max(1, o.fim - o.ini), pct = Math.min(100, Math.max(0, passou / total * 100));
+    var rL = null; try { rL = leadDoEvento(ev); } catch (eL) {}
+    var ig = ''; try { ig = gvInstaLimpo(ev.instagram || '') || (rL ? crInstaDe(rL, rL) : ''); } catch (eI) {}
+    var tel = (rL && rL.telefone) || ev.tel8 || '';
+    var iR = rL ? v2reg(rL) : -1;
+    h += '<div class="av-card">'
+      + '<div class="av-l1">' + gravAvatar(closer) + '<div><b title="' + e(nome) + '">' + e(nome) + '</b><span>' + e(closer) + (pt.sdr ? ' · SDR ' + e(pt.sdr) : '') + (rL && rL.produto ? ' · ' + e(String(rL.produto).replace(/^(programa|mentoria)\s+/i, '')) : '') + '</span></div><em class="av-tag">AO VIVO</em></div>'
+      + '<div class="av-tempo"><span>começou há ' + passou + ' min · ' + avHora(o.ini) + '</span><span>até ' + avHora(o.fim) + '</span></div><div class="av-barra"><i style="width:' + pct.toFixed(1) + '%"></i></div>'
+      + '<div class="av-acts">'
+      +   (ev.meetLink ? '<a class="btn primary" href="' + e(ev.meetLink) + '" target="_blank" rel="noopener" title="Abre o Meet numa aba nova — desligue câmera e microfone antes de clicar em Participar (você aparece na lista de participantes)">👀 Entrar calado</a>' : '<span class="hint">sem link do Meet</span>')
+      +   (ig ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" title="@' + e(ig) + ' no Instagram">' + igLogo() + ' Instagram</a>' : '')
+      +   (tel ? '<button type="button" class="btn gq-cl" onclick="avClint(event,' + i + ')" title="Abrir a conversa na Clint">🟣 Clint</button>' : '')
+      +   (iR >= 0 ? '<button type="button" class="btn" onclick="abrirLead(' + iR + ')" title="Quem é esse lead">👤 Ficha</button>' : '')
+      + '</div></div>';
+  });
+  box.innerHTML = h + '</div>';
+}
+function avClint(ev, i) {
+  var o = (GRAV._avLista || [])[i]; if (!o) return;
+  var rL = null; try { rL = leadDoEvento(o.e); } catch (e) {}
+  abrirAtendimentoClintPor(ev, (rL && rL.telefone) || o.e.tel8 || '', agNomeDoEvento(o.e.title));
+}
+// redesenha a cada minuto (o tempo anda) e relê as agendas a cada 3 min — só com a aba Gravações aberta na tela
+function avAtualizar(forcar) {
+  try { if (!telaVisivel('s-gravacoes') || document.hidden) return; } catch (e) { return; }
+  avDesenhar();
+  var wk = agDataStr(agSegunda(new Date()));
+  if (forcar || !AG.cache[wk] || Date.now() - (GRAV._avBusca || 0) > 180000) {
+    GRAV._avBusca = Date.now();
+    agBuscar(wk, function(err) { if (!err) avDesenhar(); });
+  }
+}
+setInterval(function() { avAtualizar(false); }, 60000);
 function gravFechar() {
   try { gvPipGuardar(); } catch (eG) {}
   var el = document.getElementById('gv'); if (el) el.remove();
@@ -22334,6 +22412,30 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .gx-prod { display:inline-flex; align-self:flex-start; max-width:100%; margin-top:6px; padding:3px 10px; border-radius:999px; font-size:.68rem; font-weight:800;
   background:rgba(255,255,255,.06); color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .gx-prod.vd { background:rgba(61,220,151,.14); color:#3ddc97; }
+.av-box { margin:2px 0 14px; }
+.av-vazio { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.76rem; color:var(--muted); padding:10px 14px; border-radius:14px; border:1px dashed rgba(255,255,255,.1); }
+.av-vazio b { color:var(--text2); }
+.av-ponto { width:10px; height:10px; border-radius:50%; background:#ff4d4d; flex:none; animation:avPulso 1.6s ease-out infinite; }
+.av-ponto.cinza { background:#5b616e; animation:none; }
+@keyframes avPulso { 0% { box-shadow:0 0 0 0 rgba(255,77,77,.6); } 70% { box-shadow:0 0 0 10px rgba(255,77,77,0); } 100% { box-shadow:0 0 0 0 rgba(255,77,77,0); } }
+.av-topo { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.av-topo > b { font-size:.8rem; letter-spacing:1.2px; color:#ff6b6b; }
+.av-topo > span { font-size:.76rem; font-weight:800; }
+.av-topo small { flex-basis:100%; font-size:.66rem; color:var(--muted); font-weight:600; }
+.av-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(290px,1fr)); gap:12px; }
+.av-card { display:flex; flex-direction:column; gap:10px; padding:14px; border-radius:16px; border:1px solid rgba(255,77,77,.35);
+  background:linear-gradient(160deg, rgba(255,77,77,.09), rgba(255,255,255,.02)); }
+.av-l1 { display:flex; align-items:center; gap:10px; }
+.av-l1 > div { flex:1; min-width:0; }
+.av-l1 b { display:block; font-size:.92rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.av-l1 span { font-size:.7rem; color:var(--muted); font-weight:700; }
+.av-tag { font-style:normal; font-size:.6rem; font-weight:900; letter-spacing:.8px; color:#ff6b6b; background:rgba(255,77,77,.14); padding:3px 8px; border-radius:999px; white-space:nowrap; }
+.av-tempo { display:flex; justify-content:space-between; gap:8px; font-size:.7rem; color:var(--text2); font-weight:700; }
+.av-barra { height:5px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; margin-top:-4px; }
+.av-barra i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#ff6b6b,#f6a350); }
+.av-acts { display:flex; gap:6px; flex-wrap:wrap; }
+.av-acts .btn { font-size:.72rem; padding:7px 11px; text-decoration:none; display:inline-flex; align-items:center; gap:5px; }
+@media (prefers-reduced-motion:reduce) { .av-ponto { animation:none; } }
 .gx-card .grav-info small { font-size:.64rem; color:var(--muted); }
 .gx-acts { display:flex; gap:6px; margin-top:6px; }
 .gx-a { flex:1 1 auto; font:inherit; font-size:.66rem; font-weight:700; padding:7px 6px; border-radius:10px; border:1px solid var(--border);
