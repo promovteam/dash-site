@@ -2421,6 +2421,7 @@ function produtoMudou(prod) {
 }
 
 function abrirAgendar(dur, ck){
+  if (typeof soOlhar === 'function' && soOlhar()) return;   // visitante não agenda (Bruno 26/09/2026)
   // de qual agenda partiu o clique (na visão de todas, é a coluna clicada)
   var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
   var cs0 = document.getElementById('ag-closer');
@@ -2581,7 +2582,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-26-2215';
+var VERSAO_DASH = '2026-09-26-2303';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4825,23 +4826,31 @@ function avisoRapido(txt) {
   }, 2600);
 }
 
+// 26/09/2026 (Bruno: "melhore essa experiência dentro dos cards" — print com o nome/detalhes espremidos numa coluna fina):
+// cartão em 3 partes — foto · nome + detalhes numa linha larga + etiquetas embaixo · valor e situação à direita com
+// os botões (Clint e WhatsApp) logo abaixo. Produto sem "Programa/Mentoria", data curta no ano corrente.
 function v2row(r) {
   var i = v2reg(r);
-  var dir = '<span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-    + (r.valor > 0 ? '<span class="valor" style="margin-left:0;">' + v2moeda0(r.valor) + '</span>' : '')
-    + v2pill(r) + '</span>';
-  var det = [r.leadId, r.produto, r.date ? r.date.toLocaleDateString('pt-BR') : '', r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).join(' · ');
+  var anoAtual = new Date().getFullYear();
+  var dataTxt = r.date ? (r.date.getFullYear() === anoAtual ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : r.date.toLocaleDateString('pt-BR')) : '';
+  var prod = String(r.produto || '').replace(/^(programa|mentoria)\s+/i, '');
+  var det = [r.leadId, prod, dataTxt, r.closer || ''].filter(Boolean).join(' · ');
+  var detT = [r.leadId, r.produto, r.date ? r.date.toLocaleDateString('pt-BR') : '', r.closer ? 'Closer: ' + r.closer : ''].filter(Boolean).join(' · ');
   // link para a Clint direto na lista (Bruno 19/08/2026)
   var lkC = (function(){
     try { return clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone), nome: r.nome }); } catch (e) { return ''; }
   })();
-  return '<div class="cliente-row" onclick="event.stopPropagation();abrirLead(' + i + ');">'
+  var tags = seloAnuncio(r, true) + igSeloLead(r, true);
+  var acts = (lkC ? '<a class="ld-wa cr-ic cr-clint" href="' + lkC + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa no atendimento da Clint" aria-label="Abrir na Clint">🟣</a>' : '')
+    + (r.telefone ? '<a class="ld-wa cr-ic" href="https://wa.me/55' + String(r.telefone).replace(/\D/g, '').slice(-11) + '" target="_blank" onclick="event.stopPropagation();" title="chamar no WhatsApp" aria-label="Chamar no WhatsApp">💬</a>' : '');
+  return '<div class="cliente-row cr2" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
-    + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);">' + (r.nome || 'Sem nome') + '</b><span>' + det + '</span></div>'
-    + seloAnuncio(r, true) + igSeloLead(r, true)
-    + (lkC ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;padding:5px 9px;" href="' + lkC + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa no atendimento da Clint">🟣</a>' : '')
-    + (r.telefone ? '<a class="ld-wa" style="padding:5px 9px;" href="https://wa.me/55' + String(r.telefone).replace(/\D/g, '').slice(-11) + '" target="_blank" onclick="event.stopPropagation();" title="chamar no WhatsApp">💬</a>' : '')
-    + dir + '</div>';
+    + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);" title="' + String(r.nome || '').replace(/"/g, '&quot;') + '">' + (r.nome || 'Sem nome') + '</b>'
+    +   '<span class="cr-meta" title="' + detT.replace(/"/g, '&quot;') + '">' + det + '</span>'
+    +   (tags ? '<div class="cr-tags">' + tags + '</div>' : '') + '</div>'
+    + '<div class="cr-fim"><div class="cr-val">' + (r.valor > 0 ? '<span class="valor">' + v2moeda0(r.valor) + '</span>' : '') + v2pill(r) + '</div>'
+    +   (acts ? '<div class="cr-acts">' + acts + '</div>' : '') + '</div>'
+    + '</div>';
 }
 
 // ---------- render principal ----------
@@ -5142,7 +5151,7 @@ function renderV2() {
     + '</div>'
     + '<div id="chart-legenda-box"></div>'
     + '<div class="chart-wrap" id="chart-wrap"></div></div>';
-  h += '<div class="panel" style="grid-row:span 2;"><h3>Resultado das últimas reuniões</h3>'
+  h += '<div class="panel v2-ultimas-painel" style="grid-row:span 2;"><h3>Resultado das últimas reuniões</h3>'
     + '<input class="search-input" style="margin:10px 0;" placeholder="🔍  Buscar por nome, closer, status ou produto..." oninput="filtrarUltimas(this.value)">'
     + '<div id="v2-ultimas"></div></div>';
   // 🍕 pizza: VENDIDOS por produto — clicável, alinhada com as últimas reuniões
@@ -8826,7 +8835,7 @@ function anVendasPainel(per) {
     + '<button class="btn" style="padding:6px 12px;font-size:.7rem;" onclick="AN_VD_ABERTO=!AN_VD_ABERTO;renderAnuncios();">' + (AN_VD_ABERTO ? '▴ esconder' : '▾ ver') + ' as ' + lista.length + ' vendas uma a uma' + (AN_VD_GRUPO ? ' (' + AN_VD_ROT[AN_VD_GRUPO].t.toLowerCase() + ')' : '') + '</button>'
     + (AN_VD_GRUPO ? '<button class="btn" style="padding:6px 12px;font-size:.7rem;" onclick="AN_VD_GRUPO=\'\';renderAnuncios();">mostrar todas</button>' : '')
     + '<span class="hint">clique num grupo para ver só ele</span></div>';
-  if (AN_VD_ABERTO) {
+  if (AN_VD_ABERTO && localStorage.getItem('v2Login') !== 'Visitante') {   // visitante não vê a lista com nomes
     var esc = function(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
     h += '<div style="overflow-x:auto;margin-top:10px;"><table style="width:100%;border-collapse:collapse;font-size:.78rem;">'
       + '<tr><th style="text-align:left;padding:7px 8px;">Data</th><th style="text-align:left;padding:7px 8px;">Cliente</th><th style="text-align:right;padding:7px 8px;">Valor</th><th style="text-align:left;padding:7px 8px;">De onde veio</th><th style="text-align:left;padding:7px 8px;">Como liguei ao lead</th></tr>'
@@ -15504,11 +15513,19 @@ function gvAjudaVideo(x, vid) {
   var aviso = x.vs === 'acesso' ? '🔒 <b>Esta reunião foi criada por outra conta</b> e o robô não tem acesso ao vídeo. Abra no Drive logado na conta que criou a reunião.'
     : x.vs === 'proc' ? '⏳ <b>O Google Drive ainda não preparou este vídeo</b> para tocar aqui dentro (acontece com gravação recém-terminada, muito longa ou que deu problema). Tente recarregar mais tarde ou baixe o arquivo.'
     : '';
-  return '<div class="gv-ajuda' + (aviso ? ' alerta' : '') + '">' + (aviso ? '<span class="gv-ajuda-t">' + aviso + '</span>' : '<span class="gv-ajuda-t">Vídeo não carregou aqui?</span>')
+  return '<div class="gv-ajuda' + (aviso ? ' alerta' : '') + '">' + (aviso ? '<span class="gv-ajuda-t">' + aviso + '</span>' : '<span class="gv-ajuda-t">Não carregou ou pediu cookies?</span>')
     + '<button class="btn primary" onclick="gvJanela(GRAV._seg||0)" title="Abre o vídeo numa janela do Drive, ao lado — continua ligado à conversa">🪟 Assistir em janela ao lado</button>'
     + '<button class="btn" onclick="gvRecarregarVideo()">↻ Recarregar</button>'
     + '<a class="btn" href="' + ab + '" target="_blank" rel="noopener">↗ Abrir no Drive</a>'
-    + '<a class="btn" href="' + bx + '" target="_blank" rel="noopener">⬇ Baixar</a></div>';
+    + '<a class="btn" href="' + bx + '" target="_blank" rel="noopener">⬇ Baixar</a>'
+    + '<label class="gv-sempre" title="Em janela própria o Google não pede cookies — vale para este navegador"><input type="checkbox"' + (gvSempreJanela() ? ' checked' : '') + ' onchange="gvSempreJanelaTroca(this.checked)"> sempre abrir em janela</label></div>';
+}
+// 26/09/2026 (Bruno: "sempre pede para os cookies"): navegador que bloqueia cookies de outro site (Safari, Brave, aba anônima)
+// faz o player do Drive pedir cookies dentro do dash. Em janela própria isso não acontece — a escolha fica guardada no navegador.
+function gvSempreJanela() { try { return localStorage.getItem('v2GvSempreJanela') === '1'; } catch (e) { return false; } }
+function gvSempreJanelaTroca(on) {
+  try { localStorage.setItem('v2GvSempreJanela', on ? '1' : ''); } catch (e) {}
+  if (on) gvJanela(GRAV._seg || 0); else gvVerAqui();
 }
 function gvRecarregarVideo() {
   var f = document.getElementById('gv-frame'); if (!f) return;
@@ -15624,6 +15641,7 @@ function gravAbrir(i, foco) {
   GRAV._aberto = { x: x, p: p };
   GRAV._seg = 0;
   if (vid && gvJanelaAberta()) { gvJanela(0); }   // a janela ao lado acompanha a reunião nova
+  else if (vid && gvSempreJanela() && !(window.matchMedia && matchMedia('(hover:none) and (pointer:coarse)').matches)) { gvJanela(0); }   // escolheu: sempre em janela
   if (vid) {
     setTimeout(function() { var fr = document.getElementById('gv-frame'); if (fr && !gvJanelaAberta()) fr.classList.add('ok'); }, 8000);
     clearTimeout(GRAV._tVista);
@@ -17287,6 +17305,7 @@ function fecharAprovacao() {
 // horário 🔒 (reunião extra, sábado ou feriado): pede a aprovação do closer antes
 function agendarComAprovacao(e, dataStr, hora, ck) {
   e.stopPropagation();
+  if (typeof soOlhar === 'function' && soOlhar()) return;   // visitante não agenda (Bruno 26/09/2026)
   if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
   var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
   var closerNome = closerNomeDe(quem) || 'responsável';
@@ -17298,6 +17317,7 @@ function agendarComAprovacao(e, dataStr, hora, ck) {
 // popup HT/Legado com data/hora reais
 function abrirTipoV2(e, dataStr, hora, ck) {
   e.stopPropagation();
+  if (typeof soOlhar === 'function' && soOlhar()) return;   // visitante não agenda (Bruno 26/09/2026)
   if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
   window._agAprovado = false;
   var dp = dataStr.split('-');
@@ -17315,6 +17335,7 @@ function abrirTipoV2(e, dataStr, hora, ck) {
   m.style.top = Math.min(e.clientY + 8, window.innerHeight - 230) + 'px';
 }
 function abrirAgendarCom(dur, dataStr, hora, ck, tipo) {
+  if (typeof soOlhar === 'function' && soOlhar()) return;   // visitante não agenda (Bruno 26/09/2026)
   window._agTipoReuniao = tipo || '';   // 'entrevista' = Entrevista WLD João Stecca (Bruno 22/09/2026); vazio = HT/Legado
   // no modo REMARCAR (Bruno 10/09/2026: "não está dando para remarcar, aparece como se eu estivesse agendando outra"),
   // qualquer clique num horário — inclusive o pedaço "+ Legado" da linha do tempo — é o horário NOVO da mesma reunião
@@ -21897,6 +21918,82 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
 /* 🔒 visitante não vê Pagamentos nem Contratos (Bruno 26/09/2026) */
 html.visitante .nav-item[data-s="pagamentos"], html.visitante .nav-item[data-s="contratos"],
 html.visitante #s-pagamentos, html.visitante #s-contratos { display:none !important; }
+/* 🔒 VISITANTE = SÓ NÚMEROS (Bruno 26/09/2026: "o visitante não pode ter acesso a nada que não é seguro para a empresa"):
+   sem telas de pessoas (Pesquisar, Gravações, Leads, Disparos, Pagamentos, Contratos), sem avisos operacionais,
+   sem lista de últimas reuniões, nomes dos clientes borrados na agenda */
+html.visitante .nav-item[data-s="pesquisa"], html.visitante .nav-item[data-s="gravacoes"], html.visitante .nav-item[data-s="leads"],
+html.visitante .nav-item[data-s="disparos"], html.visitante .tb-it[data-s="leads"], html.visitante .tb-it[data-s="gravacoes"],
+html.visitante #s-pesquisa, html.visitante #s-gravacoes, html.visitante #s-leads, html.visitante #s-disparos,
+html.visitante #v2-novos, html.visitante #v2-gm-falta, html.visitante #v2-pend-aviso, html.visitante #v2-clint, html.visitante #v2-semorigem,
+html.visitante #v2-avisocloser, html.visitante #v2-statuspendente, html.visitante .v2-ultimas-painel, html.visitante #vsf-btn, html.visitante #gm-toasts,
+html.visitante [onclick^="AN_VD_ABERTO"], html.visitante .an-dsp-aviso, html.visitante .bt-ext { display:none !important; }
+html.visitante .tl-ev .sg-nome, html.visitante .tl-ev .sg-avatar, html.visitante .sg-ev .sg-nome, html.visitante .sg-ev .sg-avatar,
+html.visitante .sg-cell.booked .sg-nome, html.visitante .sg-cell.booked .sg-avatar { filter:blur(5px); user-select:none; }
+html.visitante .tl-ev, html.visitante .sg-ev, html.visitante .sg-cell.booked, html.visitante .or-n, html.visitante .glass.click { cursor:default; }
+/* 🔒 visitante também não agenda: somem os "+ agendar" e os botões de marcar reunião */
+html.visitante [onclick^="abrirAgendar"], html.visitante [onclick*="marcarReuniaoDoLead"], html.visitante .gm-toast button[data-a="marcar"],
+html.visitante .tl-slot .tl-mais, html.visitante .tl-legado, html.visitante .sg-legado, html.visitante .sg-cell.vazio > b, html.visitante .sg-cell.vazio > span { display:none !important; }
+html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
+/* 🗂 cartão de reunião das listas (v2row) em 3 partes — Bruno 26/09/2026: "melhore essa experiência dentro dos cards" */
+.cliente-row.cr2 { display:grid !important; grid-template-columns:44px minmax(0,1fr) auto; column-gap:16px; row-gap:8px; align-items:center; padding:13px 16px; }
+.cr2 > .avatar { width:44px; height:44px; }
+.cr2 .lead-info { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.cr2 .lead-info > b { display:block; font-size:.92rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cr2 .cr-meta { display:block; font-size:.72rem; color:var(--text2); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cr2 .cr-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+.cr2 .cr-tags > * { max-width:100%; font-size:.66rem !important; padding:3px 9px !important; }
+.cr2 .cr-fim { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+.cr2 .cr-val { display:flex; align-items:center; gap:10px; }
+.cr2 .cr-val .valor { margin:0 !important; font-size:1rem; font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums; flex:none !important; padding-left:0 !important; }
+.cr2 .cr-acts { display:flex; gap:6px; }
+.cr2 .cr-ic { width:32px; height:32px; padding:0 !important; display:inline-flex !important; align-items:center; justify-content:center; border-radius:10px !important; font-size:.8rem; }
+.cr2 .cr-clint { background:rgba(108,71,255,.14) !important; border-color:rgba(108,71,255,.45) !important; color:#8f6bff !important; }
+@media (max-width:760px) {
+  .cliente-row.cr2 { grid-template-columns:40px minmax(0,1fr); padding:12px; }
+  .cr2 > .avatar { width:40px; height:40px; }
+  .cr2 .lead-info > b, .cr2 .cr-meta { white-space:normal; }
+  .cr2 .cr-fim { grid-column:1 / -1; flex-direction:row; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px solid rgba(255,255,255,.06); }
+}
+/* 🗂 FICHA INTERNA (Bruno 26/09/2026: "quero que melhore a ficha interna"): no computador vira duas colunas
+   (informações e anotações à esquerda, o que respondeu no formulário à direita), cabeçalho fica preso no alto com
+   atalhos (WhatsApp, ligar, copiar), informações viram blocos com o que importa em destaque */
+#modal-lead .modal-head { position:sticky; top:-1px; z-index:4; background:var(--panel, #14171d); margin-top:-4px; padding-top:6px; padding-bottom:10px;
+  box-shadow:0 12px 18px -14px rgba(0,0,0,.9); flex-wrap:wrap; row-gap:10px; }
+.fl-atalhos { flex:1 1 100%; display:flex; gap:8px; flex-wrap:wrap; padding-left:58px; }
+.fl-atalhos a, .fl-atalhos button { display:inline-flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px; font:inherit; font-size:.72rem; font-weight:800;
+  text-decoration:none; cursor:pointer; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); transition:background .2s, border-color .2s, transform .15s; }
+.fl-atalhos a:hover, .fl-atalhos button:hover { border-color:rgba(255,255,255,.22); background:rgba(255,255,255,.08); }
+.fl-atalhos .wa { color:#3ddc97; border-color:rgba(61,220,151,.35); background:rgba(61,220,151,.08); }
+#lead-info { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+#lead-info .dtl-line { flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:4px; padding:10px 12px; margin:0; border-radius:12px;
+  background:rgba(255,255,255,.03); border:1px solid var(--border); min-width:0; }
+#lead-info .dtl-line > span:first-child { font-size:.62rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+#lead-info .dtl-line > b, #lead-info .dtl-line > a, #lead-info .dtl-line > span + span { font-size:.86rem; text-align:left !important; max-width:100% !important; overflow-wrap:anywhere; }
+#lead-info .dtl-line input, #lead-info .dtl-line select { width:100%; }
+#lead-info .dtl-line[data-k="valor"] > b { color:var(--green); font-size:1.02rem; }
+#lead-info .dtl-line[data-k="valor"], #lead-info .dtl-line[data-k="status"] { border-color:rgba(61,220,151,.22); background:rgba(61,220,151,.05); }
+#lead-info .dtl-line[data-k="produto"], #lead-info .dtl-line[data-k="telefone"] { grid-column:1 / -1; }
+#fl-formulario .dtl-line { flex-direction:column; align-items:flex-start; gap:3px; }
+#fl-formulario .dtl-line > span:first-child { font-size:.62rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+#fl-formulario .dtl-line > b { max-width:100% !important; text-align:left !important; font-size:.84rem; line-height:1.45; }
+@media (min-width:1100px) {
+  #modal-lead .modal { width:min(1040px, 94vw) !important; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:16px; align-content:start;
+    grid-template-areas:"head head" "grav grav" "info form" "notas form"; }
+  #modal-lead .modal > * { min-width:0; }
+  #modal-lead .modal > .modal-head { grid-area:head; }
+  #modal-lead .modal > #card-gravacao { grid-area:grav; }
+  #modal-lead .modal > .dtl-card:nth-child(3) { grid-area:info; }
+  #modal-lead .modal > #fl-formulario { grid-area:form; }
+  #modal-lead .modal > .dtl-card:last-child { grid-area:notas; }
+  #modal-lead #fl-formulario > .dtl-card { margin-top:0; }
+}
+@media (max-width:760px) {
+  .fl-atalhos { padding-left:0; }
+}
+/* vídeo: opção "sempre em janela" só no computador */
+.gv-sempre { display:inline-flex; align-items:center; gap:6px; font-size:.66rem; font-weight:700; color:var(--text2); cursor:pointer; margin-left:4px; white-space:nowrap; }
+.gv-sempre input { accent-color:var(--accent); }
+@media (hover:none) and (pointer:coarse) { .gv-sempre { display:none; } }
 /* teclado: cartão clicável ganha foco visível */
 .glass.click:focus-visible, .pcard:focus-visible, .cliente-row:focus-visible, .lead-card:focus-visible, .px-card:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 
@@ -21911,8 +22008,8 @@ html.visitante #s-pagamentos, html.visitante #s-contratos { display:none !import
 /* ---------- 📱 cartões no celular ---------- */
 @media (max-width:760px) {
   /* listas de reunião: o nome ocupa a linha de cima inteira; etiquetas descem (antes o nome virava uma coluna fina) */
-  .cliente-row > .lead-info { flex:1 1 calc(100% - 52px) !important; min-width:0; }
-  .cliente-row > .lead-info + :not(.valor):not([style*="margin-left:auto"]) { margin-left:46px; }
+  .cliente-row:not(.cr2) > .lead-info { flex:1 1 calc(100% - 52px) !important; min-width:0; }
+  .cliente-row:not(.cr2) > .lead-info + :not(.valor):not([style*="margin-left:auto"]) { margin-left:46px; }
   .cliente-row > .lead-info b { white-space:normal; }
   /* Pesquisar reuniões e Pagamentos: cartão vira linha compacta (foto à esquerda) */
   .pcard { display:grid !important; grid-template-columns:46px minmax(0,1fr); column-gap:12px; row-gap:3px; align-items:center; justify-items:start;
@@ -21999,7 +22096,7 @@ html.visitante #s-pagamentos, html.visitante #s-contratos { display:none !import
   // 🔒 VISITANTE (Bruno 26/09/2026: "que os visitantes não consigam ter acesso aos pagamentos nem contratos"):
   // as duas telas somem do menu, do "Mais" e do trilho, e nenhum atalho abre (os dados seguem carregando por trás
   // porque a ficha do lead e a situação das vendas dependem deles)
-  var TELAS_FECHADAS = ['pagamentos', 'contratos'];
+  var TELAS_FECHADAS = ['pagamentos', 'contratos', 'pesquisa', 'gravacoes', 'leads', 'disparos'];
   function ehVisitante() { try { return localStorage.getItem('v2Login') === 'Visitante'; } catch (e) { return false; } }
   function aplicarRestricoes() {
     var v = ehVisitante();
@@ -22010,11 +22107,31 @@ html.visitante #s-pagamentos, html.visitante #s-contratos { display:none !import
   }
   doc.addEventListener('click', function (e) {
     if (!ehVisitante()) return;
-    var it = e.target && e.target.closest ? e.target.closest('.nav-item[data-s], .tb-tile[data-s]') : null;
+    var it = e.target && e.target.closest ? e.target.closest('.nav-item[data-s], .tb-tile[data-s], .tb-it[data-s]') : null;
     if (!it || TELAS_FECHADAS.indexOf(it.getAttribute('data-s')) === -1) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    try { avisoRapido('🔒 Acesso de visitante não abre ' + (it.getAttribute('data-s') === 'contratos' ? 'Contratos' : 'Pagamentos')); } catch (x) {}
+    try { avisoRapido('🔒 Acesso de visitante não abre esta tela'); } catch (x) {}
   }, true);
+  // portas que levam a dados de pessoas (fichas, listas "quem são", menus da agenda, cópias, exportações, gravações):
+  // para o visitante não abrem — o aviso só aparece quando foi um clique dele
+  ['abrirA', 'abrirB', 'abrirLead', 'abrirMenu', 'abrirSlotMenu', 'abrirListaOrigem', 'abrirPizzaProduto', 'abrirFunilSdr',
+   'abrirAtendimentoClint', 'abrirAtendimentoClintPor', 'gmAbrirLista', 'abrirStatusPendente', 'verLeadDoPopup', 'verEsperando',
+   'verAconteceu', 'verLeadsDoAnuncio', 'verFichaDaLista', 'baixarQuem', 'verFichaPendente', 'abrirGerarLista', 'abrirFichaLead',
+   'abrirEtapaLeads', 'verLeadsNovos', 'verComentariosHoje', 'abrirFichaPagDireto', 'verFormularioCompleto', 'copiarDadosLead',
+   'copiarDadosPag', 'abrirFichaPag', 'abrirMenuEvento', 'abrirRemarcarEvento', 'verContratoPag', 'abrirFichaDoTelefone',
+   'abrirBuscaLead', 'abrirBloqueiosJanela', 'abrirFollowupsJanela', 'gravAbrir', 'gravFicha', 'verPendencias', 'irParaPendencias',
+   'plVer', 'plPxAbrirLista', 'tcAbrirSemContato', 'abrirTipo', 'abrirZap', 'abrirFormVenda', 'abrirFormVendaLead', 'abrirFormVendaReuniao',
+   'abrirFormBloqueio', 'abrirFormBloqueioLead', 'abrirFormBloqueioReuniao', 'abrirFormVendaGoogle'].forEach(function (nome) {
+    var f = window[nome]; if (typeof f !== 'function') return;
+    window[nome] = function () {
+      if (ehVisitante()) {
+        var ev = window.event;
+        if (ev && ev.isTrusted && /click|key|touch|pointer/.test(ev.type)) { try { avisoRapido('🔒 Acesso de visitante: mostra os números, não os dados das pessoas'); } catch (x) {} }
+        return;
+      }
+      return f.apply(this, arguments);
+    };
+  });
   aplicarRestricoes();
   if (typeof window.mostrarAcessoAtual === 'function') {
     var _maa = window.mostrarAcessoAtual;
@@ -22037,6 +22154,37 @@ html.visitante #s-pagamentos, html.visitante #s-contratos { display:none !import
   });
   setInterval(marcarCartoes, 3000);
   setTimeout(marcarCartoes, 1500);
+
+  // ficha interna: cada informação ganha uma chave (valor, status…) e o cabeçalho ganha atalhos de contato
+  function chaveDaLinha(t) {
+    t = String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (/valor/.test(t)) return 'valor'; if (/status|situa/.test(t)) return 'status'; if (/produto/.test(t)) return 'produto';
+    if (/telefone|whats/.test(t)) return 'telefone'; if (/closer/.test(t)) return 'closer'; if (/\bsdr\b/.test(t)) return 'sdr';
+    return '';
+  }
+  function fichaMelhorar() {
+    var li = doc.getElementById('lead-info'); if (!li) return;
+    var tel = '';
+    Array.prototype.forEach.call(li.querySelectorAll('.dtl-line'), function (l) {
+      var k = chaveDaLinha((l.firstElementChild || {}).textContent); if (k && l.getAttribute('data-k') !== k) l.setAttribute('data-k', k);
+      if (k === 'telefone') { var t = (l.textContent || '').replace(/\D/g, ''); if (t.length >= 10) tel = t.slice(-11); }
+    });
+    var head = doc.querySelector('#modal-lead .modal-head'); if (!head) return;
+    var at = head.querySelector('.fl-atalhos');
+    if (!at) { at = doc.createElement('div'); at.className = 'fl-atalhos'; head.appendChild(at); }
+    var h = '';
+    if (tel && !ehVisitante()) {
+      h += '<a class="wa" href="https://wa.me/55' + tel + '" target="_blank" rel="noopener" onclick="event.stopPropagation();">💬 WhatsApp</a>'
+        + '<a href="tel:+55' + tel + '" onclick="event.stopPropagation();">📞 Ligar</a>';
+    }
+    h += '<button type="button" onclick="event.stopPropagation();var b=document.getElementById(\'btn-copiar\');if(b)b.click();">📋 Copiar dados</button>';
+    if (at.innerHTML !== h) at.innerHTML = h;
+  }
+  (function () {
+    var li = doc.getElementById('lead-info'); if (!li) return;
+    var t = null;
+    new MutationObserver(function () { clearTimeout(t); t = setTimeout(fichaMelhorar, 30); }).observe(li, { childList: true, subtree: true });
+  })();
 
   // "vendas sem dados": o número vai para o botão compacto do celular
   setInterval(function () {
