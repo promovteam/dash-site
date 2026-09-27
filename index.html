@@ -1241,6 +1241,27 @@ img { max-width:100%; height:auto; }
 .gv-carrega i { width:34px; height:34px; border-radius:50%; border:3px solid rgba(255,255,255,.25); border-top-color:var(--accent); animation:gvGira .8s linear infinite; }
 @keyframes gvGira { to { transform:rotate(360deg); } }
 .gv-video iframe.ok + .gv-carrega { opacity:0; }
+.gv-tocar, .cri-tocar { position:absolute; inset:0; z-index:3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; border:0; cursor:pointer;
+  background:linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.55)); color:#fff; font:inherit; font-size:.86rem; font-weight:800; -webkit-tap-highlight-color:transparent; }
+.gv-tocar i, .cri-tocar i { width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,.95); color:#111; display:flex; align-items:center; justify-content:center;
+  font-size:1.6rem; font-style:normal; padding-left:5px; box-shadow:0 10px 34px rgba(0,0,0,.55); transition:transform .15s ease; }
+.gv-tocar:active i, .cri-tocar:active i { transform:scale(.92); }
+.gv-tocar span, .cri-tocar span { text-shadow:0 2px 10px rgba(0,0,0,.8); letter-spacing:.2px; }
+@media (max-width:760px) { .gv-ajuda:not(.alerta) { display:none !important; } }
+html.vtela-on, html.vtela-on body { overflow:hidden !important; }
+#vtela { position:fixed; inset:0; z-index:100002; background:#000; display:flex; flex-direction:column; color:#fff;
+  padding:env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+#vtela .vt-top { flex:none; display:flex; align-items:center; gap:10px; padding:10px 12px 8px 16px; }
+#vtela .vt-top b { flex:1; min-width:0; font-size:.9rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#vtela .vt-x { flex:none; width:44px; height:44px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.1); color:#fff; font-size:1.15rem; cursor:pointer; }
+#vtela .vt-palco { position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+#vtela .vt-palco iframe { position:relative; z-index:2; display:block; border:0; background:#000; opacity:0; transition:opacity .35s ease; }
+#vtela.ok .vt-palco iframe { opacity:1; }
+#vtela .vt-carrega { position:absolute; inset:0; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; font-size:.78rem; font-weight:700; color:rgba(255,255,255,.75); }
+#vtela .vt-carrega i { width:34px; height:34px; border-radius:50%; border:3px solid rgba(255,255,255,.2); border-top-color:var(--accent); animation:gvGira .8s linear infinite; }
+#vtela .vt-pe { flex:none; display:flex; justify-content:center; padding:10px 12px 14px; }
+#vtela .vt-pe a { padding:10px 18px; border-radius:999px; border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#fff; text-decoration:none; font-size:.8rem; font-weight:800; }
+@media (orientation:landscape) and (max-height:500px) { #vtela .vt-top { position:absolute; top:0; left:0; right:0; z-index:3; background:linear-gradient(180deg, rgba(0,0,0,.6), transparent); } #vtela .vt-pe { display:none; } }
 .cri-fb { position:relative; width:100%; max-width:500px; min-height:220px; margin:0 auto; border-radius:12px; overflow:hidden; background:#000 center / contain no-repeat; }
 .cri-fb iframe { position:relative; display:block; margin:0 auto; border:none; overflow:hidden; background:transparent; max-width:100%; }
 #modal-criativo > div > div:first-child > div:first-child { min-width:0; overflow-wrap:anywhere; }   /* nome/link comprido empurrava o ✕ para fora da tela */
@@ -2598,7 +2619,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-0130';
+var VERSAO_DASH = '2026-09-27-0201';
 var _versaoNova = null;
 
 // =====================================================================
@@ -5821,6 +5842,19 @@ function _clintGuardar() {
     sessionStorage.setItem('v2ClintCache', JSON.stringify({ quando: Date.now(), dados: limpo }));
   } catch (e) {}
 }
+// 📱 endereços da Clint guardados NESTE aparelho (Bruno 27/09/2026: "quando peço para abrir na Clint no app está
+// demorando"): no iPhone o app só abre pelo endereço da conversa/negócio, que só o robô sabe (3 a 10 s perguntando à
+// Clint). Depois da 1ª vez, o endereço fica guardado aqui (mesmo em outro dia) e o botão abre o app NA HORA.
+var CLINT_IDS = (function() { try { return JSON.parse(localStorage.getItem('v2ClintIds') || '{}') || {}; } catch (e) { return {}; } })();
+function clintIdsGuardar(t8, d) {
+  if (!t8 || !d || !d.success || !d.achou || !(d.chatId || d.negocioId)) return;
+  CLINT_IDS[t8] = { c: d.chatId || '', n: d.negocioId || '', k: d.contatoId || '', t: Date.now() };
+  try {
+    var ks = Object.keys(CLINT_IDS);
+    if (ks.length > 1500) ks.sort(function(a, b) { return CLINT_IDS[a].t - CLINT_IDS[b].t; }).slice(0, ks.length - 1500).forEach(function(k) { delete CLINT_IDS[k]; });
+    localStorage.setItem('v2ClintIds', JSON.stringify(CLINT_IDS));
+  } catch (e) {}
+}
 var _clintFila = [], _clintOcupado = false;
 // regras de mudança automática de etapa (13/08/2026)
 var CLINT_DIAS_NUTRICAO = 7; // sem resposta do lead há 7 dias → vai para Nutrição
@@ -5852,6 +5886,7 @@ function _clintProximo() {
     if (terminou) return;
     terminou = true;
     CLINT[item.chave] = dados || { success: false };
+    try { clintIdsGuardar(item.chave, dados); } catch (eG) {}
     try { s.remove(); } catch (e) {}
     try { delete window[nome]; } catch (e) {}
     _clintOcupado = false;
@@ -5934,7 +5969,7 @@ function abrirAtendimentoClint(ev, i) {
     if (feito) return; feito = true;
     clearInterval(timer);
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
-    if (d && d.success) CLINT[t8] = d;
+    if (d && d.success) { CLINT[t8] = d; try { clintIdsGuardar(t8, d); } catch (eG) {} }
     var alvo = clintLinkApp(l) || 'https://app.clint.digital/chat';
     var achou = !!(d && d.success && d.achou);
     var aviso = achou ? '✅ Encontrado na Clint.' : '⚠️ Essa pessoa não está na Clint' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '') + ' — abrindo a lista.';
@@ -5991,9 +6026,11 @@ function ehCelular() {
 }
 function clintLinkApp(l) {   // no celular, conversa ou negocio (o app so assume /chat/... e /deal/...)
   if (ehCelular()) {
-    var c = CLINT[ldTel8(l.tel || l.telefone)];
+    var t8a = ldTel8(l.tel || l.telefone), c = CLINT[t8a], g = CLINT_IDS[t8a];
     if (c && c.success && c.chatId) return 'https://app.clint.digital/chat/' + c.chatId;
     if (c && c.success && c.negocioId) return 'https://app.clint.digital/deal/' + c.negocioId;
+    if (g && g.c) return 'https://app.clint.digital/chat/' + g.c;        // guardado de outra vez neste aparelho
+    if (g && g.n) return 'https://app.clint.digital/deal/' + g.n;
   }
   return clintLink(l);
 }
@@ -6001,8 +6038,8 @@ function clintLinkApp(l) {   // no celular, conversa ou negocio (o app so assume
 // vale esperar o robo (3 a 10 s) em vez de mandar para o cadastro, que abre o navegador
 function clintPrecisaPerguntar(l) {
   if (!ehCelular()) return false;
-  var c = CLINT[ldTel8(l.tel || l.telefone)];
-  return !(c && c.success && (c.chatId || c.negocioId));
+  var t8p = ldTel8(l.tel || l.telefone), c = CLINT[t8p], g = CLINT_IDS[t8p];
+  return !((c && c.success && (c.chatId || c.negocioId)) || (g && (g.c || g.n)));
 }
 function clintAbrir(url) {
   if (!url) return;
@@ -10349,6 +10386,7 @@ function abrirCriativo(nome, jaTocar, manterPer) {
     // altura de post quadrado — no celular o vídeo em pé saía cortado. Agora é montado depois (criMontarPlayer)
     // na largura da tela e na proporção do criativo; vídeo usa o player de vídeo do Facebook, que já tenta tocar
     player = '<div class="cri-fb" data-post="' + String(m.post).replace(/"/g, '') + '" data-video="' + String(m.video || '').replace(/"/g, '') + '"'
+      + ' data-link="' + String(m.link || '').replace(/"/g, '') + '" data-titulo="' + String(anRotuloChave(nome) || '').replace(/<[^>]*>/g, '').replace(/"/g, '&quot;') + '"'
       + ' data-foto="' + String(m.foto || '').replace(/"/g, '&quot;') + '"' + (m.foto ? ' style="background-image:url(\'' + String(m.foto).replace(/'/g, '%27').replace(/"/g, '%22') + '\')"' : '') + '></div>';
   }
   var rs = function(v){ return 'R$ ' + Math.round(v||0).toLocaleString('pt-BR'); };
@@ -10589,6 +10627,59 @@ function baixarQuem(chave) {
   a.download = (_anRotulo[chave] || 'leads') + ' - ' + String(_anAtual).replace(/[^\w.-]+/g, '_') + '.csv';
   a.click();
 }
+// 📱 PLAYER EM TELA CHEIA NO CELULAR (Bruno 27/09/2026: "a visualização dos vídeos está péssima no celular, seja nas
+// gravações seja nos criativos"): no celular o player do Drive/Facebook ficava num quadro pequeno e os controles
+// cobriam a imagem. Agora o ▶ abre o vídeo numa tela preta inteira (deitar o celular aumenta), com ✕ grande para voltar
+// e o botão de abrir no app. O botão "voltar" do celular também fecha.
+function vtelaCelular() { try { return window.matchMedia('(max-width:760px)').matches; } catch (e) { return false; } }
+var _vtela = null;
+function vtelaAbrir(o) {
+  vtelaFechar(true);
+  var esc = function(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var el = document.createElement('div'); el.id = 'vtela'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', o.titulo || 'Vídeo');
+  el.innerHTML = '<div class="vt-top"><b>' + esc(o.titulo || 'Vídeo') + '</b><button type="button" class="vt-x" aria-label="Fechar o vídeo" onclick="vtelaFechar()">✕</button></div>'
+    + '<div class="vt-palco"><div class="vt-carrega"><i></i>abrindo o vídeo…</div></div>'
+    + (o.link ? '<div class="vt-pe"><a href="' + esc(o.link) + '" target="_blank" rel="noopener">' + esc(o.linkRot || '↗ Abrir no app') + '</a></div>' : '');
+  document.body.appendChild(el);
+  _vtela = { el: el, o: o, hist: false };
+  document.documentElement.classList.add('vtela-on');
+  var f = document.createElement('iframe');
+  f.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+  f.setAttribute('allowfullscreen', 'true'); f.setAttribute('scrolling', 'no'); f.setAttribute('frameborder', '0'); f.title = o.titulo || 'Vídeo';
+  f.onload = function() { el.classList.add('ok'); };
+  setTimeout(function() { el.classList.add('ok'); }, 1500);
+  el.querySelector('.vt-palco').appendChild(f);
+  vtelaMedir();
+  f.src = typeof o.src === 'function' ? o.src(f._larg || 360) : o.src;
+  try { history.pushState({ vtela: 1 }, ''); _vtela.hist = true; } catch (e) {}
+}
+function vtelaMedir() {
+  if (!_vtela) return;
+  var palco = _vtela.el.querySelector('.vt-palco'), f = palco && palco.querySelector('iframe'); if (!f) return;
+  var W = palco.clientWidth, H = palco.clientHeight, p = _vtela.o.prop;
+  if (!p) { f.style.width = W + 'px'; f.style.height = H + 'px'; f._larg = W; return; }   // gravação: o player ocupa tudo e centraliza o vídeo
+  var w = Math.min(W, Math.floor(H * p)), hh = Math.floor(w / p);
+  f.style.width = w + 'px'; f.style.height = hh + 'px'; f._larg = w;
+}
+function vtelaFechar(semHistorico) {
+  if (!_vtela) return;
+  var v = _vtela; _vtela = null;
+  try { v.el.remove(); } catch (e) {}
+  document.documentElement.classList.remove('vtela-on');
+  if (!semHistorico && v.hist) { try { if (history.state && history.state.vtela) history.back(); } catch (e) {} }
+}
+window.addEventListener('popstate', function() { if (_vtela) { _vtela.hist = false; vtelaFechar(true); } });
+window.addEventListener('resize', function() { try { vtelaMedir(); } catch (e) {} });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && _vtela) { e.stopPropagation(); vtelaFechar(); } }, true);
+// gravação no celular: abre a tela cheia (no ponto escolhido)
+function gvTelaCheia(seg) {
+  var x = GRAV._aberto && GRAV._aberto.x, vid = x && (x.rec || [])[0]; if (!vid) return;
+  var p = GRAV._aberto.p || {};
+  seg = Math.max(0, Math.round(+seg || 0));
+  var base = 'https://drive.google.com/file/d/' + encodeURIComponent(vid);
+  vtelaAbrir({ titulo: (p.nome || 'Gravação') + (seg ? ' · ' + gvHora(seg) : ''), src: base + '/preview' + (seg ? '?t=' + seg : ''),
+    link: base + '/view' + (seg ? '?t=' + seg : ''), linkRot: '↗ Abrir no app do Drive' });
+}
 // monta o vídeo/post do Facebook na largura disponível e na proporção do criativo (a foto do anúncio diz se é em pé)
 function criMontarPlayer(cx) {
   var box = cx.querySelector('.cri-fb'); if (!box) return;
@@ -10605,6 +10696,16 @@ function criMontarPlayer(cx) {
     var src = vidId
       ? 'https://www.facebook.com/plugins/video.php?href=' + encodeURIComponent('https://www.facebook.com/' + partes[0] + '/videos/' + vidId + '/') + '&show_text=false&autoplay=true&width=' + larg
       : 'https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent('https://www.facebook.com/' + partes[0] + '/posts/' + partes[1]) + '&show_text=false&width=' + larg;
+    if (vidId && vtelaCelular()) {   // celular: capa com ▶ — o vídeo abre em tela cheia
+      box.style.height = Math.min(alt, Math.round((window.innerHeight || 700) * 0.55)) + 'px';
+      box.innerHTML = '<button type="button" class="cri-tocar" aria-label="Assistir o vídeo em tela cheia"><i>▶</i><span>Assistir</span></button>';
+      var linkFb = box.getAttribute('data-link') || '', titCri = box.getAttribute('data-titulo') || 'Criativo';
+      box.querySelector('button').onclick = function() {
+        vtelaAbrir({ titulo: titCri, prop: prop, link: linkFb, linkRot: '↗ Abrir no Facebook',
+          src: function(w) { return 'https://www.facebook.com/plugins/video.php?href=' + encodeURIComponent('https://www.facebook.com/' + partes[0] + '/videos/' + vidId + '/') + '&show_text=false&autoplay=true&width=' + Math.max(200, Math.round(w)); } });
+      };
+      return;
+    }
     box.style.height = alt + 'px';
     box.innerHTML = '<iframe src="' + src + '" width="' + larg + '" height="' + alt + '" scrolling="no" frameborder="0" allowfullscreen="true"'
       + ' allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" title="Criativo"></iframe>';
@@ -15706,6 +15807,7 @@ function gvTocarEm(seg, origemEl) {
   seg = Math.max(0, Math.round(+seg || 0));
   var naJanela = gvJanelaAberta();
   if (naJanela) gvJanela(seg);   // o vídeo está na janela ao lado: ela vai para o minuto
+  else if (vtelaCelular()) gvTelaCheia(seg);   // celular: abre a tela cheia já no minuto
   else {
     f.classList.remove('ok');
     f.src = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?t=' + seg;
@@ -15854,6 +15956,7 @@ function gravAbrir(i, foco) {
   GRAV._foco = foco || '';
   var p = gravPartes(x.t), st = GRAV_ST[String(x.s || 'agendada').toLowerCase()] || GRAV_ST.agendada;
   var vid = (x.rec || [])[0], doc = (x.doc || [])[0];
+  var cel = !!vid && vtelaCelular();   // celular: o vídeo abre em tela cheia (27/09/2026)
   var dt = x.d ? new Date(x.d.slice(0, 10) + 'T12:00:00') : null, semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   var meta = [p.tipo, p.lid, dt ? semana[dt.getDay()] + ' ' + x.d.slice(8, 10) + '/' + x.d.slice(5, 7) + ' · ' + x.d.slice(11, 16) : '',
               gravDur(x.dur) ? '⏱ ' + gravDur(x.dur) : '', 'Closer ' + (GRAV.closers[x.k] || x.k), p.sdr ? 'SDR ' + p.sdr : '', gravOrigem(x) ? '🧲 ' + gravOrigem(x) : ''].filter(Boolean).join(' · ');
@@ -15881,7 +15984,9 @@ function gravAbrir(i, foco) {
     +   '</div></header>'
     + '<div class="gv-corpo">'
     +   '<section class="gv-esq"><div class="gv-palco"><div class="gv-video"' + (vid ? ' data-vid="' + gravEsc(vid) + '" style="background-image:url(\'' + (GRAV.capas[vid] || 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w1280') + '\')"' : '') + '>'
-    +     (vid ? '<iframe id="gv-frame" src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview" allow="autoplay; fullscreen" allowfullscreen title="Gravação" onload="this.classList.add(\'ok\')"></iframe><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
+    +     (vid && cel ? '<iframe id="gv-frame" src="about:blank" data-src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview" title="Gravação" style="display:none"></iframe>'
+             + '<button type="button" class="gv-tocar" onclick="gvTelaCheia(GRAV._seg||0)" aria-label="Assistir a gravação em tela cheia"><i>▶</i><span>Assistir em tela cheia</span></button>'
+           : vid ? '<iframe id="gv-frame" src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview" allow="autoplay; fullscreen" allowfullscreen title="Gravação" onload="this.classList.add(\'ok\')"></iframe><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
              : '<div class="gv-sem"><b>Sem vídeo desta reunião</b><span>ficaram só as anotações do Gemini</span></div>')
     +   '</div>' + (vid ? gvAjudaVideo(x, vid) + '<div class="gv-momento" id="gv-momento"></div>' : '')
     +   (doc ? '<div class="gv-abas" role="tablist"><button data-aba="res" onclick="gvAba(\'res\')">📋 Resumo</button><button data-aba="conv" onclick="gvAba(\'conv\')">💬 Conversa</button><button data-aba="rx" onclick="gvAba(\'rx\')">🧠 Ficha da IA</button></div>' : '') + '</div>'
