@@ -2582,7 +2582,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-26-2329';
+var VERSAO_DASH = '2026-09-26-2350';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3614,6 +3614,39 @@ function igPedidoDoLead(l) {
   var pf = IGO.perfil[u] || {};
   return { vezes: p.vezes, post: p.post, quando: p.quando, texto: p.texto, seg: (pf.seg != null ? pf.seg : null), nome: pf.nome || '' };
 }
+// 26/09/2026 (Bruno: "que ao clicar vá direto para o criativo"): a etiqueta abre a janela do CRIATIVO dentro do dash
+// (com leads, agendou, vendas) — post orgânico "desde a postagem"; anúncio sem imagem cai na aba Criativos já buscando por ele
+function abrirPostCriativo(link) {
+  try {
+    var cd = _igCodigoDash(link), p = null;
+    (IGO.posts || []).forEach(function(x) { if (!p && _igCodigoDash(x.link) === cd) p = x; });
+    if (!p) { window.open(link, '_blank'); return false; }
+    var dt = p.date instanceof Date ? p.date : (p.date ? new Date(p.date) : null);
+    var quando = dt && !isNaN(dt) ? dt.toLocaleDateString('pt-BR').slice(0, 5) : '';
+    var chave = 'POST:' + (quando ? quando + ' · ' : '') + (String(p.legenda || '').replace(/[\r\n]+/g, ' ').slice(0, 42) || 'post') + '|' + p.link;
+    _criPer = { modo: 'tudo', de: null, ate: null };
+    abrirCriativo(chave, false, true);
+  } catch (e) { window.open(link, '_blank'); }
+  return false;
+}
+function irParaCriativo(nome) {
+  try { abrirCriativo(nome); } catch (e) {}
+  var cx = document.getElementById('modal-criativo');
+  if (cx && cx.style.display !== 'none' && cx.innerHTML) return false;
+  // ainda não dá para abrir aqui (os dados do Facebook só chegam com a aba Criativos na tela): vai para a aba,
+  // busca por ele e abre a janela do criativo assim que os números chegarem
+  try { AN_BUSCA = String(nome || ''); AN_PER = 'tudo'; } catch (e) {}
+  try { fecharB(); } catch (e) {} try { fecharLead(); } catch (e) {}
+  var it = document.querySelector('.nav-item[data-s="anuncios"]'); if (it) it.click();
+  var tent = 0;
+  (function tentar() {
+    tent++;
+    var inp = document.getElementById('an-busca'); if (inp && inp.value !== String(nome || '')) { inp.value = String(nome || ''); try { renderAnuncios(); } catch (e) {} }
+    try { if (_anDados[nome]) { abrirCriativo(nome); var c2 = document.getElementById('modal-criativo'); if (c2 && c2.style.display !== 'none' && c2.innerHTML) return; } } catch (e) {}
+    if (tent < 20) setTimeout(tentar, 500);
+  })();
+  return false;
+}
 function igSeloLead(l, mini) {
   var p = igPedidoDoLead(l);
   if (!p) return '';
@@ -3623,9 +3656,20 @@ function igSeloLead(l, mini) {
   // na aba Criativos), como o 📣 dos anúncios pagos; sem apelido, fica o "📷 pediu" de antes
   var po = null; try { po = POSTS_ORG.porLink[p.post] || POSTS_ORG.porCodigo[_igCodigoDash(p.post)] || null; } catch (ePo) {}
   var apel = po && po.apelido ? String(po.apelido).trim() : '';
+  // sem apelido (Bruno 26/09/2026: "que mostre o criativo"): usa o começo da LEGENDA do post; sem legenda, a data do post
+  if (!apel) {
+    var ip = null;
+    try {
+      ip = (IGO.porLink && IGO.porLink[p.post] && IGO.porLink[p.post].legenda !== undefined) ? IGO.porLink[p.post] : null;
+      if (!ip) { var cd = _igCodigoDash(p.post); for (var k = 0; k < (IGO.posts || []).length; k++) { if (_igCodigoDash(IGO.posts[k].link) === cd) { ip = IGO.posts[k]; break; } } }
+    } catch (eIp) {}
+    var leg = ip && ip.legenda ? String(ip.legenda).replace(/\s+/g, ' ').replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').trim() : '';
+    if (leg) apel = leg;
+    else if (ip && ip.date) { var dp = new Date(ip.date); if (!isNaN(dp)) apel = 'post de ' + dp.toLocaleDateString('pt-BR').slice(0, 5); }
+  }
   var tit = 'pediu diagnóstico no Instagram' + (apel ? ' no post "' + apel.replace(/"/g, "'") + '"' : '') + (dia ? ' em ' + dia : '') + (p.texto ? ': "' + p.texto.replace(/"/g, "'") + '"' : '') + ' — clique para abrir o post';
   var corte = mini ? 20 : 30;
-  return '<span class="ld-tag" title="' + tit + '" onclick="event.stopPropagation();window.open(' + JSON.stringify(p.post) + ',\'_blank\')"'
+  return '<span class="ld-tag" title="' + tit.replace(' — clique para abrir o post', ' — clique para ver o criativo') + '" onclick="event.stopPropagation();abrirPostCriativo(' + JSON.stringify(p.post).replace(/"/g, '&quot;') + ')"'
     + ' style="background:rgba(61,220,151,.14);color:#3ddc97;cursor:pointer;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;">'
     + (apel ? '📱 ' + (apel.length > corte ? apel.slice(0, corte) + '…' : apel) : '📷 pediu') + (p.vezes > 1 ? ' · ' + p.vezes + 'x' : '')
     + (mini ? '' : (dia ? ' · ' + dia : '')) + (!apel && p.seg != null ? ' · ' + (p.seg >= 1000 ? Math.round(p.seg / 1000) + 'k' : p.seg) + ' seg.' : '') + '</span>';
@@ -3636,15 +3680,26 @@ function seloAnuncio(x, mini) {
   var rotulo = mini ? '' : 'criativo que trouxe: ';
   if (a.tem && a.organico) {
     var corteO = mini ? 18 : 30;
-    return '<a class="ld-tag" href="' + (a.post.link || '#') + '" target="_blank" onclick="event.stopPropagation();"'
+    return '<a class="ld-tag" href="' + (a.post.link || '#') + '" target="_blank" onclick="event.stopPropagation();return abrirPostCriativo(' + JSON.stringify(String(a.post.link || '')).replace(/"/g, '&quot;') + ');"'
       + ' style="background:rgba(61,220,151,.15);color:#3ddc97;text-decoration:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;display:inline-block;"'
       + ' title="postagem orgânica que trouxe este lead · ' + String(a.post.link || '').replace(/"/g, '') + '">'
       + '📱 ' + rotulo + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>';
   }
   if (a.tem) {
     var corte = mini ? 18 : 30;
+    // link guardado como anúncio ({"url":"joaostecca.com.br/manychat-…"}): mostra o caminho legível (Bruno 26/09/2026)
+    var abrirCri = 'irParaCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')';
+    try {
+      var jU = /^\s*\{/.test(String(a.nome || '')) ? JSON.parse(a.nome) : null;
+      if (jU && jU.url) {
+        var caminho = String(jU.url).replace(/^https?:\/\//, '').replace(/^[^\/]+\/?/, '').replace(/\/+$/, '').replace(/[-_]+/g, ' ').trim();
+        a = Object.assign({}, a, { txt: (caminho || String(jU.url)).replace(/^manychat\s*/i, 'ManyChat · ') });
+        // não é criativo com imagem: o clique abre a página do link por onde a pessoa chegou
+        abrirCri = 'window.open(' + JSON.stringify('https://' + String(jU.url).replace(/^https?:\/\//, '')).replace(/"/g, '&quot;') + ',\'_blank\')';
+      }
+    } catch (eJ) {}
     return '<span class="ld-tag" style="background:rgba(185,138,255,.15);color:#b98aff;cursor:pointer;max-width:230px;overflow:hidden;text-overflow:ellipsis;"'
-      + ' onclick="event.stopPropagation();abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')" title="criativo que trouxe este lead: ' + String(a.txt).replace(/"/g, '') + ' — clique para ver">'
+      + ' onclick="event.stopPropagation();' + abrirCri + '" title="criativo que trouxe este lead: ' + String(a.txt).replace(/"/g, '') + ' — clique para ver">'
       + '📣 ' + rotulo + (a.txt.length > corte ? a.txt.slice(0, corte) + '…' : a.txt) + '</span>'
       + (t8 ? '<span class="ld-tag" style="background:rgba(255,255,255,.07);color:var(--muted);cursor:pointer;" title="trocar o criativo deste lead" onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')">✏️</span>' : '');
   }
