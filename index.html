@@ -2582,7 +2582,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-26-2356';
+var VERSAO_DASH = '2026-09-27-0023';
 var _versaoNova = null;
 
 // =====================================================================
@@ -8000,16 +8000,18 @@ function ldConferirGravacao(rows) {
     LD.naoSalva = true;                            // não voltou da planilha
   }
 }
-function ldGuardar(rows, modoSimples) {
+function ldGuardar(rows, modoSimples, doGuardado) {
+  if (doGuardado && LD.carregado) return;   // a planilha de verdade chegou antes: ignora a guardada
   ldEstimarDatas(rows);
-  ldConferirGravacao(rows);
+  if (!doGuardado) ldConferirGravacao(rows);   // a cópia guardada é velha: não serve para conferir gravação
   LD.rows = ldJuntarRepetidos(rows.filter(function(l){ return l.date; }).sort(function(a, b){ return b.date - a.date || b.i - a.i; }));
   LD.semData = rows.filter(function(l){ return !l.date; });
   LD.total = rows.length;
   LD.aprox = rows.filter(function(l){ return l.aprox; }).length;
   LD.modoSimples = !!modoSimples;
-  var jaTinha = LD.carregado;
+  var jaTinha = LD.carregado && !LD.doGuardado;   // a troca da cópia guardada pela planilha não toca sirene
   LD.carregado = true;
+  LD.doGuardado = !!doGuardado;
   // a releitura da planilha apaga a mistura com a base do site: refaz agora
   LD._fundido = null;
   if (typeof ldFundirSupabase === 'function') ldFundirSupabase();
@@ -8066,9 +8068,49 @@ function carregarLeadsPlanoB() {
   };
   document.body.appendChild(s);
 }
+// ⚡ ABERTURA RÁPIDA DOS LEADS (Bruno 27/09/2026: "está demorando abrir o dash — melhore"): a aba de leads tem
+// ~26 mil linhas (13 MB) e era baixada inteira a cada abertura antes de qualquer número de lead aparecer.
+// Agora a última leitura fica guardada no navegador (IndexedDB, junto da cópia da aba Vendas) e o dash desenha
+// com ela NA HORA; a planilha de verdade chega por trás e substitui. Enquanto é a cópia, LD.doGuardado = true.
+var _ldBootSalvoEm = 0;
+function _ldGuardarBoot(txt) {
+  if (Date.now() - _ldBootSalvoEm < 10 * 60000) return;   // guarda no máximo a cada 10 min
+  _ldBootSalvoEm = Date.now();
+  setTimeout(function() {
+    _bootDb(function(db) {
+      if (!db) return;
+      try { db.transaction('boot', 'readwrite').objectStore('boot').put({ quando: Date.now(), sheet: V2_SHEET, gid: LEADS_GID, txt: txt }, 'ld'); } catch (e) {}
+    });
+  }, 5000);
+}
+function _ldAbrirDoGuardado() {
+  _bootDb(function(db) {
+    if (!db || LD.carregado) return;
+    try {
+      var g = db.transaction('boot', 'readonly').objectStore('boot').get('ld');
+      g.onsuccess = function() {
+        var b = g.result;
+        if (!b || !b.txt || LD.carregado) return;
+        if (b.sheet !== V2_SHEET || String(b.gid) !== String(LEADS_GID)) return;
+        if (Date.now() - (b.quando || 0) > 4 * 86400000) return;   // mais de 4 dias: espera a planilha
+        setTimeout(function() {
+          if (LD.carregado) return;
+          try { LD.guardadoEm = b.quando; ldDoTexto(b.txt, true); } catch (e) {}
+        }, 0);
+      };
+    } catch (e) {}
+  });
+}
 function carregarLeads() {
   var url = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/export?format=csv&gid=' + LEADS_GID + '&_t=' + Date.now();
   fetch(url).then(function(r){ return r.text(); }).then(function(txt) {
+    ldDoTexto(txt, false);
+    _ldGuardarBoot(txt);
+  }).catch(function() {
+    carregarLeadsPlanoB(); // navegador bloqueou a leitura direta → caminho alternativo
+  });
+}
+function ldDoTexto(txt, doGuardado) {
     var linhas = ldCSV(txt);
     if (!linhas.length) throw new Error('planilha vazia');
     var head = linhas[0].map(function(h){ return v2norm(h); });
@@ -8121,10 +8163,7 @@ function carregarLeads() {
       });
     }
     // data estimada para quem está sem data (vizinho de cima/baixo, marcada com ≈)
-    ldGuardar(rows, false);
-  }).catch(function() {
-    carregarLeadsPlanoB(); // navegador bloqueou a leitura direta → caminho alternativo
-  });
+    ldGuardar(rows, false, doGuardado);
 }
 // ===== RESPONSÁVEL DO LEAD =====
 // Quem é o dono: a Clint manda (é lá que o time trabalha); se não estiver lá,
@@ -8674,7 +8713,9 @@ function ldTipoTrafego(l) {
   // ou pela bio: o ManyChat é o caminho, o anúncio é a origem. Antes, esses leads
   // caíam em "orgânico" e o anúncio inteiro aparecia na aba errada (Bruno 19/08/2026).
   if (anun) {
-    if (anun.indexOf('POST:') === 0 || /org[âa]nico/i.test(anun)) return 'organico';
+    // (27/09/2026) só o rótulo "Orgânico (sem anúncio)" é orgânico: o anúncio pago "Ad02_Organico_Mac" tem a palavra
+    // no nome e caía em orgânico no no-show por origem e no canal de cada SDR
+    if (anun.indexOf('POST:') === 0 || /^org[âa]nico( |$|\s*\()/i.test(anun)) return 'organico';
     // é um criativo que o Facebook conhece, ou tem cara de anúncio (Ad12, ADV-01, Diag.Julho…)
     var ehCriativo = false;
     try { ehCriativo = !!criativoDe(anun, ''); } catch (e) {}
@@ -8843,6 +8884,21 @@ function anVendasTodas() {
     x.chave = x.lead ? anChaveDoLead(x.lead) : 'ORIGEM:' + anRotuloOrigem(x.origem, '');
     return x;
   });
+  // 27/09/2026 (Bruno: "não está contando" — Isael contava 2x): formulário de pagamento com telefone digitado
+  // diferente e nome maior ("Isael" x "Isael Selvino Coelho") virava outra venda. Se o formulário SOZINHO cai no
+  // MESMO lead de uma venda da planilha sem formulário, a até 45 dias, é a mesma venda: junta as duas.
+  var jaTem = [];
+  lista.forEach(function(x) { if (x.r && !x.pg && x.lead) jaTem.push(x); });
+  lista = lista.filter(function(x) {
+    if (x.r || !x.pg || !x.lead) return true;
+    var y = null;
+    jaTem.forEach(function(z) { if (!y && !z.pg && z.lead === x.lead && (!x.t || !z.t || Math.abs(z.t - x.t) <= 45 * 864e5)) y = z; });
+    if (!y) return true;
+    y.pg = x.pg;
+    (x.tels || []).forEach(function(t8) { if (t8 && y.tels.indexOf(t8) === -1) y.tels.push(t8); });
+    if (!y.valor && x.valor) y.valor = x.valor;
+    return false;
+  });
   _anVendasMemo = { v: V, p: P, l: LR, n: V.length + P.length + LR.length, lista: lista };
   return lista;
 }
@@ -8881,8 +8937,8 @@ function anVendasPainel(per) {
   var h = '<div class="panel" style="margin-bottom:18px;">'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">💰 De onde vieram as vendas</h3>'
     + '<span class="hint">' + vs.length + ' venda' + (vs.length === 1 ? '' : 's') + ' · ' + mil(soma(vs)) + ' · planilha + formulário de pagamento, uma por pessoa</span>'
-    + '<span style="flex:1;"></span><span class="hint" style="color:#f6a350;font-weight:700;">' + per.label + '</span></div>'
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px;">';
+    + '<span style="flex:1;"></span><span class="hint an-vd-per" style="color:#f6a350;font-weight:700;">' + per.label + '</span></div>'
+    + '<div class="an-vd-grade" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px;">';
   ['pago', 'link', 'org', 'sem'].forEach(function(k) {
     var R = AN_VD_ROT[k], on = AN_VD_GRUPO === k, pct = Math.round(g[k].length / vs.length * 100);
     h += '<div class="glass click" style="padding:14px 16px;--halo:' + R.c + '33;' + (on ? 'border-color:' + R.c + ';' : '') + '" onclick="AN_VD_GRUPO=AN_VD_GRUPO===\'' + k + '\'?\'\':\'' + k + '\';AN_VD_ABERTO=true;renderAnuncios();">'
@@ -9556,20 +9612,20 @@ function renderAnuncios() {
   try { h += igPainelResumo(per); } catch (eR) {}
   var _ordEf = AN_ORD_EFETIVA();
   h += '<div class="panel">'
-    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Criativos</h3>'
+    + '<div class="an-topo" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Criativos</h3>'
     + '<span class="hint">o criativo que trouxe cada lead</span><span style="flex:1;"></span>'
-    + '<span class="hint">ordenar:</span>'
+    + '<span class="an-fila an-ord"><span class="hint">ordenar:</span>'
     + [['vendas','Vendas'],['ped','📷 Pedidos'],['agend','Agendamentos'],['reuni','Reuniões'],['fat','Faturamento'],['leads','Leads'],['gasto','Investimento']].map(function(o){
         return '<span class="chart-chip' + (_ordEf===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_ORD=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>'; }).join('')
-    + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">'
+    + '</span></div>'
+    + '<div class="an-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">'
     + '<input class="search-input" id="an-busca" value="' + String(AN_BUSCA || '').replace(/"/g, '&quot;') + '" placeholder="🔍 achar post ou anúncio…" style="margin-bottom:0;flex:1;min-width:160px;max-width:280px;padding:7px 11px;font-size:.75rem;" oninput="AN_BUSCA=this.value;clearTimeout(window._anBt);window._anBt=setTimeout(function(){renderAnuncios();document.getElementById(\'an-busca\').focus();},400);">'
-    + [['pago','💰 Tráfego pago'],['organico','🌱 Orgânico'],['sem','🔗 Sem imagem' + (_semImagem.length ? ' (' + _semImagem.length + ')' : '')]].map(function(o){
-        return '<span class="chart-chip' + (AN_TIPO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_TIPO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
-    + '<span style="width:10px;"></span>'
+    + '<span class="an-fila">' + [['pago','💰 Tráfego pago'],['organico','🌱 Orgânico'],['sem','🔗 Sem imagem' + (_semImagem.length ? ' (' + _semImagem.length + ')' : '')]].map(function(o){
+        return '<span class="chart-chip' + (AN_TIPO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_TIPO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('') + '</span>'
+    + '<span class="an-fila"><span style="width:10px;"></span>'
     + [['','Tudo'],['mql','⭐ só com MQL'],['agend','📅 só com agendamento'],['reuniao','✅ só com reunião'],['venda','💰 só com venda']].map(function(o){
         return '<span class="chart-chip' + (AN_SO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_SO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
-    + '</div>';
+    + '</span></div>';
   if (!META.dados) {
     h += '<div class="hint" style="margin-top:9px;color:#f6a350;">💸 '
       + (META.buscando ? 'Buscando investimento e imagens no Facebook…' : 'Facebook ainda não conectado' + (META.erro ? ' (' + META.erro + ')' : '') + ' — falta a chave META_TOKEN no robô. Os números de leads/reuniões/vendas abaixo já funcionam.')
@@ -9584,7 +9640,7 @@ function renderAnuncios() {
   }
   // O cadastro de postagem fica só na ficha do lead (pedido do Bruno 19/08/2026):
   // aqui a aba só MOSTRA os posts junto com os anúncios, com os números de cada um.
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
+  h += '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;margin-top:14px;">';
   if (!chaves.length) h += '<div class="hint">Nenhum anúncio no período.</div>';
   if (telaVisivel('s-anuncios')) carregarCriativos();   // as 25 páginas de criativos só com a aba aberta
   chaves.slice(0, AN_QUANTOS).forEach(function(k, i) {
@@ -9594,7 +9650,7 @@ function renderAnuncios() {
     if (cri) { m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post }; }
     _anDados[k] = { n: a.n, q: a.q, mql: a.mql, ag: a.ag, re: a.re, vd: a.vd, fat: a.fat, camp: a.camp, tipo: a.tipo, meta: m, quem: a.quem, ig: a.ig || null };
     var cpl = (m.gasto && a.n) ? m.gasto / a.n : 0;
-    h += '<div class="click" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
+    h += '<div class="click an-card" style="border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03);display:flex;flex-direction:column;cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" title="Clique para ver o criativo e os números">'
       + '<div class="an-capa" data-post="' + (m.post || '') + '" data-insta="' + (ehPost ? _lerPost(k).link : '') + '"'
       +   ' onmouseenter="tocarNoCard(this)" onmouseleave="pararNoCard(this)"'
       +   ' style="position:relative;height:132px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">'
@@ -9628,7 +9684,7 @@ function renderAnuncios() {
             ? '<a href="' + _lerPost(k).link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#3ddc97;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver post ↗</a>'
             : (m.link ? '<a href="' + m.link + '" target="_blank" onclick="event.stopPropagation();" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.7);color:#6ea8ff;font-size:.62rem;font-weight:800;padding:4px 9px;border-radius:99px;text-decoration:none;">ver anúncio ↗</a>' : ''))
       + '</div>'
-      + '<div style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
+      + '<div class="an-cc" style="padding:11px 12px;flex:1;display:flex;flex-direction:column;">'
       +   '<b style="font-size:.74rem;line-height:1.3;">' + anRotuloChave(k) + '</b>'
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:' + (a.tipo === 'pago' ? 'rgba(255,107,107,.13);color:#ff6b6b' : 'rgba(61,220,151,.13);color:#3ddc97') + ';">' + (a.tipo === 'pago' ? '💰 pago' : '🌱 orgânico') + '</span>'
       +   (function(){
@@ -9646,7 +9702,7 @@ function renderAnuncios() {
             }
             return m.gasto ? '<div class="hint" style="margin-top:3px;">' + rs(m.gasto) + ' investidos</div>' : '';
           })()
-      +   '<div style="display:flex;gap:5px;margin-top:9px;">'
+      +   '<div class="an-nums" style="display:flex;gap:5px;margin-top:9px;">'
       +     (function(){
               var kk = JSON.stringify(k).replace(/"/g, '&quot;');
               var caixa = function(etapa, valor, rot, cor, fundo, dica){
@@ -9663,7 +9719,7 @@ function renderAnuncios() {
                 + caixa('vd', a.vd, 'VENDIDO', '#3ddc97', 'rgba(61,220,151,.1)', 'ver quem comprou');
             })()
       +   '</div>'
-      +   (a.fat ? '<div style="margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);text-align:center;">'
+      +   (a.fat ? '<div class="an-fat" style="margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);text-align:center;">'
               + '<b style="color:#3ddc97;font-size:.92rem;">' + rs(a.fat) + '</b>'
               + '<div style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">FATURAMENTO'
               + (m.gasto ? ' · ' + (a.fat / m.gasto).toFixed(1) + 'x o investido' : '') + '</div></div>' : '')
@@ -9689,6 +9745,37 @@ function renderAnuncios() {
   h += '<div class="an-dsp-aviso" onclick="var n=document.querySelector(\'.nav-item[data-s=disparos]\');if(n)n.click();">📣 <span><b>Os disparos de WhatsApp agora têm uma aba própria</b> — quem da lista voltou, agendou e comprou.</span><span style="margin-left:auto;color:#ff9a5a;font-weight:800;white-space:nowrap;">abrir Disparos →</span></div>';      // 18/09/2026: disparos de WhatsApp, no lugar do conteúdo no 7º dia (pedido do Bruno)
   if (CD7_NA_TELA) { try { h += cd7Bloco(per); } catch (eCd) { } }
   el.innerHTML = h;
+  try { anAtalhos(el); } catch (eAt) {}
+}
+// 📱 atalhos da aba Criativos no celular (Bruno 27/09/2026: "melhore a visualização da aba de criativos — principalmente
+// no celular"): a aba tem 4 partes empilhadas (~17 mil pixels no celular); uma faixa presa no topo pula direto para cada uma
+var AN_ATALHO = '';
+function anAtalhos(el) {
+  var achar = function(txt) { var r = null; Array.prototype.forEach.call(el.children, function(p) { if (!r && p.classList.contains('panel') && p.textContent.indexOf(txt) !== -1) r = p; }); return r; };
+  var busca = document.getElementById('an-busca');
+  var partes = [
+    ['vendas', '💰 Vendas', achar('De onde vieram as vendas')],
+    ['origem', '🧲 Origens', el.querySelector(':scope > .or-painel')],
+    ['organico', '📷 Orgânico', achar('Pedidos no orgânico')],
+    ['criativos', '📣 Criativos', busca ? busca.closest('.panel') : null]
+  ].filter(function(x) { return x[2]; });
+  if (partes.length < 2) return;
+  partes.forEach(function(x) { x[2].id = 'an-sec-' + x[0]; x[2].classList.add('an-sec'); });
+  var bar = document.createElement('div');
+  bar.className = 'an-atalhos';
+  bar.setAttribute('role', 'tablist');
+  bar.innerHTML = partes.map(function(x) {
+    return '<button type="button" role="tab" class="an-at' + (AN_ATALHO === x[0] ? ' on' : '') + '" data-k="' + x[0] + '" onclick="anIrPara(\'' + x[0] + '\')">' + x[1] + '</button>';
+  }).join('');
+  el.insertBefore(bar, el.firstChild);
+}
+function anIrPara(k) {
+  AN_ATALHO = k;
+  document.querySelectorAll('.an-atalhos .an-at').forEach(function(b) { b.classList.toggle('on', b.getAttribute('data-k') === k); });
+  var alvo = document.getElementById('an-sec-' + k);
+  if (!alvo) return;
+  var y = alvo.getBoundingClientRect().top + (window.scrollY || document.documentElement.scrollTop) - 124;
+  try { window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); } catch (e) { window.scrollTo(0, Math.max(0, y)); }
 }
 // valor da venda pelo telefone (para somar faturamento por anúncio)
 var _valTel = null;
@@ -18640,6 +18727,7 @@ function carregarVisaoGeral() {   // painéis da tela inicial (GPT Maker, tempos
   setTimeout(function(){ try { carregarComentarios(); } catch (e3) {} }, 8000);
 }
 _v2AbrirDoGuardado();   // ⚡ desenha na hora com a última leitura; a planilha (logo abaixo) substitui
+_ldAbrirDoGuardado();   // ⚡ o mesmo para os leads (27/09/2026)
 carregarV2();
 carregarLeads();
 carregarClintPainel();
@@ -22143,6 +22231,78 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 @media (min-width:761px) { .ld-tira { display:contents; } .ld-tira-n { display:none; } }
 @media (prefers-reduced-motion:no-preference) {
   .ac-pop.on { animation:appSurge .25s var(--mv-ease, ease); }
+}
+
+/* ---------- 📱 CRIATIVOS E GRAVAÇÕES NO CELULAR (Bruno 27/09/2026: "melhore a visualização da aba de criativos e gravações — principalmente no celular") ---------- */
+.an-fila { display:contents; }          /* no computador os grupos de filtro continuam soltos na linha, como antes */
+.an-atalhos { display:none; }
+@media (max-width:760px) {
+  /* período: uma faixa só, que rola de lado */
+  #an-chips { flex-wrap:nowrap !important; overflow-x:auto; scrollbar-width:none; gap:6px !important; margin-bottom:10px !important; padding-bottom:2px; }
+  #an-chips::-webkit-scrollbar { display:none; }
+  #an-chips > * { flex:none; }
+  #an-chips > span:not(.chart-chip) { display:none; }
+  #an-periodo { width:148px !important; flex:none; }
+  /* atalhos presos no topo: Vendas · Origens · Orgânico · Criativos */
+  .an-atalhos { display:flex; gap:5px; position:sticky; top:70px; z-index:6; margin:0 -10px 12px; padding:8px 10px; overflow-x:auto; scrollbar-width:none;
+    background:color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter:blur(14px) saturate(1.3); backdrop-filter:blur(14px) saturate(1.3); }
+  .an-atalhos::-webkit-scrollbar { display:none; }
+  .an-at { flex:1 0 auto; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text2); border-radius:999px; padding:8px 9px;
+    font:inherit; font-size:.7rem; font-weight:800; white-space:nowrap; cursor:pointer; transition:background .2s, color .2s, border-color .2s; }
+  .an-at.on { background:rgba(246,163,80,.16); border-color:rgba(246,163,80,.5); color:#f6a350; }
+  .an-sec { scroll-margin-top:124px; }
+  /* "De onde vieram as vendas": os 4 grupos em 2 x 2 */
+  .an-vd-per { display:none; }
+  .an-vd-grade { grid-template-columns:1fr 1fr !important; gap:8px !important; }
+  .an-vd-grade > .glass { padding:11px 12px !important; }
+  .an-vd-grade .g-value { font-size:1.4rem !important; }
+  .an-vd-grade .g-label { font-size:.58rem !important; }
+  .an-vd-grade .g-sub { font-size:.68rem !important; }
+  .an-vd-grade .hint { font-size:.6rem !important; line-height:1.3; margin-top:4px !important; }
+  /* Detalhamento por origem: cada origem em 2 linhas (nome · faturamento · conversão / os 4 números) */
+  .or-row { grid-template-columns:repeat(12, minmax(0,1fr)) !important;
+    grid-template-areas:"nome nome nome nome nome fat fat fat fat fat cv cv" "ag ag ag re re re fe fe fe vd vd vd" !important;
+    gap:8px 5px !important; padding:10px 11px !important; }
+  .or-fat { gap:4px; }
+  .or-fat-l { flex-direction:column; align-items:flex-end; gap:0; }
+  .or-fat-l b { font-size:.8rem; }
+  .or-fat-l small { font-size:.56rem; }
+  .or-barra { height:3px; }
+  .or-cv { justify-self:end; }
+  .or-c { padding:5px 0 4px !important; }
+  /* Criativos: título, ordem e filtros em faixas que rolam de lado */
+  .an-topo > .hint, .an-topo > span[style*="flex:1"] { display:none; }
+  .an-fila { display:flex; flex-wrap:nowrap; align-items:center; gap:6px; overflow-x:auto; scrollbar-width:none; width:100%; padding:2px 0 4px; }
+  .an-fila::-webkit-scrollbar { display:none; }
+  .an-fila > * { flex:none; }
+  .an-fila > span[style*="width:10px"] { display:none; }
+  .an-filtros { gap:8px !important; }
+  #an-busca { max-width:none !important; flex:1 1 100% !important; }
+  /* cartão do criativo: foto pequena à esquerda, números embaixo (o cartão ficou com ~2/3 da altura) */
+  .an-grade { grid-template-columns:1fr !important; gap:10px !important; }
+  .an-card { display:grid !important; grid-template-columns:88px minmax(0,1fr); grid-template-rows:auto auto 1fr; column-gap:12px; padding:10px; align-items:start; }
+  .an-card .an-capa { grid-row:1 / span 3; width:88px; height:110px !important; border-radius:12px; overflow:hidden; }
+  .an-card .an-capa > a { display:none !important; }   /* "ver anúncio" continua na janela do criativo */
+  .an-card .an-play > span { width:30px !important; height:30px !important; font-size:.7rem !important; }
+  .an-card .an-capa > span[style*="top:8px"] { top:5px !important; left:5px !important; font-size:.56rem !important; padding:2px 6px !important; }
+  .an-card .an-cc { display:contents !important; }
+  .an-card .an-cc > * { grid-column:2; min-width:0; }
+  .an-card .an-cc > b { font-size:.86rem !important; line-height:1.28 !important; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
+  .an-card .an-cc > .ld-tag { margin-top:6px !important; justify-self:start; }
+  .an-card .an-cc > .hint { align-self:start; }
+  .an-card .an-nums, .an-card .an-nums ~ * { grid-column:1 / -1; }
+  .an-card .an-nums { margin-top:10px !important; gap:4px !important; }
+  .an-card .an-nums > div { padding:7px 2px 6px !important; border-radius:10px !important; }
+  .an-card .an-nums b { font-size:.98rem !important; }
+  .an-card .an-nums span { font-size:.5rem !important; letter-spacing:.02em; }
+  .an-card .an-fat { display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left !important; padding:8px 12px !important; }
+  .an-card .an-fat > div { text-align:right; }
+  /* Gravações: prateleiras mais baixas e o dia fica preso no topo enquanto rola a lista */
+  .gx-prat-l { grid-auto-columns:64% !important; }
+  .gx-mini .grav-info small { display:none; }
+  .gx-mini .grav-info > b { font-size:.8rem; }
+  #grav-lista .grav-dia { position:sticky; top:70px; z-index:4; margin:12px -10px 8px !important; padding:9px 12px;
+    background:color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter:blur(14px) saturate(1.3); backdrop-filter:blur(14px) saturate(1.3); }
 }
 </style>
 <script>
