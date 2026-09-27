@@ -2582,7 +2582,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-26-2318';
+var VERSAO_DASH = '2026-09-26-2329';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3639,8 +3639,7 @@ function seloAnuncio(x, mini) {
     return '<a class="ld-tag" href="' + (a.post.link || '#') + '" target="_blank" onclick="event.stopPropagation();"'
       + ' style="background:rgba(61,220,151,.15);color:#3ddc97;text-decoration:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;display:inline-block;"'
       + ' title="postagem orgânica que trouxe este lead · ' + String(a.post.link || '').replace(/"/g, '') + '">'
-      + '📱 ' + rotulo + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>'
-      + (t8 ? '<span class="ld-tag" style="background:rgba(255,255,255,.07);color:var(--muted);cursor:pointer;" title="trocar a postagem deste lead" onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')">✏️</span>' : '');
+      + '📱 ' + rotulo + (a.txt.length > corteO ? a.txt.slice(0, corteO) + '…' : a.txt) + '</a>';
   }
   if (a.tem) {
     var corte = mini ? 18 : 30;
@@ -3657,11 +3656,8 @@ function seloAnuncio(x, mini) {
   var bruta = String(x.origem || '') + ' ' + String(x.fonte || '') + ' ' + String(x.utm || '');
   var ehPago = /\[ads\]|\bads\b|paid/i.test(bruta) || x.meio === 'paid';
   var ehOrganico = !ehPago && /\[org\]|organic|\bbio\b|mchat|manychat|indica|prospec/i.test(bruta);
-  if (ehOrganico) {
-    return '<span class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;cursor:pointer;border:1px dashed rgba(61,220,151,.5);"'
-      + ' onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')" title="veio do orgânico — diga qual post trouxe">'
-      + '📱 qual post' + (mini ? '?' : ' trouxe? · colar link') + '</span>';
-  }
+  // 26/09/2026 (Bruno: "não quero que dê mais opção de colocar o post"): orgânico sem post conhecido não pede mais nada
+  if (ehOrganico) return '';
   return '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;cursor:pointer;border:1px dashed rgba(246,163,80,.5);"'
     + ' onclick="event.stopPropagation();escolherAnuncio(\'' + t8 + '\')" title="este lead está sem anúncio — clique para dizer de onde veio">'
     + '⚠️ sem anúncio' + (mini ? '' : ' · adicionar') + '</span>';
@@ -4847,7 +4843,10 @@ function v2row(r) {
   var lkC = (function(){
     try { return clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone), nome: r.nome }); } catch (e) { return ''; }
   })();
-  var tags = seloAnuncio(r, true) + igSeloLead(r, true);
+  // o Instagram mora na aba de leads: com ele o cartão acha o post que trouxe (antes só a ficha achava — Bruno 26/09/2026)
+  var rx = r;
+  try { var ldx = ldPorTel8(ldTel8(r.telefone)); if (ldx && ldx.insta && !r.insta) rx = Object.assign({}, r, { insta: ldx.insta }); } catch (eLx) {}
+  var tags = seloAnuncio(rx, true) + igSeloLead(rx, true);
   // 26/09/2026 (Bruno: "link deve ser da Clint, não do WhatsApp"): o botão abre a conversa na Clint — se o endereço
   // ainda não é conhecido, o robô procura a pessoa (abrirAtendimentoClintPor) e abre a conversa ou o contato
   var acts = (r.telefone || r.nome) ? '<a class="ld-wa cr-clint" href="' + (lkC || 'https://app.clint.digital/chat') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint" aria-label="Abrir na Clint">🟣 Clint</a>' : '';
@@ -12481,7 +12480,6 @@ function abrirFichaLead(i) {
             + '<div class="hint" style="margin-top:2px;">post orgânico</div>'
             + '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap;">'
             + (aa.post.link ? '<a class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;text-decoration:none;" href="' + aa.post.link + '" target="_blank">abrir o post ↗</a>' : '')
-            + '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">' + (fo ? 'trocar' : '📷 colar o print') + '</span>'
             + '</div></div></div>';
         }
         // 📷 já sabemos qual post foi: ele comentou pedindo diagnóstico ali
@@ -12500,7 +12498,6 @@ function abrirFichaLead(i) {
             +   (_ped.seg != null ? '<div class="hint" style="margin-top:2px;">👥 ' + _ped.seg.toLocaleString('pt-BR') + ' seguidores</div>' : '')
             +   '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:5px;flex-wrap:wrap;">'
             +     '<a class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;text-decoration:none;" href="' + _ped.post + '" target="_blank">abrir o post ↗</a>'
-            +     '<span class="ld-tag" style="cursor:pointer;background:rgba(255,255,255,.08);" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">foi outro post</span>'
             +   '</div></div></div>';
         }
         if (!aa.tem) {
@@ -12509,8 +12506,7 @@ function abrirFichaLead(i) {
                     && /\[org\]|organic|\bbio\b|mchat|manychat|indica|prospec/i.test(_br);
           return '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
             + (org
-                ? '<span style="color:#3ddc97;font-weight:700;font-size:.76rem;">📱 veio do orgânico — qual post trouxe?</span>'
-                  + '<button class="btn-assumir" style="padding:5px 11px;font-size:.7rem;" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">colar o link do post</button>'
+                ? '<span style="color:#3ddc97;font-weight:700;font-size:.76rem;">📱 veio do orgânico</span>'   // sem pedir o post (Bruno 26/09/2026)
                 : '<span style="color:#f6a350;font-weight:700;font-size:.76rem;">⚠️ está incompleto — não sabemos de onde veio</span>'
                   + '<button class="btn-assumir" style="padding:5px 11px;font-size:.7rem;" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">📣 adicionar</button>')
             + '</div>';
@@ -22011,9 +22007,18 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 #lead-info .dtl-line > span:first-child { font-size:.62rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
 #lead-info .dtl-line > b, #lead-info .dtl-line > a, #lead-info .dtl-line > span + span { font-size:.86rem; text-align:left !important; max-width:100% !important; overflow-wrap:anywhere; }
 #lead-info .dtl-line input, #lead-info .dtl-line select { width:100%; }
-#lead-info .dtl-line[data-k="valor"] > b { color:var(--green); font-size:1.02rem; }
-#lead-info .dtl-line[data-k="valor"], #lead-info .dtl-line[data-k="status"] { border-color:rgba(61,220,151,.22); background:rgba(61,220,151,.05); }
-#lead-info .dtl-line[data-k="produto"], #lead-info .dtl-line[data-k="telefone"] { grid-column:1 / -1; }
+/* ordem (Bruno 26/09/2026: "Informações — melhore a disposição"): o resultado primeiro (situação e valor), depois o que
+   foi vendido e quando, quem atendeu, de onde veio; ID e telefone no fim */
+#lead-info .dtl-line[data-k="nome"] { order:0; grid-column:1 / -1; }
+#lead-info .dtl-line[data-k="status"] { order:1; } #lead-info .dtl-line[data-k="valor"] { order:2; }
+#lead-info .dtl-line[data-k="produto"] { order:3; grid-column:1 / -1; }
+#lead-info .dtl-line[data-k="data"] { order:4; } #lead-info .dtl-line[data-k="forma"] { order:5; }
+#lead-info .dtl-line[data-k="closer"] { order:6; } #lead-info .dtl-line[data-k="sdr"] { order:7; }
+#lead-info .dtl-line[data-k="origem"] { order:8; } #lead-info .dtl-line[data-k="id"] { order:9; }
+#lead-info .dtl-line[data-k="telefone"] { order:10; grid-column:1 / -1; }
+#lead-info .dtl-line[data-k="status"] > b, #lead-info .dtl-line[data-k="valor"] > b { font-size:1.08rem; font-weight:800; }
+#lead-info .dtl-line[data-k="valor"] > b { color:var(--green); }
+#lead-info .dtl-line[data-k="valor"], #lead-info .dtl-line[data-k="status"] { border-color:rgba(61,220,151,.22); background:rgba(61,220,151,.05); padding:12px 14px; }
 #lead-info .dtl-line.fl-trava { opacity:.6; border-style:dashed; }
 #fl-formulario .dtl-line { flex-direction:column; align-items:flex-start; gap:3px; }
 #fl-formulario .dtl-line > span:first-child { font-size:.62rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
@@ -22200,8 +22205,10 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
   // ficha interna: cada informação ganha uma chave (valor, status…) e o cabeçalho ganha atalhos de contato
   function chaveDaLinha(t) {
     t = String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (/nome do lead/.test(t)) return 'nome'; if (/id do lead/.test(t)) return 'id';
     if (/valor/.test(t)) return 'valor'; if (/status|situa/.test(t)) return 'status'; if (/produto/.test(t)) return 'produto';
     if (/telefone|whats/.test(t)) return 'telefone'; if (/closer/.test(t)) return 'closer'; if (/\bsdr\b/.test(t)) return 'sdr';
+    if (/reuni/.test(t)) return 'data'; if (/origem/.test(t)) return 'origem'; if (/forma/.test(t)) return 'forma';
     return '';
   }
   function fichaMelhorar() {
