@@ -2487,6 +2487,8 @@ function abrirAgendar(dur, ck){
   agLimparLead();
   agEuNoSdr();      // quem entrou no dash já vem como SDR / social seller
   document.getElementById('modal-agendar').classList.add('open');
+  // o 09:00 que vinha marcado de fábrica ficava "grudado" na lista (ex.: Sarah às 09:00, fora da grade dela): começa sem horário
+  var hs0 = document.getElementById('ag-hora'); if (hs0) hs0.selectedIndex = -1;
   closerMudou();
 }
 // quem trabalha social selling pode marcar reunião sem origem
@@ -2619,7 +2621,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-0201';
+var VERSAO_DASH = '2026-09-27-1103';
 var _versaoNova = null;
 
 // =====================================================================
@@ -2628,12 +2630,12 @@ var _versaoNova = null;
 // Para acrescentar um closer: UMA linha aqui, a agenda dele no robô (CALENDARS,
 // no começo do Code.gs) e, se ele for entrar no dash, o PIN lá embaixo em ACESSOS.
 // grade = qual grade de horários ele usa: 'tony' (almoço 12:20–13:00), 'bruno' (12:20–14:00),
-// 'hora' (de 1 em 1 hora, reunião de 60 min) ou 'tarde' (de 1 em 1 hora, só das 14h em diante, sem sábado).
+// 'hora' (de 1 em 1 hora, reunião de 60 min) ou 'tarde' (de 1 em 1 hora, só das 16h em diante desde 28/09/2026 — antes 14h —, sem sábado).
 var CLOSERS = [
   { key: 'bruno',    nome: 'Bruno Pardim', grade: 'bruno' },
   { key: 'tony',     nome: 'Tony Londe',   grade: 'tony'  },
   { key: 'wesllene', nome: 'Wesllene',     grade: 'hora'  },
-  { key: 'sarah',    nome: 'Sarah',        grade: 'tarde' }    // 18/09/2026: a Sarah atende reunião SÓ depois das 14h (agenda "Reuniões Sarah")
+  { key: 'sarah',    nome: 'Sarah',        grade: 'tarde' }    // 18/09/2026: a Sarah atende reunião SÓ à tarde (agenda "Reuniões Sarah"); 27/09/2026: a partir das 16h
 ];
 // 🚫 quem não aparece mais no dash (Bruno 27/09/2026: "tire matheus do dash" — aparecia em 1º no pódio do Placar com
 // 0 vendas, porque o nome está como closer em linhas da planilha). Some do Placar (closers e SDRs) e das listas de
@@ -15301,6 +15303,11 @@ var SLOTS_TARDE = [
   { start:'17:00', end:'18:00' },
   { start:'18:00', end:'19:00', extra:true }
 ];
+// 27/09/2026 (Bruno: "coloque a agenda da sarah a partir das 16 horas"): da semana de 28/09 em diante a grade 'tarde'
+// começa às 16h (as semanas antes continuam a partir das 14h, para o histórico não mudar)
+var SLOTS_TARDE_16 = SLOTS_TARDE.filter(function(s){ return s.start >= '16:00'; });
+var TARDE_16_DESDE = new Date(2026, 8, 28);
+function horaTarde(dataRef) { var d = dataRef || AG.weekStart; return (d && d >= TARDE_16_DESDE) ? '16h' : '14h'; }
 var GRADE_14_DESDE = new Date(2026, 8, 14);
 // agendas de 1 em 1 hora (Wesllene e Sarah): a reunião dura 60 min (Bruno 18/09/2026)
 function gradeDeHora(closer) { var g = gradeDoCloser(closer); return g === 'hora' || g === 'tarde'; }
@@ -15312,7 +15319,7 @@ function gradeDoCloser(closer) {
 function slotsDo(closer, dataRef){
   var grade = gradeDoCloser(closer);
   if (grade === 'hora') return SLOTS_HORA;             // grade de 1 em 1 hora: vale para qualquer semana
-  if (grade === 'tarde') return SLOTS_TARDE;
+  if (grade === 'tarde') { var dT = dataRef || AG.weekStart; return (dT && dT >= TARDE_16_DESDE) ? SLOTS_TARDE_16 : SLOTS_TARDE; }
   var d = dataRef || AG.weekStart;
   if (d && d >= GRADE_14_DESDE) return grade === 'tony' ? SLOTS_TONY_14 : SLOTS_BRUNO_14;
   return SLOTS_TONY;
@@ -16287,10 +16294,10 @@ function agAtualizarLegenda() {
   var fim = ' · 🔒 = precisa do OK do closer (horário extra do fim do dia, sábado de manhã e feriado) · Clique num horário livre para agendar';
   if (AG.closer !== 'ambos' && gradeDeHora(AG.closer)) {
     el.innerHTML = 'Agenda de ' + closerNomeDe(AG.closer) + ': blocos de 1 hora · reunião de 60 min (Legado = 50 min)'
-      + (gradeSoTarde(AG.closer) ? ' · só atende das 14h em diante, sem sábado' : ' · almoço 12:00–13:00') + fim;
+      + (gradeSoTarde(AG.closer) ? ' · só atende das ' + horaTarde() + ' em diante, sem sábado' : ' · almoço 12:00–13:00') + fim;
   } else if (AG.closer === 'ambos' && CLOSERS.some(function(c){ return gradeDeHora(c.key); })) {
     el.innerHTML = 'Bruno e Tony: blocos de 1h40 (Legado = 50 min, 2 por bloco) · '
-      + CLOSERS.filter(function(c){ return gradeDeHora(c.key); }).map(function(c){ return c.nome + (c.grade === 'tarde' ? ' (só depois das 14h)' : ''); }).join(' e ')
+      + CLOSERS.filter(function(c){ return gradeDeHora(c.key); }).map(function(c){ return c.nome + (c.grade === 'tarde' ? ' (só das ' + horaTarde() + ' em diante)' : ''); }).join(' e ')
       + ': blocos de 1 hora, reunião de 60 min' + fim;
   } else {
     el.innerHTML = 'Blocos de 1h40 · Legado = 50 min (2 por bloco)' + fim;
