@@ -2623,7 +2623,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1313';
+var VERSAO_DASH = '2026-09-27-1325';
 var _versaoNova = null;
 
 // =====================================================================
@@ -15425,6 +15425,7 @@ function gravCarregar(fresco) {
 // passou o mouse no card: já pede o texto do Gemini, para a sala abrir com a conversa pronta
 GRAV._pre = {};
 function gravPre(iV) {
+  try { gvPreVideo(iV); } catch (ePv) {}
   var x = (GRAV.vis || [])[iV], doc = x && (x.doc || [])[0];
   if (!doc || GRAV.textos[doc] || GRAV._pre[doc]) return;
   GRAV._pre[doc] = true;
@@ -16036,7 +16037,7 @@ function gravAbrir(i, foco) {
     + '<div class="gv-corpo">'
     +   '<section class="gv-esq"><div class="gv-palco"><div class="gv-video"' + (vid ? ' data-vid="' + gravEsc(vid) + '" style="background-image:url(\'' + (GRAV.capas[vid] || 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w1280') + '\')"' : '') + '>'
     +     (dentro ? '<iframe id="gv-frame" src="about:blank" data-src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Gravação" style="display:none"></iframe>'
-             + '<video id="gv-player" class="gv-player" controls playsinline autoplay preload="auto" src="' + gvPlayerSrc(vid) + '"></video><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
+             + '<video id="gv-player" class="gv-player" controls playsinline autoplay preload="auto" data-src="' + gvPlayerSrc(vid) + '"></video><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
              + (cel ? '' : '<button type="button" class="gv-fora-bt" onclick="gvForaDaTela()" title="O vídeo sai do dash e fica flutuando por cima de tudo — dá para mexer no dash, no Instagram, na Clint">⧉ Assistir fora da tela</button>')
            : vid && cel ? '<iframe id="gv-frame" src="about:blank" data-src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview" title="Gravação" style="display:none"></iframe>'
              + '<button type="button" class="gv-tocar" onclick="gvTelaCheia(GRAV._seg||0)" aria-label="Assistir a gravação em tela cheia"><i>▶</i><span>Assistir em tela cheia</span></button>'
@@ -16065,7 +16066,7 @@ function gravAbrir(i, foco) {
   if (doc) gvAba(foco === 'transcricao' ? 'conv' : foco === 'ficha' ? 'rx' : 'res');
   GRAV._aberto = { x: x, p: p };
   GRAV._seg = 0;
-  if (dentro) { gvPlayerLigar(document.getElementById('gv-player'), x, vid); }
+  if (dentro) { gvPlayerLigar(gvPlayerAdotar(document.getElementById('gv-player'), vid), x, vid); }
   else if (vid && gvPipAberto()) { gvForaDaTela(0); }   // o vídeo fora da tela acompanha a reunião nova
   else if (vid && gvJanelaAberta()) { gvJanela(0); }   // a janela ao lado acompanha a reunião nova
   else if (vid && gvSempreJanela() && !(window.matchMedia && matchMedia('(hover:none) and (pointer:coarse)').matches)) { gvJanela(0); }   // escolheu: sempre em janela
@@ -16526,7 +16527,43 @@ function gvPlayerLigar(pl, x, vid) {
   });
   clearTimeout(pl._tDemora);
   pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok')) gvPlayerFalhou(pl, 'demora'); }, 25000);
+  if (pl.readyState >= 2) pronto();   // veio já carregado (baixou enquanto o mouse estava em cima do cartão)
   try { var p = pl.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+}
+// ⚡ 27/09/2026 (Bruno: "esse tempo tem como melhorar?"): com o mouse parado em cima de um cartão, o vídeo dele já começa a
+// baixar escondido; ao clicar, o dash usa ESSE mesmo vídeo (já com o começo e o índice carregados) — abre quase na hora.
+GRAV._preV = null; GRAV._preVT = null;
+function gvPreVideo(iV) {
+  if (!GV_CHAVE || !(window.matchMedia && matchMedia('(hover:hover)').matches)) return;
+  var x = (GRAV.vis || [])[iV], vid = x && (x.rec || [])[0]; if (!vid) return;
+  if (GRAV._preV && GRAV._preV._vid === vid) return;
+  clearTimeout(GRAV._preVT);
+  GRAV._preVT = setTimeout(function () {
+    if (document.getElementById('gv')) return;   // já tem gravação aberta
+    gvPreVideoSoltar();
+    var g = document.getElementById('gv-pre');
+    if (!g) { g = document.createElement('div'); g.id = 'gv-pre'; g.setAttribute('aria-hidden', 'true'); document.body.appendChild(g); }
+    var v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v._vid = vid;
+    v.src = gvPlayerSrc(vid); g.appendChild(v); GRAV._preV = v;
+  }, 300);
+}
+function gvPreVideoSoltar() {
+  var v = GRAV._preV; GRAV._preV = null; if (!v) return;
+  try { v.removeAttribute('src'); v.load(); } catch (e) {}
+  if (v.parentNode) v.parentNode.removeChild(v);
+}
+function gvPlayerAdotar(novo, vid) {
+  clearTimeout(GRAV._preVT);
+  var pre = GRAV._preV;
+  if (novo && pre && pre._vid === vid && !pre.error) {
+    GRAV._preV = null;
+    pre.id = 'gv-player'; pre.className = novo.className; pre.controls = true; pre.autoplay = true; pre.muted = false;
+    novo.parentNode.replaceChild(pre, novo);
+    return pre;
+  }
+  gvPreVideoSoltar();
+  if (novo && !novo.getAttribute('src')) novo.src = novo.getAttribute('data-src');
+  return novo;
 }
 function gvPlayerFalhou(pl, motivo) {
   var box = pl && pl.parentNode; if (!box || box.id === 'gv-pip-guarda') return;
@@ -16536,14 +16573,29 @@ function gvPlayerFalhou(pl, motivo) {
   // o robô diz o motivo: sem acesso = a gravação está no Drive de outra pessoa
   if (motivo === 'erro' && !pl._motivoVisto) {
     pl._motivoVisto = true;
-    fetch(gvPlayerSrc(vid), { headers: { Range: 'bytes=0-1' } }).then(function(r) { return r.status === 404 || (r.status === 403 && x.vs === 'acesso') ? 'sem acesso' : r.status === 502 ? r.text() : ''; })
-      .catch(function() { return x.vs === 'acesso' ? 'sem acesso' : ''; }).then(function(t) {
-      if (!/acesso/i.test(t || '')) return;
+    var mostrarDono = function() {
       var fa = box.querySelector('.gv-falhou'); if (!fa) return;
       var dono = (GRAV.closers && GRAV.closers[x.k]) || x.k || 'quem gravou';
       fa.querySelector('b').textContent = '🔒 Esta gravação está no Drive de ' + dono;
       fa.querySelector('span').innerHTML = 'Para abrir aqui dentro, ' + gravEsc(String(dono).split(' ')[0]) + ' precisa compartilhar a pasta <b>Meet Recordings</b> do Drive dele(a) como <b>Qualquer pessoa com o link</b> (Leitor). Uma vez só — as próximas já entram liberadas.';
-    }).catch(function() {});
+    };
+    fetch(gvPlayerSrc(vid), { headers: { Range: 'bytes=0-1' } })
+      .then(function(r) { return r.status === 404 ? 'nao-publico' : (r.status === 403 && x.vs === 'acesso') ? 'sem acesso' : r.status === 502 ? r.text() : ''; })
+      .catch(function() { return x.vs === 'acesso' ? 'sem acesso' : ''; })
+      .then(function(t) {
+        if (t === 'nao-publico' && GV_CHAVE && !pl._tentouLiberar) {
+          // (27/09/2026: "esse tempo tem como melhorar?") gravação nova ainda fechada: o robô libera AGORA, sem esperar a hora cheia
+          pl._tentouLiberar = true;
+          var fa0 = box.querySelector('.gv-falhou');
+          if (fa0) { fa0.querySelector('b').textContent = '🔓 Liberando esta gravação…'; fa0.querySelector('span').textContent = 'Ela é nova e ainda não estava aberta — o robô está liberando agora.'; }
+          fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'videoLiberar', id: vid })), { redirect: 'follow' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { if (d && d.liberado) setTimeout(gvPlayerRecarregar, 3000); else mostrarDono(); })
+            .catch(mostrarDono);
+          return;
+        }
+        if (/acesso|nao-publico/i.test(t || '')) mostrarDono();
+      }).catch(function() {});
   }
   var cel = vtelaCelular(), link = 'https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/view';
   box.insertAdjacentHTML('beforeend', '<div class="gv-na-janela gv-falhou"><b>' + (motivo === 'erro' ? '⚠️ Não consegui tocar aqui dentro' : '⏳ Está demorando para abrir aqui dentro') + '</b>'
@@ -23372,7 +23424,7 @@ body:has(.modal-overlay.open) #gv { z-index:150; }   /* a gravação desce para 
 .gv-video video.gv-player.ok { opacity:1; }
 .gv-video:has(video.gv-player) .gv-carrega { z-index:2; }
 .gv-video .gv-falhou { z-index:4; background:rgba(8,10,14,.86); }
-#gv-pip-guarda { position:fixed; left:-10px; bottom:0; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
+#gv-pip-guarda, #gv-pre { position:fixed; left:-10px; bottom:0; width:1px; height:1px; overflow:hidden; opacity:0; pointer-events:none; }
 @media (max-width:760px) { .gv-fora-bt, .gv-ajuda .gv-fora-aj { display:none; } }
 .gv-ajuda .btn.gv-fora-aj { border-color:rgba(246,163,80,.55); color:var(--accent); }
 .gv-dtabs { display:flex; gap:6px; padding:12px 16px 0; }
