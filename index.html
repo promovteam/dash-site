@@ -2582,7 +2582,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-26-2303';
+var VERSAO_DASH = '2026-09-26-2311';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4841,8 +4841,9 @@ function v2row(r) {
     try { return clintLink({ tel: r.telefone, tel8: ldTel8(r.telefone), nome: r.nome }); } catch (e) { return ''; }
   })();
   var tags = seloAnuncio(r, true) + igSeloLead(r, true);
-  var acts = (lkC ? '<a class="ld-wa cr-ic cr-clint" href="' + lkC + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa no atendimento da Clint" aria-label="Abrir na Clint">🟣</a>' : '')
-    + (r.telefone ? '<a class="ld-wa cr-ic" href="https://wa.me/55' + String(r.telefone).replace(/\D/g, '').slice(-11) + '" target="_blank" onclick="event.stopPropagation();" title="chamar no WhatsApp" aria-label="Chamar no WhatsApp">💬</a>' : '');
+  // 26/09/2026 (Bruno: "link deve ser da Clint, não do WhatsApp"): o botão abre a conversa na Clint — se o endereço
+  // ainda não é conhecido, o robô procura a pessoa (abrirAtendimentoClintPor) e abre a conversa ou o contato
+  var acts = (r.telefone || r.nome) ? '<a class="ld-wa cr-clint" href="' + (lkC || 'https://app.clint.digital/chat') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint" aria-label="Abrir na Clint">🟣 Clint</a>' : '';
   return '<div class="cliente-row cr2" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);" title="' + String(r.nome || '').replace(/"/g, '&quot;') + '">' + (r.nome || 'Sem nome') + '</b>'
@@ -21947,7 +21948,9 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 .cr2 .cr-val .valor { margin:0 !important; font-size:1rem; font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums; flex:none !important; padding-left:0 !important; }
 .cr2 .cr-acts { display:flex; gap:6px; }
 .cr2 .cr-ic { width:32px; height:32px; padding:0 !important; display:inline-flex !important; align-items:center; justify-content:center; border-radius:10px !important; font-size:.8rem; }
-.cr2 .cr-clint { background:rgba(108,71,255,.14) !important; border-color:rgba(108,71,255,.45) !important; color:#8f6bff !important; }
+.cr2 .cr-clint { display:inline-flex !important; align-items:center; gap:6px; height:32px; padding:0 13px !important; border-radius:999px !important; font-size:.72rem; font-weight:800;
+  background:rgba(108,71,255,.14) !important; border-color:rgba(108,71,255,.45) !important; color:#b9a6ff !important; text-decoration:none; }
+.cr2 .cr-clint:hover { background:rgba(108,71,255,.24) !important; }
 @media (max-width:760px) {
   .cliente-row.cr2 { grid-template-columns:40px minmax(0,1fr); padding:12px; }
   .cr2 > .avatar { width:40px; height:40px; }
@@ -21963,7 +21966,7 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 .fl-atalhos a, .fl-atalhos button { display:inline-flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px; font:inherit; font-size:.72rem; font-weight:800;
   text-decoration:none; cursor:pointer; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); transition:background .2s, border-color .2s, transform .15s; }
 .fl-atalhos a:hover, .fl-atalhos button:hover { border-color:rgba(255,255,255,.22); background:rgba(255,255,255,.08); }
-.fl-atalhos .wa { color:#3ddc97; border-color:rgba(61,220,151,.35); background:rgba(61,220,151,.08); }
+.fl-atalhos .clint { color:#b9a6ff; border-color:rgba(108,71,255,.45); background:rgba(108,71,255,.14); }
 #lead-info { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
 #lead-info .dtl-line { flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:4px; padding:10px 12px; margin:0; border-radius:12px;
   background:rgba(255,255,255,.03); border:1px solid var(--border); min-width:0; }
@@ -22173,9 +22176,11 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
     var at = head.querySelector('.fl-atalhos');
     if (!at) { at = doc.createElement('div'); at.className = 'fl-atalhos'; head.appendChild(at); }
     var h = '';
-    if (tel && !ehVisitante()) {
-      h += '<a class="wa" href="https://wa.me/55' + tel + '" target="_blank" rel="noopener" onclick="event.stopPropagation();">💬 WhatsApp</a>'
-        + '<a href="tel:+55' + tel + '" onclick="event.stopPropagation();">📞 Ligar</a>';
+    var nomeF = ((doc.getElementById('fl-nome') || {}).textContent || '').trim();
+    if ((tel || nomeF) && !ehVisitante()) {
+      // Bruno 26/09/2026: "link deve ser da Clint, não do WhatsApp"
+      h += '<a class="clint" href="https://app.clint.digital/chat" target="_blank" rel="noopener" onclick="event.stopPropagation();return abrirAtendimentoClintPor(event,' + JSON.stringify(tel).replace(/"/g, '&quot;') + ',' + JSON.stringify(nomeF).replace(/"/g, '&quot;') + ');">🟣 Abrir na Clint</a>'
+        + (tel ? '<a href="tel:+55' + tel + '" onclick="event.stopPropagation();">📞 Ligar</a>' : '');
     }
     h += '<button type="button" onclick="event.stopPropagation();var b=document.getElementById(\'btn-copiar\');if(b)b.click();">📋 Copiar dados</button>';
     if (at.innerHTML !== h) at.innerHTML = h;
