@@ -2621,7 +2621,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1154';
+var VERSAO_DASH = '2026-09-27-1212';
 var _versaoNova = null;
 
 // =====================================================================
@@ -15400,7 +15400,11 @@ function gravCarregar(fresco) {
   var res = document.getElementById('grav-resumo');
   var tinha = !fresco && gravDaMemoria(dias);
   if (tinha) { gravDesenhar(); if (res) res.textContent += ' · atualizando…'; }
-  else if (res) res.textContent = '⏳ buscando as gravações' + (dias > 120 ? ' (o histórico todo leva alguns segundos)' : '') + '…';
+  else {
+    if (res) res.textContent = '⏳ buscando as gravações' + (dias > 120 ? ' (o histórico todo leva alguns segundos)' : '') + '…';
+    var glSk = document.getElementById('grav-lista');
+    if (glSk && typeof mvSkTela === 'function') glSk.innerHTML = mvSkTela('cards', 'Buscando as gravações…');
+  }
   fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'gravacoesLista', dias: dias, fresco: !!fresco })), { redirect: 'follow' })
     .then(function(x) { return x.json(); })
     .then(function(d) {
@@ -16575,9 +16579,10 @@ function carregarAgenda() {
   var guardada = agLerLocal(wk);
   if (guardada) {
     renderSemanaV2(guardada);   // aparece na hora com o que o navegador guardou
-    if (sg) sg.insertAdjacentHTML('afterbegin', '<div class="hint" id="ag-atualizando" style="text-align:center;padding:2px 0 6px;">🔄 atualizando com o Google Agenda…</div>');
+    if (sg) sg.insertAdjacentHTML('afterbegin', '<div class="hint" id="ag-atualizando" style="text-align:center;padding:2px 0 6px;"><span class="mv-brilho-txt">🔄 atualizando com o Google Agenda…</span></div>');
   } else if (sg) {
-    sg.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);"><span class="mv-brilho-txt">Carregando agenda do Google Calendar…</span></div>';
+    sg.innerHTML = (typeof mvSkTela === 'function') ? mvSkTela('agenda', 'Buscando a agenda no Google…')
+      : '<div style="text-align:center;padding:40px;color:var(--muted);"><span class="mv-brilho-txt">Carregando agenda do Google Calendar…</span></div>';
   }
   agBuscar(wk, function(err, data) {
     if (err) {
@@ -16789,10 +16794,10 @@ function renderSemanaV2(calData) {
           var nome = agNomeDoEvento(e.title);
           var dur = e.duration || 100;
           h += '<span class="sg-tipo ' + (dur <= 50 ? 'lg' : 'ht') + '">' + (dur <= 50 ? 'LEGADO' : 'HT') + '</span>';
-          h += '<div class="sg-ev" onclick="abrirMenuEvento(event,' + idxEv + ')" style="cursor:pointer;' + (ei > 0 ? 'border-top:1px dashed rgba(255,255,255,.15);margin-top:6px;padding-top:6px;' : '') + '">';
+          h += '<div class="sg-ev' + (e._pend ? ' tl-pend' : '') + (e._novo ? ' tl-novo' : '') + '" onclick="abrirMenuEvento(event,' + idxEv + ')" style="cursor:pointer;' + (ei > 0 ? 'border-top:1px dashed rgba(255,255,255,.15);margin-top:6px;padding-top:6px;' : '') + '">';
           h += '<div class="sg-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(nome) + ');">' + v2ini(nome) + '</span><div class="sg-nome">' + nome + '</div></div>';
           h += '<div class="sg-hora">' + (e.startTime || '') + ' — ' + (e.endTime || '') + ' (' + dur + 'min)</div>';
-          h += '<div class="sg-badges"><span class="sg-st" style="background:' + info.bg + ';color:' + info.fg + ';">' + info.lbl + '</span>';
+          h += '<div class="sg-badges"><span class="sg-st" style="background:' + info.bg + ';color:' + info.fg + ';">' + (e._pend ? '⏳ gravando…' : info.lbl) + '</span>';
           if (e.obs) h += '<span class="sg-ico" title="Tem observação">📝</span>';
           if (e.meetLink) h += '<a class="sg-ico" href="' + e.meetLink + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Abrir Meet">🎥</a>';
           if (e.recordingLink) h += '<a class="sg-ico" href="' + e.recordingLink + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Gravação">🎬</a>';
@@ -16950,13 +16955,13 @@ function renderSemanaV2(calData) {
         else if (n === 2 && !colunaEstreita) pos = 'left:calc(' + (e._lane * 50) + '% + 5px);width:calc(50% - 8px);';   // duas ao mesmo tempo: lado a lado (quando há largura)
         else pos = 'left:' + (6 + e._lane * 20) + 'px;right:6px;z-index:' + (10 + e._lane) + ';';                          // em cascata: a de cima cobre, a de baixo mostra a faixa
         var cascata = n >= 3 || (n === 2 && colunaEstreita);
-        var cls = 'tl-ev' + (curto ? ' curto' : '') + (naGrade && !ehFantasma ? '' : (ehFantasma ? '' : ' fora')) + (n >= 2 && !cascata && !ehFantasma ? ' estreito' : '') + (cascata && !ehFantasma ? ' cascata' : '') + (ehFantasma ? ' fantasma' : '');
+        var cls = 'tl-ev' + (e._pend ? ' tl-pend' : '') + (e._novo ? ' tl-novo' : '') + (curto ? ' curto' : '') + (naGrade && !ehFantasma ? '' : (ehFantasma ? '' : ' fora')) + (n >= 2 && !cascata && !ehFantasma ? ' estreito' : '') + (cascata && !ehFantasma ? ' cascata' : '') + (ehFantasma ? ' fantasma' : '');
         var tipo = dur <= 50 ? 'Legado' : 'HT';
         var tit = nome + ' · ' + hhmm(st) + '–' + hhmm(en) + ' · ' + tipo + ' · ' + info.lbl + (ehFantasma ? ' · não segura o horário: dá para marcar outra pessoa aqui' : (naGrade ? '' : ' · FORA DA GRADE — clique → Remarcar para encaixar num horário'));
         htmlT += '<div class="' + cls + '" onclick="abrirMenuEvento(event,' + idxEv + ')" title="' + tit.replace(/"/g, '&quot;') + '" style="top:' + (top(st) + 2) + 'px;height:' + alt + 'px;' + pos + 'border-left-color:' + solida + ';background:linear-gradient(160deg,' + tinta + ', rgba(20,23,29,0) 72%), #171b23;">'
           + '<div class="sg-head"><span class="sg-avatar" style="background:linear-gradient(135deg,' + v2grad(nome) + ');">' + v2ini(nome) + '</span><div class="sg-nome">' + nome + '</div></div>'
           + '<div class="tl-h">' + hhmm(st) + '–' + hhmm(en) + (tipo === 'Legado' ? ' · Legado' : '') + (naGrade ? '' : ' <span class="tl-fora-tag">fora da grade</span>') + '</div>'
-          + (curto ? '' : '<span class="sg-st" style="background:' + solida + ';color:' + info.fg + ';">' + info.lbl + '</span>')
+          + (curto ? '' : '<span class="sg-st" style="background:' + solida + ';color:' + info.fg + ';">' + (e._pend ? '⏳ gravando…' : info.lbl) + '</span>')
           + '</div>';
       });
       if (ehHoje) { var mAg = agora.getHours() * 60 + agora.getMinutes(); if (mAg >= minG && mAg <= maxG) htmlT += '<div class="tl-agora" style="top:' + top(mAg) + 'px;"></div>'; }
@@ -17005,6 +17010,7 @@ function abrirMenuEvento(e, idx) {
   e.stopPropagation();
   _evAtual = _v2evs[idx];
   if (!_evAtual) return;
+  if (_evAtual._pend) { _evAtual = null; avisoRapido('⏳ Esta reunião ainda está sendo gravada — em alguns segundos ela fica pronta'); return; }
   var m = document.getElementById('slot-menu');
   var sts = [
     ['agendada','Agendada','#6ea8ff'], ['vendido','Vendido','#3ddc97'], ['entrada','Entrada','#ffd166'],
@@ -18775,8 +18781,6 @@ function agendarReuniao(btn) {
   if (mesRef) fields.push({ campo:'mes', valor: mesRef });
   if (obs) fields.push({ campo:'observacao', valor: obs });
 
-  btn.disabled = true;
-  btn.textContent = '⏳ Gravando na planilha + Calendar + Meet…';
   var pedido = {
     action: 'addRowAndCalendar',
     gid: V2_GID,
@@ -18798,9 +18802,7 @@ function agendarReuniao(btn) {
     }
   };
   var _depoisDeGravar = function() {
-    btn.disabled = false;
-    btn.textContent = '✓ Agendar reunião';
-    fecharAgendar();
+    // (a janela já fechou quando mandou — 27/09/2026: não fecha de novo, a pessoa pode estar marcando outra)
     // registra o agendamento na memória do dash (a planilha só recarrega depois),
     // para os números e a agenda já mostrarem a reunião nova
     var mD = dataBr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -18816,10 +18818,8 @@ function agendarReuniao(btn) {
       + 'Instagram: ' + (insta || '-');
     var zm = document.getElementById('zap-msg');
     if (zm) zm.textContent = msg;
-    abrirZap();
-    var wk = agDataStr(AG.weekStart);
-    delete AG.cache[wk];
-    setTimeout(carregarAgenda, 3500);
+    if (!document.querySelector('.modal-overlay.open')) abrirZap();   // se já abriu outra janela, o cartão tem o botão "Mensagem do grupo"
+    agRecarregarSemanaDe(dataBr, 1200);   // a reunião "gravando…" vira a de verdade (com o Meet) sem a agenda piscar
     setTimeout(carregarV2, 5000);
     // confere se o evento entrou MESMO na agenda do closer; se não entrou, avisa
     setTimeout(function(){ conferirEventoNaAgenda(agenda, dataBr, nome); }, 9000);
@@ -18827,26 +18827,9 @@ function agendarReuniao(btn) {
   // (Bruno 10/09/2026: "tendo que lançar duas vezes todas as reuniões") — o dash passava a mão na cabeça:
   // mandava o pedido às cegas e fingia sucesso. Com o robô saturado a 1ª tentativa se perdia em silêncio.
   // Agora ESPERA a resposta do robô; sem resposta, confere na agenda antes de liberar nova tentativa.
-  gravarComResposta(pedido, 45000).then(function(res) {
-    if (res && res.success) { _depoisDeGravar(); return; }
-    if (res && res._semResposta) {
-      btn.textContent = '⏳ Robô demorou — conferindo se entrou na agenda…';
-      setTimeout(function() {
-        conferirSeEntrou(agenda, dataBr, nome, function(entrou, falhou) {
-          btn.disabled = false; btn.textContent = '✓ Agendar reunião';
-          if (entrou) { _depoisDeGravar(); return; }
-          caixaPromov({ ico: '⚠️', titulo: falhou ? 'Não consegui confirmar' : 'Não entrou',
-            texto: falhou
-              ? 'O robô não respondeu e não consegui conferir a agenda.\n\nAbra o Google Agenda do closer: se a reunião de ' + nome + ' NÃO estiver lá, espere 1 minuto e clique em "Agendar reunião" de novo.'
-              : 'O robô não respondeu e a reunião de ' + nome + ' NÃO entrou na agenda.\n\nNada foi criado. Espere 1 minuto e clique em "Agendar reunião" de novo.',
-            botoes: [{ t: 'Entendi' }] });
-        });
-      }, 8000);
-      return;
-    }
-    btn.disabled = false; btn.textContent = '✓ Agendar reunião';
-    caixaPromov({ ico: '⚠️', titulo: 'Não consegui gravar', texto: 'O robô respondeu com erro: ' + ((res && res.error) || 'sem detalhe') + '\n\nNada foi criado. Tente de novo.', botoes: [{ t: 'Entendi' }] });
-  });
+  // ⚡ 27/09/2026 (Bruno: "deixe de alguma maneira mais rápido"): a janela fecha NA HORA e o cartão no canto acompanha o robô.
+  // Continua ESPERANDO a resposta dele (regra de 10/09/2026, "lançar duas vezes"): sem resposta, confere na agenda; se não entrou, avisa.
+  agNaHora(pedido, { nome: nome, dataBr: dataBr, hora: hora, dur: dur, agenda: agenda, closerNome: closerNome, sdr: sdr, prod: prod }, _depoisDeGravar);
 }
 
 // manda o pedido ao robô e ESPERA a resposta (JSON); sem resposta em `ms` → {_semResposta:true}
@@ -20092,7 +20075,7 @@ function plDetectarNovidades(d) {
       var a = atual[k], p = base[k] || {}, p2 = (PL_PREV && PL_PREV[k]) || {};
       if (!base[k] && !PL_PREV) return;
       var refMarc = Math.max(p.marc || 0, p2.marc || 0), refVd = Math.max(p.vd || 0, p2.vd || 0), refVdV = Math.max(p.vdV || 0, p2.vdV || 0);
-      if (k.charAt(0) === 's' && a.marc > refMarc) plComemorar('marcou', a.nome, a.marc - refMarc);
+      if (k.charAt(0) === 's' && a.marc > refMarc) plComemorar('marcou', a.nome, a.marc - refMarc, a.marc - refMarc === 1 ? plInfoMarcou(a.nome) : null);
       if (k.charAt(0) === 'c' && a.vd > refVd) plComemorar('vendeu', a.nome, a.vdV - refVdV);
     });
   }
@@ -20129,8 +20112,8 @@ function plFoguete(nome, foto, tipo) {
     +   '<circle cx="60" cy="98" r="34" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5"/>'
     + '</svg></div>';
 }
-function plComemorar(tipo, nome, q) {
-  PL_FILA.push({ tipo: tipo, nome: nome, q: q });
+function plComemorar(tipo, nome, q, info) {
+  PL_FILA.push({ tipo: tipo, nome: nome, q: q, info: info || null });
   if (!PL_FESTANDO) plProximaFesta();
 }
 function plProximaFesta() {
@@ -20153,7 +20136,7 @@ function plProximaFesta() {
   var cabeca = foto
     ? '<div class="fx-foto" style="background-image:url(' + foto + ');"><span class="fx-selo">' + ico + '</span></div>'
     : '<div class="fx-ico">' + ico + '</div>';
-  el.innerHTML = conf + plFoguete(f.nome, foto, f.tipo) + '<div class="fx-caixa">' + cabeca + '<div class="fx-t1">' + f.nome.split(' ')[0].replace(/</g, '&lt;') + ' ' + t1 + '</div><div class="fx-t2">' + t2.replace(/</g, '&lt;') + '</div></div>';
+  el.innerHTML = conf + plFoguete(f.nome, foto, f.tipo) + '<div class="fx-caixa">' + cabeca + '<div class="fx-t1">' + f.nome.split(' ')[0].replace(/</g, '&lt;') + ' ' + t1 + '</div><div class="fx-t2">' + t2.replace(/</g, '&lt;') + '</div>' + plInfoHtml(f.info) + '</div>';
   el.style.display = 'flex';
   try { plSomFesta(f.tipo); } catch (e) {}
   setTimeout(plProximaFesta, 6500);
@@ -20173,7 +20156,26 @@ function plSomFesta(tipo) {
     o.start(ctx.currentTime + i * 0.16); o.stop(ctx.currentTime + i * 0.16 + 0.35);
   });
 }
-function plTestarFesta() { plComemorar('marcou', 'Sarah', 1); plComemorar('vendeu', 'Tony Londe', 3596.4); }
+// 27/09/2026 (Bruno: "animação grande cobrindo a tela toda ao agendar, com a foto e os dados da reunião"): a caixa da festa
+// mostra QUEM foi marcado, o dia/hora e com qual closer
+function plInfoHtml(info) {
+  if (!info || !info.lead) return '';
+  var e = function(t) { return String(t || '').replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var sub = [info.quando, info.closer ? 'com ' + String(info.closer).split(' ')[0] : ''].filter(Boolean).join(' · ');
+  return '<div class="fx-info"><b>📅 ' + e(info.lead) + '</b>' + (sub ? '<span>' + e(sub) + '</span>' : '') + '</div>';
+}
+// a marcação que acabou de entrar na planilha (carimbo dos últimos 30 min) desta pessoa
+function plInfoMarcou(nome) {
+  var k = v2norm(plPessoa(nome)), melhor = null, agora = Date.now();
+  (V2.rows || []).forEach(function(r) {
+    if (!r.carimboT || agora - r.carimboT > 30 * 60000 || v2norm(plPessoa(r.sdr || '')) !== k) return;
+    if (!melhor || r.carimboT > melhor.carimboT) melhor = r;
+  });
+  if (!melhor) return null;
+  var sem = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], d = melhor.date;
+  return { lead: melhor.nome, quando: d ? 'reunião ' + sem[d.getDay()] + ' ' + d.toLocaleDateString('pt-BR').slice(0, 5) : '', closer: melhor.closer };
+}
+function plTestarFesta() { plComemorar('marcou', 'Sarah', 1, { lead: 'Maria Exemplo', quando: 'seg 28/09 às 16:00', closer: 'Sarah' }); plComemorar('vendeu', 'Tony Londe', 3596.4); }
 // quais reunioes entraram na conta de uma pessoa (100% conferivel — Bruno 02/09/2026)
 // HORA da reuniao: a planilha nao guarda hora, entao vem do evento da agenda (Bruno 03/09/2026).
 // Usa as semanas ja baixadas pelo placar (PL_AG) e pela Agenda (AG); se a semana ainda nao veio,
@@ -23249,6 +23251,417 @@ body:has(.modal-overlay.open) #gv { z-index:150; }   /* a gravação desce para 
 .btn.gq-rx { width:100%; justify-content:center; margin-top:12px; font-size:.74rem; }
 @media (prefers-reduced-motion:reduce) { .gv-quem.gq-entra > * { animation:none !important; } .gv-fora-bt { transition:none; } }
 </style>
+
+<!-- ===== ⚡ AGENDAR NA HORA, BARRA DE ATUALIZAÇÃO, BOTÕES GRAVANDO E TELA TODA CARREGANDO (Bruno 27/09/2026: "melhore essa
+     experiência com animação de atualização de dados ou de agendamento de reunião em todo o dash", "e deixe de alguma maneira mais
+     rápido", "uma animação que preencha toda a tela" → as duas: carregamento na tela toda + festa em tela cheia ao agendar) =====
+     • AGENDAR: a janela fecha NA HORA; um cartão no canto mostra planilha → agenda → Meet → avisos; a reunião já aparece na
+       agenda "gravando…" e vira definitiva quando o robô confirma. Se der errado, o cartão fica vermelho com "Tentar de novo".
+     • BARRA NO TOPO: toda vez que o dash fala com o robô ou com a planilha, uma linha colorida corre no alto da tela.
+     • BOTÕES "⏳ …": viram um botão com rodinha girando e brilho passando, em qualquer tela.
+     • TELA TODA CARREGANDO: agenda e gravações mostram o desenho da tela brilhando enquanto os dados chegam. -->
+<style>
+#mv-barra { position:fixed; left:0; top:0; height:3px; width:0; z-index:100005; pointer-events:none; opacity:0; border-radius:0 3px 3px 0;
+  background:linear-gradient(90deg,#f6a350,#ffd166 40%,#3ddc97 70%,#6ea8ff); box-shadow:0 0 12px rgba(246,163,80,.65);
+  transition:width .5s cubic-bezier(.22,1,.36,1), opacity .35s ease; }
+#mv-barra.on { opacity:1; }
+#mv-barra::after { content:''; position:absolute; right:-10px; top:-4px; width:80px; height:11px; background:radial-gradient(closest-side, rgba(255,255,255,.85), transparent); }
+#mv-onda { position:fixed; inset:0; z-index:100004; pointer-events:none; overflow:hidden; display:none; }
+#mv-onda i { position:absolute; top:-20%; bottom:-20%; width:42vw; left:-50vw; transform:skewX(-14deg);
+  background:linear-gradient(100deg, transparent, rgba(246,163,80,.06) 35%, rgba(255,255,255,.09) 50%, rgba(110,168,255,.06) 65%, transparent);
+  animation:mvOnda 1.15s cubic-bezier(.4,0,.2,1) forwards; }
+@keyframes mvOnda { to { left:112vw; } }
+.mv-atual { display:inline-flex; align-items:center; gap:6px; align-self:center; font-size:.66rem; font-weight:800; color:#3ddc97; white-space:nowrap;
+  padding:6px 11px; border-radius:999px; background:rgba(61,220,151,.10); border:1px solid rgba(61,220,151,.35); animation:mvAtualEntra .35s ease both; }
+.mv-atual.sai { animation:mvAtualSai .35s ease forwards; }
+@keyframes mvAtualEntra { from { opacity:0; transform:translateY(-6px) scale(.95); } to { opacity:1; transform:none; } }
+@keyframes mvAtualSai { to { opacity:0; transform:translateY(-6px); } }
+@media (max-width:620px) { .mv-atual { display:none; } }
+
+.mv-gravando { position:relative; overflow:hidden; cursor:progress !important; opacity:1 !important; }
+.mv-gravando .mv-roda { display:inline-block; width:.95em; height:.95em; margin-right:.45em; vertical-align:-.14em; border-radius:50%;
+  border:2px solid currentColor; border-right-color:transparent; animation:mvRoda .7s linear infinite; }
+.mv-gravando .mv-varre { position:absolute; inset:0; pointer-events:none; background:linear-gradient(100deg, transparent 30%, rgba(255,255,255,.26) 50%, transparent 70%);
+  background-size:250% 100%; animation:mvVarre 1.3s linear infinite; }
+@keyframes mvRoda { to { transform:rotate(360deg); } }
+@keyframes mvVarre { from { background-position:120% 0; } to { background-position:-120% 0; } }
+
+.mv-sktela { position:relative; display:flex; flex-direction:column; gap:12px; min-height:min(72vh, 680px); padding:4px 0 10px; }
+.mv-skmsg { position:absolute; left:50%; top:34%; transform:translate(-50%,-50%); z-index:2; display:flex; align-items:center; gap:10px; padding:12px 18px;
+  border-radius:999px; background:rgba(18,21,27,.9); border:1px solid rgba(255,255,255,.12); font-size:.82rem; font-weight:800; color:var(--text2);
+  box-shadow:0 14px 34px rgba(0,0,0,.45); white-space:nowrap; }
+.mv-skmsg i { width:16px; height:16px; border-radius:50%; border:2px solid var(--accent); border-right-color:transparent; animation:mvRoda .8s linear infinite; }
+.mv-skb { display:block; border-radius:14px; border:1px solid rgba(255,255,255,.05);
+  background:linear-gradient(100deg, rgba(255,255,255,.03) 30%, rgba(255,255,255,.085) 50%, rgba(255,255,255,.03) 70%); background-size:300% 100%;
+  animation:mvBrilhoSk 1.5s linear infinite; }
+.mv-skag { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; flex:1; }
+.mv-skag > div { display:flex; flex-direction:column; gap:10px; }
+.mv-skcards { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:14px; }
+.mv-skcard { display:flex; flex-direction:column; gap:8px; }
+@media (max-width:760px) { .mv-skag { grid-template-columns:repeat(3, minmax(0,1fr)); } .mv-skmsg { font-size:.74rem; } }
+
+#agt-fila { position:fixed; right:18px; top:84px; z-index:10200; display:flex; flex-direction:column; gap:10px; width:min(370px, calc(100vw - 24px)); pointer-events:none; }
+.agt { pointer-events:auto; position:relative; display:flex; gap:12px; padding:14px 34px 12px 14px; border-radius:18px; color:var(--text); overflow:hidden;
+  background:linear-gradient(160deg, rgba(32,36,46,.97), rgba(18,21,27,.97)); border:1px solid rgba(246,163,80,.45);
+  box-shadow:0 18px 40px rgba(0,0,0,.5); animation:agtEntra .45s cubic-bezier(.34,1.3,.64,1) both; }
+.agt.ok { border-color:rgba(61,220,151,.6); } .agt.erro { border-color:rgba(255,107,107,.65); }
+.agt.sai { animation:agtSai .3s ease forwards; }
+@keyframes agtEntra { from { opacity:0; transform:translate3d(30px,0,0) scale(.96); } to { opacity:1; transform:none; } }
+@keyframes agtSai { to { opacity:0; transform:translate3d(30px,0,0) scale(.96); } }
+.agt-ico { width:38px; height:38px; flex:none; border-radius:50%; display:grid; place-items:center; background:rgba(246,163,80,.14); font-size:1.1rem; }
+.agt-roda { width:20px; height:20px; border-radius:50%; border:3px solid rgba(246,163,80,.3); border-top-color:#f6a350; animation:mvRoda .8s linear infinite; }
+.agt.ok .agt-ico { background:rgba(61,220,151,.16); animation:agtPop .5s cubic-bezier(.34,1.6,.64,1); }
+.agt.erro .agt-ico { background:rgba(255,107,107,.16); }
+@keyframes agtPop { from { transform:scale(.4); } to { transform:scale(1); } }
+.agt-txt { flex:1; min-width:0; }
+.agt-txt > b { display:block; font-size:.86rem; font-weight:900; }
+.agt-txt > span { display:block; font-size:.7rem; color:var(--muted); font-weight:700; margin-top:2px; }
+.agt-passos { display:flex; gap:5px; flex-wrap:wrap; margin-top:9px; }
+.agt-passos em { font-style:normal; font-size:.62rem; font-weight:800; padding:3px 8px; border-radius:999px; background:rgba(255,255,255,.05); color:var(--muted); transition:background .3s ease, color .3s ease; }
+.agt-passos em.vez { background:rgba(246,163,80,.16); color:#f6a350; animation:mvPisca 1s ease-in-out infinite; }
+.agt-passos em.feito { background:rgba(61,220,151,.14); color:#3ddc97; }
+.agt-barra { height:4px; border-radius:99px; background:rgba(255,255,255,.07); margin-top:10px; overflow:hidden; }
+.agt-barra i { display:block; height:100%; width:4%; border-radius:99px; background:linear-gradient(90deg,#f6a350,#ffd166); transition:width 14s cubic-bezier(.1,.7,.2,1); }
+.agt.ok .agt-barra i { width:100% !important; background:linear-gradient(90deg,#3ddc97,#6ee7b7); transition:width .4s ease; }
+.agt.erro .agt-barra i { width:100% !important; background:#ff6b6b; transition:width .3s ease; }
+.agt-msg { font-size:.72rem; color:var(--text2); margin-top:8px; line-height:1.45; }
+.agt-bts { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; } .agt-bts:empty { display:none; }
+.agt-bts .btn { font-size:.7rem; padding:6px 11px; }
+.agt-x { position:absolute; right:8px; top:8px; width:24px; height:24px; border-radius:50%; border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:.8rem; }
+.agt-x:hover { background:rgba(255,255,255,.08); color:var(--text); }
+.agt-x:focus-visible, .agt-bts .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media (max-width:760px) { #agt-fila { right:12px; left:12px; width:auto; top:calc(10px + env(safe-area-inset-top, 0px)); } }
+
+.tl-ev.tl-pend, .sg-ev.tl-pend { border-style:dashed !important; opacity:.9; }
+.sg-ev.tl-pend { position:relative; }
+.tl-ev.tl-pend::after, .sg-ev.tl-pend::after { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(100deg, transparent 30%, rgba(255,255,255,.13) 50%, transparent 70%); background-size:250% 100%; animation:mvVarre 1.2s linear infinite; }
+@keyframes agNovo { 0% { box-shadow:0 0 0 0 rgba(61,220,151,.0); transform:scale(.96); } 25% { box-shadow:0 0 0 4px rgba(61,220,151,.55), 0 0 30px rgba(61,220,151,.45); transform:scale(1.03); }
+  100% { box-shadow:0 0 0 0 rgba(61,220,151,0); transform:none; } }
+.tl-ev.tl-novo, .sg-ev.tl-novo { animation:agNovo 1.8s ease-out !important; }
+
+#pl-festa::before { content:''; position:absolute; left:50%; top:50%; width:170vmax; height:170vmax; transform:translate(-50%,-50%); pointer-events:none;
+  background:repeating-conic-gradient(from 0deg, rgba(255,209,102,.075) 0deg 9deg, transparent 9deg 18deg); animation:fxRaios 16s linear infinite; }
+@keyframes fxRaios { to { transform:translate(-50%,-50%) rotate(360deg); } }
+#pl-festa .fx-info { margin:16px auto 0; display:flex; flex-direction:column; gap:4px; padding:12px 18px; border-radius:16px; max-width:420px;
+  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:#fff; }
+#pl-festa .fx-info b { font-size:1.08rem; font-weight:900; overflow-wrap:anywhere; }
+#pl-festa .fx-info span { font-size:.8rem; color:rgba(255,255,255,.78); font-weight:700; }
+
+@media (prefers-reduced-motion:reduce) {
+  #mv-barra, #mv-barra::after { transition:none; } #mv-onda { display:none !important; }
+  .mv-gravando .mv-roda, .mv-gravando .mv-varre, .mv-skb, .mv-skmsg i, .agt, .agt.sai, .agt-roda, .agt-passos em.vez, .agt.ok .agt-ico,
+  .tl-ev.tl-pend::after, .sg-ev.tl-pend::after, .tl-ev.tl-novo, .sg-ev.tl-novo, #pl-festa::before, .mv-atual, .mv-atual.sai { animation:none !important; }
+}
+</style>
+<script>
+// ---------- 🌈 BARRA NO TOPO + ONDA DE LUZ QUANDO CHEGA DADO NOVO ----------
+(function () {
+  var doc = document, barra = null, abertos = 0, tSobe = null, largura = 0;
+  var REDUZ = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function barraEl() { if (!barra) { barra = doc.createElement('div'); barra.id = 'mv-barra'; barra.setAttribute('aria-hidden', 'true'); doc.body.appendChild(barra); } return barra; }
+  // começa uma carga e devolve a função que a termina (a barra anda sozinha até ~90% e completa quando a última termina)
+  window.mvCarga = function () {
+    var acabou = false, b = barraEl();
+    abertos++;
+    if (abertos === 1) {
+      largura = Math.max(largura, 8);
+      b.style.transition = 'width .5s cubic-bezier(.22,1,.36,1), opacity .35s ease';
+      b.style.width = largura + '%'; b.classList.add('on');
+      clearInterval(tSobe); tSobe = setInterval(function () { largura += (90 - largura) * 0.12; b.style.width = largura + '%'; }, 400);
+    }
+    var seguro = setTimeout(terminar, 45000);
+    function terminar() {
+      if (acabou) return; acabou = true; clearTimeout(seguro);
+      abertos = Math.max(0, abertos - 1);
+      if (abertos) return;
+      clearInterval(tSobe); largura = 100; b.style.width = '100%';
+      setTimeout(function () {
+        if (abertos) return; b.classList.remove('on');
+        setTimeout(function () { if (abertos) return; b.style.transition = 'none'; b.style.width = '0'; largura = 0; }, 380);
+      }, 300);
+    }
+    return terminar;
+  };
+  window.mvOnda = function () {
+    if (REDUZ || doc.hidden) return;
+    var o = doc.getElementById('mv-onda');
+    if (!o) { o = doc.createElement('div'); o.id = 'mv-onda'; o.setAttribute('aria-hidden', 'true'); doc.body.appendChild(o); }
+    o.innerHTML = '<i></i>'; o.style.display = 'block';
+    clearTimeout(o._t); o._t = setTimeout(function () { o.style.display = 'none'; o.innerHTML = ''; }, 1250);
+  };
+  // "✓ atualizado 11:58" no topo por 3 s
+  window.mvAtualizado = function (txt) {
+    var tr = doc.querySelector('.topbar-right'); if (!tr) return;
+    var s = doc.getElementById('mv-atual');
+    if (s) s.remove();
+    s = doc.createElement('span'); s.id = 'mv-atual'; s.className = 'mv-atual'; s.setAttribute('role', 'status');
+    var h = new Date();
+    s.textContent = '✓ ' + (txt || 'atualizado') + ' ' + ('0' + h.getHours()).slice(-2) + ':' + ('0' + h.getMinutes()).slice(-2);
+    tr.insertBefore(s, tr.firstChild);
+    setTimeout(function () { s.classList.add('sai'); setTimeout(function () { s.remove(); }, 360); }, 3000);
+  };
+  // tudo o que fala com o robô (Apps Script) ou lê a planilha acende a barra
+  var _fetch = window.fetch;
+  if (_fetch) window.fetch = function (a) {
+    var u = typeof a === 'string' ? a : (a && a.url) || '';
+    var p = _fetch.apply(this, arguments);
+    if (/script\.google(usercontent)?\.com|docs\.google\.com\/spreadsheets/.test(u)) { var fim = window.mvCarga(); p.then(fim, fim); }
+    return p;
+  };
+  if (typeof window.sendToGAS === 'function') {
+    var _s = window.sendToGAS;
+    window.sendToGAS = function () { var fim = window.mvCarga(), p = _s.apply(this, arguments); p.then(fim, fim); return p; };
+  }
+  // a planilha de vendas chega por <script> (não por fetch): começa no carregarV2, termina quando ela responde
+  function assinatura() {
+    var rs = (window.V2 && V2.rows) || [], h = rs.length;
+    for (var i = 0; i < rs.length; i++) { var s = String(rs[i].status || '') + String(rs[i].nome || ''); for (var j = 0; j < s.length; j += 2) h = (h * 31 + s.charCodeAt(j)) | 0; }
+    return h;
+  }
+  var fimV2 = null, antes = null, jaVeio = false;
+  if (typeof window.carregarV2 === 'function') {
+    var _c = window.carregarV2;
+    window.carregarV2 = function () {
+      if (fimV2) fimV2();
+      fimV2 = window.mvCarga();
+      try { antes = assinatura(); } catch (e) { antes = null; }
+      return _c.apply(this, arguments);
+    };
+  }
+  if (typeof window.__gvizV2 === 'function') {
+    var _g = window.__gvizV2;
+    window.__gvizV2 = function (resp, guardado) {
+      try { return _g.apply(this, arguments); }
+      finally {
+        if (!guardado) {
+          if (fimV2) { fimV2(); fimV2 = null; }
+          try {
+            var mudou = antes !== null && assinatura() !== antes;
+            if (jaVeio && mudou) { window.mvOnda(); window.mvAtualizado('dados novos'); }
+            jaVeio = true;
+          } catch (e) {}
+        }
+      }
+    };
+  }
+})();
+
+// ---------- ⏳ BOTÕES "GRAVANDO…" EM TODO O DASH ----------
+// qualquer botão que o dash troca para "⏳ algo…" ganha rodinha girando e um brilho passando (o texto continua o mesmo)
+(function () {
+  var doc = document;
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function ehBotao(el) {
+    return !!(el && el.nodeType === 1 && (el.tagName === 'BUTTON' || (el.classList && (el.classList.contains('btn') || el.classList.contains('ld-selo'))) || el.getAttribute('role') === 'button'));
+  }
+  function checar(el) {
+    if (!ehBotao(el)) return;
+    var t = el.textContent || '';
+    if (el._mvTxt !== undefined && t === el._mvTxt && el.classList.contains('mv-gravando')) return;   // fui eu que mudei
+    var gravando = /^\s*⏳/.test(t) && (/…|\.\.\./.test(t) || el.disabled);
+    if (gravando) {
+      el.classList.add('mv-gravando'); el.setAttribute('aria-busy', 'true');
+      if (!el.children.length) el.innerHTML = '<i class="mv-roda" aria-hidden="true"></i>' + esc(t.replace(/^\s*⏳\s*/, '')) + '<i class="mv-varre" aria-hidden="true"></i>';
+      el._mvTxt = el.textContent;
+    } else if (el.classList.contains('mv-gravando')) {
+      el.classList.remove('mv-gravando'); el.removeAttribute('aria-busy'); el._mvTxt = undefined;
+    }
+  }
+  function olhar() {
+    new MutationObserver(function (ms) {
+      for (var i = 0; i < ms.length; i++) {
+        var t = ms[i].target; if (t && t.nodeType === 3) t = t.parentElement;
+        if (!t || t.nodeType !== 1) continue;
+        var b = t.closest ? t.closest('button, .btn, .ld-selo, [role="button"]') : null;
+        if (b) checar(b);
+      }
+    }).observe(doc.body, { childList: true, characterData: true, subtree: true });
+  }
+  if (doc.body) olhar(); else doc.addEventListener('DOMContentLoaded', olhar);
+})();
+
+// ---------- 🦴 TELA TODA CARREGANDO (o desenho da tela brilhando enquanto os dados chegam) ----------
+function mvSkTela(tipo, msg) {
+  var e = function (t) { return String(t).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); };
+  var h = '<div class="mv-sktela" role="status" aria-live="polite"><div class="mv-skmsg"><i aria-hidden="true"></i>' + e(msg || 'Carregando…') + '</div>';
+  if (tipo === 'agenda') {
+    h += '<div class="mv-skag" aria-hidden="true">';
+    for (var c = 0; c < 6; c++) {
+      h += '<div><span class="mv-skb" style="height:54px;animation-delay:' + (c * 80) + 'ms"></span>';
+      for (var k = 0, n = 3 + (c * 5) % 3; k < n; k++) h += '<span class="mv-skb" style="height:' + (70 + ((c + 2) * (k + 3) * 23) % 70) + 'px;animation-delay:' + ((c * 90 + k * 70) % 700) + 'ms"></span>';
+      h += '</div>';
+    }
+    h += '</div>';
+  } else if (tipo === 'cards') {
+    h += '<div class="mv-skcards" aria-hidden="true">';
+    for (var i = 0; i < 12; i++) h += '<div class="mv-skcard"><span class="mv-skb" style="aspect-ratio:16/9;animation-delay:' + (i * 70 % 700) + 'ms"></span><span class="mv-skb" style="height:14px;width:78%"></span><span class="mv-skb" style="height:11px;width:52%"></span></div>';
+    h += '</div>';
+  } else {
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;" aria-hidden="true">';
+    for (var j = 0; j < 4; j++) h += '<span class="mv-skb" style="height:96px;animation-delay:' + (j * 90) + 'ms"></span>';
+    h += '</div><span class="mv-skb" style="height:220px" aria-hidden="true"></span>';
+    for (var l = 0; l < 6; l++) h += '<span class="mv-skb" style="height:46px;animation-delay:' + (l * 80) + 'ms" aria-hidden="true"></span>';
+  }
+  return h + '</div>';
+}
+
+// ---------- ⚡ AGENDAR NA HORA ----------
+var AG_GRAVANDO = 0;
+window.addEventListener('beforeunload', function (ev) { if (AG_GRAVANDO > 0) { ev.preventDefault(); ev.returnValue = ''; } });
+function agEsc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function agQuandoTxt(dataBr, hora) {
+  var dp = String(dataBr || '').split('/'); if (dp.length !== 3) return dataBr + ' ' + (hora || '');
+  var d = new Date(+dp[2], +dp[1] - 1, +dp[0]), sem = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  return sem[d.getDay()] + ' ' + dp[0] + '/' + dp[1] + (hora ? ' às ' + hora : '');
+}
+// a reunião entra na agenda na hora, "gravando…", até o robô confirmar
+function agPendenteAdd(ctx, pedido) {
+  if (typeof AG === 'undefined' || !AG.cache) return null;
+  var dp = String(ctx.dataBr || '').split('/'); if (dp.length !== 3 || !ctx.hora) return null;
+  var wk = agDataStr(agSegunda(new Date(+dp[2], +dp[1] - 1, +dp[0]))), data = AG.cache[wk];
+  if (!data) return null;   // semana que ainda não foi aberta: ela já vem certa quando abrir
+  var ini = agMin(ctx.hora), dur = +ctx.dur || 60, fim = ini + dur;
+  var hh = function (m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); };
+  var pre = (pedido && pedido.calendar && pedido.calendar.prefixoTitulo) || 'Diagnostico';
+  var ev = { id: 'pend-' + Date.now(), title: pre + ' - ' + ctx.nome + ' | Equipe João Stecca' + (ctx.sdr ? ' (' + ctx.sdr + ')' : ''),
+    date: dp[2] + '-' + dp[1] + '-' + dp[0], startTime: ctx.hora, endTime: hh(fim), duration: dur, status: 'agendada', _statusExplicit: true, _pend: true };
+  (data[ctx.agenda] = data[ctx.agenda] || []).push(ev);
+  var P = { wk: wk, ev: ev, agenda: ctx.agenda };
+  agPendenteRedesenhar(P);
+  return P;
+}
+function agPendenteRedesenhar(P) { try { if (P && AG.weekStart && agDataStr(AG.weekStart) === P.wk && AG.cache[P.wk]) renderSemanaV2(AG.cache[P.wk]); } catch (e) {} }
+function agPendenteConfirmar(P) { if (!P) return; P.ev._pend = false; P.ev._novo = true; agPendenteRedesenhar(P); setTimeout(function () { P.ev._novo = false; }, 2500); }
+function agPendenteTirar(P) {
+  if (!P) return;
+  var arr = AG.cache[P.wk] && AG.cache[P.wk][P.agenda];
+  if (arr) { var i = arr.indexOf(P.ev); if (i !== -1) arr.splice(i, 1); }
+  agPendenteRedesenhar(P);
+}
+// relê do Google a semana da reunião (sem apagar o que está na tela)
+function agRecarregarSemanaDe(dataBr, ms) {
+  var dp = String(dataBr || '').split('/'); if (dp.length !== 3) return;
+  var wk = agDataStr(agSegunda(new Date(+dp[2], +dp[1] - 1, +dp[0])));
+  setTimeout(function () {
+    agBuscar(wk, function (err, data) { if (!err && data && AG.weekStart && agDataStr(AG.weekStart) === wk) renderSemanaV2(data); });
+  }, ms || 0);
+}
+function agIrPara(dataBr) {
+  var dp = String(dataBr || '').split('/');
+  var item = document.querySelector('.nav-item[data-s="agenda"]'); if (item) item.click();
+  if (dp.length === 3) { AG.weekStart = agSegunda(new Date(+dp[2], +dp[1] - 1, +dp[0])); carregarAgenda(); }
+}
+// cartão no canto: planilha → agenda → Meet → avisos
+function agTarefaNova(ctx) {
+  var fila = document.getElementById('agt-fila');
+  if (!fila) { fila = document.createElement('div'); fila.id = 'agt-fila'; fila.setAttribute('aria-live', 'polite'); document.body.appendChild(fila); }
+  var el = document.createElement('div'); el.className = 'agt'; el.setAttribute('role', 'status');
+  el.innerHTML = '<div class="agt-ico"><i class="agt-roda" aria-hidden="true"></i></div><div class="agt-txt">'
+    + '<b>Agendando ' + agEsc(String(ctx.nome || 'a reunião').split(' ')[0]) + '…</b>'
+    + '<span>' + agEsc(agQuandoTxt(ctx.dataBr, ctx.hora) + (ctx.closerNome ? ' · com ' + String(ctx.closerNome).split(' ')[0] : '')) + '</span>'
+    + '<div class="agt-passos"><em class="vez">📄 Planilha</em><em>📅 Agenda</em><em>🎥 Meet</em><em>📲 Avisos</em></div>'
+    + '<div class="agt-barra"><i></i></div><div class="agt-msg" hidden></div><div class="agt-bts"></div></div>'
+    + '<button class="agt-x" aria-label="Fechar aviso" title="Fechar este aviso (a gravação continua)">✕</button>';
+  fila.appendChild(el);
+  el.querySelector('.agt-x').onclick = function () { agTarefaFechar(el); };
+  requestAnimationFrame(function () { requestAnimationFrame(function () { var i = el.querySelector('.agt-barra i'); if (i) i.style.width = '88%'; }); });
+  var passos = el.querySelectorAll('.agt-passos em'), n = 0;
+  el._t = setInterval(function () {
+    if (n >= passos.length - 1) { clearInterval(el._t); return; }
+    passos[n].classList.remove('vez'); passos[n].classList.add('feito'); n++; passos[n].classList.add('vez');
+  }, 2400);
+  return el;
+}
+function agTarefaFechar(el) { if (!el || el._fechando) return; el._fechando = true; clearInterval(el._t); clearTimeout(el._auto); el.classList.add('sai'); setTimeout(function () { el.remove(); }, 320); }
+function agTarefaBotoes(el, lista) {
+  var box = el.querySelector('.agt-bts'); box.innerHTML = '';
+  lista.forEach(function (b) {
+    var bt = document.createElement('button'); bt.className = 'btn' + (b.prim ? ' primary' : ''); bt.textContent = b.t;
+    bt.onclick = function () { b.ao(bt); }; box.appendChild(bt);
+  });
+}
+function agTarefaOk(el, ctx) {
+  clearInterval(el._t);
+  el.classList.remove('erro'); el.classList.add('ok');
+  el.querySelectorAll('.agt-passos em').forEach(function (e) { e.classList.remove('vez'); e.classList.add('feito'); });
+  el.querySelector('.agt-ico').innerHTML = '✅';
+  el.querySelector('.agt-txt > b').textContent = 'Reunião agendada: ' + String(ctx.nome || '').split(' ')[0];
+  agTarefaBotoes(el, [
+    { t: '📲 Mensagem do grupo', ao: function () { try { abrirZap(); } catch (e) {} } },
+    { t: '📅 Ver na agenda', ao: function () { agIrPara(ctx.dataBr); agTarefaFechar(el); } }
+  ]);
+  el._auto = setTimeout(function () { if (!el.matches(':hover')) agTarefaFechar(el); else el.addEventListener('mouseleave', function () { agTarefaFechar(el); }, { once: true }); }, 9000);
+}
+function agTarefaErro(el, titulo, texto, tentar, esperaSeg) {
+  clearInterval(el._t);
+  el.classList.remove('ok'); el.classList.add('erro');
+  el.querySelector('.agt-ico').innerHTML = '⚠️';
+  el.querySelector('.agt-txt > b').textContent = titulo;
+  var m = el.querySelector('.agt-msg'); m.hidden = false; m.textContent = texto;
+  var bts = [];
+  if (tentar) bts.push({ t: '↻ Tentar de novo', prim: true, ao: function (bt) { if (bt.disabled) return; agTarefaFechar(el); tentar(); } });
+  bts.push({ t: 'Fechar', ao: function () { agTarefaFechar(el); } });
+  agTarefaBotoes(el, bts);
+  var bt0 = tentar && el.querySelector('.agt-bts .btn');
+  if (bt0 && esperaSeg) {   // o robô ainda pode estar gravando: espera antes de deixar mandar de novo (não duplica)
+    var falta = esperaSeg; bt0.disabled = true; bt0.textContent = '↻ Tentar de novo (em ' + falta + ' s)';
+    var tm = setInterval(function () { falta--; if (falta <= 0 || !document.body.contains(bt0)) { clearInterval(tm); bt0.disabled = false; bt0.textContent = '↻ Tentar de novo'; return; } bt0.textContent = '↻ Tentar de novo (em ' + falta + ' s)'; }, 1000);
+  }
+}
+function agTarefaConferindo(el) {
+  el.querySelector('.agt-txt > b').textContent = 'O robô demorou — conferindo se entrou na agenda…';
+}
+// festa em tela cheia para quem marcou, com a foto e os dados da reunião (e o placar não repete quando a planilha trouxer a mesma)
+function agFestaMarcou(ctx) {
+  if (typeof plComemorar !== 'function') return;
+  var eu = ''; try { eu = localStorage.getItem('v2Login') || ''; } catch (e) {}
+  var quem = plPessoa(ctx.sdr || '') || plPessoa(eu) || 'Time';
+  if (ctx.sdr) try {
+    var k = 's:' + v2norm(plPessoa(ctx.sdr)), ch = _plVistoChave();
+    var visto = JSON.parse(localStorage.getItem(ch) || 'null') || {};
+    var base = Math.max((visto[k] && visto[k].marc) || 0, (PL_PREV && PL_PREV[k] && PL_PREV[k].marc) || 0);
+    visto[k] = Object.assign({ nome: plPessoa(ctx.sdr) }, visto[k] || {}, { marc: base + 1 });
+    localStorage.setItem(ch, JSON.stringify(visto));
+    if (PL_PREV) PL_PREV[k] = Object.assign({ nome: plPessoa(ctx.sdr) }, PL_PREV[k] || {}, { marc: base + 1 });
+  } catch (e) {}
+  plComemorar('marcou', quem, 1, { lead: ctx.nome, quando: agQuandoTxt(ctx.dataBr, ctx.hora), closer: ctx.closerNome });
+}
+function agNaHora(pedido, ctx, depois) {
+  try { fecharAgendar(); } catch (e) {}
+  var P = null; try { P = agPendenteAdd(ctx, pedido); } catch (e) {}
+  var el = agTarefaNova(ctx);
+  AG_GRAVANDO++;
+  var terminou = false;
+  function sucesso() {
+    if (terminou) return; terminou = true; AG_GRAVANDO = Math.max(0, AG_GRAVANDO - 1);
+    agPendenteConfirmar(P);
+    agTarefaOk(el, ctx);
+    try { depois(); } catch (e) {}
+    try { agFestaMarcou(ctx); } catch (e) {}
+  }
+  function falha(titulo, texto, podeTentar, esperaSeg) {
+    if (terminou) return; terminou = true; AG_GRAVANDO = Math.max(0, AG_GRAVANDO - 1);
+    agPendenteTirar(P);
+    agTarefaErro(el, titulo, texto, podeTentar ? function () { agNaHora(pedido, ctx, depois); } : null, esperaSeg);
+  }
+  gravarComResposta(pedido, 45000).then(function (res) {
+    if (res && res.success) { sucesso(); return; }
+    if (res && res._semResposta) {
+      agTarefaConferindo(el);
+      setTimeout(function () {
+        conferirSeEntrou(ctx.agenda, ctx.dataBr, ctx.nome, function (entrou, falhou) {
+          if (entrou) { sucesso(); return; }
+          if (falhou) falha('Não consegui confirmar', 'O robô não respondeu e não consegui conferir a agenda. Abra o Google Agenda do closer: se a reunião de ' + ctx.nome + ' NÃO estiver lá, agende de novo.', false);
+          else falha('Não entrou na agenda', 'O robô não respondeu e a reunião de ' + ctx.nome + ' NÃO entrou. Nada foi criado.', true, 45);
+        });
+      }, 8000);
+      return;
+    }
+    falha('Não consegui gravar', 'O robô respondeu com erro: ' + ((res && res.error) || 'sem detalhe') + '. Nada foi criado.', true, 0);
+  });
+}
+</script>
 
 </body>
 </html>
