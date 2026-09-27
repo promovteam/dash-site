@@ -2590,7 +2590,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-0046';
+var VERSAO_DASH = '2026-09-27-0056';
 var _versaoNova = null;
 
 // =====================================================================
@@ -19532,10 +19532,12 @@ function plAgEventos(wk, cb) {
   if (c && Date.now() - c.t < 180000) { cb(c.data); return; }
   if (PL_AG.buscando[k]) { cb(null); return; }   // ja tem uma busca desta semana no ar
   PL_AG.buscando[k] = true;
-  fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + k + '&_t=' + Date.now(), { redirect: 'follow' })
-    .then(function(r){ return r.json(); })
-    .then(function(data){ PL_AG.buscando[k] = false; if (data && data.success) { PL_AG.cache[k] = { t: Date.now(), data: data }; cb(data); } else cb(null); })
-    .catch(function(){ PL_AG.buscando[k] = false; cb(null); });
+  // 27/09/2026: usa a mesma busca da Agenda (agBuscar) — ao abrir o dash, o placar e a agenda pediam a MESMA semana
+  // ao robô ao mesmo tempo (2 pedidos iguais de ~3 s disputando o robô com os outros); agora vai um só e os dois usam
+  agBuscar(k, function(err, data) {
+    PL_AG.buscando[k] = false;
+    if (!err && data && data.success) { PL_AG.cache[k] = { t: Date.now(), data: data }; cb(data); } else cb(null);
+  });
 }
 function plEvDataStr(r) { return r.date ? (r.date.getFullYear() + '-' + String(r.date.getMonth() + 1).padStart(2, '0') + '-' + String(r.date.getDate()).padStart(2, '0')) : ''; }
 // SDR que aparece no titulo do evento: "... | Equipe Joao Stecca (Selina)"
