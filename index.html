@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-1015';
+var VERSAO_DASH = '2026-09-28-1025';
 var _versaoNova = null;
 
 // =====================================================================
@@ -20847,23 +20847,45 @@ function plVer(tipo, chave, met, _denovo) {
     + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
     + '<div class="hint" style="margin-bottom:10px;">' + (met === 'vd' ? 'Vendas pela data em que foram vendidas (carimbo da venda ou formulário de pagamento). 💳 = só no formulário, sem linha na aba Vendas.' : 'Exatamente as linhas da aba Vendas que entraram nessa conta.') + ' Clique no nome para abrir a ficha.</div>';
   if (!rows.length) h += '<div class="pl-vazio">Nenhuma</div>';
+  // 28/09/2026 (Bruno: "melhore a experiência de visualização desta parte"): cada reunião vira um cartão — horário grande à
+  // esquerda, nome e pessoas no meio, status colorido e valor à direita, histórico numa linha discreta; agrupado por dia
+  var semD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], diaAnt = null;
+  var esc = function(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var dd = function(t) { var x = new Date(t); return ('0' + x.getDate()).slice(-2) + '/' + ('0' + (x.getMonth() + 1)).slice(-2); };
+  var stCls = function(r) { var sn = r.sn || ''; if (r._pag || sn === 'vendido') return 'vd'; if (sn === 'no show') return 'ns'; if (/bloqueio|entrada/.test(sn)) return 'bl'; if (_fsRealizada(sn)) return 're'; if (/remarc/.test(sn)) return 'rm'; return 'ag'; };
+  var porDia = {};
+  if (met !== 'marc') rows.forEach(function(r) { var k = r.date ? r.date.toDateString() : '—'; porDia[k] = (porDia[k] || 0) + 1; });
   rows.forEach(function(r, iRow) {
     var iR = r._agenda ? -1 : v2reg(r);
     var hora = horas[iRow] || '';
-    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);margin-bottom:6px;font-size:.76rem;">'
-      + (r._agenda ? '<b style="color:#f6a350;" title="Evento cinza na agenda sem linha na planilha">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + ' 📆</b>'
-        : r._pag ? '<b style="color:#3ddc97;" title="Venda registrada no formulário de pagamento, sem linha na aba Vendas">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + ' 💳</b>'
-        : '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')">' + (r.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>')
-      + '<span class="hint" style="margin:0;">' + (r.leadId || '') + '</span>'
-      + (r._pag ? '<span class="hint" style="margin:0;">💳 formulário de pagamento em ' + fmt(r.date ? r.date.getTime() : null) + '</span>'
-        : '<span class="hint" style="margin:0;">reunião ' + fmt(r.date ? r.date.getTime() : null) + (hora ? ' <b style="color:#ffd166;">' + hora + '</b>' : (semanasFaltando.length && !_denovo ? ' <i style="opacity:.6;">⏳</i>' : '')) + '</span>'
-        + '<span class="hint" style="margin:0;">marcada em ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : '') + '</span>')
-      + (met === 'vd' && !r._pag && plDataVenda(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#3ddc97;">venda em ' + fmt(plDataVenda(r)) + '</span>' : '')
-      + ((met === 'ns' || met === 'todas') && r.sn === 'no show' && plDataNoShow(r) !== (r.date ? r.date.getTime() : null) ? '<span class="hint" style="margin:0;color:#ffd166;">no-show em ' + fmt(plDataNoShow(r)) + ' · remarcada</span>' : '')
-      + '<span class="ld-tag"' + (met === 'todas' ? ' style="color:' + (r.sn === 'no show' ? '#ff6b6b' : _fsRealizada(r.sn) ? '#6ea8ff' : '#ffd166') + ';"' : '') + '>' + (r.status || '') + '</span>'
-      + '<span class="hint" style="margin:0;">' + (tipo === 'sdr' ? 'closer ' + (r.closer || '—') : (tipo === 'closer' ? 'SDR ' + (plPessoa(r.sdr) || '—') : 'closer ' + (r.closer || '—') + ' · SDR ' + (plPessoa(r.sdr) || '—'))) + '</span>'
-      + ((r.valor || r._valorDoForm) ? '<span class="ld-tag" style="color:#ffd166;">' + v2moeda0(r.valor || r._valorDoForm) + '</span>' : '')
-      + (met === 'pend' ? '<span style="margin-left:auto;display:flex;gap:6px;">'
+    if (met !== 'marc') {
+      var kD = r.date ? r.date.toDateString() : '—';
+      if (kD !== diaAnt) {
+        diaAnt = kD;
+        h += '<div class="plv-dia"><b>' + (r.date ? semD[r.date.getDay()] + ' ' + dd(r.date.getTime()) : 'sem data') + '</b><span>' + porDia[kD] + (porDia[kD] === 1 ? ' reunião' : ' reuniões') + '</span></div>';
+      }
+    }
+    var nome = esc(r.nome || 'Sem nome');
+    var nomeH = r._agenda ? '<b class="plv-nome" title="Evento cinza na agenda sem linha na planilha">' + nome + ' 📆</b>'
+      : r._pag ? '<b class="plv-nome vd" title="Venda registrada no formulário de pagamento, sem linha na aba Vendas">' + nome + ' 💳</b>'
+      : '<b class="plv-nome click" role="button" tabindex="0" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')" title="Abrir a ficha">' + nome + '</b>';
+    var hist = [];
+    if (r._pag) hist.push('💳 formulário de pagamento em ' + fmt(r.date ? r.date.getTime() : null));
+    else {
+      if (met === 'marc') hist.push('reunião ' + fmt(r.date ? r.date.getTime() : null));
+      hist.push('marcada ' + (r.carimbo ? String(r.carimbo).slice(0, 16) : '—') + (plDataMarcacao(r) !== r.carimboT ? ' (carimbo tardio → vale o dia da reunião)' : ''));
+    }
+    if (met === 'vd' && !r._pag && plDataVenda(r) !== (r.date ? r.date.getTime() : null)) hist.push('<em class="g">venda em ' + fmt(plDataVenda(r)) + '</em>');
+    if ((met === 'ns' || met === 'todas') && r.sn === 'no show' && plDataNoShow(r) !== (r.date ? r.date.getTime() : null)) hist.push('<em class="y">no-show em ' + fmt(plDataNoShow(r)) + ' · remarcada</em>');
+    var pess = tipo === 'sdr' ? [['closer', r.closer]] : tipo === 'closer' ? [['SDR', plPessoa(r.sdr)]] : [['closer', r.closer], ['SDR', plPessoa(r.sdr)]];
+    var val = r.valor || r._valorDoForm;
+    h += '<div class="plv-it st-' + stCls(r) + '">'
+      + '<div class="plv-hora">' + (r._pag ? '<b>💳</b>' : '<b>' + (hora || (semanasFaltando.length && !_denovo ? '⏳' : '—')) + '</b>') + (met === 'marc' && r.date ? '<small>' + semD[r.date.getDay()] + ' ' + dd(r.date.getTime()) + '</small>' : '') + '</div>'
+      + '<div class="plv-meio"><div class="plv-l1">' + nomeH + (r.leadId ? '<span class="plv-id">' + esc(r.leadId) + '</span>' : '') + '</div>'
+      +   '<div class="plv-pess">' + pess.map(function(q) { return '<span>' + (q[1] ? tmMini(q[1]) : '') + '<i>' + q[0] + '</i> ' + esc(String(q[1] || '—').split(' ')[0]) + '</span>'; }).join('') + '</div>'
+      +   '<div class="plv-hist">' + hist.join(' · ') + '</div></div>'
+      + '<div class="plv-dir"><span class="plv-st">' + esc(r.status || (r._pag ? 'Vendido (formulário)' : '')) + '</span>' + (val ? '<b class="plv-val">' + v2moeda0(val) + '</b>' : '') + '</div>'
+      + (met === 'pend' ? '<span class="plv-bts">'
           + '<button class="btn-assumir" style="padding:5px 10px;font-size:.7rem;background:rgba(255,107,107,.16);color:#ff6b6b;border:1px solid rgba(255,107,107,.5);" onclick="event.stopPropagation();plMarcarNoShow(' + iR + ', this)">🤦 No-show</button>'
           + '<button class="btn-assumir" style="padding:5px 10px;font-size:.7rem;" onclick="event.stopPropagation();this.closest(\'.modal-overlay\').remove();abrirLead(' + iR + ')" title="Abre a ficha para marcar vendido, não vendido, bloqueio…">✅ compareceu → ficha</button></span>' : '')
       + '</div>';
@@ -26388,5 +26410,39 @@ function rlImprimir() {
   setInterval(function () { if (!document.hidden) carregar(); }, 15 * 60000);
 })();
 </script>
+<style>
+/* 🔎 lista de reuniões do Placar em cartões (28/09/2026) */
+.plv-dia { display:flex; align-items:baseline; gap:8px; margin:14px 2px 6px; padding-bottom:5px; border-bottom:1px solid rgba(255,255,255,.07); }
+.plv-dia:first-of-type { margin-top:4px; }
+.plv-dia b { font-size:.78rem; font-weight:900; text-transform:uppercase; letter-spacing:1px; color:var(--text); }
+.plv-dia span { font-size:.68rem; color:var(--muted); font-weight:700; }
+.plv-it { --c:#ffd166; position:relative; display:grid; grid-template-columns:62px minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 12px 10px 14px; margin-bottom:7px;
+  border-radius:14px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07); overflow:hidden; transition:background .15s ease, border-color .15s ease; }
+.plv-it::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--c); }
+.plv-it:hover { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.14); }
+.plv-it.st-ns { --c:#ff6b6b; } .plv-it.st-re { --c:#6ea8ff; } .plv-it.st-vd { --c:#3ddc97; } .plv-it.st-bl { --c:#b98aff; } .plv-it.st-rm { --c:#ff9a5a; } .plv-it.st-ag { --c:#ffd166; }
+.plv-hora { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding:6px 0; border-radius:10px; background:rgba(0,0,0,.25); }
+.plv-hora b { font-size:1rem; font-weight:900; font-variant-numeric:tabular-nums; color:var(--text); }
+.plv-hora small { font-size:.58rem; color:var(--muted); font-weight:800; }
+.plv-meio { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.plv-l1 { display:flex; align-items:baseline; gap:7px; min-width:0; }
+.plv-nome { font-size:.88rem; font-weight:900; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.plv-nome.click { cursor:pointer; color:#8fbaff; } .plv-nome.click:hover { text-decoration:underline; } .plv-nome.vd { color:#3ddc97; }
+.plv-nome.click:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+.plv-id { flex:none; font-size:.62rem; font-weight:800; color:var(--muted); padding:1px 6px; border-radius:6px; background:rgba(255,255,255,.05); }
+.plv-pess { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:.7rem; color:var(--text2); font-weight:700; }
+.plv-pess span { display:inline-flex; align-items:center; gap:4px; }
+.plv-pess i { font-style:normal; font-size:.58rem; font-weight:900; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+.plv-hist { font-size:.64rem; color:var(--muted); font-weight:600; line-height:1.45; }
+.plv-hist em { font-style:normal; font-weight:800; } .plv-hist em.g { color:#3ddc97; } .plv-hist em.y { color:#ffd166; }
+.plv-dir { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+.plv-st { font-size:.64rem; font-weight:900; padding:3px 9px; border-radius:999px; white-space:nowrap; color:var(--c); background:color-mix(in srgb, var(--c) 14%, transparent); }
+.plv-val { font-size:.86rem; font-weight:900; color:#ffd166; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.plv-bts { grid-column:1 / -1; display:flex; gap:6px; justify-content:flex-end; }
+@media (max-width:560px) {
+  .plv-it { grid-template-columns:52px minmax(0,1fr); }
+  .plv-dir { grid-column:2; flex-direction:row; align-items:center; justify-content:flex-start; }
+}
+</style>
 </body>
 </html>
