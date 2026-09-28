@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-0915';
+var VERSAO_DASH = '2026-09-28-0925';
 var _versaoNova = null;
 
 // =====================================================================
@@ -16884,11 +16884,10 @@ function gvOndeEsta() {
 function avEventosAgora() {
   if (typeof AG === 'undefined' || !AG.cache) return null;
   var hoje = new Date(), wk = agDataStr(agSegunda(hoje)), data = AG.cache[wk]; if (!data) return null;
-  var dia = agDataStr(hoje), agora = hoje.getHours() * 60 + hoje.getMinutes(), vivos = [], prox = [];
+  var dia = agDataStr(hoje), agora = hoje.getHours() * 60 + hoje.getMinutes(), vivos = [], prox = [], porCk = {};
   closerKeys().forEach(function(ck) {
     (data[ck] || []).forEach(function(e) {
       if (e.date !== dia || e._pend) return;
-      if (/no.?show|remarcad/.test(v2norm(e.status || ''))) return;
       if (/reuni[aã]o\s+comercial/i.test(e.title || '')) return;   // a reunião interna do time
       try {
         if (agEhCompromisso({ title: e.title, status: e._st0 !== undefined ? e._st0 : e.status, meetLink: e.meetLink, leadTag: e.leadTag, tel8: e.tel8,
@@ -16897,44 +16896,65 @@ function avEventosAgora() {
       var ini = agMin(String(e.startTime || '').slice(0, 5)), fim = agMin(String(e.endTime || '').slice(0, 5));
       if (!(fim > ini)) fim = ini + (e.duration || 60);
       var o = { e: e, ck: ck, ini: ini, fim: fim };
-      if (ini <= agora && agora < fim) vivos.push(o);
-      else if (ini > agora && ini - agora <= 90) prox.push(o);
+      // 28/09/2026 (Bruno: "mostre a atual e a próxima"): além da reunião de agora, a PRÓXIMA de cada closer; a que está
+      // no horário mas foi marcada no-show/remarcada aparece como alerta (a pessoa pode ter entrado atrasada)
+      var ns = /no.?show|remarcad/.test(v2norm(e.status || ''));
+      var P = porCk[ck] || (porCk[ck] = { ck: ck, vivos: [], prox: null, ns: [] });
+      if (ini <= agora && agora < fim) { if (ns) P.ns.push(o); else { vivos.push(o); P.vivos.push(o); } }
+      else if (ini > agora && !ns) { if (!P.prox || ini < P.prox.ini) P.prox = o; if (ini - agora <= 90) prox.push(o); }
     });
   });
   vivos.sort(function(a, b) { return a.ini - b.ini; }); prox.sort(function(a, b) { return a.ini - b.ini; });
-  return { vivos: vivos, prox: prox, agora: agora };
+  return { vivos: vivos, prox: prox, agora: agora, porCk: porCk };
 }
 function avHora(m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); }
+function avCardHtml(o, r, i, tipo) {
+  var ev = o.e, e = gravEsc, nome = agNomeDoEvento(ev.title), pt = gravPartes(ev.title);
+  var rL = null; try { rL = leadDoEvento(ev); } catch (eL) {}
+  var ig = ''; try { ig = gvInstaLimpo(ev.instagram || '') || (rL ? crInstaDe(rL, rL) : ''); } catch (eI) {}
+  var tel = (rL && rL.telefone) || ev.tel8 || '', iR = rL ? v2reg(rL) : -1;
+  var tempo = '';
+  if (tipo === 'vivo') {
+    var passou = r.agora - o.ini, pct = Math.min(100, Math.max(0, passou / Math.max(1, o.fim - o.ini) * 100));
+    tempo = '<div class="av-tempo"><span>começou há ' + passou + ' min · ' + avHora(o.ini) + '</span><span>até ' + avHora(o.fim) + '</span></div><div class="av-barra"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
+  } else if (tipo === 'ns') {
+    tempo = '<div class="av-aviso">⚠️ ' + avHora(o.ini) + ' a ' + avHora(o.fim) + ' · marcada como <b>' + (/remarcad/.test(v2norm(ev.status || '')) ? 'remarcada' : 'no-show') + '</b> — se a pessoa entrou atrasada, dá para entrar e mudar o status na agenda</div>';
+  } else {
+    var falta = o.ini - r.agora;
+    tempo = '<div class="av-tempo"><span>começa às ' + avHora(o.ini) + ' · em ' + (falta >= 60 ? Math.floor(falta / 60) + ' h' + (falta % 60 ? ' ' + (falta % 60) + ' min' : '') : falta + ' min') + '</span><span>até ' + avHora(o.fim) + '</span></div>';
+  }
+  var tag = tipo === 'vivo' ? '<em class="av-tag">AO VIVO</em>' : tipo === 'ns' ? '<em class="av-tag ns">NO-SHOW?</em>' : '<em class="av-tag prox">A SEGUIR</em>';
+  return '<div class="av-card ' + tipo + '">'
+    + '<div class="av-l1"><div><b title="' + e(nome) + '">' + e(nome) + '</b><span>' + (pt.sdr ? 'SDR ' + e(pt.sdr) : '') + (rL && rL.produto ? (pt.sdr ? ' · ' : '') + e(String(rL.produto).replace(/^(programa|mentoria)\s+/i, '')) : '') + '</span></div>' + tag + '</div>'
+    + tempo
+    + '<div class="av-acts">'
+    +   (ev.meetLink ? '<a class="btn' + (tipo === 'prox' ? '' : ' primary') + '" href="' + e(ev.meetLink) + '" target="_blank" rel="noopener" title="Abre o Meet numa aba nova — desligue câmera e microfone antes de clicar em Participar">' + (tipo === 'prox' ? '🎥 Meet' : '👀 Entrar calado') + '</a>' : '')
+    +   (ig ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" title="@' + e(ig) + ' no Instagram">' + igLogo() + ' Instagram</a>' : '')
+    +   (tel ? '<button type="button" class="btn gq-cl" onclick="avClint(event,' + i + ')" title="Abrir a conversa na Clint">🟣 Clint</button>' : '')
+    +   (iR >= 0 ? '<button type="button" class="btn" onclick="abrirLead(' + iR + ')" title="Quem é esse lead">👤 Ficha</button>' : '')
+    + '</div></div>';
+}
 function avDesenhar() {
   var box = document.getElementById('grav-aovivo'); if (!box) return;
   var r = avEventosAgora(), e = gravEsc;
   if (!r) { box.innerHTML = '<div class="av-vazio"><i class="av-ponto cinza"></i>Ao vivo: lendo as agendas…</div>'; return; }
-  if (!r.vivos.length) {
-    var p0 = r.prox[0];
-    box.innerHTML = '<div class="av-vazio"><i class="av-ponto cinza"></i><b>Nenhuma reunião ao vivo agora</b>'
-      + (p0 ? '<span>· próxima às <b>' + avHora(p0.ini) + '</b>: ' + e(agNomeDoEvento(p0.e.title)) + ' com ' + e(String(closerNomeDe(p0.ck) || p0.ck).split(' ')[0]) + '</span>' : '') + '</div>';
-    GRAV._avLista = [];
-    return;
-  }
-  GRAV._avLista = r.vivos;
-  var h = '<div class="av-topo"><i class="av-ponto"></i><b>AO VIVO AGORA</b><span>' + r.vivos.length + (r.vivos.length === 1 ? ' reunião' : ' reuniões') + '</span>'
-    + '<small>Para assistir, entre no Meet com câmera e microfone desligados — o Google não deixa mostrar a reunião aqui dentro, e quem entra aparece na lista de participantes.</small></div><div class="av-grade">';
-  r.vivos.forEach(function(o, i) {
-    var ev = o.e, nome = agNomeDoEvento(ev.title), closer = closerNomeDe(o.ck) || o.ck, pt = gravPartes(ev.title);
-    var passou = r.agora - o.ini, total = Math.max(1, o.fim - o.ini), pct = Math.min(100, Math.max(0, passou / total * 100));
-    var rL = null; try { rL = leadDoEvento(ev); } catch (eL) {}
-    var ig = ''; try { ig = gvInstaLimpo(ev.instagram || '') || (rL ? crInstaDe(rL, rL) : ''); } catch (eI) {}
-    var tel = (rL && rL.telefone) || ev.tel8 || '';
-    var iR = rL ? v2reg(rL) : -1;
-    h += '<div class="av-card">'
-      + '<div class="av-l1">' + gravAvatar(closer) + '<div><b title="' + e(nome) + '">' + e(nome) + '</b><span>' + e(closer) + (pt.sdr ? ' · SDR ' + e(pt.sdr) : '') + (rL && rL.produto ? ' · ' + e(String(rL.produto).replace(/^(programa|mentoria)\s+/i, '')) : '') + '</span></div><em class="av-tag">AO VIVO</em></div>'
-      + '<div class="av-tempo"><span>começou há ' + passou + ' min · ' + avHora(o.ini) + '</span><span>até ' + avHora(o.fim) + '</span></div><div class="av-barra"><i style="width:' + pct.toFixed(1) + '%"></i></div>'
-      + '<div class="av-acts">'
-      +   (ev.meetLink ? '<a class="btn primary" href="' + e(ev.meetLink) + '" target="_blank" rel="noopener" title="Abre o Meet numa aba nova — desligue câmera e microfone antes de clicar em Participar (você aparece na lista de participantes)">👀 Entrar calado</a>' : '<span class="hint">sem link do Meet</span>')
-      +   (ig ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" title="@' + e(ig) + ' no Instagram">' + igLogo() + ' Instagram</a>' : '')
-      +   (tel ? '<button type="button" class="btn gq-cl" onclick="avClint(event,' + i + ')" title="Abrir a conversa na Clint">🟣 Clint</button>' : '')
-      +   (iR >= 0 ? '<button type="button" class="btn" onclick="abrirLead(' + iR + ')" title="Quem é esse lead">👤 Ficha</button>' : '')
-      + '</div></div>';
+  var cols = Object.keys(r.porCk).map(function(k) { return r.porCk[k]; }).filter(function(P) { return P.vivos.length || P.prox || P.ns.length; });
+  // quem está em reunião primeiro; depois, quem tem a próxima mais cedo
+  cols.sort(function(a, b) { return (b.vivos.length - a.vivos.length) || ((a.prox ? a.prox.ini : 9999) - (b.prox ? b.prox.ini : 9999)); });
+  GRAV._avLista = [];
+  var idx = function(o) { GRAV._avLista.push(o); return GRAV._avLista.length - 1; };
+  if (!cols.length) { box.innerHTML = '<div class="av-vazio"><i class="av-ponto cinza"></i><b>Nenhuma reunião agora</b><span>· e nenhuma mais tarde hoje</span></div>'; return; }
+  var h = '<div class="av-topo"><i class="av-ponto' + (r.vivos.length ? '' : ' cinza') + '"></i><b' + (r.vivos.length ? '' : ' style="color:var(--text2);"') + '>' + (r.vivos.length ? 'AO VIVO AGORA' : 'NENHUMA AO VIVO AGORA') + '</b>'
+    + '<span>' + (r.vivos.length ? r.vivos.length + (r.vivos.length === 1 ? ' reunião' : ' reuniões') + ' · ' : '') + 'a atual e a próxima de cada closer</span>'
+    + '<small>Para assistir, entre no Meet com câmera e microfone desligados — o Google não deixa mostrar a reunião aqui dentro, e quem entra aparece na lista de participantes.</small></div><div class="av-grade av-cols">';
+  cols.forEach(function(P) {
+    var closer = closerNomeDe(P.ck) || P.ck;
+    var est = P.vivos.length ? '<span class="av-est on">● em reunião</span>' : P.ns.length && !P.prox ? '<span class="av-est">sem mais reuniões hoje</span>' : P.prox ? '<span class="av-est">livre até ' + avHora(P.prox.ini) + '</span>' : '';
+    h += '<div class="av-col"><div class="av-col-h">' + gravAvatar(closer) + '<b>' + e(String(closer).split(' ')[0]) + '</b>' + est + '</div>';
+    P.vivos.forEach(function(o) { h += avCardHtml(o, r, idx(o), 'vivo'); });
+    P.ns.forEach(function(o) { h += avCardHtml(o, r, idx(o), 'ns'); });
+    if (P.prox) h += avCardHtml(P.prox, r, idx(P.prox), 'prox');
+    h += '</div>';
   });
   box.innerHTML = h + '</div>';
 }
@@ -22547,6 +22567,17 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .av-topo > span { font-size:.76rem; font-weight:800; }
 .av-topo small { flex-basis:100%; font-size:.66rem; color:var(--muted); font-weight:600; }
 .av-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(290px,1fr)); gap:12px; }
+.av-cols { grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); align-items:start; }
+.av-col { display:flex; flex-direction:column; gap:8px; padding:10px; border-radius:18px; background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.06); }
+.av-col-h { display:flex; align-items:center; gap:8px; padding:2px 4px; }
+.av-col-h b { font-size:.86rem; font-weight:900; }
+.av-est { margin-left:auto; font-size:.64rem; font-weight:800; color:var(--muted); padding:3px 9px; border-radius:999px; background:rgba(255,255,255,.05); white-space:nowrap; }
+.av-est.on { color:#ff6b6b; background:rgba(255,77,77,.13); }
+.av-card.prox { border-color:rgba(110,168,255,.3); background:linear-gradient(160deg, rgba(110,168,255,.07), rgba(255,255,255,.015)); }
+.av-card.ns { border-color:rgba(255,154,90,.45); border-style:dashed; background:rgba(255,154,90,.05); }
+.av-tag.prox { color:#8fbaff; background:rgba(110,168,255,.14); }
+.av-tag.ns { color:#ff9a5a; background:rgba(255,154,90,.14); }
+.av-aviso { font-size:.7rem; line-height:1.45; color:var(--text2); font-weight:600; }
 .av-card { display:flex; flex-direction:column; gap:10px; padding:14px; border-radius:16px; border:1px solid rgba(255,77,77,.35);
   background:linear-gradient(160deg, rgba(255,77,77,.09), rgba(255,255,255,.02)); }
 .av-l1 { display:flex; align-items:center; gap:10px; }
