@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-2332';
+var VERSAO_DASH = '2026-09-28-0027';
 var _versaoNova = null;
 
 // =====================================================================
@@ -8876,7 +8876,7 @@ var AN_SO = '';        // '' = todos · 'venda' = só os que venderam · 'reunia
 // 'auto' só vale enquanto o Bruno não escolhe: se ele clicar em Vendas, é Vendas.
 function AN_ORD_EFETIVA() {
   if (AN_ORD && AN_ORD !== 'auto') return AN_ORD;
-  return AN_TIPO === 'organico' ? 'ped' : 'vendas';
+  return AN_TIPO === 'organico' ? 'ped' : 'fat';   // (27/09/2026: "considere em vendas o valor mais que o número")
 }
 // ===== chave do "criativo" de cada lead e coleta dos números por criativo (Bruno 08/09/2026) =====
 // - lead com anúncio/post: o próprio criativo
@@ -9712,7 +9712,8 @@ function renderAnuncios() {
     + '<div class="an-topo" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">📣 Criativos</h3>'
     + '<span class="hint">o criativo que trouxe cada lead</span><span style="flex:1;"></span>'
     + '<span class="an-fila an-ord"><span class="hint">ordenar:</span>'
-    + [['vendas','Vendas'],['ped','📷 Pedidos'],['agend','Agendamentos'],['reuni','Reuniões'],['fat','Faturamento'],['leads','Leads'],['gasto','Investimento']].map(function(o){
+    // 28/09/2026 (Bruno: "faturamento - número de vendas - reuniões - agendamentos - pedidos")
+    + [['fat','💰 Faturamento'],['vendas','Nº de vendas'],['reuni','Reuniões'],['agend','Agendamentos'],['ped','📷 Pedidos'],['leads','Leads'],['gasto','Investimento']].map(function(o){
         return '<span class="chart-chip' + (_ordEf===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_ORD=\'' + o[0] + '\';renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '</span></div>'
     + '<div class="an-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;">'
@@ -10701,6 +10702,7 @@ function vtelaFechar(semHistorico) {
   var v = _vtela; _vtela = null;
   try { v.el.remove(); } catch (e) {}
   document.documentElement.classList.remove('vtela-on');
+  try { if (v.o && typeof v.o.aoFechar === 'function') v.o.aoFechar(); } catch (e) {}
   if (!semHistorico && v.hist) { try { if (history.state && history.state.vtela) history.back(); } catch (e) {} }
 }
 window.addEventListener('popstate', function() { if (_vtela) { _vtela.hist = false; vtelaFechar(true); } });
@@ -10712,8 +10714,13 @@ function gvTelaCheia(seg) {
   var p = GRAV._aberto.p || {};
   seg = Math.max(0, Math.round(+seg || 0));
   var base = 'https://drive.google.com/file/d/' + encodeURIComponent(vid);
+  var fIn = document.getElementById('gv-frame'), plIn = document.getElementById('gv-player'), voltar = null;
+  if (GRAV._modoDrive && fIn && fIn.src && fIn.src !== 'about:blank') {
+    var srcIn = fIn.src; fIn.src = 'about:blank'; fIn.classList.remove('ok');
+    voltar = function() { var f2 = document.getElementById('gv-frame'); if (f2 && GRAV._modoDrive && f2.src === 'about:blank') { f2.src = srcIn.replace(/[?&]autoplay=1/, ''); setTimeout(function() { f2.classList.add('ok'); }, GV_MOSTRA_MS); } };
+  } else if (plIn && !plIn.paused) { try { plIn.pause(); } catch (e) {} }
   vtelaAbrir({ titulo: (p.nome || 'Gravação') + (seg ? ' · ' + gvHora(seg) : ''), src: base + '/preview?autoplay=1' + (seg ? '&t=' + seg : ''),
-    link: base + '/view' + (seg ? '?t=' + seg : ''), linkRot: '↗ Abrir no app do Drive' });
+    link: base + '/view' + (seg ? '?t=' + seg : ''), linkRot: '↗ Abrir no app do Drive', aoFechar: voltar });
 }
 // monta o vídeo/post do Facebook na largura disponível e na proporção do criativo (a foto do anúncio diz se é em pé)
 function criMontarPlayer(cx) {
@@ -16659,12 +16666,17 @@ function gvModoDrive(motivo, vidEsperado, txtGoogle) {
   var n = document.getElementById('gv-ctl-drive'); if (n) n.remove();
   var alvo = c || box.parentNode;
   if (alvo) alvo.insertAdjacentHTML(c ? 'afterend' : 'beforeend', '<div class="gv-ctl gv-ctl-drive" id="gv-ctl-drive"' + (txtGoogle ? ' title="Motivo do Google: ' + gravEsc(txtGoogle) + '"' : '') + '>'
-    + '<span><b>▶ Tocando no player do Google</b> — ' + porque + '. A velocidade fica na engrenagem ⚙️ do vídeo; clicar numa fala leva o vídeo até ela.</span>'
-    + '<button type="button" class="btn" onclick="gvSairModoDrive()">↻ Tentar o player do dash</button></div>');
+    + '<span><b>▶ Player do Google</b><em class="gv-drv-longo"> — ' + porque + '. A velocidade fica na engrenagem ⚙️ do vídeo; clicar numa fala leva o vídeo até ela.</em><em class="gv-drv-curto"> · velocidade na ⚙️</em></span>'
+    // 28/09/2026 (Bruno: "arrume a visualização do vídeo no celular" / "para abrir em versão mobile"): no celular o aviso vira uma
+    // linha curta e ganha o "⛶ Tela cheia" (o vídeo ocupa o celular todo, dentro do dash)
+    + (vtelaCelular() ? '<button type="button" class="btn primary" onclick="gvTelaCheia(GRAV._seg||0)">⛶ Tela cheia</button>' : '')
+    + '<button type="button" class="btn" onclick="gvSairModoDrive()" title="Tentar o player do dash">↻<span class="gv-drv-longo"> Tentar o player do dash</span></button></div>');
+  var gvEl = document.getElementById('gv'); if (gvEl) gvEl.classList.add('gv-drive');
 }
 function gvSairModoDrive() {
   var x = GRAV._aberto && GRAV._aberto.x, vid = x && (x.rec || [])[0]; if (!vid) return;
   GRAV._modoDrive = false; gvDriveDesmarcar(vid);
+  var gvEl = document.getElementById('gv'); if (gvEl) gvEl.classList.remove('gv-drive');
   var f = document.getElementById('gv-frame');
   if (f) { f.onload = null; f.src = 'about:blank'; f.classList.remove('ok'); f.style.display = 'none'; var c0 = f.nextElementSibling; if (c0 && c0.classList.contains('gv-carrega')) c0.remove(); }
   var n = document.getElementById('gv-ctl-drive'); if (n) n.remove();
@@ -17823,55 +17835,11 @@ function _csDocsForaDaPlanilha(rows) {
     return !(nomes[k] || nomes['2:' + pr]);
   });
 }
-function renderContratos() {
-  var cx = document.getElementById('ctr-corpo');
-  if (!cx) return;
-  try { _ctrConferirSePrecisa(); } catch (eC) {}
-  try { _csDocsCarregar(); } catch (eD) {}
-  var rows = (PAG.rows || []).filter(function(p) { return !/legado/i.test(String(p.programa || '')); })
-    .sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
-  if (!rows.length) { cx.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Ainda carregando as vendas… (ou nenhuma registrada)</div>'; return; }
-  var cont = { 'Em produção': 0, 'Aguardando assinatura': 0, 'Concluído': 0, 'Sem contrato': 0, 'Outros': 0 };
-  rows.forEach(function(p) {
-    var s = String(p.stC || '').trim();
-    if (!p.contrato && !s) cont['Sem contrato']++;
-    else if (cont[s] !== undefined) cont[s]++;
-    else cont['Outros']++;
-  });
-  var h = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">';
-  [['Sem contrato', '⚪ Sem contrato', cont['Sem contrato']],
-   ['Aguardando assinatura', '🔵 Aguardando assinatura', cont['Aguardando assinatura']],
-   ['Em produção', '🟡 Em produção', cont['Em produção']],
-   ['Concluído', '🟢 Assinados', cont['Concluído']],
-   ['Outros', '🟠 Outros', cont['Outros']],
-   ['', 'Todos', rows.length]].forEach(function(c) {
-    h += '<button class="chart-chip' + (_ctrFiltro === c[0] ? ' on' : '') + '" onclick="_ctrFiltro=\'' + c[0] + '\';renderContratos()">' + c[1] + ' (' + c[2] + ')</button>';
-  });
-  h += '<button class="chart-chip" style="margin-left:auto;" onclick="conferirAssinaturasAgora(this)" title="Pergunta à Clicksign AGORA em que pé está cada contrato pendente, sem esperar a rodada automática">🔄 Conferir assinaturas agora</button>';
-  h += '<span class="hint" id="ctr-ultima" style="align-self:center;margin-left:8px;"></span>';
-  h += '</div>';
-  var lista = rows.filter(function(p) {
-    if (!_ctrFiltro) return true;
-    var s = String(p.stC || '').trim();
-    if (_ctrFiltro === 'Sem contrato') return !p.contrato && !s;
-    if (_ctrFiltro === 'Outros') return (p.contrato || s) && ['Em produção', 'Aguardando assinatura', 'Concluído'].indexOf(s) === -1 && !(!p.contrato && !s);
-    return s === _ctrFiltro;
-  });
-  if (!lista.length) h += '<div class="hint" style="padding:24px;text-align:center;">Nenhum contrato neste filtro.</div>';
-  lista.slice(0, 120).forEach(function(p) {
-    var i = (PAG.rows || []).indexOf(p);
-    var st = String(p.stC || '').trim() || (p.contrato ? '—' : 'Sem contrato');
-    var assEm = (p.extras && (p.extras['Assinado em (Clicksign)'] || '')) || '';
-    if (/conclu/i.test(st) && assEm) st += ' · ✍️ ' + String(assEm).slice(0, 10);
-    var cor = p.contrato || p.stC ? _ctrCorSt(p.stC) : '#8b8fa3';
-    h += '<div class="dtl-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:12px 16px;">'
-      + '<div class="avatar" style="width:38px;height:38px;font-size:.85rem;background:linear-gradient(135deg,' + v2grad(p.nome) + ');">' + v2ini(p.nome) + '</div>'
-      + '<div style="flex:1;min-width:180px;cursor:pointer;" onclick="abrirFichaPagDireto(' + i + ')">'
-      + '<b style="font-size:.85rem;">' + (p.nome || '—') + '</b><br>'
-      + '<span class="hint">' + [p.programa, p.valor > 0 ? v2moeda(p.valor) : '', p.date ? p.date.toLocaleDateString('pt-BR') : '', p.vendedor].filter(Boolean).join(' · ') + '</span></div>'
-      + '<span class="ld-tag" style="background:' + cor + '22;color:' + cor + ';font-weight:800;">' + st + '</span>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-      + (function() {
+// 28/09/2026 (Bruno: "melhore a disposição da aba de contratos — pode ser numa disposição de Chamex, folha A4 — faça algo bem
+// melhor"): cada contrato vira uma FOLHA A4 (papel branco, cabeçalho da Promov, dados da venda, linha de assinatura e um
+// CARIMBO com a situação). Os botões de sempre ficam embaixo de cada folha. No alto, os totais por situação (clicáveis) e a busca.
+var _ctrBusca = '';
+function _ctrBotoes(p, i) {
           var lk = String(p.contrato || '');
           var envM = lk.match(/envelopes\/([0-9a-f\-]{36})/i);
           var stN = v2norm(p.stC || '');
@@ -17887,10 +17855,90 @@ function renderContratos() {
           if (envM && podeC && emProd) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;background:rgba(61,220,151,.16);border-color:rgba(61,220,151,.5);color:#3ddc97;" onclick="enviarContratoPag(' + i + ')">📨 Enviar</button>';
           if (envM && podeC && aguarda) b += '<button class="btn" style="padding:7px 12px;font-size:.7rem;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;" onclick="usarEditadoPag(' + i + ', true)" title="Cancela o contrato enviado, sobe o Word editado e reenvia para o cliente assinar.">🔁 Corrigir e reenviar</button>';
           return b;
-        })()
-      + '</div></div>';
+}
+function _ctrSitu(p) {
+  var s = v2norm(p.stC || '');
+  if (!p.contrato && !String(p.stC || '').trim()) return { k: 'sem', t: 'Sem contrato', c: 'SEM CONTRATO' };
+  if (s.indexOf('conclu') !== -1) return { k: 'ok', t: 'Assinado', c: 'ASSINADO' };
+  if (s.indexOf('aguardando assinatura') !== -1) return { k: 'ag', t: 'Aguardando assinatura', c: 'AGUARDANDO ASSINATURA' };
+  if (s.indexOf('em produ') !== -1) return { k: 'prod', t: 'Em produção', c: 'RASCUNHO' };
+  if (/cancelado|nao realizado/.test(s)) return { k: 'cancel', t: String(p.stC || '').trim(), c: 'CANCELADO' };
+  return { k: 'outro', t: String(p.stC || '').trim() || '—', c: String(p.stC || '').trim().toUpperCase() || '—' };
+}
+function _ctrFolha(p, i, n) {
+  var e = function(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var st = _ctrSitu(p), assEm = (p.extras && (p.extras['Assinado em (Clicksign)'] || '')) || '';
+  var prog = String(p.programa || 'Programa').replace(/^(programa|mentoria)\s+/i, '');
+  var nome = String(p.nome || '—'), dt = p.date ? p.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+  var primeiro = nome.split(/\s+/).slice(0, 2).join(' ');
+  return '<div class="ctr-folha ctr-' + st.k + '" style="--i:' + (n % 12) + '">'
+    + '<div class="ctr-papel" role="button" tabindex="0" onclick="verContratoPag(' + i + ')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver o contrato de ' + e(nome) + '">'
+    +   '<div class="ctr-in"><div class="ctr-cab"><b>PROMOV</b><span>Contrato de adesão</span></div>'
+    +   '<div class="ctr-prog">' + e(prog) + '</div>'
+    +   '<div class="ctr-nome" onclick="event.stopPropagation();abrirFichaPagDireto(' + i + ')" title="Abrir a ficha do cliente">' + e(nome) + '</div>'
+    +   '<div class="ctr-linhas" aria-hidden="true"><i></i><i></i><i style="width:82%"></i><i></i><i style="width:64%"></i><i></i><i style="width:48%"></i></div>'
+    +   '<dl class="ctr-dados"><div><dt>Valor</dt><dd>' + (p.valor > 0 ? e(v2moeda0(p.valor)) : '—') + '</dd></div><div><dt>Venda</dt><dd>' + e(dt) + '</dd></div><div><dt>Closer</dt><dd>' + e(String(p.vendedor || '—').split(' ')[0]) + '</dd></div></dl>'
+    +   '<div class="ctr-ass"><span class="ctr-rubrica">' + (st.k === 'ok' ? e(primeiro) : '') + '</span><small>' + (st.k === 'ok' ? 'assinado' + (assEm ? ' em ' + e(String(assEm).slice(0, 10)) : '') : 'assinatura do cliente') + '</small></div></div>'
+    +   '<div class="ctr-carimbo">' + e(st.c) + '</div>'
+    +   '<span class="ctr-pg">1/1</span>'
+    + '</div>'
+    + '<div class="ctr-acoes">' + _ctrBotoes(p, i) + '</div>'
+    + '</div>';
+}
+function renderContratos() {
+  var cx = document.getElementById('ctr-corpo');
+  if (!cx) return;
+  try { _ctrConferirSePrecisa(); } catch (eC) {}
+  try { _csDocsCarregar(); } catch (eD) {}
+  var rows = (PAG.rows || []).filter(function(p) { return !/legado/i.test(String(p.programa || '')); })
+    .sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
+  if (!rows.length) { cx.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Ainda carregando as vendas… (ou nenhuma registrada)</div>'; return; }
+  var cont = { 'Em produção': 0, 'Aguardando assinatura': 0, 'Concluído': 0, 'Sem contrato': 0, 'Outros': 0 };
+  rows.forEach(function(p) {
+    var s = String(p.stC || '').trim();
+    if (!p.contrato && !s) cont['Sem contrato']++;
+    else if (cont[s] !== undefined) cont[s]++;
+    else cont['Outros']++;
   });
-  if (lista.length > 120) h += '<div class="hint" style="text-align:center;">Mostrando os 120 mais recentes — use os filtros para achar os outros.</div>';
+  var pct = rows.length ? Math.round(cont['Concluído'] / rows.length * 100) : 0;
+  var h = '<div class="ctr-topo">'
+    + '<div class="ctr-resumo"><div class="ctr-anel" style="--p:' + pct + '"><b>' + pct + '%</b><small>assinados</small></div>'
+    + '<div><b>' + cont['Concluído'] + ' de ' + rows.length + ' contratos assinados</b><span>fora o Legado · ' + (rows.length - cont['Concluído']) + ' ainda em andamento</span></div></div>'
+    + '<div class="ctr-tiles">';
+  [['Sem contrato', '⚪', 'Sem contrato', 'sem'], ['Em produção', '🟡', 'Em produção', 'prod'], ['Aguardando assinatura', '🔵', 'Aguardando assinatura', 'ag'], ['Concluído', '🟢', 'Assinados', 'ok'], ['Outros', '🟠', 'Outros', 'outro'], ['', '📚', 'Todos', 'todos']].forEach(function(c) {
+    var n = c[0] ? cont[c[0]] : rows.length;
+    h += '<button class="ctr-tile ctr-t-' + c[3] + (_ctrFiltro === c[0] ? ' on' : '') + '" onclick="_ctrFiltro=\'' + c[0] + '\';renderContratos()"><span>' + c[1] + '</span><b>' + n + '</b><small>' + c[2] + '</small></button>';
+  });
+  h += '</div><div class="ctr-barra">'
+    + '<input class="search-input" id="ctr-busca" placeholder="🔍  Procurar cliente, programa ou closer…" value="' + String(_ctrBusca).replace(/"/g, '&quot;') + '" oninput="clearTimeout(window._ctrBt);var v=this.value;window._ctrBt=setTimeout(function(){_ctrBusca=v;renderContratos();var b=document.getElementById(\'ctr-busca\');if(b){b.focus();b.setSelectionRange(v.length,v.length);}},300);">'
+    + '<button class="chart-chip" onclick="conferirAssinaturasAgora(this)" title="Pergunta à Clicksign AGORA em que pé está cada contrato pendente, sem esperar a rodada automática">🔄 Conferir assinaturas agora</button>'
+    + '<span class="hint" id="ctr-ultima" style="align-self:center;"></span></div></div>';
+  var q = v2norm(_ctrBusca || '');
+  var lista = rows.filter(function(p) {
+    if (q && v2norm([p.nome, p.programa, p.vendedor].join(' ')).indexOf(q) === -1) return false;
+    if (!_ctrFiltro) return true;
+    var s = String(p.stC || '').trim();
+    if (_ctrFiltro === 'Sem contrato') return !p.contrato && !s;
+    if (_ctrFiltro === 'Outros') return (p.contrato || s) && ['Em produção', 'Aguardando assinatura', 'Concluído'].indexOf(s) === -1 && !(!p.contrato && !s);
+    return s === _ctrFiltro;
+  });
+  if (!lista.length) h += '<div class="hint" style="padding:24px;text-align:center;">Nenhum contrato neste filtro.</div>';
+  // agrupado por mês da venda: cada mês é uma "pilha" de folhas
+  var meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'], grupo = null, n = 0;
+  lista.slice(0, 120).forEach(function(p) {
+    var i = (PAG.rows || []).indexOf(p);
+    var g = p.date ? meses[p.date.getMonth()] + ' ' + p.date.getFullYear() : 'sem data';
+    if (g !== grupo) {
+      if (grupo !== null) h += '</div>';
+      var doMes = lista.filter(function(x) { return (x.date ? meses[x.date.getMonth()] + ' ' + x.date.getFullYear() : 'sem data') === g; });
+      var ass = doMes.filter(function(x) { return _ctrSitu(x).k === 'ok'; }).length;
+      h += '<div class="ctr-mes"><b>' + g.replace(/^./, function(c) { return c.toUpperCase(); }) + '</b><span>' + doMes.length + (doMes.length === 1 ? ' contrato' : ' contratos') + ' · ' + ass + ' assinado' + (ass === 1 ? '' : 's') + '</span></div><div class="ctr-mesa">';
+      grupo = g;
+    }
+    h += _ctrFolha(p, i, n++);
+  });
+  if (grupo !== null) h += '</div>';
+  if (lista.length > 120) h += '<div class="hint" style="text-align:center;">Mostrando os 120 mais recentes — use os filtros ou a busca para achar os outros.</div>';
   // 📄 na Clicksign e FORA da planilha (nome nao bate com nenhuma venda registrada)
   var fora = _csDocsForaDaPlanilha(rows);
   if (fora === null) h += '<div class="hint" style="margin-top:14px;">📄 Conferindo o que existe na Clicksign…</div>';
@@ -25959,6 +26007,25 @@ function rlImprimir() {
 .topbar.mv-rolou .ceo-rolagem { opacity:1; }
 /* linha do topo */
 #mv-barra .ceo-topo { position:absolute; right:-14px; top:calc(3px + env(safe-area-inset-top, 0px)); display:flex; gap:1px; pointer-events:none; }
+
+/* 28/09/2026 — aviso do player do Google numa linha; no celular, curto e com "⛶ Tela cheia"; controles numa linha só */
+.gv-ctl-drive { flex-direction:row !important; align-items:center; gap:10px; font-size:.74rem; color:var(--text2); line-height:1.45; }
+.gv-ctl-drive > span { flex:1; min-width:0; }
+@media (max-width:760px) { #gv .gv-ctl-drive > span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } } .gv-ctl-drive b { color:#fff; } .gv-ctl-drive em { font-style:normal; }
+.gv-ctl-drive .gv-drv-curto { display:none; }
+.gv-ctl-drive .btn { flex:none; padding:7px 12px; font-size:.72rem; }
+@media (max-width:760px) {
+  #gv .gv-ctl-drive { margin:6px 12px 0 !important; padding:7px 8px 7px 12px !important; border-radius:12px; font-size:.7rem; }
+  #gv .gv-ctl-drive .gv-drv-longo { display:none; }
+  #gv .gv-ctl-drive .gv-drv-curto { display:inline; color:var(--muted); }
+  #gv .gv-ctl-drive .btn { padding:7px 10px; font-size:.7rem; }
+  #gv.gv-drive .gv-ajuda { display:none !important; }
+  #gv .gv-ctl { margin:6px 12px 0; padding:8px 10px; gap:7px; }
+  #gv .gv-ctl-l { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; gap:5px; }
+  #gv .gv-ctl-l::-webkit-scrollbar { display:none; }
+  #gv .gv-ctl-l > * { flex:none; }
+  #gv .gv-ctl-l .btn { padding:6px 9px; font-size:.68rem; }
+}
 /* "abrindo o vídeo…": o PV e o João entram andando e dançam num palquinho */
 .gv-carrega:has(.ceo-carrega), .vt-carrega:has(.ceo-carrega) { background:radial-gradient(60% 55% at 50% 58%, rgba(246,163,80,.20), rgba(8,10,14,.86) 70%); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); gap:8px; font-weight:800; letter-spacing:.3px; }
 .ceo-carrega { position:relative; display:inline-flex; align-items:flex-end; justify-content:center; gap:14px; width:170px; height:92px; }
@@ -26119,5 +26186,71 @@ function rlImprimir() {
 })();
 </script>
 
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
+/* 📄 ABA CONTRATOS EM FOLHAS A4 (28/09/2026) */
+.ctr-topo { display:flex; flex-direction:column; gap:14px; margin-bottom:22px; }
+.ctr-resumo { display:flex; align-items:center; gap:16px; }
+.ctr-resumo > div:last-child b { display:block; font-size:1.05rem; font-weight:900; }
+.ctr-resumo > div:last-child span { font-size:.74rem; color:var(--muted); font-weight:700; }
+.ctr-anel { --p:0; flex:none; width:78px; height:78px; border-radius:50%; display:grid; place-content:center; text-align:center;
+  background:radial-gradient(closest-side, var(--bg, #0c0e12) 78%, transparent 80% 100%), conic-gradient(#3ddc97 calc(var(--p) * 1%), rgba(255,255,255,.08) 0); }
+.ctr-anel b { font-size:1.15rem; font-weight:900; line-height:1; } .ctr-anel small { font-size:.52rem; color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:.6px; }
+.ctr-tiles { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; }
+.ctr-tile { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:12px 14px; border-radius:16px; border:1px solid var(--border); background:rgba(255,255,255,.03);
+  color:var(--text); font:inherit; cursor:pointer; text-align:left; transition:transform .2s ease, border-color .2s ease, background .2s ease; }
+.ctr-tile:hover { transform:translateY(-2px); border-color:rgba(246,163,80,.45); }
+.ctr-tile.on { border-color:var(--accent); background:rgba(246,163,80,.12); box-shadow:0 10px 26px -16px rgba(246,163,80,.8); }
+.ctr-tile span { font-size:1rem; } .ctr-tile b { font-size:1.6rem; font-weight:900; line-height:1.1; } .ctr-tile small { font-size:.66rem; color:var(--text2); font-weight:800; }
+.ctr-tile:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.ctr-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.ctr-barra .search-input { flex:1; min-width:220px; margin:0; }
+.ctr-mes { display:flex; align-items:baseline; gap:10px; margin:22px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+.ctr-mes b { font-size:1rem; font-weight:900; letter-spacing:.3px; } .ctr-mes span { font-size:.72rem; color:var(--muted); font-weight:700; }
+.ctr-mesa { display:grid; grid-template-columns:repeat(auto-fill, minmax(215px, 1fr)); gap:26px 20px; }
+.ctr-folha { display:flex; flex-direction:column; gap:10px; animation:ctrEntra .5s cubic-bezier(.22,1,.36,1) both; animation-delay:calc(var(--i, 0) * 40ms); }
+@keyframes ctrEntra { from { opacity:0; transform:translateY(14px) rotate(-1deg); } to { opacity:1; transform:none; } }
+/* a folha: papel sulfite com a pilha de folhas atrás */
+.ctr-papel { position:relative; aspect-ratio:210 / 297; container-type:inline-size; background:#fbfaf6; color:#1d2027; border-radius:4px; cursor:pointer; overflow:hidden;
+  padding:0;
+  box-shadow:0 1px 0 rgba(0,0,0,.06), 0 18px 30px -18px rgba(0,0,0,.85), 5px 5px 0 -1px #e9e6dd, 5px 5px 0 0 rgba(0,0,0,.25), 10px 10px 0 -1px #dcd8cc, 10px 10px 0 0 rgba(0,0,0,.2);
+  transition:transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s ease; }
+.ctr-in { position:absolute; inset:0; padding:9cqw 9cqw 8cqw; display:flex; flex-direction:column; gap:3.4cqw; }
+.ctr-papel::before { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,.7), transparent 40%), repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.012) 3px 4px); }
+.ctr-papel:hover { transform:translateY(-6px) rotate(-.6deg); box-shadow:0 1px 0 rgba(0,0,0,.06), 0 30px 44px -20px rgba(0,0,0,.9), 5px 5px 0 -1px #e9e6dd, 5px 5px 0 0 rgba(0,0,0,.25), 10px 10px 0 -1px #dcd8cc, 10px 10px 0 0 rgba(0,0,0,.2); }
+.ctr-papel:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+.ctr-cab { display:flex; align-items:baseline; justify-content:space-between; gap:4cqw; padding-bottom:3cqw; border-bottom:.6cqw solid #1d2027; }
+.ctr-cab b { font-family:'Barlow Condensed', Inter, sans-serif; font-size:9cqw; font-weight:900; letter-spacing:.6cqw; }
+.ctr-cab span { font-size:4.2cqw; font-weight:700; color:#6b6f79; text-transform:uppercase; letter-spacing:.4cqw; text-align:right; }
+.ctr-prog { font-size:4.6cqw; font-weight:900; text-transform:uppercase; letter-spacing:.5cqw; color:#b5641c; }
+.ctr-nome { font-size:7.4cqw; font-weight:900; line-height:1.15; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.ctr-nome:hover { text-decoration:underline; }
+.ctr-linhas { display:flex; flex-direction:column; gap:2.6cqw; margin-top:1cqw; }
+.ctr-linhas i { display:block; height:1.5cqw; width:100%; border-radius:1cqw; background:#e7e4db; }
+.ctr-dados { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:2cqw; margin:auto 0 0; padding:3cqw 0; border-top:.4cqw dashed #cfcabd; border-bottom:.4cqw dashed #cfcabd; }
+.ctr-dados div { min-width:0; } .ctr-dados dt { font-size:3.4cqw; font-weight:800; color:#8a8d95; text-transform:uppercase; letter-spacing:.3cqw; }
+.ctr-dados dd { margin:0; font-size:4.6cqw; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; }
+.ctr-ass { display:flex; flex-direction:column; align-items:center; gap:.5cqw; margin-top:3cqw; }
+.ctr-rubrica { display:block; width:78%; min-height:11cqw; text-align:center; border-bottom:.5cqw solid #1d2027; font-family:'Caveat', 'Snell Roundhand', 'Brush Script MT', cursive; font-size:10cqw; line-height:1.1; color:#1e3a8a; transform:rotate(-3deg); }
+.ctr-ass small { font-size:3.3cqw; color:#8a8d95; font-weight:700; }
+.ctr-pg { position:absolute; right:6cqw; bottom:3cqw; font-size:3cqw; color:#a6a9b0; font-weight:700; }
+/* o carimbo */
+.ctr-carimbo { position:absolute; left:50%; top:47%; z-index:2; max-width:84%; padding:2.2cqw 4cqw; border:1.2cqw double currentColor; border-radius:3cqw; font-family:'Barlow Condensed', Inter, sans-serif;
+  font-size:7.6cqw; font-weight:900; letter-spacing:.6cqw; line-height:1.05; text-align:center; text-transform:uppercase; transform:translate(-50%, -50%) rotate(-14deg); opacity:.82;
+  mix-blend-mode:multiply; pointer-events:none; animation:ctrCarimba .5s cubic-bezier(.34,1.56,.64,1) both; animation-delay:calc(260ms + var(--i, 0) * 40ms); }
+@keyframes ctrCarimba { from { opacity:0; transform:translate(-50%, -50%) rotate(-14deg) scale(1.9); } to { opacity:.82; transform:translate(-50%, -50%) rotate(-14deg) scale(1); } }
+.ctr-ok .ctr-carimbo { color:#138a55; } .ctr-ag .ctr-carimbo { color:#1f5fd1; font-size:6cqw; } .ctr-prod .ctr-carimbo { color:#b7791f; }
+.ctr-sem .ctr-carimbo { color:#7b7f88; } .ctr-cancel .ctr-carimbo { color:#c0392b; } .ctr-outro .ctr-carimbo { color:#c2621d; font-size:6cqw; }
+.ctr-sem .ctr-papel { background:#f3f2ee; } .ctr-sem .ctr-linhas i { background:#ebe8e0; }
+.ctr-acoes { display:flex; gap:6px; flex-wrap:wrap; }
+.ctr-acoes .btn { padding:6px 10px !important; font-size:.66rem !important; }
+@media (max-width:900px) { .ctr-tiles { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+@media (max-width:560px) {
+  .ctr-mesa { grid-template-columns:repeat(2, minmax(0,1fr)); gap:22px 14px; }
+  .ctr-tiles { grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; } .ctr-tile { padding:9px 10px; } .ctr-tile b { font-size:1.25rem; }
+  .ctr-papel { box-shadow:0 14px 24px -16px rgba(0,0,0,.85), 3px 3px 0 -1px #e9e6dd, 6px 6px 0 -1px #dcd8cc; }
+}
+@media (prefers-reduced-motion:reduce) { .ctr-folha, .ctr-carimbo { animation:none !important; } .ctr-papel { transition:none; } }
+</style>
 </body>
 </html>
