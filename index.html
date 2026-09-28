@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-0959';
+var VERSAO_DASH = '2026-09-28-1004';
 var _versaoNova = null;
 
 // =====================================================================
@@ -16497,6 +16497,7 @@ function gvForaDaTela(seg) {
   GRAV._seg = seg;
   if (gvPipAberto()) { carregar(GRAV._pip); gvModoFora(true); return; }
   documentPictureInPicture.requestWindow({ width: 600, height: 372 }).then(function(w) {
+    try { gvAvisoFora(); } catch (eAv) {}
     GRAV._pip = w;
     var d = w.document;
     d.head.innerHTML = '<meta charset="utf-8"><title>Gravação</title><style>' + GV_PIP_CSS + '</style>';
@@ -16753,13 +16754,17 @@ function gvPlayerRecarregar() {
   try { var p = pl.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
 }
 // "fora da tela" com o player do dash: a janelinha do próprio navegador, por cima de tudo (Chrome, Edge e Safari)
+// 28/09/2026 (Bruno: "não sei se consegue assistir estando em outras páginas"): ao sair para a janelinha, o dash explica
+function gvAvisoFora() {
+  avisoRapido('📺 O vídeo está numa janelinha por cima de tudo: pode trocar de aba, abrir o Instagram, a Clint ou outro programa que ele continua tocando. Só não feche a aba do dash.');
+}
 function gvPlayerForaDaTela(pl) {
   try {
     if (document.pictureInPictureElement === pl) { document.exitPictureInPicture(); return; }
     if (pl.readyState < 1) { avisoRapido('⏳ O vídeo ainda está abrindo — clique de novo em alguns segundos'); return; }
     if (document.pictureInPictureEnabled && pl.requestPictureInPicture) {
       var pp = pl.requestPictureInPicture();
-      if (pp && pp.catch) pp.catch(function (e) { avisoRapido('Não consegui pôr o vídeo fora da tela (' + ((e && e.message) || e) + ')'); });
+      if (pp && pp.then) pp.then(gvAvisoFora, function (e) { avisoRapido('Não consegui pôr o vídeo fora da tela (' + ((e && e.message) || e) + ')'); });
       if (pl.paused) { var p2 = pl.play(); if (p2 && p2.catch) p2.catch(function () {}); }
       return;
     }
@@ -18982,6 +18987,12 @@ function agUsarDaLista(i) {
   agUsarLead(_blLista[i]);
 }
 // so Bruno e Adm trocam a pessoa ligada a uma reuniao (Bruno 23/08/2026)
+// 🤝 Executivo = time de Customer Success (Bruno 28/09/2026: "transforme o acesso da Juliane em executivo")
+function ehExecutivo() {
+  var login = localStorage.getItem('v2Login'), ok = false;
+  if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a) { if (a.nome === login && a.executivo) ok = true; });
+  return ok;
+}
 function ehContratos() {
   if (ehAdm()) return true;
   var login = localStorage.getItem('v2Login');
@@ -19616,7 +19627,7 @@ var ACESSOS = [
   { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
-  { nome: 'Juliane Promov', pin: '4172', contratos: true },   // envia contratos (Clicksign), sem poderes de adm
+  { nome: 'Juliane Promov', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
   { nome: 'Ismael',        pin: '6180' },
@@ -19655,7 +19666,7 @@ function montarLogin() {
     var b = document.createElement('button');
     b.className = 'btn';
     b.style.cssText = 'padding:13px;font-size:.85rem;width:100%;';
-    b.textContent = (a.soOlha ? '👁 ' : a.adm ? '🛡 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : '');
+    b.textContent = (a.soOlha ? '👁 ' : a.adm ? '🛡 ' : a.executivo ? '🤝 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : a.executivo ? ' — Executiva (CS)' : '');
     b.onclick = function() {
       window._lgEscolhido = a.nome;
       ov.querySelector('#lg-quem').textContent = a.nome;
@@ -19686,6 +19697,7 @@ function loginConferir() {
   if (ov) ov.remove();
   montarSeletorEu();
   renderLeads();
+  if (quem.executivo) setTimeout(function() { var nv = document.querySelector('.nav-item[data-s="contratos"]'); if (nv) nv.click(); }, 300);   // o CS trabalha em Contratos
 }
 if (loginPrecisa()) montarLogin();
 // 🔁 sair e entrar com outro acesso (Bruno 08/09/2026: "que tenha opção de mudar de acesso")
@@ -19698,7 +19710,7 @@ function mostrarAcessoAtual() {
   var el = document.getElementById('acesso-atual'); if (!el) return;
   var login = localStorage.getItem('v2Login');
   if (login === null) { el.innerHTML = '👤 <b>uso local</b> (sem login)'; return; }
-  var papel = ehAdm() ? 'admin' : (ehContratos() ? 'contratos' : (localStorage.getItem('v2Login') === 'Visitante' ? 'só olha' : 'equipe'));
+  var papel = ehAdm() ? 'admin' : (ehExecutivo() ? 'executivo · customer success' : ehContratos() ? 'contratos' : (localStorage.getItem('v2Login') === 'Visitante' ? 'só olha' : 'equipe'));
   el.innerHTML = '👤 <b>' + String(login).replace(/</g, '&lt;') + '</b> · ' + papel;
 }
 mostrarAcessoAtual();
