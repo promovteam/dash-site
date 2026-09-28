@@ -121,6 +121,8 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
 .plano-val { font-size:1.02rem; font-weight:800; color:var(--text); }
 .plano-cond[hidden] { display:none; }
 .pre-ok { display:inline-flex; align-items:center; gap:6px; margin-top:10px; font-size:.76rem; font-weight:700; color:var(--ok); }
+.campo.falta input, .campo.falta select { border-color:rgba(246,163,80,.75); background:rgba(246,163,80,.07); }
+.campo.falta > label::after { content:'falta'; margin-left:auto; font-size:.64rem; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--accent); }
 .rev-nota { padding:0 14px 12px; font-size:.76rem; color:var(--muted); }
 .rodape { margin-top:26px; text-align:center; font-size:.7rem; color:#5d6372; }
 @media (min-width:600px) { .card { padding:26px 24px; } }
@@ -527,18 +529,47 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
     return Math.max(0, ['voce', 'contato', 'endereco', 'dupla', 'revisao'].indexOf(o.etapa));
   }
   var volta = restaurar();
+  // 28/09/2026 (Bruno: "que já puxe informações existentes e a pessoa somente complementa"): tudo o que a Promov já tem
+  // entra preenchido; a página abre no primeiro passo em que falta algo (quem já tem tudo cai direto na revisão)
+  var comeco = volta;
   (function () {
-    var n = 0, poe = function (id, v) { var el = $(id); if (!el || !v || el.value.trim()) return; el.value = MASC[id] ? MASC[id](v) : v; conferir(id, false); n++; };
-    poe('nome', H.nome); poe('cel', H.cel); poe('email', String(H.email || '').toLowerCase());
-    poe('insta', H.insta ? '@' + String(H.insta).replace(/^@+/, '') : ''); poe('nicho', H.nicho);
-    if (H.dn || H.dc) { $('tem-dupla').checked = true; poe('d-nome', H.dn); poe('d-cel', H.dc); poe('d-email', String(H.de || '').toLowerCase()); }
-    if (n) {
-      $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para o ' + prog : '') + '. ' : '') + 'O que já temos veio preenchido — é só conferir e completar.';
-      var s = document.createElement('div'); s.className = 'pre-ok'; s.textContent = '✓ ' + n + ' campo' + (n > 1 ? 's' : '') + ' já preenchido' + (n > 1 ? 's' : ''); $('ola').appendChild(s);
+    var n = 0, poe = function (id, v) { var el = $(id); if (!el || v == null || !String(v).trim() || String(el.value || '').trim()) return; el.value = MASC[id] ? MASC[id](String(v)) : String(v).trim(); n++; };
+    var data = function (v) { var t = String(v || '').trim(), m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[3] + '/' + m[2] + '/' + m[1]; m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if (!m) return ''; var a = +m[3]; if (a < 100) a += a > 30 ? 1900 : 2000; return ('0' + m[1]).slice(-2) + '/' + ('0' + m[2]).slice(-2) + '/' + a; };
+    var civil = function (v) { var t = semAc(v); return /solteir/.test(t) ? 'Solteiro(a)' : /casad/.test(t) ? 'Casado(a)' : /uniao|estavel/.test(t) ? 'União estável' : /divorc|separad/.test(t) ? 'Divorciado(a)' : /viuv/.test(t) ? 'Viúvo(a)' : ''; };
+    var uf = function (v) { var t = String(v || '').trim().toUpperCase(); return UFS.indexOf(t) >= 0 ? t : ''; };
+    poe('nome', H.nome); poe('cpf', H.cpf); poe('nasc', data(H.nasc)); poe('rg', H.rg); poe('civil', civil(H.civ)); poe('prof', H.prof);
+    if (H.raz || H.cnpj) { document.querySelector('.seg button[data-tipo="PJ"]').click(); poe('razao', H.raz); poe('cnpj', H.cnpj); }
+    poe('cel', H.cel); poe('email', String(H.email || '').toLowerCase()); poe('insta', H.insta ? '@' + String(H.insta).replace(/^@+/, '') : ''); poe('nicho', H.nicho);
+    poe('cep', H.cep); poe('rua', H.rua); poe('num', H.num); poe('comp', H.comp); poe('bairro', H.bai); poe('cidade', H.cid); poe('uf', uf(H.uf));
+    // endereço que veio num texto só (venda anterior): o CEP busca rua/bairro/cidade nos Correios, o número vem do texto
+    if (H.end && !$('cep').value && !$('rua').value) {
+      var te = String(H.end), mc = te.match(/\b(\d{5})-?(\d{3})\b/);
+      if (mc) { $('cep').value = mc[1] + '-' + mc[2]; n++; $('cep').dispatchEvent(new Event('input')); }
+      var mn = te.replace(/\b\d{5}-?\d{3}\b/, '').match(/,\s*(?:n[º°o]?\.?\s*)?(\d{1,6}|s\/n)\b/i); if (mn) poe('num', mn[1].toUpperCase());
+      var mco = te.match(/\b(apto?\.?|apartamento|bloco|casa|sala|lote|quadra|qd\.?|lt\.?)\s+[^,]*/i); if (mco) poe('comp', mco[0].trim());
     }
+    if (H.dn || H.dc || H.dcpf) {
+      $('tem-dupla').checked = true; poe('d-nome', H.dn); poe('d-cpf', H.dcpf); poe('d-rg', H.drg); poe('d-cel', H.dc); poe('d-email', String(H.de || '').toLowerCase());
+      if (H.dend) { $('d-mesmo').checked = false; $('d-end-box').hidden = false; poe('d-end', H.dend); }
+    }
+    if (!n) return;
+    IDS.forEach(function (id) { if ($(id) && $(id).value) conferir(id, false); });
+    montarPassos();
+    var falta = 0, primeiro = -1;
+    ordem.forEach(function (nome, i) {
+      (CAMPOS[nome] || []).forEach(function (id) {
+        var box = document.querySelector('[data-c="' + id + '"]'); if (!box || box.closest('[hidden]')) return;
+        var r = REGRAS[id] ? REGRAS[id]($(id).value, id) : '';
+        if (typeof r === 'string' && r) { falta++; if (primeiro < 0) primeiro = i; box.classList.add('falta'); var el = $(id); var tira = function () { if (String(el.value || '').trim()) box.classList.remove('falta'); }; el.addEventListener('input', tira); el.addEventListener('change', tira); }
+      });
+    });
+    if (!volta) comeco = primeiro < 0 ? ordem.length - 1 : primeiro;
+    $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para o ' + prog : '') + '. ' : '')
+      + (falta ? 'Já preenchemos o que temos — só falta completar ' + (falta === 1 ? '1 informação' : falta + ' informações') + '.' : 'Já preenchemos tudo o que temos — é só conferir e enviar.');
+    var sBadge = document.createElement('div'); sBadge.className = 'pre-ok'; sBadge.textContent = '✓ ' + n + ' campo' + (n > 1 ? 's' : '') + ' já preenchido' + (n > 1 ? 's' : '') + ' pela Promov'; $('ola').appendChild(sBadge);
   })();
   montarPassos();
-  ir(Math.min(volta, ordem.length - 1));
+  ir(Math.min(comeco, ordem.length - 1));
 })();
 </script>
 </body>

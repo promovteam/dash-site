@@ -207,9 +207,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <div class="opt-item"><input type="radio" name="ventrada" id="v-ent-s" value="Sim" onchange="toggleEntrada()"><label for="v-ent-s">Sim</label></div>
       </div>
     </div>
-    <div class="f" id="entrada-valor-wrap" style="display:none">
-      <label>Valor da entrada</label>
-      <input type="text" id="v-entrada-valor" placeholder="R$ 0,00">
+    <div class="fr" id="entrada-valor-wrap" style="display:none">
+      <div class="f">
+        <label>Valor da entrada</label>
+        <input type="text" id="v-entrada-valor" placeholder="R$ 0,00">
+      </div>
+      <div class="f">
+        <label>Entrada paga por</label>
+        <select id="v-entrada-forma">
+          <option value="">Selecione...</option>
+          <option>Pix</option><option>Cartão de crédito</option><option>Boleto</option><option>TED</option><option>Dinheiro</option>
+        </select>
+      </div>
     </div>
 
     <!-- Forma de pagamento -->
@@ -233,13 +242,20 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
             <option value="">Selecione...</option>
             <option>1x</option><option>2x</option><option>3x</option><option>4x</option><option>5x</option><option>6x</option>
             <option>7x</option><option>8x</option><option>9x</option><option>10x</option><option>11x</option><option>12x</option>
+            <option>13x</option><option>14x</option><option>15x</option><option>16x</option><option>17x</option><option>18x</option>
+            <option>19x</option><option>20x</option><option>21x</option><option>22x</option><option>23x</option><option>24x</option>
           </select>
         </div>
         <div class="f">
           <label>Valor da parcela</label>
           <input type="text" id="v-parcela-valor" placeholder="R$ 0,00">
-          <div class="f-hint">Calculado automaticamente — pode editar</div>
+          <div class="f-hint">Calculado automaticamente (tirando a entrada) — pode editar</div>
         </div>
+      </div>
+      <div class="f" id="boleto-venc-wrap" style="display:none;margin-bottom:16px">
+        <label>1º vencimento do boleto</label>
+        <input type="date" id="v-boleto-venc">
+        <div class="f-hint">Pode ser remarcado depois, se o cliente pedir</div>
       </div>
     </div>
     <div id="recorrente-field" style="display:none">
@@ -738,14 +754,24 @@ function vendaGoStep(n) {
 // TOGGLES — VENDA
 // =====================================================================
 function toggleEntrada() {
-  document.getElementById('entrada-valor-wrap').style.display = document.getElementById('v-ent-s').checked ? 'block' : 'none';
+  document.getElementById('entrada-valor-wrap').style.display = document.getElementById('v-ent-s').checked ? 'grid' : 'none';
+  calcParcela(); calcRecorrente();
 }
 
 function togglePagamento() {
   var val = document.getElementById('v-pagamento').value;
-  document.getElementById('parcelas-field').style.display = (val === 'Cartão de crédito') ? 'block' : 'none';
+  document.getElementById('parcelas-field').style.display = (val === 'Cartão de crédito' || val === 'Boleto') ? 'block' : 'none';
   document.getElementById('recorrente-field').style.display = (val === 'Cartão recorrente') ? 'block' : 'none';
+  var bv = document.getElementById('boleto-venc-wrap'); if (bv) bv.style.display = (val === 'Boleto') ? 'block' : 'none';
+  calcParcela();
 }
+// o que falta pagar depois da entrada (Bruno 28/09/2026: "tenha entrada também e boleto pode ser parcelado")
+function _restanteVenda() {
+  var total = parseValor(document.getElementById('v-valor').value);
+  var ent = document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked ? parseValor(document.getElementById('v-entrada-valor').value) : 0;
+  return ent > 0 && ent < total ? total - ent : total;
+}
+function _reais(n) { return 'R$ ' + n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 
 function parseValor(str) {
   return parseFloat((str || '').replace(/[^\d,]/g, '').replace(',', '.')) || 0;
@@ -760,23 +786,24 @@ function valorLimpo(id) {
 
 function calcParcela() {
   var parcelas = document.getElementById('v-parcelas').value;
-  var total = parseValor(document.getElementById('v-valor').value);
+  var total = _restanteVenda();
   if (parcelas && total > 0) {
     var n = parseInt(parcelas);
-    document.getElementById('v-parcela-valor').value = 'R$ ' + (total / n).toFixed(2).replace('.', ',');
+    document.getElementById('v-parcela-valor').value = _reais(total / n);
   }
 }
 
 function calcRecorrente() {
   var vezes = document.getElementById('v-recorrente-vezes').value;
-  var total = parseValor(document.getElementById('v-valor').value);
+  var total = _restanteVenda();
   if (vezes && total > 0) {
     var n = parseInt(vezes);
-    document.getElementById('v-recorrente-valor').value = 'R$ ' + (total / n).toFixed(2).replace('.', ',');
+    document.getElementById('v-recorrente-valor').value = _reais(total / n);
   }
 }
 
 document.getElementById('v-valor').addEventListener('input', function() { calcParcela(); calcRecorrente(); });
+document.getElementById('v-entrada-valor').addEventListener('input', function() { calcParcela(); calcRecorrente(); });
 
 function togglePJ() {
   document.getElementById('pj-fields').style.display = document.getElementById('tipo-pj').checked ? 'block' : 'none';
@@ -985,12 +1012,12 @@ function submitVenda() {
     entrada: document.getElementById('v-ent-s').checked ? 'Sim' : 'Não',
     valor_entrada: valorLimpo('v-entrada-valor'),
     forma_pagamento: pgto,
-    parcelas: (pgto === 'Cartão de crédito') ? document.getElementById('v-parcelas').value : '',
-    valor_parcela: (pgto === 'Cartão de crédito') ? valorLimpo('v-parcela-valor') : '',
+    parcelas: (pgto === 'Cartão de crédito' || pgto === 'Boleto') ? document.getElementById('v-parcelas').value : '',
+    valor_parcela: (pgto === 'Cartão de crédito' || pgto === 'Boleto') ? valorLimpo('v-parcela-valor') : '',
     recorrente_vezes: (pgto === 'Cartão recorrente') ? document.getElementById('v-recorrente-vezes').value : '',
     valor_mensal: (pgto === 'Cartão recorrente') ? valorLimpo('v-recorrente-valor') : '',
     link_clint: document.getElementById('v-clint').value,
-    observacao: document.getElementById('v-obs').value,
+    observacao: [document.getElementById('v-obs').value, _pgtoExtra()].filter(Boolean).join('\n'),
     teve_bloqueio: window.__teveBloqueio || '',
     pedidoId: (window.__pedidoId = 'v' + Date.now() + Math.random().toString(36).slice(2, 7)),
     nome: document.getElementById('c-nome').value,
@@ -1267,11 +1294,18 @@ function copiarLinkCadastro(bt) {
   // o que já sabemos vai junto, depois do # (não passa por servidor): o cliente só confere e completa, e vê o programa e as condições
   var pg = g('v-pagamento'), cond = [];
   if (pg && !/^nao sei$/.test(_semAcento(pg))) cond.push(pg);
-  if (pg === 'Cartão de crédito' && g('v-parcelas')) cond.push(g('v-parcelas').replace(/x$/i, '') + 'x' + (g('v-parcela-valor') ? ' de ' + g('v-parcela-valor') : ''));
+  if ((pg === 'Cartão de crédito' || pg === 'Boleto') && g('v-parcelas')) cond.push(g('v-parcelas').replace(/x$/i, '') + 'x' + (g('v-parcela-valor') ? ' de ' + g('v-parcela-valor') : ''));
   if (pg === 'Cartão recorrente' && g('v-recorrente-vezes')) cond.push(g('v-recorrente-vezes') + 'x' + (g('v-recorrente-valor') ? ' de ' + g('v-recorrente-valor') : ''));
-  if (document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked && g('v-entrada-valor')) cond.push('entrada de ' + g('v-entrada-valor'));
+  var bvL = g('v-boleto-venc'), mBL = bvL.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (pg === 'Boleto' && bvL) cond.push('1º vencimento ' + (mBL ? mBL[3] + '/' + mBL[2] + '/' + mBL[1] : bvL));
+  if (document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked && g('v-entrada-valor')) cond.push('entrada de ' + g('v-entrada-valor') + (g('v-entrada-forma') ? ' (' + g('v-entrada-forma') + ')' : ''));
   var dd = { nome: nome, cel: g('c-cel') || q.cel || '', email: g('c-email') || q.email || '', insta: g('c-insta') || q.insta || '', nicho: g('c-nicho') || q.nicho || '', prog: prog, valor: g('v-valor') || q.valor || '', pgto: cond.join(' · ') };
-  if (dupla) { dd.dn = g('c-dupla-nome'); dd.dc = g('c-dupla-cel'); dd.de = g('c-dupla-email'); }
+  if (dupla) { dd.dn = g('c-dupla-nome'); dd.dc = g('c-dupla-cel'); dd.de = g('c-dupla-email'); dd.dcpf = g('c-dupla-cpf'); dd.drg = g('c-dupla-rg'); dd.dend = g('c-dupla-endereco'); }
+  // tudo o que já está na tela vai junto: o cliente só completa o que falta (Bruno 28/09/2026)
+  var nascV = g('c-nasc'), mNa = nascV.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  dd.cpf = g('c-cpf'); dd.rg = g('c-rg'); dd.nasc = mNa ? mNa[3] + '/' + mNa[2] + '/' + mNa[1] : nascV; dd.civ = g('c-civil'); dd.prof = g('c-prof');
+  dd.cep = g('c-cep'); dd.rua = g('c-rua'); dd.num = g('c-num'); dd.comp = g('c-comp'); dd.bai = g('c-bairro'); dd.cid = g('c-cidade'); dd.uf = g('c-estado');
+  if (document.getElementById('tipo-pj') && document.getElementById('tipo-pj').checked) { dd.raz = g('c-razao'); dd.cnpj = g('c-cnpj'); }
   Object.keys(dd).forEach(function(k) { if (!dd[k]) delete dd[k]; });
   var hash = ''; try { hash = '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(dd)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); } catch (eH) {}
   var url = new URL('cadastro.html', location.href).href.split('?')[0] + '?' + p.join('&') + hash;
@@ -1394,15 +1428,25 @@ function _programaFormsF(p) {
   return base;
 }
 function _vendedorFormsF(v) { var t = _semAcento(v); if (/bruno/.test(t)) return 'Bruno Pardim'; if (/tony/.test(t)) return 'Tony Londe'; return String(v || '').trim(); }
+// forma da entrada e 1º vencimento do boleto vão na observação (o Forms não tem pergunta própria)
+function _pgtoExtra() {
+  var g = function(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }, l = [];
+  if (document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked && g('v-entrada-forma')) l.push('Entrada paga por ' + g('v-entrada-forma'));
+  var bv = g('v-boleto-venc'), mB = bv.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (g('v-pagamento') === 'Boleto' && bv) l.push('1º vencimento do boleto: ' + (mB ? mB[3] + '/' + mB[2] + '/' + mB[1] : bv));
+  return l.join('\n');
+}
 function dadosParaForms() {
   var g = function(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
   var pj = document.getElementById('tipo-pj') && document.getElementById('tipo-pj').checked;
   var pgto = g('v-pagamento'), det = [];
   if (pgto) det.push(pgto);
-  if (pgto === 'Cartão de crédito' && g('v-parcelas')) det.push(g('v-parcelas').replace(/x$/i, '') + 'x' + (g('v-parcela-valor') ? ' de ' + g('v-parcela-valor') : ''));
+  if ((pgto === 'Cartão de crédito' || pgto === 'Boleto') && g('v-parcelas')) det.push(g('v-parcelas').replace(/x$/i, '') + 'x' + (g('v-parcela-valor') ? ' de ' + g('v-parcela-valor') : ''));
   if (pgto === 'Cartão recorrente' && g('v-recorrente-vezes')) det.push('recorrente ' + g('v-recorrente-vezes') + 'x' + (g('v-recorrente-valor') ? ' de ' + g('v-recorrente-valor') : ''));
   var entrada = document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked;
-  if (entrada && g('v-entrada-valor')) det.push('entrada ' + g('v-entrada-valor'));
+  if (entrada && g('v-entrada-valor')) det.push('entrada ' + g('v-entrada-valor') + (g('v-entrada-forma') ? ' (' + g('v-entrada-forma') + ')' : ''));
+  var bvF = g('v-boleto-venc'), mBF = bvF.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (pgto === 'Boleto' && bvF) det.push('1º vencimento ' + (mBF ? mBF[3] + '/' + mBF[2] + '/' + mBF[1] : bvF));
   var dupla = document.getElementById('dupla-s') && document.getElementById('dupla-s').checked;
   if (dupla) det.push('dupla: ' + [g('c-dupla-nome'), g('c-dupla-cel'), g('c-dupla-email')].filter(Boolean).join(' '));
   if (pj) det.push('PJ: ' + g('c-razao') + (g('c-cnpj') ? ' CNPJ ' + g('c-cnpj') : ''));
@@ -1733,7 +1777,22 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 @keyframes chegou{0%{box-shadow:0 0 0 0 rgba(61,220,151,.55)}100%{box-shadow:0 0 0 14px rgba(61,220,151,0)}}
 .pre-toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;z-index:9999;background:#12261d;border:1px solid rgba(61,220,151,.5);color:#bff3da;font-weight:700;font-size:.86rem;padding:12px 18px;border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .35s;pointer-events:none;max-width:calc(100vw - 32px);text-align:center}
 .pre-toast.on{transform:translate(-50%,0);opacity:1}
-.bt-pedir{background:rgba(61,220,151,.14)!important;color:#3ddc97!important;border:1px solid rgba(61,220,151,.45)!important;box-shadow:none!important}
+.pre-escolha{margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+.pre-escolha-t{font-size:.76rem;font-weight:700;color:var(--text-2);margin-bottom:10px;letter-spacing:.2px}
+.pre-escolha-bts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pre-esc{display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:3px;align-items:center;text-align:left;padding:14px 16px;border-radius:16px;cursor:pointer;font:inherit;color:var(--text);transition:transform .15s,background .2s,border-color .2s,box-shadow .2s}
+.pre-esc .pre-esc-ic{grid-row:span 2;font-size:1.45rem;line-height:1}
+.pre-esc b{font-size:.92rem;font-weight:800}
+.pre-esc small{font-size:.72rem;color:var(--text-2);line-height:1.4;font-weight:500}
+.pre-esc.cli{background:rgba(61,220,151,.09);border:1px solid rgba(61,220,151,.45)}
+.pre-esc.cli b{color:#3ddc97}
+.pre-esc.eu{background:rgba(246,163,80,.09);border:1px solid rgba(246,163,80,.45)}
+.pre-esc.eu b{color:#f6a350}
+.pre-esc:hover{transform:translateY(-1px);box-shadow:0 10px 24px -14px rgba(0,0,0,.8)}
+.pre-esc:focus-visible{outline:2px solid #ffd166;outline-offset:2px}
+.pre-esc.feito{background:rgba(61,220,151,.16)}
+.pre-esc.feito small{color:#bff3da}
+@media (max-width:560px){.pre-escolha-bts{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.pre-gira,.pre-pulso,.chegou{animation:none}.pre-toast{transition:none}}
 </style>
 <script>
@@ -1828,7 +1887,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 
   // "Cartão de crédito · 12x de R$ 997,00 · entrada de R$ 1.000,00" → campos da forma de pagamento
   function pagamento(t) {
-    var s = _semAcento(t), forma = /recorrent/.test(s) ? 'Cartão recorrente' : /cart|credito/.test(s) ? 'Cartão de crédito' : /pix/.test(s) ? 'Pix' : /boleto/.test(s) ? 'Boleto' : /\bted\b|transfer/.test(s) ? 'TED' : '';
+    var s = _semAcento(t), sF = s.replace(/entrada[^·]*/g, ' ');   // a forma da ENTRADA "(pix)" não é a forma principal
+    var forma = /recorrent/.test(sF) ? 'Cartão recorrente' : /cart|credito/.test(sF) ? 'Cartão de crédito' : /boleto/.test(sF) ? 'Boleto' : /pix/.test(sF) ? 'Pix' : /\bted\b|transfer/.test(sF) ? 'TED' : '';
     if (forma && vazio('v-pagamento')) { poe($('v-pagamento'), forma); try { togglePagamento(); } catch (e) {} }
     var mP = s.match(/(\d{1,2})\s*x(?:\s*de\s*(r\$\s*[\d.]+(?:,\d{2})?))?/);
     if (mP) {
@@ -1837,6 +1897,10 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
     }
     var mE = s.match(/entrada\s*(?:de)?\s*(r\$\s*[\d.]+(?:,\d{2})?)/);
     if (mE && $('v-ent-s') && !$('v-ent-s').checked) { $('v-ent-s').checked = true; try { toggleEntrada(); } catch (e) {} if (vazio('v-entrada-valor')) poe($('v-entrada-valor'), mE[1].replace(/^r\$/, 'R$')); }
+    var mEf = s.match(/entrada[^(]*\((pix|cartao de credito|cartao|boleto|ted|dinheiro)\)/);
+    if (mEf && vazio('v-entrada-forma')) poe($('v-entrada-forma'), { pix: 'Pix', 'cartao de credito': 'Cartão de crédito', cartao: 'Cartão de crédito', boleto: 'Boleto', ted: 'TED', dinheiro: 'Dinheiro' }[mEf[1]]);
+    var mV = s.match(/vencimento\s*(?:do boleto)?\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (mV && vazio('v-boleto-venc')) poe($('v-boleto-venc'), mV[3] + '-' + ('0' + mV[2]).slice(-2) + '-' + ('0' + mV[1]).slice(-2));
   }
 
   // ---------- campos que vieram do cliente: marcados até o closer mexer ----------
@@ -1875,7 +1939,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
           if (el.type === 'file' || el.type === 'radio') return;
           if (el.closest('#pj-fields') && !pj) return;
           if (el.closest('#dupla-fields') && !dupla) return;
-          if (el.closest('#parcelas-field') && pg !== 'Cartão de crédito') return;
+          if (el.closest('#parcelas-field') && pg !== 'Cartão de crédito' && pg !== 'Boleto') return;
           if (el.closest('#recorrente-field') && pg !== 'Cartão recorrente') return;
           if (String(el.value || '').trim()) return;
           var lb = el.closest('.f') && el.closest('.f').querySelector('label');
@@ -1991,14 +2055,32 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
   var tit = $('success-title');
   if (tit && window.MutationObserver) new MutationObserver(function () { if (/venda registrada/i.test(tit.textContent || '')) { apagarRascunho(); R.sujo = false; } }).observe(tit, { childList: true, characterData: true, subtree: true });
 
-  // botão na parte 1: preencheu a negociação → pede o resto ao cliente
+  // fim da parte 1: a ESCOLHA — pedir para o cliente preencher ou preencher eu mesmo (Bruno 28/09/2026)
   var row1 = $('v-step1').querySelector('.btn-row');
-  if (row1 && !row1.querySelector('.bt-pedir')) {
-    var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn bt-pedir'; b1.textContent = '🔗 Pedir os dados ao cliente';
-    b1.title = 'Copia a mensagem com o link — o cliente preenche no celular e os dados entram aqui sozinhos';
-    b1.onclick = function () { copiarLinkCadastro(b1); };
-    var prox = row1.querySelector('button[onclick*="vendaGoStep(2)"]'); row1.insertBefore(b1, prox || null);
+  if (row1 && !$('pre-escolha')) {
+    var e1 = document.createElement('div'); e1.className = 'pre-escolha'; e1.id = 'pre-escolha';
+    e1.innerHTML = '<div class="pre-escolha-t">E os dados do cliente (CPF, endereço…)?</div><div class="pre-escolha-bts">'
+      + '<button type="button" class="pre-esc cli" id="pre-esc-cli"><span class="pre-esc-ic" aria-hidden="true">📲</span><b>Pedir para o cliente preencher</b><small>ele recebe um link já com o que temos, completa no celular e tudo volta para cá sozinho</small></button>'
+      + '<button type="button" class="pre-esc eu" id="pre-esc-eu"><span class="pre-esc-ic" aria-hidden="true">✍️</span><b>Preencher eu mesmo</b><small>seguir agora para os dados do cliente</small></button></div>';
+    row1.parentNode.insertBefore(e1, row1); row1.style.display = 'none';
+    $('pre-esc-eu').onclick = function () { vendaGoStep(2); };
+    $('pre-esc-cli').onclick = function () {
+      // o programa e as condições vão no link: a parte 1 precisa estar completa
+      var falta = Array.prototype.filter.call($('v-step1').querySelectorAll('[required]'), function (el) { return el.type !== 'file' && el.type !== 'radio' && !String(el.value || '').trim(); });
+      if (falta.length) {
+        falta.forEach(function (el) { el.style.borderColor = 'var(--red)'; setTimeout(function () { el.style.borderColor = ''; }, 2400); });
+        falta[0].focus(); falta[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+        toast('Preencha ' + falta.map(function (el) { var lb = el.closest('.f') && el.closest('.f').querySelector('label'); return lb ? lb.childNodes[0].textContent.replace(/[*:]/g, '').trim().toLowerCase() : ''; }).filter(Boolean).join(', ') + ' — vai junto no link para o cliente');
+        return;
+      }
+      copiarLinkCadastro($('pre-esc-cli').querySelector('b'));
+    };
   }
+  var _linkAntes = window.__preLinkEnviado;
+  window.__preLinkEnviado = function () {
+    _linkAntes();
+    var bc = $('pre-esc-cli'); if (bc) { bc.classList.add('feito'); bc.querySelector('small').textContent = '✓ Mensagem copiada — cole na conversa da Clint. Pode fechar esta tela: quando o cliente mandar, os dados entram aqui.'; }
+  };
 
   faltas();
   if (cel8) { if (R.msg || !R.link) buscar(false); else { estadoCliente('esperando'); buscar(false); } }

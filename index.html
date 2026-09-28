@@ -1325,6 +1325,17 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
   .grav-nome { flex-basis:calc(100% - 60px); }
   .grav-acoes { width:100%; padding-left:56px; }
 }
+/* 🗓 remarcar para OUTRO closer (Bruno 28/09/2026: "quero que possa ser para outra pessoa") */
+.rm-quem{margin:14px 0 2px}
+.rm-quem-t{font-size:.7rem;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--text-2);margin-bottom:8px}
+.rm-quem-bts{display:flex;flex-wrap:wrap;gap:6px}
+.rm-q{font:inherit;font-size:.8rem;font-weight:700;padding:7px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--text);cursor:pointer;transition:background .2s,border-color .2s}
+.rm-q:hover{background:rgba(255,255,255,.1)}
+.rm-q small{font-size:.6rem;font-weight:700;opacity:.65;margin-left:4px;text-transform:uppercase;letter-spacing:.4px}
+.rm-q.on{background:rgba(255,154,90,.2);border-color:rgba(255,154,90,.75);color:#ff9a5a}
+.rm-q:focus-visible{outline:2px solid #ffd166;outline-offset:2px}
+.rm-quem-nota{margin-top:12px;font-size:.8rem;line-height:1.55}
+.rm-conf{margin-top:8px;padding:7px 10px;border-radius:10px;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ff8a8a;font-weight:700;font-size:.76rem}
 </style>
 </head>
 <body>
@@ -2628,7 +2639,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-1353';
+var VERSAO_DASH = '2026-09-28-1435';
 var _versaoNova = null;
 
 // =====================================================================
@@ -17701,21 +17712,114 @@ function cancelarRemarcacao() {
   var b = document.getElementById('ag-banner-remarcar');
   if (b) b.remove();
 }
-// clique num horario livre com a REMARCAÇÃO ligada: mesma pessoa, mesma linha — so muda a data
-function remarcarNoSlot(dataStr, hora) {
+// clique num horario livre com a REMARCAÇÃO ligada: mesma pessoa, mesma linha — muda a data e, se quiser, o closer
+// (Bruno 28/09/2026: "quero que possa ser para outra pessoa"): a janela pergunta "Com quem?"; clicando na coluna de
+// outro closer (agenda "ambos"), ele já vem escolhido. Avisa se o closer escolhido já tem reunião nesse horário.
+function _rmDuracao(ev, para) {
+  var t = String((ev && ev.title) || '') + ' ' + String((ev && ev.r && ev.r.produto) || '');
+  return /legado|entrevista/i.test(t) ? 50 : durHT(para);
+}
+function _rmConflito(ck, dataStr, hora, dur, ignorarId) {
+  try {
+    var wk = agDataStr(agSegunda(new Date(dataStr + 'T12:00:00'))), cd = AG.cache[wk] || agLerLocal(wk);
+    if (!cd || !cd[ck]) return null;
+    var min = function(h) { var q = String(h || '').split(':'); return q.length > 1 ? (+q[0]) * 60 + (+q[1]) : NaN; };
+    var ini = min(hora), fim = ini + (dur || 60);
+    return (cd[ck] || []).filter(function(e) {
+      if ((ignorarId && e.id === ignorarId) || e.date !== dataStr || /cancel|remarc/.test(v2norm(e.status || ''))) return false;
+      var a = min(e.startTime), b = min(e.endTime); if (isNaN(a)) return false; if (isNaN(b)) b = a + 60;
+      return a < fim && ini < b;
+    })[0] || null;
+  } catch (e) { return null; }
+}
+function remarcarNoSlot(dataStr, hora, ckSlot) {
   var ev = window._agRemarcando;
   if (!ev) return;
   var dp = dataStr.split('-');
-  if (ev.soPlanilha) {   // veio da ficha: nao temos o evento antigo — mesma linha, evento novo
-    var r = ev.r;
-    confirmarBonito('Remarcar a reunião?',
-      '<b>' + String(r.nome || '').replace(/</g, '&lt;') + '</b> → <b style="color:#ff9a5a;">' + dp[2] + '/' + dp[1] + ' às ' + hora + '</b><br><br>É uma <b>REMARCAÇÃO</b>: a mesma linha da planilha só muda de data (não cria outro nome) e o evento novo entra na agenda com os dados do lead. Closer e SDR recebem o aviso.',
-      '🗓 Remarcar', function() { _remarcarPlanilhaOk(r, dataStr, hora); });
-    return;
-  }
-  confirmarBonito('Remarcar a reunião?',
-    '<b>' + String(ev.title || '').replace(/</g, '&lt;').slice(0, 60) + '</b> → <b style="color:#ff9a5a;">' + dp[2] + '/' + dp[1] + ' às ' + hora + '</b><br><br>É uma <b>REMARCAÇÃO</b>: mesma pessoa, mesma linha na planilha — não cria reunião nova. Closer e SDR recebem o aviso.',
-    '🗓 Remarcar', function() { _remarcarEventoOk(ev, dataStr, hora, dp); });
+  var r0 = ev.soPlanilha ? ev.r : null;
+  var atual = ev.soPlanilha ? (closerChaveDe(r0 && r0.closer) || (AG.closer !== 'ambos' ? AG.closer : '')) : (ev._cal || (AG.closer !== 'ambos' ? AG.closer : ''));
+  var sel = (ckSlot && closerNomeDe(ckSlot)) ? ckSlot : atual;
+  var nomeEv = ev.soPlanilha ? String((r0 && r0.nome) || '') : String(ev.title || '').slice(0, 60);
+  var chips = CLOSERS.filter(function(c) { return !foraDoDash(c.nome); }).map(function(c) {
+    return '<button type="button" class="rm-q' + (c.key === sel ? ' on' : '') + '" data-ck="' + c.key + '">' + c.nome.split(' ')[0] + (c.key === atual ? '<small>atual</small>' : '') + '</button>';
+  }).join('');
+  var corpo = '<b>' + nomeEv.replace(/</g, '&lt;') + '</b> → <b style="color:#ff9a5a;">' + dp[2] + '/' + dp[1] + ' às ' + hora + '</b>'
+    + '<div class="rm-quem"><div class="rm-quem-t">Com quem?</div><div class="rm-quem-bts">' + chips + '</div><div class="rm-quem-nota" id="rm-quem-nota"></div></div>';
+  window._rmPara = sel;
+  confirmarBonito('Remarcar a reunião?', corpo, '🗓 Remarcar', function() {
+    var para = window._rmPara || atual;
+    if (!para || para === atual) {
+      if (ev.soPlanilha) _remarcarPlanilhaOk(r0, dataStr, hora); else _remarcarEventoOk(ev, dataStr, hora, dp);
+      return;
+    }
+    _remarcarParaOutro(ev, dataStr, hora, atual, para);
+  });
+  var cx = document.getElementById('modal-confirma');
+  var nota = function() {
+    var n = document.getElementById('rm-quem-nota'); if (!n) return;
+    var p = window._rmPara, mesmo = !p || p === atual, nP = (closerNomeDe(p) || '').split(' ')[0];
+    var c = p ? _rmConflito(p, dataStr, hora, _rmDuracao(ev, p), ev.id) : null;
+    n.innerHTML = (mesmo
+      ? 'É uma <b>REMARCAÇÃO</b>: mesma pessoa, mesma linha na planilha — não cria reunião nova. Closer e SDR recebem o aviso.'
+      : 'Passa para a agenda de <b>' + nP + '</b>' + (atual ? ' (sai da de ' + (closerNomeDe(atual) || atual).split(' ')[0] + ')' : '') + '. Mesma pessoa, <b>mesma linha</b> na planilha: muda a data e o closer — não cria reunião nova.')
+      + (c ? '<div class="rm-conf">⚠️ ' + nP + ' já tem reunião nesse horário: ' + String(c.title || '').replace(/</g, '&lt;').slice(0, 55) + (c.startTime ? ' (' + c.startTime + ')' : '') + '</div>' : '');
+  };
+  if (cx) Array.prototype.forEach.call(cx.querySelectorAll('.rm-q'), function(b) {
+    b.onclick = function() { window._rmPara = b.dataset.ck; Array.prototype.forEach.call(cx.querySelectorAll('.rm-q'), function(x) { x.classList.toggle('on', x === b); }); nota(); };
+  });
+  nota();
+}
+// remarcar COM OUTRO CLOSER: evento novo (com Meet) na agenda de quem vai atender, o antigo fica "remarcada" e a MESMA
+// linha da planilha ganha a data, o mês, o status e o closer novos (não cria outra pessoa)
+function _remarcarParaOutro(ev, dataStr, hora, de, para) {
+  var dp = dataStr.split('-'), dataBr = dp[2] + '/' + dp[1] + '/' + dp[0];
+  var r = ev.soPlanilha ? ev.r : null;
+  if (!r) { try { r = leadDoEvento(ev); } catch (e) {} }
+  var tit = String(ev.title || ''), temTraco = tit.indexOf(' - ') > 0;
+  var prefixo = temTraco ? tit.split(' - ')[0].trim() : (/legado/i.test((r && r.produto) || '') ? 'Legado' : 'Diagnostico');
+  var nome = (temTraco ? tit.slice(tit.indexOf(' - ') + 3).split('|')[0].trim() : '') || (r && r.nome) || 'Lead';
+  var sdr = (r && r.sdr) || ((tit.match(/\|[^(]*\(([^()]+)\)\s*$/) || [])[1] || '');
+  var tel = ev.tel || (r && r.telefone) || '';
+  var lR = tel ? (LD.rows || []).filter(function(x) { return x.tel8 === ldTel8(tel); })[0] : null;
+  var nDe = (closerNomeDe(de) || de || '').split(' ')[0], nPara = (closerNomeDe(para) || para).split(' ')[0];
+  var antes = ev.soPlanilha ? (r && r.date ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : '') : String(ev.date || '').split('-').reverse().slice(0, 2).join('/') + (ev.startTime ? ' ' + ev.startTime : '');
+  try { avisoRapido('🗓 Passando a reunião para a agenda de ' + nPara + '…'); } catch (e) {}
+  sendToGAS({ action: 'addCalendarOnly', calendar: {
+    agenda: para, data: dataBr, hora: hora, duracao: _rmDuracao(ev, para), prefixoTitulo: prefixo,
+    nome: nome, sdr: sdr, telefone: tel, leadId: ev.leadTag || '',
+    instagram: ev.instagram || (lR && lR.insta ? '@' + String(lR.insta).replace(/^@/, '') : ''),
+    clint: ev.clint || clintLink({ tel: tel, nome: nome }) || '',
+    emailLead: ev.email || (lR ? lR.email : '') || '',
+    obs: 'Remarcação — era com ' + (nDe || 'outro closer') + (antes ? ' em ' + antes : '')
+  } }).then(function(res) {
+    if (!res || !res.success) { alert('Não consegui criar a reunião na agenda de ' + nPara + ': ' + ((res && res.error) || 'sem resposta do robô')); return; }
+    if (ev.id) { sendToGAS({ action: 'updateEventStatus', calendar: de || AG.closer, eventId: ev.id, status: 'remarcada' }); ev.status = 'remarcada'; ev._statusExplicit = true; }
+    if (r && r.nome) {
+      var ref = v2dataRef(r), mesNovo = mesPlanilhaDe(dataStr);
+      var mesAntigo = r.date ? mesPlanilhaDe(r.date.getFullYear() + '-' + String(r.date.getMonth() + 1).padStart(2, '0') + '-' + String(r.date.getDate()).padStart(2, '0')) : '';
+      var eraNS = (r.sn || v2norm(r.status || '')) === 'no show' || v2norm(ev.status || '') === 'noshow';
+      r.obs = (String(r.obs || '').trim() ? String(r.obs).trim() + ' | ' : '')
+        + (eraNS ? '🔴 No-show em ' + (r.date ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : '') + ' ##NOSHOW## | ' : '')
+        + 'Remarcada para ' + dp[2] + '/' + dp[1] + ' ' + hora + ' com ' + nPara + (nDe ? ' (era com ' + nDe + (antes ? ' em ' + antes : '') + ')' : '');
+      // uma coisa de cada vez: observação e data pela data ANTIGA; mês, status e closer já pela data nova
+      sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: ref, gid: V2_GID }).then(function() {
+        return sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'data', valor: dataBr, dataRef: ref, gid: V2_GID });
+      }).then(function() {
+        if (mesNovo && mesNovo !== mesAntigo) sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'mes', valor: mesNovo, dataRef: dataBr, gid: V2_GID });
+        sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'statusReuniao', valor: 'Reunião agendada', dataRef: dataBr, gid: V2_GID });
+        sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'closer', valor: closerNomeDe(para), dataRef: dataBr, gid: V2_GID });
+      });
+      var hp = hora.split(':');
+      r.date = new Date(+dp[0], +dp[1] - 1, +dp[2], parseInt(hp[0] || 0, 10), parseInt(hp[1] || 0, 10));
+      r.status = 'Reunião agendada'; r.sn = 'reuniao agendada'; r.closer = closerNomeDe(para); r.mes = mesNovo || r.mes;
+    } else {
+      try { avisoRapido('⚠️ Não achei essa pessoa na planilha: confira a data e o closer dela na aba Vendas'); } catch (eA) {}
+    }
+    cancelarRemarcacao();
+    agInvalidar();
+    setTimeout(function() { try { carregarAgenda(); } catch (e) {} try { renderV2(); } catch (e) {} }, 2500);
+    try { avisoRapido('🗓 REMARCADA com ' + nPara + ' para ' + dp[2] + '/' + dp[1] + ' às ' + hora + ' — evento novo na agenda de ' + nPara + (nDe ? ', a de ' + nDe + ' ficou como remarcada' : '') + ' · mesma linha na planilha'); } catch (e) {}
+  });
 }
 function _remarcarPlanilhaOk(r, dataStr, hora) {
   var dp = dataStr.split('-');
@@ -18584,7 +18688,7 @@ function fecharAprovacao() {
 function agendarComAprovacao(e, dataStr, hora, ck) {
   e.stopPropagation();
   if (typeof soOlhar === 'function' && soOlhar()) return;   // visitante não agenda (Bruno 26/09/2026)
-  if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
+  if (window._agRemarcando) { remarcarNoSlot(dataStr, hora, ck); return; }
   var quem = ck || (AG.closer !== 'ambos' ? AG.closer : '');
   var closerNome = closerNomeDe(quem) || 'responsável';
   pedirAprovacao(closerNome, hora, function() {
@@ -18596,7 +18700,7 @@ function agendarComAprovacao(e, dataStr, hora, ck) {
 function abrirTipoV2(e, dataStr, hora, ck) {
   e.stopPropagation();
   if (typeof soOlhar === 'function' && soOlhar()) return;   // visitante não agenda (Bruno 26/09/2026)
-  if (window._agRemarcando) { remarcarNoSlot(dataStr, hora); return; }
+  if (window._agRemarcando) { remarcarNoSlot(dataStr, hora, ck); return; }
   window._agAprovado = false;
   var dp = dataStr.split('-');
   var lbl = dp[2] + '/' + dp[1];
@@ -18617,7 +18721,7 @@ function abrirAgendarCom(dur, dataStr, hora, ck, tipo) {
   window._agTipoReuniao = tipo || '';   // 'entrevista' = Entrevista WLD João Stecca (Bruno 22/09/2026); vazio = HT/Legado
   // no modo REMARCAR (Bruno 10/09/2026: "não está dando para remarcar, aparece como se eu estivesse agendando outra"),
   // qualquer clique num horário — inclusive o pedaço "+ Legado" da linha do tempo — é o horário NOVO da mesma reunião
-  if (window._agRemarcando && dataStr && hora) { remarcarNoSlot(dataStr, hora); return; }
+  if (window._agRemarcando && dataStr && hora) { remarcarNoSlot(dataStr, hora, ck); return; }
   abrirAgendar(dur, ck);
   if (dataStr) {
     var dp = dataStr.split('-');
@@ -19045,6 +19149,17 @@ function cadastroCopiarLink(bt) {
   try {
     var t8 = r ? ldTel8(r.telefone) : '', l = t8 ? (LD.rows || []).filter(function(x) { return x.tel8 === t8; })[0] : null;
     var dd = { nome: nome, cel: (r && r.telefone) || (l && l.tel) || '', email: (l && l.email) || '', insta: l ? _instaHandle(l.insta) : '', nicho: (l && l.nicho) || '', prog: (r && r.produto) || '', valor: (r && r.valor > 0) ? v2moeda(r.valor) : '' };
+    // tudo o que a Promov já tem vai junto — bloqueio/entrada e a venda anterior da pessoa (Bruno 28/09/2026: "a pessoa somente complementa")
+    var b = null, ant = null; try { b = bloqueioDe(dd.cel, nome); } catch (eB) {} try { ant = _vendaAnteriorDe(dd.cel, nome); } catch (eA) {}
+    ant = ant || {};
+    dd.cpf = (b && b.cpf) || ant.cpf || ''; dd.email = dd.email || (b && b.email) || ant.email || ''; dd.insta = dd.insta || _instaHandle((b && b.insta) || ant.insta || ''); dd.nicho = dd.nicho || ant.nicho || '';
+    dd.rg = ant.rg || ''; dd.nasc = ant.nasc || ''; dd.civ = ant.civil || ''; dd.prof = ant.prof || ''; dd.end = ant.endereco || '';
+    if (b) {
+      if (!dd.prog && b.programa) dd.prog = b.programa;
+      if (!dd.valor && b.total) dd.valor = b.total;
+      dd.pgto = [b.forma, b.parcelas ? String(b.parcelas).replace(/x$/i, '') + 'x' + (b.valorParcela ? ' de ' + b.valorParcela : '') : '', b.valor ? 'entrada de ' + b.valor : ''].filter(Boolean).join(' · ');
+      if (/^sim/i.test(b.dupla || '')) { dd.dn = b.duplaNome || ''; dd.dc = b.duplaCel || ''; dd.de = b.duplaEmail || ''; }
+    }
     Object.keys(dd).forEach(function(k) { if (!dd[k]) delete dd[k]; });
     hash = '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(dd)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   } catch (eH) {}
