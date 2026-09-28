@@ -298,7 +298,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <div class="colar-row">
         <button type="button" class="btn" onclick="preencherColado('c')">✨ Preencher com o texto</button>
         <button type="button" class="btn" style="background:var(--surface);color:var(--text);border:1px solid var(--border);" onclick="abrirFormsPreenchido()">📝 Abrir o Google Forms preenchido</button>
-        <span class="colar-msg" id="c-colar-msg">Pode colar com TITULAR e SEGUNDA CADEIRA separados</span>
+        <span class="colar-msg" id="c-colar-msg">Cole a resposta do lead — os campos se preenchem sozinhos (TITULAR e SEGUNDA CADEIRA separados também)</span>
       </div>
     </div>
 
@@ -630,7 +630,7 @@ var FORM_VENDA_CAMPOS = {
   programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
   nicho: 'entry.1257400668', obs: 'entry.589500904'
 };
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbyYWM_lOzMmATCwPILzveSqJZOOqUYJYbMQoZuvl2GpBjp8nvemHDfc0JwcH9cy8yFZ/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbwZJ0VkgnICq3qXD5ExxKyAPWPw5cK-hImLEAAkT0IA_IxgKqR9v3qhGi65Byqt1DBR/exec';
 
 var currentStep = 1;
 var currentMode = 'venda'; // 'venda' or 'bloqueio'
@@ -1040,7 +1040,8 @@ function submitVenda() {
         if (res.success) {
           document.getElementById('success-title').textContent = 'Venda registrada!';
           document.getElementById('success-msg').innerHTML = 'A venda de <b>' + document.getElementById('c-nome').value + '</b> entrou no formulário de fechamento (planilha da entrega + contrato), como se tivesse sido preenchida lá.'
-            + (res.faltou && res.faltou.length ? '<br><br><span style="color:var(--red);">Campos que o formulário não aceitou (confira na planilha): ' + res.faltou.join('; ') + '</span>' : '');
+            + (res.faltou && res.faltou.length ? '<br><br><span style="color:var(--red);">Campos que o formulário não aceitou (confira na planilha): ' + res.faltou.join('; ') + '</span>' : '')
+            + (res.semResposta && res.semResposta.length ? '<br><br><span style="color:#f6a350;">Ficaram em branco no Google Forms (o dash ainda não sabe preencher): ' + res.semResposta.join('; ') + '</span>' : '');
         } else {
           document.getElementById('success-title').textContent = 'Não deu para enviar';
           document.querySelector('#success .success-icon').textContent = '!';
@@ -1319,6 +1320,19 @@ function aplicarEndereco(e, ids, msg) {
     avisarPaiDados();
   }).catch(function(){});
 }
+// 28/09/2026 (Bruno: "quero que isso preencha os dados"): colou o texto do lead → os campos se preenchem SOZINHOS
+// (sem clicar em "Preencher"); digitando/editando na caixa, preenche de novo 0,7 s depois de parar
+(function () {
+  function ligar(p) {
+    var ta = document.getElementById(p + '-colar'); if (!ta || ta._auto) return; ta._auto = true;
+    var t = 0, ultimo = '';
+    var rodar = function () { var v = ta.value; if (v === ultimo) return; ultimo = v; if ((v.match(/[:：]/g) || []).length >= 2) preencherColado(p); };
+    ta.addEventListener('paste', function () { setTimeout(rodar, 60); });
+    ta.addEventListener('input', function () { clearTimeout(t); t = setTimeout(rodar, 700); });
+  }
+  function tudo() { ligar('c'); ligar('b'); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tudo); else tudo();
+})();
 function preencherColado(p) {   // p = 'c' (venda) ou 'b' (bloqueio)
   var ta = document.getElementById(p + '-colar'); if (!ta) return;
   var d = lerDadosColados(ta.value), t = d.titular, ids = [], msg = document.getElementById(p + '-colar-msg');
