@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-1004';
+var VERSAO_DASH = '2026-09-28-1015';
 var _versaoNova = null;
 
 // =====================================================================
@@ -14793,6 +14793,15 @@ window.__gvizPagV2 = function(resp) {
         stC: cel(r, iStC).trim(), omie: cel(r, iOmie).trim(),
         vendedor: cel(r, iVend).trim(), date: dt, extras: extras
       });
+    });
+    // 28/09/2026: o Forms antigo só tinha Tony e Bruno — quem escolhia "Outro" sem escrever gravava "__other_option__"
+    // (venda da Sarah saiu assim). Nesses casos o vendedor vira o closer da reunião da mesma pessoa (aba Vendas).
+    rows.forEach(function(p) {
+      if (!/__other_option__|^outro$/i.test(String(p.vendedor || '').trim())) return;
+      var t8 = ldTel8(p.celular || ''), kN = v2nomeChave(p.nome || ''), achou = '';
+      (V2.rows || []).forEach(function(r) { if (!achou && r.closer && ((t8 && ldTel8(r.telefone) === t8) || (kN && v2nomeChave(r.nome) === kN))) achou = r.closer; });
+      p.vendedor = achou || '';
+      p._vendedorDeduzido = !!achou;
     });
     PAG.rows = rows;
     try { if (typeof telaVisivel === 'function' && telaVisivel('s-contratos')) renderContratos(); } catch (eCtr) {}
