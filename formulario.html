@@ -297,6 +297,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <textarea id="c-colar" placeholder="Cole aqui o texto do lead, do jeito que ele mandou:&#10;Nome completo: ...&#10;CPF: ...&#10;Celular: ...&#10;E-mail: ...&#10;(uma linha por campo — os campos abaixo se preenchem sozinhos)"></textarea>
       <div class="colar-row">
         <button type="button" class="btn" onclick="preencherColado('c')">✨ Preencher com o texto</button>
+        <button type="button" class="btn" style="background:rgba(61,220,151,.14);color:#3ddc97;border:1px solid rgba(61,220,151,.45);" onclick="copiarLinkCadastro(this)" title="Copia uma mensagem com o link da página de cadastro — o cliente preenche no celular e manda de volta pelo WhatsApp">🔗 Link para o cliente preencher</button>
         <button type="button" class="btn" style="background:var(--surface);color:var(--text);border:1px solid var(--border);" onclick="abrirFormsPreenchido()">📝 Abrir o Google Forms preenchido</button>
         <span class="colar-msg" id="c-colar-msg">Cole a resposta do lead — os campos se preenchem sozinhos (TITULAR e SEGUNDA CADEIRA separados também)</span>
       </div>
@@ -1253,11 +1254,28 @@ function separarEndereco(texto) {
   }
   return r;
 }
+// 🔗 LINK DE CADASTRO PARA O CLIENTE (Bruno 28/09/2026: "gere algo que o próprio lead responda através de um link externo, simples e fácil")
+// copia a mensagem pronta com o link da página cadastro.html; o cliente preenche e manda de volta no formato que esta tela entende
+function copiarLinkCadastro(bt) {
+  var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function(p){ if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
+  var g = function(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  var nome = g('c-nome') || q.nome || '', vend = g('v-vendedor') || q.vendedor || '', prog = g('v-programa') || q.programa || '';
+  var dupla = document.getElementById('dupla-s') && document.getElementById('dupla-s').checked;
+  var p = ['n=' + encodeURIComponent(nome.split(' ')[0] || ''), 'c=' + encodeURIComponent(vend), 'p=' + encodeURIComponent(prog)];
+  if (q.wz) p.push('w=' + encodeURIComponent(String(q.wz).replace(/\D/g, '')));
+  if (dupla) p.push('d=1');
+  var url = new URL('cadastro.html', location.href).href.split('?')[0] + '?' + p.join('&');
+  var msg = 'Oi' + (nome ? ', ' + nome.split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
+  var ok = function() { var m = document.getElementById('c-colar-msg'); if (m) m.textContent = '✓ Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente mandar os dados de volta, cole aqui em cima.'; if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado'; setTimeout(function(){ bt.textContent = t0; }, 2500); } };
+  (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
+}
 function lerDadosColados(texto) {
   var out = { titular: {}, dupla: {}, n: 0 }, quem = 'titular';
   var chaves = [
     ['nome', /^(nome( completo)?|nome do (mentorado|cliente|titular)|mentorad[oa]|titular)$/],
-    ['cpf', /^(cpf|cnpj|cpf ?\/ ?cnpj|cpf ou cnpj|documento)$/],
+    ['cnpj', /^cnpj( da empresa)?$/],
+    ['razao', /razao social|^empresa$|^nome da empresa$/],
+    ['cpf', /^(cpf|cpf ?\/ ?cnpj|cpf ou cnpj|documento)$/],
     ['rg', /^(rg|identidade|rg ?\/ ?orgao emissor)$/],
     ['nasc', /nascimento|^data de nasc|^nasc|^dn$/],
     ['civil', /estado civil/],
@@ -1344,7 +1362,10 @@ function preencherColado(p) {   // p = 'c' (venda) ou 'b' (bloqueio)
     _poeColado('c-insta', _instaColado(t.insta), ids); _poeColado('c-yt', t.yt, ids); _poeColado('c-tik', t.tik, ids); _poeColado('c-seg', t.seg, ids); _poeColado('c-nicho', t.nicho, ids);
     var e = t.endereco ? separarEndereco(t.endereco) : { rua: '', num: '', comp: '', bairro: '', cidade: '', uf: '', cep: '' };
     ['cep', 'rua', 'num', 'comp', 'bairro', 'cidade', 'uf'].forEach(function(k){ if (t[k]) e[k] = (k === 'uf') ? _ufColada(t[k]) : (k === 'cep' ? String(t[k]).replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2') : t[k]); });
-    if (temDupla) { try { document.getElementById('dupla-s').checked = true; toggleDupla(); } catch (er) {} _poeColado('c-dupla-nome', d.dupla.nome, ids); _poeColado('c-dupla-cel', _telColado(d.dupla.cel), ids); _poeColado('c-dupla-email', d.dupla.email, ids); }
+    if (temDupla) { try { document.getElementById('dupla-s').checked = true; toggleDupla(); } catch (er) {} _poeColado('c-dupla-nome', d.dupla.nome, ids); _poeColado('c-dupla-cel', _telColado(d.dupla.cel), ids); _poeColado('c-dupla-email', d.dupla.email, ids);
+      _poeColado('c-dupla-cpf', _cpfColado(d.dupla.cpf), ids); _poeColado('c-dupla-rg', d.dupla.rg, ids); _poeColado('c-dupla-endereco', d.dupla.endereco, ids); }
+    // empresa (CNPJ) — vem da página de cadastro do cliente (28/09/2026)
+    if (t.cnpj || t.razao) { try { var pjR = document.getElementById('tipo-pj'); if (pjR && !pjR.checked) { pjR.checked = true; togglePJ(); } } catch (ePj) {} _poeColado('c-cnpj', t.cnpj, ids); _poeColado('c-razao', t.razao, ids); }
     aplicarEndereco(e, ids, msg);
     if (msg) msg.textContent = ids.length ? '✓ ' + ids.length + ' campos preenchidos' + (t.endereco ? ' · confira o endereço' : '') + (temDupla ? ' · dupla incluída' : '') : 'Não achei "Campo: valor" no texto';
   } else {
@@ -1601,6 +1622,74 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
     if (e.key === 'Escape') { fechar(); return; }
     if (ehData(e.target) && e.key !== 'Tab') e.preventDefault();
   }, true);
+})();
+</script>
+<script>
+// ✅ CONFERÊNCIA RIGOROSA DOS DADOS DO CLIENTE (Bruno 28/09/2026: "com rigor dos dados, pois serão para contrato e nota")
+// CPF/CNPJ pelos dígitos verificadores, celular com DDD válido, e-mail com aviso de erro de digitação, CEP com 8 números,
+// data de nascimento real. Mostra na hora, ao sair do campo, e não deixa passar da etapa "Cliente" nem enviar com dado errado.
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var dig = function (v) { return String(v || '').replace(/\D/g, ''); };
+  var DDDS = [11,12,13,14,15,16,17,18,19,21,22,24,27,28,31,32,33,34,35,37,38,41,42,43,44,45,46,47,48,49,51,53,54,55,61,62,63,64,65,66,67,68,69,71,73,74,75,77,79,81,82,83,84,85,86,87,88,89,91,92,93,94,95,96,97,98,99];
+  var DOM = ['gmail.com','hotmail.com','outlook.com','yahoo.com','yahoo.com.br','icloud.com','live.com','uol.com.br','bol.com.br','terra.com.br','outlook.com.br','hotmail.com.br','msn.com','me.com'];
+  function lev(a, b) { var m = [], i, j; for (i = 0; i <= b.length; i++) m[i] = [i]; for (j = 0; j <= a.length; j++) m[0][j] = j; for (i = 1; i <= b.length; i++) for (j = 1; j <= a.length; j++) m[i][j] = b[i - 1] === a[j - 1] ? m[i - 1][j - 1] : Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1); return m[b.length][a.length]; }
+  function cpfOk(v) { var c = dig(v); if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false; for (var t = 9; t < 11; t++) { var s = 0; for (var i = 0; i < t; i++) s += +c[i] * (t + 1 - i); if (+c[t] !== (s * 10) % 11 % 10) return false; } return true; }
+  function cnpjOk(v) { var c = dig(v); if (c.length !== 14 || /^(\d)\1{13}$/.test(c)) return false; var k = function (n) { var p = n === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2], s = 0; for (var i = 0; i < n; i++) s += +c[i] * p[i]; var r = s % 11; return r < 2 ? 0 : 11 - r; }; return k(12) === +c[12] && k(13) === +c[13]; }
+  function celErro(v) { var d = dig(v).replace(/^55(?=\d{10,11}$)/, ''); if (d.length !== 10 && d.length !== 11) return 'Celular com DDD: (00) 00000-0000'; if (DDDS.indexOf(+d.slice(0, 2)) < 0) return 'Esse DDD não existe'; if (d.length === 11 && d[2] !== '9') return 'Celular começa com 9 depois do DDD'; return ''; }
+  function emailErro(v, id) {
+    var e = String(v || '').trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}(\.[a-z]{2,})?$/.test(e)) return 'E-mail inválido — confira o @ e o final';
+    var dom = e.split('@')[1], sug = ''; if (DOM.indexOf(dom) < 0) DOM.forEach(function (d) { if (!sug && lev(dom, d) <= 2) sug = d; });
+    return sug ? { aviso: 'Será que é <a href="#" data-sug="' + id + '" data-v="' + e.split('@')[0] + '@' + sug + '">' + e.split('@')[0] + '@' + sug + '</a>?' } : '';
+  }
+  function dataErro(v) {
+    var s = String(v || ''), m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/) || s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (!m) return 'Data de nascimento inválida';
+    var a = m[1].length === 4 ? [+m[1], +m[2], +m[3]] : [+m[3], +m[2], +m[1]], d = new Date(a[0], a[1] - 1, a[2]);
+    if (d.getDate() !== a[2]) return 'Essa data não existe'; var anos = (Date.now() - d.getTime()) / (365.25 * 864e5); if (anos < 16 || anos > 100) return 'Confira o ano de nascimento'; return '';
+  }
+  var pj = function () { return !!($('tipo-pj') && $('tipo-pj').checked); };
+  var dupla = function () { return !!($('dupla-s') && $('dupla-s').checked); };
+  var REGRAS = {
+    'c-nome': function (v) { return String(v).trim().split(/\s+/).length >= 2 ? '' : 'Nome completo (nome e sobrenome)'; },
+    'c-cpf': function (v) { return cpfOk(v) ? '' : (dig(v).length !== 11 ? 'CPF tem 11 números' : 'Esse CPF não existe — confira os números'); },
+    'c-cnpj': function (v) { return !pj() || cnpjOk(v) ? '' : (dig(v).length !== 14 ? 'CNPJ tem 14 números' : 'Esse CNPJ não existe — confira'); },
+    'c-cel': celErro,
+    'c-email': function (v) { return emailErro(v, 'c-email'); },
+    'c-cep': function (v) { return dig(v).length === 8 ? '' : 'CEP tem 8 números'; },
+    'c-nasc': dataErro,
+    'c-dupla-cpf': function (v) { return !dupla() || !String(v).trim() || cpfOk(v) ? '' : 'CPF da dupla não existe — confira'; },
+    'c-dupla-cel': function (v) { return !dupla() || !String(v).trim() ? '' : celErro(v); },
+    'c-dupla-email': function (v) { return !dupla() || !String(v).trim() ? '' : emailErro(v, 'c-dupla-email'); }
+  };
+  var OK = { 'c-cpf': '✓ CPF válido', 'c-cnpj': '✓ CNPJ válido', 'c-cel': '✓ celular ok', 'c-email': '✓ e-mail ok' };
+  function marcar(id) {
+    var el = $(id); if (!el) return true;
+    var r = REGRAS[id](el.value), erro = typeof r === 'string' ? r : '', aviso = r && r.aviso;
+    var box = el.parentNode, m = box.querySelector('.rg-msg');
+    box.querySelectorAll('.field-error').forEach(function (x) { x.remove(); });
+    if (!m) { m = document.createElement('div'); m.className = 'rg-msg'; m.style.cssText = 'font-size:.7rem;margin-top:4px;font-weight:600;'; box.appendChild(m); }
+    if (!String(el.value).trim() && !erro) { m.textContent = ''; el.style.borderColor = ''; return true; }
+    el.style.borderColor = erro ? 'var(--red)' : 'rgba(61,220,151,.6)';
+    m.style.color = erro ? 'var(--red)' : aviso ? '#ffd166' : '#3ddc97';
+    m.innerHTML = erro || aviso || OK[id] || '';
+    return !erro;
+  }
+  Object.keys(REGRAS).forEach(function (id) { var el = $(id); if (!el) return; el.addEventListener('blur', function () { if (String(el.value).trim()) marcar(id); }); el.addEventListener('change', function () { if (String(el.value).trim()) marcar(id); }); });
+  document.addEventListener('click', function (e) { var a = e.target.closest && e.target.closest('[data-sug]'); if (!a) return; e.preventDefault(); $(a.dataset.sug).value = a.dataset.v; marcar(a.dataset.sug); });
+  // quem colou o texto: confere tudo o que entrou
+  var _pc = window.preencherColado;
+  if (typeof _pc === 'function') window.preencherColado = function (p) { var r = _pc.apply(this, arguments); if (p === 'c') setTimeout(function () { Object.keys(REGRAS).forEach(function (id) { if ($(id) && String($(id).value).trim()) marcar(id); }); }, 50); return r; };
+  function problemas() { var l = []; Object.keys(REGRAS).forEach(function (id) { var el = $(id); if (!el) return; if (!marcar(id)) l.push(el); }); return l; }
+  function barrar(l) {
+    if (!l.length) return false;
+    if (typeof currentStep !== 'undefined' && currentStep !== 2) { try { document.getElementById('v-step' + currentStep).style.display = 'none'; document.getElementById('v-step2').style.display = 'block'; currentStep = 2; updateProgress(); } catch (e) {} }
+    l[0].focus(); l[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    return true;
+  }
+  var _go = window.vendaGoStep;
+  if (typeof _go === 'function') window.vendaGoStep = function (n) { if (typeof currentStep !== 'undefined' && currentStep === 2 && n > 2 && barrar(problemas())) return; return _go.apply(this, arguments); };
+  var _sv = window.submitVenda;
+  if (typeof _sv === 'function') window.submitVenda = function () { if (barrar(problemas())) return; return _sv.apply(this, arguments); };
 })();
 </script>
 </body>

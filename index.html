@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-1034';
+var VERSAO_DASH = '2026-09-28-1046';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4232,11 +4232,16 @@ function igCardsOrganicos(per) {
 var POSTS_ORG = { porLink: {}, porCodigo: {}, carregado: false };
 // codigo do post no link do Instagram (reel/p/tv) — assim o mesmo post casa mesmo com ?igsh=… ou sem www
 function _igCodigoDash(link) { var m = String(link || '').match(/instagram\.com\/(?:[^\/?#]+\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i); return m ? m[1] : ''; }
-function carregarPostsOrganicos() {
+function carregarPostsOrganicos(tentativa) {
+  if (POSTS_ORG._pedindo) return;
+  POSTS_ORG._pedindo = true;
   var nome = 'poCb' + Math.random().toString(36).slice(2, 8);
   var sc = document.createElement('script');
+  var deNovo = function() { POSTS_ORG._pedindo = false; if ((tentativa || 0) < 2) setTimeout(function() { carregarPostsOrganicos((tentativa || 0) + 1); }, 5000 + (tentativa || 0) * 8000); };
   window[nome] = function(d) {
     try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    POSTS_ORG._pedindo = false;
+    if (!(d && d.success)) { deNovo(); return; }
     if (d && d.success) {
       POSTS_ORG.porLink = {}; POSTS_ORG.porCodigo = {};
       (d.lista || []).forEach(function(p){ if (p.link && p.fotoId) { POSTS_ORG.porLink[p.link] = p; var c = _igCodigoDash(p.link); if (c) POSTS_ORG.porCodigo[c] = p; } });
@@ -4246,7 +4251,7 @@ function carregarPostsOrganicos() {
       setTimeout(function(){ try { pedirCapasIG(); } catch (eP) {} }, 800);
     }
   };
-  sc.onerror = function(){ try { delete window[nome]; } catch (e) {} };
+  sc.onerror = function(){ try { delete window[nome]; } catch (e) {} deNovo(); };
   sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'listarPostsOrganicos' }));
   document.body.appendChild(sc);
 }
@@ -4555,6 +4560,7 @@ function abrirFormVenda(dados) {
   if (dados.cel) dados.cel = String(dados.cel).replace(/\D/g, '').replace(/^55(\d{10,11})$/, '$1');
   // a NOSSA tela (formulario.html modo venda), ja preenchida; o robo responde o Google Forms por dentro
   var partes = ['embed=1', 'modo=venda'];
+  try { var wzC = dspClintNumero(); if (wzC) partes.push('wz=' + wzC); } catch (eWz) {}
   var mapa = { nome: dados.nome, cel: dados.cel, email: dados.email, insta: dados.insta, seg: dados.seg, nicho: dados.nicho, vendedor: _nomeCurto(dados.vendedor), sdr: dados.sdr,
     programa: dados.programa, clint: dados.clint, cpf: dados.cpf, valor: dados.valor, obs: dados.obs,
     entrada: dados.teveEntrada === 'Sim' ? 'Sim' : '', valorEntrada: dados.valorEntrada || '', bloqueio: dados.teveBloqueio === 'Sim' ? 'Sim' : '',
@@ -9541,6 +9547,7 @@ function renderDisparos() {
 function renderAnuncios() {
   var el = document.getElementById('an-corpo');
   if (!el) return;
+  try { if (!POSTS_ORG.carregado) carregarPostsOrganicos(); } catch (ePo) {}   // capas dos posts já ao abrir a aba (28/09/2026)
   var per = anPeriodo();
   // chips de período
   var chips = document.getElementById('an-chips');
@@ -9975,6 +9982,9 @@ function buscarCriativosTodos(tentativa, silencioso) {
     if (silencioso) return;
     // outro computador está montando a lista agora: espera e pede de novo (em vez de cair nas 25 páginas)
     if (d && d.error && /montagem|rodando/i.test(d.error) && (tentativa || 0) < 5) { setTimeout(function() { buscarCriativosTodos((tentativa || 0) + 1); }, 45000); return; }
+    // 28/09/2026 (Bruno: "cadê as imagens"): robô recém-implantado "acordando" falha na 1ª chamada — tenta de novo 2 vezes
+    // antes de cair no caminho lento das páginas (que deixava tudo "sem imagem" por minutos)
+    if ((tentativa || 0) < 2 && !(d && d.error && /desconhecid|unknown|nao existe/i.test(d.error))) { META_CRI.esperandoTodos = true; setTimeout(function() { buscarCriativosTodos((tentativa || 0) + 1); }, 5000 + (tentativa || 0) * 8000); return; }
     // robô antigo (não conhece a ação) ou falhou: volta ao jeito antigo, por páginas
     META_CRI.todosOk = false;
     carregarCriativos();
@@ -19006,6 +19016,19 @@ function agUsarDaLista(i) {
 }
 // so Bruno e Adm trocam a pessoa ligada a uma reuniao (Bruno 23/08/2026)
 // 🤝 Executivo = time de Customer Success (Bruno 28/09/2026: "transforme o acesso da Juliane em executivo")
+// 🔗 link da página de cadastro para o cliente preencher (28/09/2026) — mesma mensagem da tela de venda
+function cadastroCopiarLink(bt) {
+  var r = null; try { r = _v2reg[_fichaAtual]; } catch (e) {}
+  var nome = (r && r.nome) || ((document.getElementById('fl-nome') || {}).textContent || '').trim();
+  var p = ['n=' + encodeURIComponent(String(nome).split(' ')[0] || ''), 'c=' + encodeURIComponent((r && r.closer) || ''), 'p=' + encodeURIComponent((r && r.produto) || '')];
+  try { var wz = dspClintNumero(); if (wz) p.push('w=' + wz); } catch (e) {}
+  if (r && /cadeira/i.test(r.produto || '')) p.push('d=1');
+  var url = new URL('cadastro.html', location.href).href.split('?')[0].replace(/index\.html$/, '') + '?' + p.join('&');
+  url = url.replace(/\/cadastro\.html/, '/cadastro.html');
+  var msg = 'Oi' + (nome ? ', ' + String(nome).split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
+  var ok = function() { try { avisoRapido('🔗 Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente mandar os dados, cole na tela 💰 Registrar venda.'); } catch (e) {} if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado'; setTimeout(function() { bt.textContent = t0; }, 2500); } };
+  (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
+}
 function ehExecutivo() {
   var login = localStorage.getItem('v2Login'), ok = false;
   if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a) { if (a.nome === login && a.executivo) ok = true; });
@@ -23409,6 +23432,7 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 .fl-atalhos .clint { color:#b9a6ff; border-color:rgba(108,71,255,.45); background:rgba(108,71,255,.14); }
 .fl-atalhos .ig { color:#ff9ac4; border-color:rgba(225,48,108,.45); background:linear-gradient(135deg, rgba(254,218,117,.10), rgba(214,41,118,.16) 55%, rgba(79,91,213,.14)); }
 .fl-atalhos .ig svg { width:15px; height:15px; flex:none; }
+.fl-atalhos .cad { color:#3ddc97; border-color:rgba(61,220,151,.45); background:rgba(61,220,151,.1); }
 /* o topo da ficha fica por cima de um fundo inteiro (antes o que rolava aparecia acima dele — print do Bruno 28/09/2026) */
 #modal-lead .modal-head::before { content:''; position:absolute; left:-40px; right:-40px; bottom:100%; height:44px; background:var(--panel, #14171d); pointer-events:none; }
 #modal-lead .modal-head { box-shadow:0 12px 18px -14px rgba(0,0,0,.85); }
@@ -23746,6 +23770,7 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
     if (!ig) try { ig = gvInstaLimpo(((li.textContent || '').match(/instagram(?:\.com\/|:\s*)@?([A-Za-z0-9._]{2,30})/i) || [])[1] || ''); } catch (eL) {}
     if (ig && !ehVisitante()) h += '<a class="ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + ig + ' no Instagram">' + igLogo() + ' @' + ig + '</a>';
     h += '<button type="button" onclick="event.stopPropagation();var b=document.getElementById(\'btn-copiar\');if(b)b.click();">📋 Copiar dados</button>';
+    if (!ehVisitante()) h += '<button type="button" class="cad" onclick="event.stopPropagation();cadastroCopiarLink(this)" title="Copia uma mensagem com o link para o cliente preencher os dados do contrato no celular">🔗 Link de cadastro</button>';
     if (at.innerHTML !== h) at.innerHTML = h;
   }
   (function () {

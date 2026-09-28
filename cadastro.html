@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d11">
+<meta name="robots" content="noindex">
+<title>Cadastro Promov</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!--
+  📝 CADASTRO DO CLIENTE PROMOV (Bruno 28/09/2026: "remodele o de preenchimento do cliente com experiência fluida e fácil de preencher,
+  numa experiência premium e fácil, mas com rigor dos dados, pois serão para contrato e nota").
+  O closer manda o link; o cliente preenche no celular, passo a passo, com cada dado conferido na hora (CPF/CNPJ pelos dígitos,
+  CEP pelos Correios/ViaCEP, e-mail com aviso de erro de digitação, celular com DDD válido, data real). No fim, "Enviar pelo WhatsApp"
+  manda tudo no formato que a tela de venda do dash entende (colou → os campos se preenchem sozinhos).
+  Nada é gravado em servidor: os dados vão direto do celular do cliente para a conversa com a Promov.
+  Parâmetros do link: n = primeiro nome · w = WhatsApp da Promov (com 55) · p = programa · c = closer · d=1 = já abre a segunda cadeira
+-->
+<style>
+:root {
+  --bg:#0b0d11; --surface:#13161d; --surface2:#191d26; --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.16);
+  --text:#f1f2f5; --text2:#c3c7d1; --muted:#8b91a0; --accent:#f6a350; --accent2:#ffd166; --ok:#3ddc97; --err:#ff6b6b;
+  --r:16px; --disp:'Barlow Condensed', 'Arial Narrow', Inter, sans-serif;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+[hidden] { display:none !important; }
+html { -webkit-text-size-adjust:100%; }
+body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--text); font:15px/1.5 Inter, system-ui, -apple-system, sans-serif;
+  background-image:radial-gradient(90% 60% at 50% -10%, rgba(246,163,80,.13), transparent 60%), radial-gradient(60% 50% at 100% 110%, rgba(255,209,102,.06), transparent 60%);
+  background-attachment:fixed; }
+.pg { max-width:540px; margin:0 auto; padding:calc(18px + env(safe-area-inset-top)) 16px calc(120px + env(safe-area-inset-bottom)); }
+.topo { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+.marca { font-family:var(--disp); font-weight:900; font-size:1.55rem; letter-spacing:2px; }
+.marca i { font-style:normal; color:var(--accent); }
+.selo { display:inline-flex; align-items:center; gap:6px; font-size:.7rem; font-weight:700; color:var(--muted); padding:5px 10px; border-radius:999px; border:1px solid var(--line); }
+.selo svg { width:13px; height:13px; }
+.ola h1 { font-family:var(--disp); font-weight:800; font-size:clamp(1.9rem, 7.5vw, 2.5rem); line-height:1.02; letter-spacing:.3px; text-wrap:balance; }
+.ola h1 em { font-style:normal; color:var(--accent2); }
+.ola p { margin-top:8px; color:var(--text2); font-size:.92rem; max-width:44ch; }
+.passos { display:flex; gap:6px; margin:22px 0 18px; }
+.passos span { flex:1; height:4px; border-radius:99px; background:var(--line2); overflow:hidden; position:relative; }
+.passos span::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg, var(--accent), var(--accent2)); transform:scaleX(0); transform-origin:left; transition:transform .45s cubic-bezier(.22,1,.36,1); }
+.passos span.feito::after, .passos span.agora::after { transform:scaleX(1); }
+.passos span.agora::after { opacity:.9; }
+.etapa-rot { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+.etapa-rot b { font-family:var(--disp); font-weight:800; font-size:1.35rem; letter-spacing:.4px; text-transform:uppercase; }
+.etapa-rot span { font-size:.72rem; font-weight:700; color:var(--muted); }
+.card { background:linear-gradient(180deg, var(--surface2), var(--surface)); border:1px solid var(--line); border-radius:22px; padding:20px 18px; box-shadow:0 24px 50px -30px rgba(0,0,0,.9); }
+.etapa { display:none; }
+.etapa.on { display:block; animation:entra .45s cubic-bezier(.22,1,.36,1); }
+.etapa.on.volta { animation-name:entraVolta; }
+@keyframes entra { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:none; } }
+@keyframes entraVolta { from { opacity:0; transform:translateX(-18px); } to { opacity:1; transform:none; } }
+.grupo { display:flex; flex-direction:column; gap:14px; }
+.lado { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.lado.l3 { grid-template-columns:1.6fr 1fr; }
+.campo { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.campo > label { font-size:.78rem; font-weight:700; color:var(--text2); display:flex; justify-content:space-between; gap:8px; }
+.campo > label small { font-weight:600; color:var(--muted); }
+.campo input, .campo select { width:100%; height:50px; padding:0 14px; border-radius:14px; border:1px solid var(--line2); background:rgba(0,0,0,.28); color:var(--text);
+  font:inherit; font-size:1rem; font-weight:600; transition:border-color .2s, box-shadow .2s, background .2s; -webkit-appearance:none; appearance:none; }
+.campo select { background-image:linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:calc(100% - 20px) 22px, calc(100% - 14px) 22px; background-size:6px 6px; background-repeat:no-repeat; padding-right:34px; }
+.campo select option { background:#13161d; color:var(--text); }
+.campo input::placeholder { color:#5d6372; font-weight:500; }
+.campo input:focus, .campo select:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(246,163,80,.15); background:rgba(0,0,0,.36); }
+.campo.ok input, .campo.ok select { border-color:rgba(61,220,151,.55); }
+.campo.erro input, .campo.erro select { border-color:var(--err); box-shadow:0 0 0 4px rgba(255,107,107,.12); }
+.msg { font-size:.74rem; font-weight:600; min-height:0; color:var(--muted); line-height:1.4; }
+.campo.erro .msg { color:var(--err); }
+.campo.ok .msg.okmsg { color:var(--ok); }
+.msg button { font:inherit; font-weight:800; color:var(--accent2); background:none; border:0; text-decoration:underline; cursor:pointer; padding:0; }
+.seg { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:4px; border-radius:14px; background:rgba(0,0,0,.3); border:1px solid var(--line); }
+.seg button { height:42px; border:0; border-radius:11px; background:transparent; color:var(--text2); font:inherit; font-weight:700; font-size:.88rem; cursor:pointer; transition:background .2s, color .2s; }
+.seg button.on { background:var(--accent); color:#1a1206; }
+.seg button:focus-visible { outline:2px solid var(--accent2); outline-offset:2px; }
+.check { display:flex; gap:12px; align-items:flex-start; padding:14px; border-radius:14px; border:1px solid var(--line); background:rgba(0,0,0,.2); cursor:pointer; font-size:.86rem; color:var(--text2); }
+.check input { width:22px; height:22px; margin-top:1px; accent-color:var(--accent); flex:none; }
+.check b { color:var(--text); }
+.divisor { display:flex; align-items:center; gap:10px; margin:4px 0; font-size:.7rem; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); }
+.divisor::before, .divisor::after { content:''; flex:1; height:1px; background:var(--line); }
+.cep-st { display:inline-flex; align-items:center; gap:6px; }
+.gira { width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,.2); border-top-color:var(--accent); animation:gira .8s linear infinite; }
+@keyframes gira { to { transform:rotate(360deg); } }
+.rev { display:flex; flex-direction:column; gap:12px; }
+.rev-bloco { border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+.rev-bloco h3 { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; font-size:.74rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--muted); background:rgba(255,255,255,.03); }
+.rev-bloco h3 button { font:inherit; font-size:.72rem; letter-spacing:0; text-transform:none; font-weight:800; color:var(--accent2); background:none; border:0; cursor:pointer; }
+.rev-bloco dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; padding:12px 14px; font-size:.86rem; }
+.rev-bloco dt { color:var(--muted); font-weight:600; white-space:nowrap; }
+.rev-bloco dd { font-weight:700; overflow-wrap:anywhere; }
+.acoes { position:fixed; left:0; right:0; bottom:0; z-index:5; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(180deg, rgba(11,13,17,0), rgba(11,13,17,.92) 30%); }
+.acoes .in { max-width:540px; margin:0 auto; display:flex; gap:10px; }
+.bt { height:54px; border-radius:16px; border:1px solid var(--line2); background:rgba(255,255,255,.05); color:var(--text); font:inherit; font-weight:800; font-size:.95rem; cursor:pointer; padding:0 18px;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; transition:transform .15s, background .2s, box-shadow .2s; }
+.bt:active { transform:scale(.98); }
+.bt.pri { flex:1; border:0; color:#1a1206; background:linear-gradient(135deg, var(--accent2), var(--accent)); box-shadow:0 14px 30px -12px rgba(246,163,80,.7); }
+.bt.zap { flex:1; border:0; color:#062414; background:linear-gradient(135deg, #5ef0a4, #25d366); box-shadow:0 14px 30px -12px rgba(37,211,102,.6); }
+.bt:focus-visible { outline:2px solid var(--accent2); outline-offset:3px; }
+.bt[disabled] { opacity:.45; cursor:not-allowed; box-shadow:none; }
+.privado { display:flex; gap:10px; align-items:flex-start; margin-top:16px; font-size:.74rem; color:var(--muted); line-height:1.5; }
+.privado svg { flex:none; width:16px; height:16px; margin-top:2px; color:var(--ok); }
+.fim { text-align:center; padding:26px 6px 6px; }
+.fim .ok { width:84px; height:84px; margin:0 auto 16px; border-radius:50%; display:grid; place-items:center; background:radial-gradient(circle, rgba(61,220,151,.25), rgba(61,220,151,.05)); border:2px solid rgba(61,220,151,.6); animation:pulo .6s cubic-bezier(.34,1.56,.64,1) both; }
+.fim .ok svg { width:40px; height:40px; color:var(--ok); }
+@keyframes pulo { from { transform:scale(.4); opacity:0; } to { transform:none; opacity:1; } }
+.fim h2 { font-family:var(--disp); font-weight:800; font-size:2rem; line-height:1.05; }
+.fim p { margin:10px auto 0; color:var(--text2); max-width:38ch; font-size:.92rem; }
+.fim .bt { margin-top:18px; width:100%; }
+.rodape { margin-top:26px; text-align:center; font-size:.7rem; color:#5d6372; }
+@media (min-width:600px) { .card { padding:26px 24px; } }
+@media (max-width:360px) { .lado { grid-template-columns:1fr; } }
+@media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<main class="pg">
+  <header class="topo">
+    <div class="marca">PROMOV<i>.</i></div>
+    <span class="selo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>dados protegidos</span>
+  </header>
+
+  <section class="ola" id="ola">
+    <h1 id="ola-t">Seus dados para o <em>contrato</em></h1>
+    <p id="ola-p">Leva uns 2 minutinhos. Cada informação é conferida na hora, para o contrato e a nota fiscal saírem certinhos.</p>
+  </section>
+
+  <div class="passos" id="passos" aria-hidden="true"></div>
+  <div class="etapa-rot"><b id="etapa-nome">Você</b><span id="etapa-num">1 de 4</span></div>
+
+  <form class="card" id="form" novalidate autocomplete="on">
+    <!-- 1. VOCÊ -->
+    <div class="etapa on" data-etapa="voce">
+      <div class="grupo">
+        <div class="campo"><label>Contrato em nome de</label>
+          <div class="seg" role="group" aria-label="Tipo de contrato"><button type="button" data-tipo="PF" class="on">Pessoa física</button><button type="button" data-tipo="PJ">Empresa (CNPJ)</button></div>
+        </div>
+        <div class="campo" data-c="nome"><label for="nome">Nome completo</label><input id="nome" name="name" autocomplete="name" placeholder="Como está no documento" enterkeyhint="next"><div class="msg"></div></div>
+        <div class="lado">
+          <div class="campo" data-c="cpf"><label for="cpf">CPF</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" enterkeyhint="next"><div class="msg"></div></div>
+          <div class="campo" data-c="nasc"><label for="nasc">Nascimento</label><input id="nasc" inputmode="numeric" autocomplete="bday" placeholder="dd/mm/aaaa" maxlength="10" enterkeyhint="next"><div class="msg"></div></div>
+        </div>
+        <div class="lado l3">
+          <div class="campo" data-c="rg"><label for="rg">RG</label><input id="rg" placeholder="Número do RG" maxlength="18" enterkeyhint="next"><div class="msg"></div></div>
+          <div class="campo" data-c="org"><label for="org">Órgão/UF <small>opcional</small></label><input id="org" placeholder="SSP/GO" maxlength="12" enterkeyhint="next"><div class="msg"></div></div>
+        </div>
+        <div class="lado">
+          <div class="campo" data-c="civil"><label for="civil">Estado civil</label>
+            <select id="civil"><option value="">Escolha…</option><option>Solteiro(a)</option><option>Casado(a)</option><option>União estável</option><option>Divorciado(a)</option><option>Viúvo(a)</option></select><div class="msg"></div></div>
+          <div class="campo" data-c="prof"><label for="prof">Profissão</label><input id="prof" autocomplete="organization-title" placeholder="Ex.: pastor, empresária" enterkeyhint="next"><div class="msg"></div></div>
+        </div>
+        <div class="grupo" id="pj" hidden>
+          <div class="divisor">dados da empresa</div>
+          <div class="campo" data-c="razao"><label for="razao">Razão social</label><input id="razao" autocomplete="organization" placeholder="Como está no CNPJ"><div class="msg"></div></div>
+          <div class="campo" data-c="cnpj"><label for="cnpj">CNPJ</label><input id="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00" maxlength="18"><div class="msg"></div></div>
+        </div>
+        <label class="check"><input type="checkbox" id="tem-dupla"><span><b>Vou fazer com mais alguém</b> — segunda cadeira no programa</span></label>
+      </div>
+    </div>
+
+    <!-- 2. CONTATO -->
+    <div class="etapa" data-etapa="contato">
+      <div class="grupo">
+        <div class="campo" data-c="cel"><label for="cel">Celular com WhatsApp</label><input id="cel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(00) 00000-0000" maxlength="15" enterkeyhint="next"><div class="msg"></div></div>
+        <div class="campo" data-c="email"><label for="email">E-mail</label><input id="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com" autocapitalize="off" spellcheck="false" enterkeyhint="next"><div class="msg"></div></div>
+        <div class="campo" data-c="insta"><label for="insta">Instagram <small>o seu @</small></label><input id="insta" placeholder="@seuperfil" autocapitalize="off" spellcheck="false" enterkeyhint="next"><div class="msg"></div></div>
+        <div class="campo" data-c="nicho"><label for="nicho">Seu nicho <small>área de atuação</small></label><input id="nicho" placeholder="Ex.: igreja, saúde, finanças" enterkeyhint="done"><div class="msg"></div></div>
+      </div>
+    </div>
+
+    <!-- 3. ENDEREÇO -->
+    <div class="etapa" data-etapa="endereco">
+      <div class="grupo">
+        <div class="campo" data-c="cep"><label for="cep">CEP <small id="cep-st"></small></label><input id="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" maxlength="9" enterkeyhint="next"><div class="msg">Digite o CEP que o endereço se completa sozinho</div></div>
+        <div class="campo" data-c="rua"><label for="rua">Rua / avenida</label><input id="rua" autocomplete="address-line1" placeholder="Rua, avenida…"><div class="msg"></div></div>
+        <div class="lado">
+          <div class="campo" data-c="num"><label for="num">Número</label><input id="num" inputmode="numeric" placeholder="123 ou S/N" maxlength="10"><div class="msg"></div></div>
+          <div class="campo" data-c="comp"><label for="comp">Complemento <small>opcional</small></label><input id="comp" autocomplete="address-line2" placeholder="Apto, bloco…"><div class="msg"></div></div>
+        </div>
+        <div class="campo" data-c="bairro"><label for="bairro">Bairro</label><input id="bairro" placeholder="Bairro"><div class="msg"></div></div>
+        <div class="lado l3">
+          <div class="campo" data-c="cidade"><label for="cidade">Cidade</label><input id="cidade" autocomplete="address-level2" placeholder="Cidade"><div class="msg"></div></div>
+          <div class="campo" data-c="uf"><label for="uf">UF</label><select id="uf" autocomplete="address-level1"><option value="">UF</option></select><div class="msg"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. SEGUNDA CADEIRA -->
+    <div class="etapa" data-etapa="dupla">
+      <div class="grupo">
+        <p class="msg" style="font-size:.84rem;color:var(--text2);">Os dados da outra pessoa que vai participar com você.</p>
+        <div class="campo" data-c="d-nome"><label for="d-nome">Nome completo</label><input id="d-nome" placeholder="Como está no documento"><div class="msg"></div></div>
+        <div class="lado">
+          <div class="campo" data-c="d-cpf"><label for="d-cpf">CPF</label><input id="d-cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14"><div class="msg"></div></div>
+          <div class="campo" data-c="d-rg"><label for="d-rg">RG</label><input id="d-rg" placeholder="Número do RG" maxlength="18"><div class="msg"></div></div>
+        </div>
+        <div class="campo" data-c="d-cel"><label for="d-cel">Celular</label><input id="d-cel" type="tel" inputmode="tel" placeholder="(00) 00000-0000" maxlength="15"><div class="msg"></div></div>
+        <div class="campo" data-c="d-email"><label for="d-email">E-mail</label><input id="d-email" type="email" inputmode="email" placeholder="email@exemplo.com" autocapitalize="off" spellcheck="false"><div class="msg"></div></div>
+        <label class="check"><input type="checkbox" id="d-mesmo" checked><span><b>Mora no mesmo endereço</b> que eu</span></label>
+        <div class="campo" data-c="d-end" id="d-end-box" hidden><label for="d-end">Endereço completo com CEP</label><input id="d-end" placeholder="Rua, número, bairro, cidade, UF, CEP"><div class="msg"></div></div>
+      </div>
+    </div>
+
+    <!-- 5. REVISÃO -->
+    <div class="etapa" data-etapa="revisao">
+      <div class="rev" id="rev"></div>
+      <label class="check" style="margin-top:14px;"><input type="checkbox" id="aceite"><span>Confirmo que os dados estão <b>corretos</b> e autorizo o uso deles para o <b>contrato</b> e a <b>nota fiscal</b>.</span></label>
+      <div class="msg" id="aceite-msg" style="margin-top:6px;"></div>
+      <div class="privado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>Seus dados não ficam guardados nesta página: vão direto do seu celular para a conversa com a Promov no WhatsApp.</span></div>
+    </div>
+
+    <!-- 6. FIM -->
+    <div class="etapa" data-etapa="fim">
+      <div class="fim">
+        <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <h2>Prontinho!</h2>
+        <p id="fim-p">Seus dados foram para o WhatsApp. É só apertar <b>enviar</b> lá na conversa.</p>
+        <a class="bt zap" id="fim-zap" href="#" target="_blank" rel="noopener">Abrir o WhatsApp de novo</a>
+        <button type="button" class="bt" id="fim-copiar" style="margin-top:10px;width:100%;">Copiar os dados</button>
+      </div>
+    </div>
+  </form>
+
+  <p class="rodape">Promov · cadastro para contrato e nota fiscal</p>
+</main>
+
+<div class="acoes" id="acoes"><div class="in">
+  <button type="button" class="bt" id="bt-voltar" hidden>Voltar</button>
+  <button type="button" class="bt pri" id="bt-seguir">Continuar</button>
+</div></div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var Q = new URLSearchParams(location.search);
+  var P = { n: (Q.get('n') || '').trim(), w: (Q.get('w') || '').replace(/\D/g, ''), p: (Q.get('p') || '').trim(), c: (Q.get('c') || '').trim(), d: Q.get('d') === '1' };
+  var tipo = 'PF';
+  var UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+  var DDDS = [11,12,13,14,15,16,17,18,19,21,22,24,27,28,31,32,33,34,35,37,38,41,42,43,44,45,46,47,48,49,51,53,54,55,61,62,63,64,65,66,67,68,69,71,73,74,75,77,79,81,82,83,84,85,86,87,88,89,91,92,93,94,95,96,97,98,99];
+  var DOMINIOS = ['gmail.com','hotmail.com','outlook.com','yahoo.com','yahoo.com.br','icloud.com','live.com','uol.com.br','bol.com.br','terra.com.br','outlook.com.br','hotmail.com.br','msn.com','me.com'];
+  UFS.forEach(function (u) { var o = document.createElement('option'); o.value = u; o.textContent = u; $('uf').appendChild(o); });
+
+  // ---------- saudação ----------
+  var prog = P.p ? P.p.replace(/^(programa|mentoria)\s+/i, '') : '';
+  if (P.n) $('ola-t').innerHTML = 'Oi, <em>' + esc(P.n.split(' ')[0]) + '</em>! Seus dados para o contrato';
+  $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para o ' + prog : '') + '. ' : '') + 'Leva uns 2 minutinhos — cada informação é conferida na hora, para o contrato e a nota fiscal saírem certinhos.';
+  if (P.d) $('tem-dupla').checked = true;
+
+  // ---------- utilidades ----------
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function dig(v) { return String(v || '').replace(/\D/g, ''); }
+  function semAc(v) { return String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function cpfOk(v) {
+    var c = dig(v); if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+    for (var t = 9; t < 11; t++) { var s = 0; for (var i = 0; i < t; i++) s += +c[i] * (t + 1 - i); var d = (s * 10) % 11 % 10; if (+c[t] !== d) return false; }
+    return true;
+  }
+  function cnpjOk(v) {
+    var c = dig(v); if (c.length !== 14 || /^(\d)\1{13}$/.test(c)) return false;
+    var calc = function (n) { var p = n === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2], s = 0; for (var i = 0; i < n; i++) s += +c[i] * p[i]; var r = s % 11; return r < 2 ? 0 : 11 - r; };
+    return calc(12) === +c[12] && calc(13) === +c[13];
+  }
+  function lev(a, b) {
+    var m = [], i, j; for (i = 0; i <= b.length; i++) m[i] = [i]; for (j = 0; j <= a.length; j++) m[0][j] = j;
+    for (i = 1; i <= b.length; i++) for (j = 1; j <= a.length; j++) m[i][j] = b[i - 1] === a[j - 1] ? m[i - 1][j - 1] : Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1);
+    return m[b.length][a.length];
+  }
+  // máscaras
+  var MASC = {
+    cpf: function (v) { var d = dig(v).slice(0, 11); return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2'); },
+    cnpj: function (v) { var d = dig(v).slice(0, 14); return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2'); },
+    cel: function (v) { var d = dig(v).replace(/^55(?=\d{10,11}$)/, '').slice(0, 11); if (d.length <= 2) return d ? '(' + d : ''; if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2); if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6); return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7); },
+    cep: function (v) { var d = dig(v).slice(0, 8); return d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d; },
+    nasc: function (v) { var d = dig(v).slice(0, 8); if (d.length > 4) return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4); if (d.length > 2) return d.slice(0, 2) + '/' + d.slice(2); return d; }
+  };
+  MASC['d-cpf'] = MASC.cpf; MASC['d-cel'] = MASC.cel;
+  Object.keys(MASC).forEach(function (id) {
+    var el = $(id); if (!el) return;
+    el.addEventListener('input', function () { var p = el.selectionStart, antes = el.value.length; el.value = MASC[id](el.value); var dep = el.value.length; try { el.setSelectionRange(p + (dep - antes), p + (dep - antes)); } catch (e) {} });
+  });
+
+  // ---------- regras de cada campo (vazio = ok) ----------
+  function nomeOk(v) { var p = String(v).trim().split(/\s+/).filter(Boolean); if (p.length < 2) return 'Escreva o nome completo (nome e sobrenome)'; if (/[0-9@#$%]/.test(v)) return 'O nome não pode ter números ou símbolos'; return ''; }
+  function celOk(v) {
+    var d = dig(v).replace(/^55(?=\d{10,11}$)/, '');
+    if (d.length !== 11 && d.length !== 10) return 'Celular com DDD: (00) 00000-0000';
+    if (DDDS.indexOf(+d.slice(0, 2)) < 0) return 'Esse DDD não existe — confira os dois primeiros números';
+    if (d.length === 11 && d[2] !== '9') return 'Celular começa com 9 depois do DDD';
+    return '';
+  }
+  function emailOk(v, id) {
+    var e = String(v).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}(\.[a-z]{2,})?$/.test(e)) return 'E-mail inválido — confira o @ e o final (.com, .com.br…)';
+    var dom = e.split('@')[1], sug = '';
+    if (DOMINIOS.indexOf(dom) < 0) DOMINIOS.forEach(function (d) { if (!sug && lev(dom, d) <= 2) sug = d; });
+    if (sug) return { aviso: 'Você quis dizer <button type="button" data-sug="' + id + '" data-v="' + esc(e.split('@')[0] + '@' + sug) + '">' + esc(e.split('@')[0] + '@' + sug) + '</button>?' };
+    return '';
+  }
+  function dataOk(v) {
+    var m = String(v).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (!m) return 'Data no formato dd/mm/aaaa';
+    var d = new Date(+m[3], +m[2] - 1, +m[1]); if (d.getDate() !== +m[1] || d.getMonth() !== +m[2] - 1) return 'Essa data não existe';
+    var anos = (Date.now() - d.getTime()) / (365.25 * 864e5); if (anos < 16) return 'Confira o ano — a pessoa precisa ter 16 anos ou mais'; if (anos > 100) return 'Confira o ano de nascimento';
+    return '';
+  }
+  var REGRAS = {
+    nome: nomeOk,
+    cpf: function (v) { return cpfOk(v) ? '' : (dig(v).length < 11 ? 'CPF tem 11 números' : 'Esse CPF não existe — confira os números'); },
+    nasc: dataOk,
+    rg: function (v) { var d = String(v).replace(/[^0-9a-z]/gi, ''); return d.length >= 5 ? '' : 'Número do RG (pelo menos 5 caracteres)'; },
+    org: function () { return ''; },
+    civil: function (v) { return v ? '' : 'Escolha o estado civil'; },
+    prof: function (v) { return String(v).trim().length >= 3 ? '' : 'Qual a sua profissão?'; },
+    razao: function (v) { return tipo !== 'PJ' || String(v).trim().length >= 3 ? '' : 'Razão social da empresa'; },
+    cnpj: function (v) { return tipo !== 'PJ' || cnpjOk(v) ? '' : (dig(v).length < 14 ? 'CNPJ tem 14 números' : 'Esse CNPJ não existe — confira os números'); },
+    cel: celOk,
+    email: function (v) { return emailOk(v, 'email'); },
+    insta: function (v) { var s = String(v).trim().replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/.*$/, ''); if (!s) return 'Seu @ do Instagram (se não tiver, escreva "não tenho")'; if (/^n[aã]o tenho$/i.test(String(v).trim())) return ''; return /^[a-z0-9._]{1,30}$/i.test(s) ? '' : 'Só letras, números, ponto e _ — sem espaço'; },
+    nicho: function (v) { return String(v).trim().length >= 2 ? '' : 'Em que área você atua?'; },
+    cep: function (v) { return dig(v).length === 8 ? '' : 'CEP tem 8 números'; },
+    rua: function (v) { return String(v).trim().length >= 3 ? '' : 'Nome da rua ou avenida'; },
+    num: function (v) { return /^(s\/?n|\d+[a-z]?)$/i.test(String(v).trim()) ? '' : 'Número (ou S/N se não tiver)'; },
+    comp: function () { return ''; },
+    bairro: function (v) { return String(v).trim().length >= 2 ? '' : 'Bairro'; },
+    cidade: function (v) { return String(v).trim().length >= 2 ? '' : 'Cidade'; },
+    uf: function (v) { return v ? '' : 'Escolha o estado'; },
+    'd-nome': nomeOk,
+    'd-cpf': function (v) { return cpfOk(v) ? '' : (dig(v).length < 11 ? 'CPF tem 11 números' : 'Esse CPF não existe — confira os números'); },
+    'd-rg': function (v) { return String(v).replace(/[^0-9a-z]/gi, '').length >= 5 ? '' : 'Número do RG'; },
+    'd-cel': celOk,
+    'd-email': function (v) { return emailOk(v, 'd-email'); },
+    'd-end': function (v) { return $('d-mesmo').checked || /\d{5}-?\d{3}/.test(v) ? '' : 'Endereço completo com o CEP'; }
+  };
+  var OKMSG = { cpf: '✓ CPF válido', cnpj: '✓ CNPJ válido', cel: '✓ Celular ok', email: '✓ E-mail ok', nasc: '' };
+  function conferir(id, mostrar) {
+    var box = document.querySelector('[data-c="' + id + '"]'); if (!box || box.closest('[hidden]')) return true;
+    var el = $(id), r = REGRAS[id] ? REGRAS[id](el.value, id) : '', msg = box.querySelector('.msg');
+    var erro = typeof r === 'string' ? r : '', aviso = typeof r === 'object' && r ? r.aviso : '';
+    if (!mostrar && !box.classList.contains('erro') && !box.classList.contains('ok')) { if (!erro) { box.classList.add('ok'); if (msg && OKMSG[id]) { msg.textContent = OKMSG[id]; msg.classList.add('okmsg'); } } return !erro; }
+    box.classList.toggle('erro', !!erro); box.classList.toggle('ok', !erro);
+    if (msg) {
+      msg.classList.toggle('okmsg', !erro && !aviso && !!OKMSG[id]);
+      msg.innerHTML = erro ? esc(erro) : aviso ? aviso : (OKMSG[id] || (msg.dataset.base || ''));
+    }
+    return !erro;
+  }
+  document.querySelectorAll('.msg').forEach(function (m) { m.dataset.base = m.textContent; });
+  Object.keys(REGRAS).forEach(function (id) {
+    var el = $(id); if (!el) return;
+    el.addEventListener('blur', function () { if (el.value.trim() || id === 'civil' || id === 'uf') conferir(id, true); salvar(); });
+    el.addEventListener('input', function () { var box = el.closest('.campo'); if (box.classList.contains('erro')) conferir(id, true); salvar(); });
+    el.addEventListener('change', function () { conferir(id, true); salvar(); });
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-sug]'); if (!b) return;
+    $(b.dataset.sug).value = b.dataset.v; conferir(b.dataset.sug, true); salvar();
+  });
+
+  // ---------- CEP → endereço ----------
+  var cepUlt = '';
+  $('cep').addEventListener('input', function () {
+    var c = dig(this.value); if (c.length !== 8 || c === cepUlt) return; cepUlt = c;
+    var st = $('cep-st'); st.innerHTML = '<span class="cep-st"><i class="gira"></i> buscando…</span>';
+    fetch('https://viacep.com.br/ws/' + c + '/json/').then(function (r) { return r.json(); }).then(function (v) {
+      if (!v || v.erro) { st.textContent = ''; var box = document.querySelector('[data-c="cep"]'); box.classList.add('erro'); box.querySelector('.msg').textContent = 'Não achei esse CEP — confira, ou preencha o endereço abaixo'; return; }
+      if (v.logradouro) $('rua').value = v.logradouro; if (v.bairro) $('bairro').value = v.bairro; if (v.localidade) $('cidade').value = v.localidade; if (v.uf) $('uf').value = v.uf;
+      ['cep', 'rua', 'bairro', 'cidade', 'uf'].forEach(function (id) { if ($(id).value) conferir(id, true); });
+      st.innerHTML = '<span style="color:var(--ok)">✓ encontrado</span>';
+      setTimeout(function () { ($('rua').value ? $('num') : $('rua')).focus(); }, 60);
+      salvar();
+    }).catch(function () { st.textContent = ''; });
+  });
+
+  // ---------- PF / PJ, dupla ----------
+  document.querySelectorAll('.seg button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      tipo = b.dataset.tipo; document.querySelectorAll('.seg button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      $('pj').hidden = tipo !== 'PJ'; salvar();
+    });
+  });
+  $('d-mesmo').addEventListener('change', function () { $('d-end-box').hidden = this.checked; salvar(); });
+  $('tem-dupla').addEventListener('change', function () { montarPassos(); salvar(); });
+
+  // ---------- etapas ----------
+  var NOMES = { voce: 'Você', contato: 'Contato', endereco: 'Endereço', dupla: 'Segunda cadeira', revisao: 'Revisão' };
+  var CAMPOS = { voce: ['nome', 'cpf', 'nasc', 'rg', 'org', 'civil', 'prof', 'razao', 'cnpj'], contato: ['cel', 'email', 'insta', 'nicho'], endereco: ['cep', 'rua', 'num', 'comp', 'bairro', 'cidade', 'uf'], dupla: ['d-nome', 'd-cpf', 'd-rg', 'd-cel', 'd-email', 'd-end'] };
+  var ordem = [], atual = 0;
+  function montarPassos() {
+    ordem = ['voce', 'contato', 'endereco'].concat($('tem-dupla').checked ? ['dupla'] : []).concat(['revisao']);
+    $('passos').innerHTML = ordem.map(function (_, i) { return '<span class="' + (i < atual ? 'feito' : i === atual ? 'agora' : '') + '"></span>'; }).join('');
+  }
+  function ir(i, voltando) {
+    atual = Math.max(0, Math.min(ordem.length - 1, i));
+    var nome = ordem[atual];
+    document.querySelectorAll('.etapa').forEach(function (e) { var on = e.dataset.etapa === nome; e.classList.toggle('on', on); e.classList.toggle('volta', on && !!voltando); });
+    $('etapa-nome').textContent = NOMES[nome]; $('etapa-num').textContent = (atual + 1) + ' de ' + ordem.length;
+    $('bt-voltar').hidden = atual === 0;
+    $('bt-seguir').textContent = nome === 'revisao' ? 'Enviar pelo WhatsApp' : 'Continuar';
+    $('bt-seguir').className = 'bt ' + (nome === 'revisao' ? 'zap' : 'pri');
+    if (nome === 'revisao') montarRevisao();
+    montarPassos();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    salvar();
+  }
+  function etapaOk(nome) {
+    var ok = true, primeiro = null;
+    (CAMPOS[nome] || []).forEach(function (id) { var r = conferir(id, true); if (!r && ok) { ok = false; primeiro = $(id); } });
+    if (primeiro) setTimeout(function () { primeiro.focus(); primeiro.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 50);
+    return ok;
+  }
+  $('bt-seguir').addEventListener('click', function () {
+    var nome = ordem[atual];
+    if (nome === 'revisao') { enviar(); return; }
+    if (etapaOk(nome)) ir(atual + 1);
+  });
+  $('bt-voltar').addEventListener('click', function () { ir(atual - 1, true); });
+  // Enter passa para o próximo campo; no último da etapa, continua
+  $('form').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    var campos = Array.prototype.slice.call(document.querySelectorAll('.etapa.on input:not([type=checkbox]), .etapa.on select')).filter(function (x) { return !x.closest('[hidden]'); });
+    var i = campos.indexOf(e.target); if (i >= 0 && i < campos.length - 1) campos[i + 1].focus(); else $('bt-seguir').click();
+  });
+
+  // ---------- revisão e texto ----------
+  function v(id) { return String(($(id) || {}).value || '').trim(); }
+  function insta() { var s = v('insta'); if (/^n[aã]o tenho$/i.test(s)) return 'não tenho'; s = s.replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/.*$/, ''); return s ? '@' + s : ''; }
+  function endereco() { return [v('rua') + (v('num') ? ', ' + v('num').toUpperCase() : ''), v('comp'), v('bairro'), v('cidade') + (v('uf') ? ' - ' + v('uf') : ''), v('cep') ? 'CEP ' + v('cep') : ''].filter(Boolean).join(', '); }
+  function dados() {
+    var t = [
+      ['Nome completo', v('nome')], ['CPF', v('cpf')], ['RG', v('rg') + (v('org') ? ' ' + v('org').toUpperCase() : '')], ['Data de nascimento', v('nasc')],
+      ['Estado civil', v('civil')], ['Profissão', v('prof')]
+    ];
+    if (tipo === 'PJ') t.push(['Razão social', v('razao')], ['CNPJ', v('cnpj')]);
+    var c = [['Celular', v('cel')], ['E-mail', v('email').toLowerCase()], ['Instagram', insta()], ['Nicho', v('nicho')]];
+    var en = [['CEP', v('cep')], ['Rua', v('rua')], ['Número', v('num').toUpperCase()], ['Complemento', v('comp')], ['Bairro', v('bairro')], ['Cidade', v('cidade')], ['UF', v('uf')]];
+    var d = $('tem-dupla').checked ? [['Nome completo', v('d-nome')], ['CPF', v('d-cpf')], ['RG', v('d-rg')], ['Celular', v('d-cel')], ['E-mail', v('d-email').toLowerCase()], ['Endereço', $('d-mesmo').checked ? endereco() : v('d-end')]] : null;
+    return { t: t, c: c, en: en, d: d };
+  }
+  function montarRevisao() {
+    var D = dados(), bloco = function (tit, lista, etapa) {
+      return '<div class="rev-bloco"><h3>' + tit + '<button type="button" data-ir="' + etapa + '">editar</button></h3><dl>'
+        + lista.filter(function (x) { return x[1]; }).map(function (x) { return '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>'; }).join('') + '</dl></div>';
+    };
+    $('rev').innerHTML = bloco(tipo === 'PJ' ? 'Titular e empresa' : 'Titular', D.t, 'voce') + bloco('Contato', D.c, 'contato') + bloco('Endereço', [['Endereço', endereco()]], 'endereco') + (D.d ? bloco('Segunda cadeira', D.d, 'dupla') : '');
+  }
+  $('rev').addEventListener('click', function (e) { var b = e.target.closest('[data-ir]'); if (b) ir(ordem.indexOf(b.dataset.ir), true); });
+  function texto() {
+    var D = dados(), L = ['*Cadastro para contrato — Promov*', '', 'TITULAR'];
+    D.t.concat(D.c, D.en).forEach(function (x) { if (x[1]) L.push(x[0] + ': ' + x[1]); });
+    if (D.d) { L.push('', 'SEGUNDA CADEIRA'); D.d.forEach(function (x) { if (x[1]) L.push(x[0] + ': ' + x[1]); }); }
+    L.push('', '✅ Confirmo que os dados estão corretos e autorizo o uso para o contrato e a nota fiscal.');
+    return L.join('\n');
+  }
+  function linkZap() { return 'https://wa.me/' + (P.w || '') + '?text=' + encodeURIComponent(texto()); }
+  function enviar() {
+    for (var i = 0; i < ordem.length - 1; i++) if (!etapaOk(ordem[i])) { ir(i, true); return; }
+    if (!$('aceite').checked) { $('aceite-msg').textContent = 'Marque a confirmação para enviar'; $('aceite-msg').style.color = 'var(--err)'; return; }
+    var url = linkZap();
+    $('fim-zap').href = url;
+    $('fim-p').innerHTML = 'Seus dados foram para o WhatsApp' + (P.w ? ' da Promov' : '') + '. É só apertar <b>enviar</b> lá na conversa.' + (P.w ? '' : ' Se abrir a lista de conversas, escolha a conversa com a Promov.');
+    document.querySelectorAll('.etapa').forEach(function (e) { e.classList.toggle('on', e.dataset.etapa === 'fim'); });
+    $('acoes').hidden = true; $('passos').innerHTML = ordem.map(function () { return '<span class="feito"></span>'; }).join('');
+    $('etapa-nome').textContent = 'Pronto'; $('etapa-num').textContent = '';
+    try { localStorage.removeItem(CHAVE); } catch (e) {}
+    window.open(url, '_blank') || (location.href = url);
+  }
+  $('aceite').addEventListener('change', function () { $('aceite-msg').textContent = ''; });
+  $('fim-copiar').addEventListener('click', function () {
+    var t = texto(), b = this;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = '✓ Copiado — cole na conversa com a Promov'; })
+      .catch(function () { var a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); b.textContent = '✓ Copiado'; } catch (e) {} a.remove(); });
+  });
+
+  // ---------- rascunho: se fechar a página, continua de onde parou ----------
+  var CHAVE = 'promovCadastro:' + (P.n || '') + ':' + (P.c || '');
+  var IDS = ['nome','cpf','nasc','rg','org','civil','prof','razao','cnpj','cel','email','insta','nicho','cep','rua','num','comp','bairro','cidade','uf','d-nome','d-cpf','d-rg','d-cel','d-email','d-end'];
+  var tSalvar = 0;
+  function salvar() {
+    clearTimeout(tSalvar);
+    tSalvar = setTimeout(function () {
+      var o = { tipo: tipo, dupla: $('tem-dupla').checked, mesmo: $('d-mesmo').checked, etapa: ordem[atual] };
+      IDS.forEach(function (id) { o[id] = ($(id) || {}).value || ''; });
+      try { localStorage.setItem(CHAVE, JSON.stringify(o)); } catch (e) {}
+    }, 250);
+  }
+  function restaurar() {
+    var o = null; try { o = JSON.parse(localStorage.getItem(CHAVE) || 'null'); } catch (e) {}
+    if (!o) return 0;
+    IDS.forEach(function (id) { if ($(id) && o[id]) $(id).value = o[id]; });
+    if (o.tipo === 'PJ') document.querySelector('.seg button[data-tipo="PJ"]').click();
+    $('tem-dupla').checked = !!o.dupla || P.d; $('d-mesmo').checked = o.mesmo !== false; $('d-end-box').hidden = $('d-mesmo').checked;
+    IDS.forEach(function (id) { if ($(id) && $(id).value) conferir(id, false); });
+    return Math.max(0, ['voce', 'contato', 'endereco', 'dupla', 'revisao'].indexOf(o.etapa));
+  }
+  var volta = restaurar();
+  montarPassos();
+  ir(Math.min(volta, ordem.length - 1));
+})();
+</script>
+</body>
+</html>
