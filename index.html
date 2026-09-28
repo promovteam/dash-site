@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-0027';
+var VERSAO_DASH = '2026-09-28-0915';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4431,6 +4431,7 @@ function salvarAnuncioEscolhido(nome) {
     pronto = true;
     try { sc.remove(); } catch (e) {}
     try { delete window[cb]; } catch (e) {}
+    if (d && d.success && d.aba) { try { anuncioMarcaEnviada(t8, valor); } catch (eE) {} }   // robô v172+: ficou na aba compartilhada
     if (d && !d.success) {
       // o lead ainda não está na aba da pesquisa (veio da base do site): fica só no painel
       alert('Marquei aqui no painel, mas a planilha ainda não tem esta pessoa '
@@ -12677,7 +12678,7 @@ function ldRow(l, quente) {
     + (donoNome || !ldPodeTrocarDono() ? '' : '<button class="btn-assumir" onclick="ldAssumir(' + i + ', event)" title="Assumir este lead">✋ Assumir</button>')
     + (ldPodeTrocarDono() ? '<button class="btn-assumir" style="background:rgba(110,168,255,.14);color:#6ea8ff;border:1px solid rgba(110,168,255,.45);" onclick="ldPassarPara(' + i + ', event)" title="Só Bruno e Adm: mandar este lead para outra pessoa">👤 ' + (donoNome ? 'Trocar' : 'Para quem') + '</button>' : '')
     + (clintLink(l) ? '<a class="ld-wa" style="background:rgba(108,71,255,.16);border-color:rgba(108,71,255,.5);color:#8f6bff;" href="' + clintLinkApp(l) + '"' + (ehCelular() ? '' : ' target="_blank"') + ' onclick="return abrirAtendimentoClint(event,' + i + ')" title="Abrir a conversa deste lead no atendimento da Clint">🟣 Clint</a>' : '')
-    + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(l.insta) + '" target="_blank" onclick="event.stopPropagation()">📷</a>' : '')
+    + (l.insta ? '<a class="ld-wa" style="background:rgba(185,138,255,.12);border-color:rgba(185,138,255,.35);color:#b98aff;" href="https://instagram.com/' + encodeURIComponent(String(l.insta).replace(/^@/, '')) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="@' + gravEsc(String(l.insta).replace(/^@/, '')) + ' no Instagram">' + igLogo() + '</a>' : '')
     + (wa ? '<a class="ld-wa" href="' + wa + '" target="_blank" onclick="event.stopPropagation()">💬 WhatsApp</a>' : '')
     + '</div>'
     + '</div>';
@@ -17550,6 +17551,11 @@ function abrirMenuEvento(e, idx) {
   h += '<div class="lm-sep"></div>';
   if (['noshow', 'agendada', 'remarcada'].indexOf(v2norm(_evAtual.status || '')) !== -1) h += '<div class="lm-item" style="color:#ff9a5a;font-weight:700;" onclick="fecharSlotMenu();abrirRemarcarEvento()">🗓 Remarcar — nova data e hora</div>';
   h += '<div class="lm-item" onclick="fecharSlotMenu();fichaDoEvento()">📇 Ver ficha do lead</div>';
+  try {
+    var igEv = crInstaDe(leadDoEvento(_evAtual));
+    if (!igEv) igEv = gvInstaLimpo((String(_evAtual.description || '').match(/instagram(?:\.com\/|:\s*)@?([A-Za-z0-9._]{2,30})/i) || [])[1] || '');
+    if (igEv) h += '<a class="lm-item" href="https://instagram.com/' + encodeURIComponent(igEv) + '" target="_blank" rel="noopener" onclick="fecharSlotMenu()" style="display:flex;align-items:center;gap:8px;">' + igLogo() + ' @' + gravEsc(igEv) + '</a>';
+  } catch (eIg) {}
   if (_evAtual.meetLink) h += '<a class="lm-item" href="' + _evAtual.meetLink + '" target="_blank" rel="noopener" onclick="fecharSlotMenu()">🎥 Abrir Meet</a>';
   if (_evAtual.recordingLink) h += '<a class="lm-item" href="' + _evAtual.recordingLink + '" target="_blank" rel="noopener" onclick="fecharSlotMenu()">🎬 Ver gravação</a>';
   m.innerHTML = h;
@@ -23267,6 +23273,11 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
   text-decoration:none; cursor:pointer; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); transition:background .2s, border-color .2s, transform .15s; }
 .fl-atalhos a:hover, .fl-atalhos button:hover { border-color:rgba(255,255,255,.22); background:rgba(255,255,255,.08); }
 .fl-atalhos .clint { color:#b9a6ff; border-color:rgba(108,71,255,.45); background:rgba(108,71,255,.14); }
+.fl-atalhos .ig { color:#ff9ac4; border-color:rgba(225,48,108,.45); background:linear-gradient(135deg, rgba(254,218,117,.10), rgba(214,41,118,.16) 55%, rgba(79,91,213,.14)); }
+.fl-atalhos .ig svg { width:15px; height:15px; flex:none; }
+/* o topo da ficha fica por cima de um fundo inteiro (antes o que rolava aparecia acima dele — print do Bruno 28/09/2026) */
+#modal-lead .modal-head::before { content:''; position:absolute; left:-40px; right:-40px; bottom:100%; height:44px; background:var(--panel, #14171d); pointer-events:none; }
+#modal-lead .modal-head { box-shadow:0 12px 18px -14px rgba(0,0,0,.85); }
 #lead-info { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
 #lead-info .dtl-line { flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:4px; padding:10px 12px; margin:0; border-radius:12px;
   background:rgba(255,255,255,.03); border:1px solid var(--border); min-width:0; }
@@ -23594,6 +23605,12 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
       h += '<a class="clint" href="https://app.clint.digital/chat" target="_blank" rel="noopener" onclick="event.stopPropagation();return abrirAtendimentoClintPor(event,' + JSON.stringify(tel).replace(/"/g, '&quot;') + ',' + JSON.stringify(nomeF).replace(/"/g, '&quot;') + ');">🟣 Abrir na Clint</a>'
         + (tel ? '<a href="tel:+55' + tel + '" onclick="event.stopPropagation();">📞 Ligar</a>' : '');
     }
+    // 28/09/2026 (Bruno: "coloque o insta em todos"): o Instagram vem da planilha, das anotações ("Instagram: @…") ou da aba Leads
+    var ig = '';
+    try { ig = crInstaDe(_v2reg[_fichaAtual]); } catch (eI) {}
+    if (!ig) try { var nt = (doc.getElementById('fl-notas') || {}).value || ''; ig = gvInstaLimpo((nt.match(/instagram(?:\.com\/|:\s*)@?([A-Za-z0-9._]{2,30})/i) || [])[1] || ''); } catch (eN) {}
+    if (!ig) try { ig = gvInstaLimpo(((li.textContent || '').match(/instagram(?:\.com\/|:\s*)@?([A-Za-z0-9._]{2,30})/i) || [])[1] || ''); } catch (eL) {}
+    if (ig && !ehVisitante()) h += '<a class="ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + ig + ' no Instagram">' + igLogo() + ' @' + ig + '</a>';
     h += '<button type="button" onclick="event.stopPropagation();var b=document.getElementById(\'btn-copiar\');if(b)b.click();">📋 Copiar dados</button>';
     if (at.innerHTML !== h) at.innerHTML = h;
   }
@@ -23601,6 +23618,7 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
     var li = doc.getElementById('lead-info'); if (!li) return;
     var t = null;
     new MutationObserver(function () { clearTimeout(t); t = setTimeout(fichaMelhorar, 30); }).observe(li, { childList: true, subtree: true });
+    var nt = doc.getElementById('fl-notas'); if (nt) nt.addEventListener('input', function () { clearTimeout(t); t = setTimeout(fichaMelhorar, 400); });
   })();
 
   // "vendas sem dados": o número vai para o botão compacto do celular
@@ -26252,5 +26270,71 @@ function rlImprimir() {
 }
 @media (prefers-reduced-motion:reduce) { .ctr-folha, .ctr-carimbo { animation:none !important; } .ctr-papel { transition:none; } }
 </style>
+<script>
+// 📣 MARCAÇÕES DE ANÚNCIO COMPARTILHADAS (Bruno 28/09/2026: "por que somente os criativos pagos estão aparecendo em outros acessos")
+// A marcação "este lead veio do post X" ficava só no navegador de quem marcou quando o lead ainda não estava na aba da
+// pesquisa. Agora o robô (v172+) guarda TODA marcação na aba "Anuncio Marcado" e todo acesso lê essa aba. O navegador
+// que tem marcações só dele manda para o robô sozinho (uma a uma, devagar). Com o robô antigo, tenta de novo em 12 h.
+(function () {
+  var ENV_K = 'v2AnuncioMarcaEnviado', TENT_K = 'v2AnuncioMarcaSemAba';
+  function lerEnv() { try { return JSON.parse(localStorage.getItem(ENV_K) || '{}') || {}; } catch (e) { return {}; } }
+  function gravarEnv(o) { try { localStorage.setItem(ENV_K, JSON.stringify(o)); } catch (e) {} }
+  window.ANUNCIO_COMP = {};
+  window.anuncioMarcaEnviada = function (t8, valor) { var e = lerEnv(); e[t8] = valor; gravarEnv(e); };
+  function aplicar() {
+    (LD.rows || []).forEach(function (l) { if (l.tel8 && ANUNCIO_MARCA[l.tel8]) l.anuncio = ANUNCIO_MARCA[l.tel8]; });
+    try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e) {}
+    try { if (telaVisivel('s-leads')) renderLeads(); } catch (e) {}
+    try { if (telaVisivel('s-relatorio') && !document.querySelector('#modal-a.open')) rlRender(); } catch (e) {}
+  }
+  function enviarPendentes(comp) {
+    try { if (typeof ehVisitante === 'function' && ehVisitante()) return; } catch (e) {}
+    var semAba = 0; try { semAba = +localStorage.getItem(TENT_K) || 0; } catch (e) {}
+    if (semAba && Date.now() - semAba < 12 * 3600000) return;
+    var env = lerEnv();
+    var pend = Object.keys(ANUNCIO_MARCA).filter(function (t8) { return /^\d{8}$/.test(t8) && ANUNCIO_MARCA[t8] && comp[t8] !== ANUNCIO_MARCA[t8] && env[t8] !== ANUNCIO_MARCA[t8]; });
+    var i = 0;
+    (function prox() {
+      if (i >= pend.length || i >= 200) return;
+      var t8 = pend[i++], valor = ANUNCIO_MARCA[t8], cb = 'amCb' + Math.random().toString(36).slice(2, 8), sc = document.createElement('script'), feito = false;
+      window[cb] = function (d) {
+        feito = true; try { sc.remove(); delete window[cb]; } catch (e) {}
+        if (d && d.success && d.aba) { anuncioMarcaEnviada(t8, valor); setTimeout(prox, 1200); return; }
+        try { localStorage.setItem(TENT_K, String(Date.now())); } catch (e) {}   // robô ainda sem a aba: para e tenta mais tarde
+      };
+      sc.onerror = function () { try { delete window[cb]; } catch (e) {} };
+      sc.src = APPS_SCRIPT_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'marcarAnuncio', tel8: t8, telefone: t8, anuncio: valor, quem: ((typeof ldEu === 'function' && ldEu()) || '') + ' (do navegador)' }));
+      document.body.appendChild(sc);
+      setTimeout(function () { if (!feito) { try { sc.remove(); delete window[cb]; } catch (e) {} } }, 30000);
+    })();
+  }
+  function carregar() {
+    if (typeof LD === 'undefined' || !LD.carregado) { setTimeout(carregar, 3000); return; }
+    fetch('https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent('Anuncio Marcado') + '&headers=1&_t=' + Date.now())
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (t) {
+        var linhas = ldCSV(t || ''), comp = {};
+        var cab = (linhas[0] || []).map(function (c) { return v2norm(c); });
+        if (cab[0] !== 'telefone' || cab[1] !== 'anuncio') linhas = [];   // a aba ainda não existe (o Google devolveu outra)
+        for (var i = 1; i < linhas.length; i++) {
+          var t8 = String(linhas[i][0] || '').replace(/\D/g, '').slice(-8), an = String(linhas[i][1] || '').trim();
+          if (t8.length === 8 && an) comp[t8] = an;
+        }
+        window.ANUNCIO_COMP = comp;
+        var env = lerEnv(), mudou = false;
+        Object.keys(comp).forEach(function (t8) {
+          var loc = ANUNCIO_MARCA[t8];
+          if (loc === undefined || (loc !== comp[t8] && env[t8] === loc)) { ANUNCIO_MARCA[t8] = comp[t8]; env[t8] = comp[t8]; mudou = true; }
+          else if (loc === comp[t8]) env[t8] = loc;
+        });
+        gravarEnv(env);
+        if (mudou) { try { localStorage.setItem('v2AnuncioMarca', JSON.stringify(ANUNCIO_MARCA)); } catch (e) {} aplicar(); }
+        enviarPendentes(comp);
+      }).catch(function () {});
+  }
+  setTimeout(carregar, 15000);
+  setInterval(function () { if (!document.hidden) carregar(); }, 15 * 60000);
+})();
+</script>
 </body>
 </html>
