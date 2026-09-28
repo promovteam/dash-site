@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-1031';
+var VERSAO_DASH = '2026-09-28-1034';
 var _versaoNova = null;
 
 // =====================================================================
@@ -16923,30 +16923,39 @@ function avEventosAgora() {
 }
 function avHora(m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); }
 function avCardHtml(o, r, i, tipo) {
+  // 28/09/2026 (Bruno: "melhore a visualização, a organização das informações"): horário grande à esquerda, nome e pessoas
+  // à direita, uma linha só de botões (principal + ícones); a reunião marcada no-show vira uma faixa fina
   var ev = o.e, e = gravEsc, nome = agNomeDoEvento(ev.title), pt = gravPartes(ev.title);
   var rL = null; try { rL = leadDoEvento(ev); } catch (eL) {}
   var ig = ''; try { ig = gvInstaLimpo(ev.instagram || '') || (rL ? crInstaDe(rL, rL) : ''); } catch (eI) {}
   var tel = (rL && rL.telefone) || ev.tel8 || '', iR = rL ? v2reg(rL) : -1;
-  var tempo = '';
+  if (tipo === 'ns') {
+    return '<div class="av-ns" title="Marcada como ' + (/remarcad/.test(v2norm(ev.status || '')) ? 'remarcada' : 'no-show') + ' — se a pessoa entrou atrasada, dá para entrar e mudar o status na agenda">'
+      + '<span class="av-ns-ic">⚠️</span><b>' + avHora(o.ini) + '</b><span class="av-ns-n">' + e(nome) + '</span><em>' + (/remarcad/.test(v2norm(ev.status || '')) ? 'remarcada' : 'no-show?') + '</em>'
+      + (ev.meetLink ? '<a class="av-ns-bt" href="' + e(ev.meetLink) + '" target="_blank" rel="noopener" title="Entrar calado no Meet">entrar</a>' : '')
+      + (iR >= 0 ? '<button type="button" class="av-ns-bt" onclick="abrirLead(' + iR + ')" title="Ficha do lead">ficha</button>' : '') + '</div>';
+  }
+  var sub = [pt.sdr ? 'SDR ' + String(pt.sdr).replace(/^ss\s+/i, '') : '', rL && rL.produto ? String(rL.produto).replace(/^(programa|mentoria)\s+/i, '') : ''].filter(Boolean).join(' · ');
+  var quando, barra = '';
   if (tipo === 'vivo') {
     var passou = r.agora - o.ini, pct = Math.min(100, Math.max(0, passou / Math.max(1, o.fim - o.ini) * 100));
-    tempo = '<div class="av-tempo"><span>começou há ' + passou + ' min · ' + avHora(o.ini) + '</span><span>até ' + avHora(o.fim) + '</span></div><div class="av-barra"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
-  } else if (tipo === 'ns') {
-    tempo = '<div class="av-aviso">⚠️ ' + avHora(o.ini) + ' a ' + avHora(o.fim) + ' · marcada como <b>' + (/remarcad/.test(v2norm(ev.status || '')) ? 'remarcada' : 'no-show') + '</b> — se a pessoa entrou atrasada, dá para entrar e mudar o status na agenda</div>';
+    quando = 'há ' + passou + ' min';
+    barra = '<div class="av-barra" title="até ' + avHora(o.fim) + '"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
   } else {
     var falta = o.ini - r.agora;
-    tempo = '<div class="av-tempo"><span>começa às ' + avHora(o.ini) + ' · em ' + (falta >= 60 ? Math.floor(falta / 60) + ' h' + (falta % 60 ? ' ' + (falta % 60) + ' min' : '') : falta + ' min') + '</span><span>até ' + avHora(o.fim) + '</span></div>';
+    quando = 'em ' + (falta >= 60 ? Math.floor(falta / 60) + 'h' + (falta % 60 ? ('0' + (falta % 60)).slice(-2) : '') : falta + ' min');
   }
-  var tag = tipo === 'vivo' ? '<em class="av-tag">AO VIVO</em>' : tipo === 'ns' ? '<em class="av-tag ns">NO-SHOW?</em>' : '<em class="av-tag prox">A SEGUIR</em>';
+  var ico = function(cls, conteudo, rot, attrs) { return '<' + (attrs.indexOf('href=') === 0 ? 'a ' : 'button type="button" ') + 'class="av-ic ' + cls + '" ' + attrs + ' title="' + rot + '" aria-label="' + rot + '">' + conteudo + '</' + (attrs.indexOf('href=') === 0 ? 'a' : 'button') + '>'; };
   return '<div class="av-card ' + tipo + '">'
-    + '<div class="av-l1"><div><b title="' + e(nome) + '">' + e(nome) + '</b><span>' + (pt.sdr ? 'SDR ' + e(pt.sdr) : '') + (rL && rL.produto ? (pt.sdr ? ' · ' : '') + e(String(rL.produto).replace(/^(programa|mentoria)\s+/i, '')) : '') + '</span></div>' + tag + '</div>'
-    + tempo
-    + '<div class="av-acts">'
-    +   (ev.meetLink ? '<a class="btn' + (tipo === 'prox' ? '' : ' primary') + '" href="' + e(ev.meetLink) + '" target="_blank" rel="noopener" title="Abre o Meet numa aba nova — desligue câmera e microfone antes de clicar em Participar">' + (tipo === 'prox' ? '🎥 Meet' : '👀 Entrar calado') + '</a>' : '')
-    +   (ig ? '<a class="btn gq-ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" title="@' + e(ig) + ' no Instagram">' + igLogo() + ' Instagram</a>' : '')
-    +   (tel ? '<button type="button" class="btn gq-cl" onclick="avClint(event,' + i + ')" title="Abrir a conversa na Clint">🟣 Clint</button>' : '')
-    +   (iR >= 0 ? '<button type="button" class="btn" onclick="abrirLead(' + iR + ')" title="Quem é esse lead">👤 Ficha</button>' : '')
-    + '</div></div>';
+    + '<div class="av-hr"><b>' + avHora(o.ini) + '</b><small>' + quando + '</small><small class="ate">até ' + avHora(o.fim) + '</small></div>'
+    + '<div class="av-info"><div class="av-l1"><b title="' + e(nome) + '">' + e(nome) + '</b>' + (tipo === 'vivo' ? '<em class="av-tag">AO VIVO</em>' : '<em class="av-tag prox">A SEGUIR</em>') + '</div>'
+    +   (sub ? '<span class="av-sub">' + e(sub) + '</span>' : '') + barra
+    +   '<div class="av-acts">'
+    +     (ev.meetLink ? '<a class="btn av-main' + (tipo === 'vivo' ? ' primary' : '') + '" href="' + e(ev.meetLink) + '" target="_blank" rel="noopener" title="Abre o Meet numa aba nova — desligue câmera e microfone antes de clicar em Participar">' + (tipo === 'vivo' ? '👀 Entrar calado' : '🎥 Meet') + '</a>' : '')
+    +     (ig ? ico('ig', igLogo(), '@' + e(ig) + ' no Instagram', 'href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener"') : '')
+    +     (tel ? ico('cl', '🟣', 'Abrir a conversa na Clint', 'onclick="avClint(event,' + i + ')"') : '')
+    +     (iR >= 0 ? ico('fi', '👤', 'Ficha do lead', 'onclick="abrirLead(' + iR + ')"') : '')
+    +   '</div></div></div>';
 }
 function avDesenhar() {
   var box = document.getElementById('grav-aovivo'); if (!box) return;
@@ -26524,6 +26533,35 @@ function rlImprimir() {
 .pl-ldia-pt.vd, .pl-ldia-h i.vd { --c:#3ddc97; background:#3ddc97; } .pl-ldia-pt.bl, .pl-ldia-h i.bl { --c:#b98aff; background:#b98aff; }
 .pl-ldia-pt.ns, .pl-ldia-h i.ns { --c:#ff6b6b; background:#ff6b6b; }
 @media (max-width:620px) { .pl-ldia-hr:nth-child(odd) { display:none; } }
+</style>
+<style>
+/* 🔴 Ao vivo — cartões organizados (28/09/2026) */
+.av-col .av-card { display:grid; grid-template-columns:58px minmax(0,1fr); gap:12px; align-items:start; padding:12px; }
+.av-hr { display:flex; flex-direction:column; align-items:center; gap:1px; padding:8px 0; border-radius:12px; background:rgba(0,0,0,.28); }
+.av-hr b { font-size:1.08rem; font-weight:900; font-variant-numeric:tabular-nums; color:var(--text); line-height:1.1; }
+.av-hr small { font-size:.6rem; font-weight:800; color:var(--text2); white-space:nowrap; }
+.av-hr small.ate { color:var(--muted); font-weight:700; }
+.av-card.vivo .av-hr { background:rgba(255,77,77,.14); } .av-card.vivo .av-hr small:not(.ate) { color:#ff8a8a; }
+.av-card.prox .av-hr small:not(.ate) { color:#8fbaff; }
+.av-info { min-width:0; display:flex; flex-direction:column; gap:6px; }
+.av-info .av-l1 { display:flex; align-items:center; gap:8px; }
+.av-info .av-l1 b { flex:1; min-width:0; font-size:.9rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.av-sub { font-size:.68rem; color:var(--muted); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.av-info .av-barra { margin-top:0; }
+.av-info .av-acts { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; margin-top:2px; }
+.av-info .av-acts .av-main { flex:1; justify-content:center; min-width:0; white-space:nowrap; padding:7px 10px; font-size:.72rem; }
+.av-ic { flex:none; width:32px; height:32px; border-radius:50%; display:grid; place-items:center; font-size:.9rem; line-height:1; text-decoration:none; cursor:pointer;
+  border:1px solid var(--border); background:rgba(255,255,255,.05); color:var(--text); transition:transform .15s ease, border-color .15s ease, background .15s ease; }
+.av-ic:hover, .av-ic:focus-visible { transform:translateY(-1px); border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.1); outline:none; }
+.av-ic.ig { border-color:rgba(225,48,108,.45); background:linear-gradient(135deg, rgba(254,218,117,.08), rgba(214,41,118,.16)); }
+.av-ic.cl { border-color:rgba(108,71,255,.5); background:rgba(108,71,255,.14); font-size:.75rem; }
+.av-ic svg { width:16px; height:16px; }
+.av-ns { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:12px; border:1px dashed rgba(255,154,90,.45); background:rgba(255,154,90,.06); font-size:.72rem; min-width:0; }
+.av-ns-ic { flex:none; } .av-ns b { flex:none; font-variant-numeric:tabular-nums; }
+.av-ns-n { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text2); font-weight:700; }
+.av-ns em { flex:none; font-style:normal; font-size:.6rem; font-weight:900; color:#ff9a5a; text-transform:uppercase; letter-spacing:.5px; }
+.av-ns-bt { flex:none; font:inherit; font-size:.64rem; font-weight:800; padding:4px 9px; border-radius:999px; border:1px solid rgba(255,154,90,.5); background:transparent; color:#ffb27a; cursor:pointer; text-decoration:none; }
+.av-ns-bt:hover { background:rgba(255,154,90,.14); }
 </style>
 </body>
 </html>
