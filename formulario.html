@@ -1012,7 +1012,7 @@ function submitVenda() {
     entrada: document.getElementById('v-ent-s').checked ? 'Sim' : 'Não',
     valor_entrada: valorLimpo('v-entrada-valor'),
     forma_pagamento: pgto,
-    parcelas: (pgto === 'Cartão de crédito' || pgto === 'Boleto') ? document.getElementById('v-parcelas').value : '',
+    parcelas: (pgto === 'Cartão de crédito' || pgto === 'Boleto') ? String(parseInt(document.getElementById('v-parcelas').value, 10) || '') : '',   // só o número: o robô põe o x (ficava 10xx)
     valor_parcela: (pgto === 'Cartão de crédito' || pgto === 'Boleto') ? valorLimpo('v-parcela-valor') : '',
     recorrente_vezes: (pgto === 'Cartão recorrente') ? document.getElementById('v-recorrente-vezes').value : '',
     valor_mensal: (pgto === 'Cartão recorrente') ? valorLimpo('v-recorrente-valor') : '',
@@ -1135,7 +1135,7 @@ function submitBloqueio() {
     valor_total: valorLimpo('b-valor'),
     valor_bloqueio: valorLimpo('b-bloqueio-valor'),
     forma_pagamento: pgto,
-    parcelas: (pgto === 'Cartão de crédito') ? document.getElementById('b-parcelas').value : '',
+    parcelas: (pgto === 'Cartão de crédito') ? String(parseInt(document.getElementById('b-parcelas').value, 10) || '') : '',   // só o número: o robô põe o x (ficava 10xx)
     valor_parcela: (pgto === 'Cartão de crédito') ? valorLimpo('b-parcela-valor') : '',
     recorrente_vezes: (pgto === 'Cartão recorrente') ? document.getElementById('b-recorrente-vezes').value : '',
     valor_mensal: (pgto === 'Cartão recorrente') ? valorLimpo('b-recorrente-valor') : '',
@@ -1544,7 +1544,7 @@ function avisarPaiDados() {
   poe('c-cpf', q.cpf); poe('v-valor', q.valor); poe('v-obs', q.obs);
   if (q.dupla === 'Sim') { try { document.getElementById('dupla-s').checked = true; toggleDupla(); poe('c-dupla-nome', q.duplaNome); poe('c-dupla-cel', q.duplaCel); poe('c-dupla-email', q.duplaEmail); } catch (e) {} }
   // pagamento que ja tinha sido combinado no bloqueio/entrada
-  if (q.forma) { try { poe('v-pagamento', q.forma); togglePagamento(); poe('v-parcelas', q.parcelas); poe('v-parcela-valor', q.valorParcela); poe('v-recorrente-vezes', q.recorrente); poe('v-recorrente-valor', q.valorMensal); } catch (e) {} }
+  if (q.forma) { try { poe('v-pagamento', q.forma); togglePagamento(); poe('v-parcelas', /^\d+$/.test(String(q.parcelas || '')) ? q.parcelas + 'x' : q.parcelas); poe('v-parcela-valor', q.valorParcela); poe('v-recorrente-vezes', q.recorrente); poe('v-recorrente-valor', q.valorMensal); } catch (e) {} }
   if (q.entrada === 'Sim') { try { document.getElementById('v-ent-s').checked = true; toggleEntrada(); poe('v-entrada-valor', q.valorEntrada); } catch (e) {} }
   window.__teveBloqueio = q.bloqueio === 'Sim' ? 'Sim' : '';
   if (q.modo === 'venda') {
