@@ -17,6 +17,8 @@
   manda tudo no formato que a tela de venda do dash entende (colou → os campos se preenchem sozinhos).
   Nada é gravado em servidor: os dados vão direto do celular do cliente para a conversa com a Promov.
   Parâmetros do link: n = primeiro nome · w = WhatsApp da Promov (com 55) · p = programa · c = closer · d=1 = já abre a segunda cadeira
+  Depois do # (28/09/2026): d = JSON em base64 com o que o closer já sabe (nome, cel, email, insta, nicho, prog, valor, pgto, dn/dc/de da dupla):
+  a página abre preenchida, mostra "Seu programa" com as condições, e a mensagem volta com o bloco PEDIDO para a tela de venda.
 -->
 <style>
 :root {
@@ -109,6 +111,17 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
 .fim h2 { font-family:var(--disp); font-weight:800; font-size:2rem; line-height:1.05; }
 .fim p { margin:10px auto 0; color:var(--text2); max-width:38ch; font-size:.92rem; }
 .fim .bt { margin-top:18px; width:100%; }
+.plano { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; margin-top:16px; padding:14px 16px; border-radius:18px;
+  border:1px solid rgba(246,163,80,.3); background:linear-gradient(135deg, rgba(246,163,80,.13), rgba(255,209,102,.03)); animation:entra .5s cubic-bezier(.22,1,.36,1) both; }
+.plano-ic { grid-row:span 2; width:42px; height:42px; border-radius:13px; display:grid; place-items:center; background:rgba(246,163,80,.18); color:var(--accent2); }
+.plano-ic svg { width:22px; height:22px; }
+.plano-rot { font-size:.66rem; font-weight:800; letter-spacing:1.3px; text-transform:uppercase; color:var(--muted); }
+.plano b { display:block; font-family:var(--disp); font-weight:800; font-size:1.4rem; letter-spacing:.3px; line-height:1.05; }
+.plano-cond { grid-column:1 / -1; display:flex; flex-direction:column; gap:2px; margin-top:8px; padding-top:9px; border-top:1px dashed var(--line2); font-size:.84rem; font-weight:600; color:var(--text2); font-variant-numeric:tabular-nums; }
+.plano-val { font-size:1.02rem; font-weight:800; color:var(--text); }
+.plano-cond[hidden] { display:none; }
+.pre-ok { display:inline-flex; align-items:center; gap:6px; margin-top:10px; font-size:.76rem; font-weight:700; color:var(--ok); }
+.rev-nota { padding:0 14px 12px; font-size:.76rem; color:var(--muted); }
 .rodape { margin-top:26px; text-align:center; font-size:.7rem; color:#5d6372; }
 @media (min-width:600px) { .card { padding:26px 24px; } }
 @media (max-width:360px) { .lado { grid-template-columns:1fr; } }
@@ -126,6 +139,12 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
     <h1 id="ola-t">Seus dados para o <em>contrato</em></h1>
     <p id="ola-p">Leva uns 2 minutinhos. Cada informação é conferida na hora, para o contrato e a nota fiscal saírem certinhos.</p>
   </section>
+
+  <div class="plano" id="plano" hidden>
+    <div class="plano-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg></div>
+    <div><span class="plano-rot">Seu programa</span><b id="plano-nome"></b></div>
+    <div class="plano-cond" id="plano-cond" hidden></div>
+  </div>
 
   <div class="passos" id="passos" aria-hidden="true"></div>
   <div class="etapa-rot"><b id="etapa-nome">Você</b><span id="etapa-num">1 de 4</span></div>
@@ -237,6 +256,10 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
   var $ = function (id) { return document.getElementById(id); };
   var Q = new URLSearchParams(location.search);
   var P = { n: (Q.get('n') || '').trim(), w: (Q.get('w') || '').replace(/\D/g, ''), p: (Q.get('p') || '').trim(), c: (Q.get('c') || '').trim(), d: Q.get('d') === '1' };
+  // o que o closer já sabe vem depois do # (não passa por servidor): nome, contato, programa e condições (28/09/2026)
+  var H = {};
+  try { var mh = location.hash.match(/[#&]d=([A-Za-z0-9\-_]+)/); if (mh) { var b64 = mh[1].replace(/-/g, '+').replace(/_/g, '/'); while (b64.length % 4) b64 += '='; H = JSON.parse(decodeURIComponent(escape(atob(b64)))) || {}; } } catch (e) { H = {}; }
+  if (!P.p && H.prog) P.p = String(H.prog);
   var tipo = 'PF';
   var UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
   var DDDS = [11,12,13,14,15,16,17,18,19,21,22,24,27,28,31,32,33,34,35,37,38,41,42,43,44,45,46,47,48,49,51,53,54,55,61,62,63,64,65,66,67,68,69,71,73,74,75,77,79,81,82,83,84,85,86,87,88,89,91,92,93,94,95,96,97,98,99];
@@ -248,6 +271,10 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
   if (P.n) $('ola-t').innerHTML = 'Oi, <em>' + esc(P.n.split(' ')[0]) + '</em>! Seus dados para o contrato';
   $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para o ' + prog : '') + '. ' : '') + 'Leva uns 2 minutinhos — cada informação é conferida na hora, para o contrato e a nota fiscal saírem certinhos.';
   if (P.d) $('tem-dupla').checked = true;
+  if (prog) {
+    $('plano').hidden = false; $('plano-nome').textContent = prog;
+    if (H.valor || H.pgto) { $('plano-cond').hidden = false; $('plano-cond').innerHTML = (H.valor ? '<span class="plano-val">' + esc(H.valor) + '</span>' : '') + (H.pgto ? '<span>' + esc(H.pgto) + '</span>' : ''); }
+  }
 
   // ---------- utilidades ----------
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -444,11 +471,15 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
       return '<div class="rev-bloco"><h3>' + tit + '<button type="button" data-ir="' + etapa + '">editar</button></h3><dl>'
         + lista.filter(function (x) { return x[1]; }).map(function (x) { return '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>'; }).join('') + '</dl></div>';
     };
-    $('rev').innerHTML = bloco(tipo === 'PJ' ? 'Titular e empresa' : 'Titular', D.t, 'voce') + bloco('Contato', D.c, 'contato') + bloco('Endereço', [['Endereço', endereco()]], 'endereco') + (D.d ? bloco('Segunda cadeira', D.d, 'dupla') : '');
+    var pl = prog ? '<div class="rev-bloco"><h3>Programa</h3><dl><dt>Programa</dt><dd>' + esc(prog) + '</dd>' + (H.valor ? '<dt>Valor</dt><dd>' + esc(H.valor) + '</dd>' : '') + (H.pgto ? '<dt>Pagamento</dt><dd>' + esc(H.pgto) + '</dd>' : '') + '</dl>'
+      + '<p class="rev-nota">Algo diferente do combinado? Fale com ' + esc(P.c ? P.c.split(' ')[0] : 'a Promov') + ' antes de enviar.</p></div>' : '';
+    $('rev').innerHTML = pl + bloco(tipo === 'PJ' ? 'Titular e empresa' : 'Titular', D.t, 'voce') + bloco('Contato', D.c, 'contato') + bloco('Endereço', [['Endereço', endereco()]], 'endereco') + (D.d ? bloco('Segunda cadeira', D.d, 'dupla') : '');
   }
   $('rev').addEventListener('click', function (e) { var b = e.target.closest('[data-ir]'); if (b) ir(ordem.indexOf(b.dataset.ir), true); });
   function texto() {
-    var D = dados(), L = ['*Cadastro para contrato — Promov*', '', 'TITULAR'];
+    var D = dados(), L = ['*Cadastro para contrato — Promov*', ''];
+    if (prog) { L.push('PEDIDO', 'Programa: ' + prog); if (H.valor) L.push('Valor total: ' + H.valor); if (H.pgto) L.push('Pagamento: ' + H.pgto); L.push(''); }
+    L.push('TITULAR');
     D.t.concat(D.c, D.en).forEach(function (x) { if (x[1]) L.push(x[0] + ': ' + x[1]); });
     if (D.d) { L.push('', 'SEGUNDA CADEIRA'); D.d.forEach(function (x) { if (x[1]) L.push(x[0] + ': ' + x[1]); }); }
     L.push('', '✅ Confirmo que os dados estão corretos e autorizo o uso para o contrato e a nota fiscal.');
@@ -496,6 +527,16 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
     return Math.max(0, ['voce', 'contato', 'endereco', 'dupla', 'revisao'].indexOf(o.etapa));
   }
   var volta = restaurar();
+  (function () {
+    var n = 0, poe = function (id, v) { var el = $(id); if (!el || !v || el.value.trim()) return; el.value = MASC[id] ? MASC[id](v) : v; conferir(id, false); n++; };
+    poe('nome', H.nome); poe('cel', H.cel); poe('email', String(H.email || '').toLowerCase());
+    poe('insta', H.insta ? '@' + String(H.insta).replace(/^@+/, '') : ''); poe('nicho', H.nicho);
+    if (H.dn || H.dc) { $('tem-dupla').checked = true; poe('d-nome', H.dn); poe('d-cel', H.dc); poe('d-email', String(H.de || '').toLowerCase()); }
+    if (n) {
+      $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para o ' + prog : '') + '. ' : '') + 'O que já temos veio preenchido — é só conferir e completar.';
+      var s = document.createElement('div'); s.className = 'pre-ok'; s.textContent = '✓ ' + n + ' campo' + (n > 1 ? 's' : '') + ' já preenchido' + (n > 1 ? 's' : ''); $('ola').appendChild(s);
+    }
+  })();
   montarPassos();
   ir(Math.min(volta, ordem.length - 1));
 })();

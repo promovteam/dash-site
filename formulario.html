@@ -299,7 +299,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <button type="button" class="btn" onclick="preencherColado('c')">✨ Preencher com o texto</button>
         <button type="button" class="btn" style="background:rgba(61,220,151,.14);color:#3ddc97;border:1px solid rgba(61,220,151,.45);" onclick="copiarLinkCadastro(this)" title="Copia uma mensagem com o link da página de cadastro — o cliente preenche no celular e manda de volta pelo WhatsApp">🔗 Link para o cliente preencher</button>
         <button type="button" class="btn" style="background:var(--surface);color:var(--text);border:1px solid var(--border);" onclick="abrirFormsPreenchido()">📝 Abrir o Google Forms preenchido</button>
-        <span class="colar-msg" id="c-colar-msg">Cole a resposta do lead — os campos se preenchem sozinhos (TITULAR e SEGUNDA CADEIRA separados também)</span>
+        <span class="colar-msg" id="c-colar-msg">A resposta do cliente na Clint entra sozinha — se ele mandou por outro lugar, cole aqui (TITULAR e SEGUNDA CADEIRA separados também)</span>
       </div>
     </div>
 
@@ -1264,9 +1264,19 @@ function copiarLinkCadastro(bt) {
   var p = ['n=' + encodeURIComponent(nome.split(' ')[0] || ''), 'c=' + encodeURIComponent(vend), 'p=' + encodeURIComponent(prog)];
   if (q.wz) p.push('w=' + encodeURIComponent(String(q.wz).replace(/\D/g, '')));
   if (dupla) p.push('d=1');
-  var url = new URL('cadastro.html', location.href).href.split('?')[0] + '?' + p.join('&');
+  // o que já sabemos vai junto, depois do # (não passa por servidor): o cliente só confere e completa, e vê o programa e as condições
+  var pg = g('v-pagamento'), cond = [];
+  if (pg && !/^nao sei$/.test(_semAcento(pg))) cond.push(pg);
+  if (pg === 'Cartão de crédito' && g('v-parcelas')) cond.push(g('v-parcelas').replace(/x$/i, '') + 'x' + (g('v-parcela-valor') ? ' de ' + g('v-parcela-valor') : ''));
+  if (pg === 'Cartão recorrente' && g('v-recorrente-vezes')) cond.push(g('v-recorrente-vezes') + 'x' + (g('v-recorrente-valor') ? ' de ' + g('v-recorrente-valor') : ''));
+  if (document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked && g('v-entrada-valor')) cond.push('entrada de ' + g('v-entrada-valor'));
+  var dd = { nome: nome, cel: g('c-cel') || q.cel || '', email: g('c-email') || q.email || '', insta: g('c-insta') || q.insta || '', nicho: g('c-nicho') || q.nicho || '', prog: prog, valor: g('v-valor') || q.valor || '', pgto: cond.join(' · ') };
+  if (dupla) { dd.dn = g('c-dupla-nome'); dd.dc = g('c-dupla-cel'); dd.de = g('c-dupla-email'); }
+  Object.keys(dd).forEach(function(k) { if (!dd[k]) delete dd[k]; });
+  var hash = ''; try { hash = '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(dd)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); } catch (eH) {}
+  var url = new URL('cadastro.html', location.href).href.split('?')[0] + '?' + p.join('&') + hash;
   var msg = 'Oi' + (nome ? ', ' + nome.split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
-  var ok = function() { var m = document.getElementById('c-colar-msg'); if (m) m.textContent = '✓ Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente mandar os dados de volta, cole aqui em cima.'; if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado'; setTimeout(function(){ bt.textContent = t0; }, 2500); } };
+  var ok = function() { var m = document.getElementById('c-colar-msg'); if (m) m.textContent = '✓ Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente enviar, os dados entram aqui sozinhos.'; if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado — cole na Clint'; setTimeout(function(){ bt.textContent = t0; }, 2800); } try { if (window.__preLinkEnviado) window.__preLinkEnviado(); } catch (eP) {} };
   (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
 }
 function lerDadosColados(texto) {
@@ -1690,6 +1700,308 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
   if (typeof _go === 'function') window.vendaGoStep = function (n) { if (typeof currentStep !== 'undefined' && currentStep === 2 && n > 2 && barrar(problemas())) return; return _go.apply(this, arguments); };
   var _sv = window.submitVenda;
   if (typeof _sv === 'function') window.submitVenda = function () { if (barrar(problemas())) return; return _sv.apply(this, arguments); };
+})();
+</script>
+<style>
+/* ===== PRÉ-PREENCHIMENTO PARA O CLOSER VALIDAR (Bruno 28/09/2026) ===== */
+.pre-box{display:flex;flex-direction:column;gap:8px;margin:0 0 14px;padding:12px 14px;border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(0,0,0,.1));border:1px solid rgba(255,255,255,.08);font-size:.8rem;line-height:1.45;color:#c9cbe0}
+.pre-box[hidden]{display:none}
+.pre-l{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.pre-l[hidden]{display:none}
+.pre-l b{color:#eef0ff}
+.pre-ic{flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font-size:.85rem;background:rgba(255,255,255,.06)}
+.pre-l.ok .pre-ic{background:rgba(61,220,151,.16)}
+.pre-l.espera .pre-ic{background:rgba(246,163,80,.16)}
+.pre-tx{flex:1;min-width:180px}
+.pre-bt{font:inherit;font-size:.74rem;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#eef0ff;cursor:pointer;text-decoration:none;white-space:nowrap;transition:background .2s,border-color .2s}
+.pre-bt:hover{background:rgba(255,255,255,.1)}
+.pre-bt.v{border-color:rgba(61,220,151,.45);background:rgba(61,220,151,.12);color:#3ddc97}
+.pre-bt.v:hover{background:rgba(61,220,151,.2)}
+.pre-bt:focus-visible{outline:2px solid #ffd166;outline-offset:2px}
+.pre-falta{padding-top:8px;border-top:1px dashed rgba(255,255,255,.1)}
+.pre-falta .chip{font:inherit;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid rgba(255,209,102,.35);background:rgba(255,209,102,.08);color:#ffd166;cursor:pointer}
+.pre-falta .chip:hover{background:rgba(255,209,102,.16)}
+.pre-falta.tudo{color:#3ddc97;font-weight:700}
+.pre-msg{white-space:pre-wrap;font:12px/1.45 ui-monospace,Menlo,monospace;background:rgba(0,0,0,.3);border-radius:10px;padding:8px 10px;max-height:190px;overflow:auto;color:#d7d9ee;margin-top:2px;width:100%}
+.pre-gira{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.2);border-top-color:#f6a350;animation:preGira .8s linear infinite;display:inline-block}
+.pre-pulso{width:8px;height:8px;border-radius:50%;background:#f6a350;display:inline-block;animation:prePulso 1.6s ease-in-out infinite}
+@keyframes preGira{to{transform:rotate(360deg)}}
+@keyframes prePulso{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+.do-cliente{border-color:rgba(61,220,151,.6)!important;background:rgba(61,220,151,.07)!important}
+.f .do-cliente-tag{display:inline-block;margin-left:6px;font-size:.62rem;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#3ddc97;padding:1px 6px;border-radius:6px;background:rgba(61,220,151,.12);vertical-align:1px}
+.chegou{animation:chegou 1.2s ease-out}
+@keyframes chegou{0%{box-shadow:0 0 0 0 rgba(61,220,151,.55)}100%{box-shadow:0 0 0 14px rgba(61,220,151,0)}}
+.pre-toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;z-index:9999;background:#12261d;border:1px solid rgba(61,220,151,.5);color:#bff3da;font-weight:700;font-size:.86rem;padding:12px 18px;border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .35s;pointer-events:none;max-width:calc(100vw - 32px);text-align:center}
+.pre-toast.on{transform:translate(-50%,0);opacity:1}
+.bt-pedir{background:rgba(61,220,151,.14)!important;color:#3ddc97!important;border:1px solid rgba(61,220,151,.45)!important;box-shadow:none!important}
+@media (prefers-reduced-motion:reduce){.pre-gira,.pre-pulso,.chegou{animation:none}.pre-toast{transition:none}}
+</style>
+<script>
+// =====================================================================
+// PRÉ-PREENCHIMENTO PARA O CLOSER VALIDAR (Bruno 28/09/2026: "quero que já preencha o formulário, ou seja, um
+// pré-preenchimento para o closer validar · que já puxe o programa, as condições de pagamento, os nomes e dados já dados
+// pelo lead, para ele corrigir ou só preencher os que não tem · quando o closer preencher as primeiras informações e gerar
+// o link para o lead preencher · que já puxe informações já disponíveis · muito fluido").
+// Ordem do que entra na tela (o de baixo só completa o que o de cima deixou vazio, menos o cliente, que corrige):
+//   1. o que o dash sabe (link do iframe: lead, reunião, bloqueio)          → já vinha
+//   2. o RASCUNHO do closer para esse lead (o que ele digitou antes)         → volta igualzinho
+//   3. a VENDA ANTERIOR dessa pessoa na planilha (#pre= que o dash manda)    → só os campos vazios
+//   4. a RESPOSTA DO CLIENTE na conversa da Clint (página de cadastro ou o modelo "Nome completo: …")
+//      → entra sozinha, os campos ficam marcados "do cliente" até o closer mexer; o programa/pagamento do link só completa
+// Com o link enviado e a tela aberta, confere a conversa a cada minuto: quando o cliente manda, os campos aparecem.
+// =====================================================================
+(function () {
+  var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function (p) { if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
+  if (q.modo === 'bloqueio') return;
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $('form-venda'); if (!form || !$('v-step1')) return;
+  var cel8 = String(q.cel || '').replace(/\D/g, '').slice(-8);
+  var CH = cel8.length === 8 ? 'vendaRascunho:' + cel8 : '';
+  var R = { sujo: false, msg: '', hx: '', link: 0, cli: [] };
+  var marcaTx = function (t) { var h = 0, x = String(t || '').replace(/\s+/g, ' ').trim(); for (var i = 0; i < x.length; i++) h = (h * 31 + x.charCodeAt(i)) | 0; return x.length + ':' + h; };
+  var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var quando = function (t) { var d = new Date(t); if (isNaN(d)) return ''; var h = new Date(), ontem = new Date(h.getTime() - 864e5); var hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    if (d.toDateString() === h.toDateString()) return 'hoje às ' + hm; if (d.toDateString() === ontem.toDateString()) return 'ontem às ' + hm; return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' às ' + hm; };
+
+  // ---------- caixa de avisos no topo ----------
+  var box = document.createElement('div'); box.className = 'pre-box'; box.id = 'pre-box'; box.hidden = true;
+  box.innerHTML = '<div class="pre-l" id="pre-rasc" hidden></div><div class="pre-l" id="pre-ant" hidden></div><div class="pre-l" id="pre-cli" hidden></div><div class="pre-l pre-falta" id="pre-falta" hidden></div>';
+  form.insertBefore(box, form.firstChild);
+  function linha(id, cls, ic, html) { var l = $(id); l.className = 'pre-l ' + (id === 'pre-falta' ? 'pre-falta ' : '') + (cls || ''); l.innerHTML = (ic ? '<span class="pre-ic" aria-hidden="true">' + ic + '</span>' : '') + html; l.hidden = false; box.hidden = false; }
+  function toast(t) { var el = $('pre-toast'); if (!el) { el = document.createElement('div'); el.id = 'pre-toast'; el.className = 'pre-toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); } el.textContent = t; el.classList.add('on'); clearTimeout(el._t); el._t = setTimeout(function () { el.classList.remove('on'); }, 4200); }
+
+  // ---------- campos ----------
+  function campos() { return Array.prototype.slice.call(form.querySelectorAll('input[id], select[id], textarea[id]')).filter(function (el) { return el.type !== 'file' && el.id !== 'c-colar' && el.name !== 'tiporeg'; }); }
+  function foto() { var o = {}; campos().forEach(function (el) { o[el.id] = (el.type === 'radio' || el.type === 'checkbox') ? el.checked : el.value; }); return o; }
+  function poe(el, v) {
+    if (!el) return;
+    if (el.tagName === 'SELECT' && v) {
+      var n = function (t) { return _semAcento(t).replace(/^programa\s+|^mentoria\s+/, '').replace(/2a cadeira|segunda cadeira/g, '2 cadeira').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }, achou = false;
+      for (var i = 0; i < el.options.length; i++) if (n(el.options[i].text) === n(v) || n(el.options[i].value) === n(v)) { el.selectedIndex = i; achou = true; break; }
+      if (!achou) for (var j = 0; j < el.options.length; j++) if (el.options[j].value && n(v).indexOf(n(el.options[j].text)) === 0) { el.selectedIndex = j; achou = true; break; }
+      if (!achou) { var o = document.createElement('option'); o.text = o.value = String(v); el.appendChild(o); el.value = String(v); }
+    } else el.value = v == null ? '' : String(v);
+  }
+  function alternar() { ['toggleEntrada', 'togglePagamento', 'togglePJ', 'toggleDupla'].forEach(function (f) { try { if (typeof window[f] === 'function') window[f](); } catch (e) {} }); }
+  function vazio(id) { var el = $(id); return !!el && !String(el.value || '').trim(); }
+
+  // ---------- 2. rascunho do closer ----------
+  var tS = 0;
+  function salvar() {
+    if (!CH || !R.sujo) return;
+    clearTimeout(tS);
+    tS = setTimeout(function () {
+      var o = { t: Date.now(), v: foto(), msg: R.msg, hx: R.hx, link: R.link, cli: R.cli, passo: typeof currentStep !== 'undefined' ? currentStep : 1, nome: ($('c-nome') || {}).value || '' };
+      try { localStorage.setItem(CH, JSON.stringify(o)); } catch (e) {}
+    }, 300);
+  }
+  function apagarRascunho() { try { if (CH) localStorage.removeItem(CH); } catch (e) {} }
+  var rasc = null;
+  try { rasc = CH ? JSON.parse(localStorage.getItem(CH) || 'null') : null; } catch (e) {}
+  if (rasc && (!rasc.t || Date.now() - rasc.t > 21 * 864e5)) { apagarRascunho(); rasc = null; }
+  if (rasc && rasc.v) {
+    var vs = rasc.v;
+    // radios/checkbox primeiro (abrem os blocos), depois os valores
+    campos().forEach(function (el) { if ((el.type === 'radio' || el.type === 'checkbox') && vs[el.id] === true) el.checked = true; });
+    alternar();
+    campos().forEach(function (el) { if (el.type !== 'radio' && el.type !== 'checkbox' && vs[el.id] !== undefined && String(vs[el.id]).trim()) poe(el, vs[el.id]); });
+    alternar();
+    R.msg = rasc.msg || ''; R.hx = rasc.hx || ''; R.link = rasc.link || 0; R.cli = rasc.cli || []; R.sujo = true;
+    R.cli.forEach(function (id) { marcarCliente(id); });
+    linha('pre-rasc', '', '✏️', '<span class="pre-tx">Continuei de onde você parou (' + esc(quando(rasc.t)) + ').</span><button type="button" class="pre-bt" id="pre-zerar">começar do zero</button>');
+    $('pre-zerar').onclick = function () { if (!confirm('Apagar o que foi preenchido para esse cliente e começar de novo?')) return; apagarRascunho(); location.reload(); };
+  }
+
+  // ---------- 3. venda anterior dessa pessoa (o dash manda em #pre=) ----------
+  var ant = null;
+  try { var mH = location.hash.match(/[#&]pre=([^&]+)/); if (mH) ant = JSON.parse(decodeURIComponent(mH[1])); } catch (e) {}
+  if (ant) {
+    var n0 = 0, tenta = function (id, v) { if (v && vazio(id)) { poe($(id), v); n0++; } };
+    tenta('c-cpf', _cpfColado(ant.cpf)); tenta('c-email', ant.email); tenta('c-insta', ant.insta ? _instaColado(ant.insta).replace(/^@/, '') : ''); tenta('c-rg', ant.rg);
+    tenta('c-nasc', _dataColada(ant.nasc)); tenta('c-civil', _civilColado(ant.civil)); tenta('c-prof', ant.prof); tenta('c-nicho', ant.nicho);
+    if (ant.endereco && vazio('c-rua') && vazio('c-cep')) { var e0 = separarEndereco(ant.endereco); [['c-cep', e0.cep], ['c-rua', e0.rua], ['c-num', e0.num], ['c-comp', e0.comp], ['c-bairro', e0.bairro], ['c-cidade', e0.cidade], ['c-estado', _ufColada(e0.uf)]].forEach(function (x) { tenta(x[0], x[1]); }); }
+    tenta('v-programa', ant.programa); tenta('v-valor', ant.valor);
+    if (ant.forma && vazio('v-pagamento')) { pagamento(ant.forma); n0++; }
+    alternar();
+    if (n0) linha('pre-ant', '', '📄', '<span class="pre-tx">Completei <b>' + n0 + ' campo' + (n0 > 1 ? 's' : '') + '</b> com a venda anterior dessa pessoa' + (ant.quando ? ' (' + esc(ant.quando) + ')' : '') + ' — confira.</span>');
+  }
+
+  // "Cartão de crédito · 12x de R$ 997,00 · entrada de R$ 1.000,00" → campos da forma de pagamento
+  function pagamento(t) {
+    var s = _semAcento(t), forma = /recorrent/.test(s) ? 'Cartão recorrente' : /cart|credito/.test(s) ? 'Cartão de crédito' : /pix/.test(s) ? 'Pix' : /boleto/.test(s) ? 'Boleto' : /\bted\b|transfer/.test(s) ? 'TED' : '';
+    if (forma && vazio('v-pagamento')) { poe($('v-pagamento'), forma); try { togglePagamento(); } catch (e) {} }
+    var mP = s.match(/(\d{1,2})\s*x(?:\s*de\s*(r\$\s*[\d.]+(?:,\d{2})?))?/);
+    if (mP) {
+      if ($('v-pagamento').value === 'Cartão recorrente') { if (vazio('v-recorrente-vezes')) poe($('v-recorrente-vezes'), String(+mP[1])); if (mP[2] && vazio('v-recorrente-valor')) poe($('v-recorrente-valor'), mP[2].replace(/^r\$/, 'R$')); }
+      else { if (vazio('v-parcelas')) poe($('v-parcelas'), (+mP[1]) + 'x'); if (mP[2] && vazio('v-parcela-valor')) poe($('v-parcela-valor'), mP[2].replace(/^r\$/, 'R$')); }
+    }
+    var mE = s.match(/entrada\s*(?:de)?\s*(r\$\s*[\d.]+(?:,\d{2})?)/);
+    if (mE && $('v-ent-s') && !$('v-ent-s').checked) { $('v-ent-s').checked = true; try { toggleEntrada(); } catch (e) {} if (vazio('v-entrada-valor')) poe($('v-entrada-valor'), mE[1].replace(/^r\$/, 'R$')); }
+  }
+
+  // ---------- campos que vieram do cliente: marcados até o closer mexer ----------
+  function marcarCliente(id) {
+    var el = $(id); if (!el || !String(el.value || '').trim()) return;
+    el.classList.add('do-cliente');
+    var lb = el.closest('.f') && el.closest('.f').querySelector('label');
+    if (lb && !lb.querySelector('.do-cliente-tag')) { var tg = document.createElement('span'); tg.className = 'do-cliente-tag'; tg.textContent = 'do cliente'; lb.appendChild(tg); }
+  }
+  function desmarcar(el) {
+    el.classList.remove('do-cliente');
+    var lb = el.closest('.f') && el.closest('.f').querySelector('label'), tg = lb && lb.querySelector('.do-cliente-tag');
+    if (tg && !el.closest('.f').querySelector('.do-cliente')) tg.remove();
+    R.cli = R.cli.filter(function (x) { return x !== el.id; });
+  }
+  // o closer mexeu: vira rascunho dele
+  ['input', 'change'].forEach(function (ev) {
+    form.addEventListener(ev, function (e) {
+      if (!e.isTrusted) return;
+      R.sujo = true;
+      if (e.target && e.target.classList && e.target.classList.contains('do-cliente')) desmarcar(e.target);
+      salvar(); faltas();
+    });
+  });
+
+  // ---------- o que ainda falta ----------
+  var tF = 0;
+  function faltas() {
+    clearTimeout(tF);
+    tF = setTimeout(function () {
+      var pj = $('tipo-pj') && $('tipo-pj').checked, dupla = $('dupla-s') && $('dupla-s').checked, pg = ($('v-pagamento') || {}).value;
+      var lista = [];
+      ['v-step1', 'v-step2', 'v-step3'].forEach(function (sid, i) {
+        var sec = $(sid); if (!sec) return;
+        sec.querySelectorAll('[required]').forEach(function (el) {
+          if (el.type === 'file' || el.type === 'radio') return;
+          if (el.closest('#pj-fields') && !pj) return;
+          if (el.closest('#dupla-fields') && !dupla) return;
+          if (el.closest('#parcelas-field') && pg !== 'Cartão de crédito') return;
+          if (el.closest('#recorrente-field') && pg !== 'Cartão recorrente') return;
+          if (String(el.value || '').trim()) return;
+          var lb = el.closest('.f') && el.closest('.f').querySelector('label');
+          var nome = lb ? lb.childNodes[0].textContent.replace(/[*:]/g, '').trim() : el.id;
+          lista.push({ id: el.id, nome: nome, passo: i + 1 });
+        });
+      });
+      if (!lista.length) { linha('pre-falta', 'tudo', '', '✓ Tudo preenchido — confira e registre'); return; }
+      linha('pre-falta', '', '', '<span>Falta:</span>' + lista.map(function (x) { return '<button type="button" class="chip" data-ir="' + x.id + '" data-passo="' + x.passo + '">' + esc(x.nome) + '</button>'; }).join(''));
+    }, 250);
+  }
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ir]'); if (!b) return;
+    var alvo = $(b.dataset.ir), n = +b.dataset.passo;
+    if (typeof currentStep !== 'undefined' && currentStep !== n) { try { $('v-step' + currentStep).style.display = 'none'; $('v-step' + n).style.display = 'block'; currentStep = n; updateProgress(); } catch (er) {} }
+    if (alvo) setTimeout(function () { alvo.scrollIntoView({ block: 'center', behavior: 'smooth' }); alvo.focus({ preventScroll: true }); alvo.classList.add('chegou'); setTimeout(function () { alvo.classList.remove('chegou'); }, 1300); }, 60);
+  });
+
+  // ---------- 4. resposta do cliente na conversa da Clint ----------
+  var buscando = false, rodadas = 0, tP = 0;
+  function textoDe(m) { var t = String(m.texto || ''); if (/^\s*\{/.test(t)) { try { var o = JSON.parse(t); t = o.text || o.body || o.caption || o.message || ''; } catch (e) {} } return String(t || ''); }
+  function doCliente(m) { return /customer|contact|client|lead/i.test(String(m.tipo || '')) || (!m.tipo && !m.user_id); }
+  function acharDados(msgs) {
+    var cli = msgs.filter(doCliente);
+    for (var i = cli.length - 1; i >= 0; i--) { var t = textoDe(cli[i]), d = lerDadosColados(t); if (d.n >= 3) return { texto: t, quando: cli[i].quando, n: d.n }; }
+    // respondeu em várias mensagens: junta as do cliente dos últimos 4 dias
+    var lim = Date.now() - 4 * 864e5, rec = cli.filter(function (m) { return new Date(m.quando).getTime() >= lim; });
+    if (rec.length > 1) { var junto = rec.map(textoDe).join('\n'), d2 = lerDadosColados(junto); if (d2.n >= 3) return { texto: junto, quando: rec[rec.length - 1].quando, n: d2.n, picado: true }; }
+    return null;
+  }
+  function estadoCliente(tipo, x) {
+    var linkBt = '<button type="button" class="pre-bt v" onclick="copiarLinkCadastro(this)">🔗 Copiar link para o cliente</button>';
+    var clintBt = q.clint && /^https?:/.test(q.clint) ? '<a class="pre-bt" href="' + esc(q.clint) + '" target="_blank" rel="noopener">Abrir a conversa na Clint ↗</a>' : '';
+    if (tipo === 'buscando') linha('pre-cli', '', '<i class="pre-gira"></i>', '<span class="pre-tx">Procurando os dados do cliente na conversa da Clint…</span>');
+    else if (tipo === 'achou') linha('pre-cli', 'ok', '📥', '<span class="pre-tx"><b>O cliente mandou os dados</b> ' + esc(quando(x.quando)) + ' — preenchi ' + x.campos + ' campo' + (x.campos === 1 ? '' : 's') + ' (em verde). Confira antes de registrar.</span><button type="button" class="pre-bt" id="pre-ver">ver mensagem</button><div class="pre-msg" id="pre-msgtx" hidden>' + esc(x.texto) + '</div>');
+    else if (tipo === 'ja') linha('pre-cli', 'ok', '📥', '<span class="pre-tx">Os dados que o cliente mandou ' + esc(quando(x.quando)) + ' já estão na tela.</span><button type="button" class="pre-bt" id="pre-ver">ver mensagem</button><button type="button" class="pre-bt" id="pre-reaplicar">preencher de novo</button><div class="pre-msg" id="pre-msgtx" hidden>' + esc(x.texto) + '</div>');
+    else if (tipo === 'esperando') linha('pre-cli', 'espera', '<i class="pre-pulso"></i>', '<span class="pre-tx"><b>Esperando o cliente</b> — link enviado ' + esc(quando(R.link)) + '. Quando ele mandar, os dados aparecem aqui sozinhos.</span>' + clintBt + '<button type="button" class="pre-bt" id="pre-buscar">🔄 procurar agora</button>');
+    else if (tipo === 'nada') linha('pre-cli', '', '💬', '<span class="pre-tx">O cliente ainda não mandou os dados. Mande o link: ele preenche no celular e tudo entra aqui.</span>' + linkBt + '<button type="button" class="pre-bt" id="pre-buscar">🔄 procurar de novo</button>');
+    else if (tipo === 'erro') linha('pre-cli', '', '⚠️', '<span class="pre-tx">Não consegui ler a conversa da Clint agora' + (x ? ' (' + esc(String(x).slice(0, 90)) + ')' : '') + '. Se o cliente já mandou, cole a mensagem na parte 2.</span>' + linkBt + '<button type="button" class="pre-bt" id="pre-buscar">🔄 tentar de novo</button>');
+    var bv = $('pre-ver'); if (bv) bv.onclick = function () { var m = $('pre-msgtx'); m.hidden = !m.hidden; bv.textContent = m.hidden ? 'ver mensagem' : 'esconder'; };
+    var bb = $('pre-buscar'); if (bb) bb.onclick = function () { buscar(true); };
+    var br = $('pre-reaplicar'); if (br) br.onclick = function () { aplicar(x, true); };
+  }
+  function buscar(manual) {
+    if (!cel8 || buscando || typeof GAS_URL === 'undefined') return;
+    buscando = true; clearTimeout(tP);
+    if (manual || !R.msg) estadoCliente('buscando');
+    var cb = 'preCli' + Date.now() + Math.floor(Math.random() * 1000), sc = document.createElement('script'), feito = false;
+    var fim = function (res) {
+      if (feito) return; feito = true; buscando = false;
+      try { sc.remove(); } catch (e) {} window[cb] = function () {};
+      tratar(res, manual);
+    };
+    window[cb] = fim; sc.onerror = function () { fim({ success: false, error: 'sem resposta do robô' }); };
+    setTimeout(function () { fim({ success: false, error: 'o robô demorou demais' }); }, 45000);
+    var cid = (String(q.clint || '').match(/contacts\/([\w-]+)/) || [])[1] || '';
+    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 80 }));
+    document.body.appendChild(sc);
+  }
+  function tratar(res, manual) {
+    if (!res || !res.success) {
+      if (R.link && !manual) { estadoCliente('esperando'); agendar(); return; }
+      estadoCliente(/nao achado/i.test((res && res.error) || '') ? 'nada' : 'erro', res && res.error); return;
+    }
+    var msgs = [];
+    (res.chats || []).forEach(function (c) { (c.mensagens || []).forEach(function (m) { msgs.push(m); }); });
+    msgs.sort(function (a, b) { return new Date(a.quando) - new Date(b.quando); });
+    var x = acharDados(msgs);
+    if (!x) { estadoCliente(R.link ? 'esperando' : 'nada'); agendar(); return; }
+    if ((R.msg && R.msg === x.quando) || (R.hx && R.hx === marcaTx(x.texto))) { estadoCliente('ja', x); return; }   // a mesma mensagem: o closer já conferiu/corrigiu
+    aplicar(x);
+  }
+  function aplicar(x, deNovo) {
+    var antes = foto();
+    $('c-colar').value = x.texto;
+    try { preencherColado('c'); } catch (e) {}
+    pedido(x.texto);
+    alternar();
+    R.msg = x.quando; R.hx = marcaTx(x.texto); R.sujo = true; clearTimeout(tP);
+    var marca = function () {
+      var depois = foto(), ids = [];
+      Object.keys(depois).forEach(function (id) { var el = $(id); if (!el || el.type === 'radio' || el.type === 'checkbox') return; if (String(depois[id] || '').trim() && depois[id] !== antes[id]) ids.push(id); });
+      if (deNovo) ids = ids.concat(R.cli);
+      R.cli = ids.filter(function (id, i) { return ids.indexOf(id) === i; });
+      R.cli.forEach(marcarCliente);
+      x.campos = Math.max(R.cli.length, x.n || 0);
+      estadoCliente('achou', x); salvar(); faltas();
+    };
+    setTimeout(marca, 150); setTimeout(marca, 1600);   // o CEP completa o endereço logo depois
+    toast('📥 Chegaram os dados do cliente — confira os campos em verde');
+    box.classList.add('chegou'); setTimeout(function () { box.classList.remove('chegou'); }, 1300);
+  }
+  // o bloco do programa que a página de cadastro devolve (só completa o que o closer deixou vazio)
+  function pedido(texto) {
+    var L = {};
+    String(texto || '').split(/\r?\n/).forEach(function (l) {
+      var m = l.match(/^\s*[*_\-•]*\s*(programa|produto|valor(?: total)?|pagamento|forma de pagamento|condi[cç][aã]o(?: de pagamento)?)\s*[*_]*\s*[:：]\s*(.+)$/i);
+      if (m) L[/^prog|^prod/i.test(m[1]) ? 'prog' : /^valor/i.test(m[1]) ? 'valor' : 'pgto'] = m[2].trim();
+    });
+    if (L.prog && vazio('v-programa')) poe($('v-programa'), L.prog);
+    if (L.valor && vazio('v-valor')) poe($('v-valor'), L.valor);
+    if (L.pgto) pagamento(L.pgto);
+  }
+  function agendar() {
+    clearTimeout(tP);
+    if (!R.link || Date.now() - R.link > 3 * 864e5 || rodadas >= 30) return;
+    tP = setTimeout(function () { if (document.hidden) { agendar(); return; } rodadas++; buscar(false); }, 60000);
+  }
+  // quem copiou o link (botão da parte 1, da parte 2 ou daqui) passa a esperar o cliente
+  window.__preLinkEnviado = function () { R.link = Date.now(); R.sujo = true; rodadas = 0; salvar(); if (!R.msg) { estadoCliente('esperando'); agendar(); } };
+
+  // venda registrada: o rascunho sai
+  var tit = $('success-title');
+  if (tit && window.MutationObserver) new MutationObserver(function () { if (/venda registrada/i.test(tit.textContent || '')) { apagarRascunho(); R.sujo = false; } }).observe(tit, { childList: true, characterData: true, subtree: true });
+
+  // botão na parte 1: preencheu a negociação → pede o resto ao cliente
+  var row1 = $('v-step1').querySelector('.btn-row');
+  if (row1 && !row1.querySelector('.bt-pedir')) {
+    var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn bt-pedir'; b1.textContent = '🔗 Pedir os dados ao cliente';
+    b1.title = 'Copia a mensagem com o link — o cliente preenche no celular e os dados entram aqui sozinhos';
+    b1.onclick = function () { copiarLinkCadastro(b1); };
+    var prox = row1.querySelector('button[onclick*="vendaGoStep(2)"]'); row1.insertBefore(b1, prox || null);
+  }
+
+  faltas();
+  if (cel8) { if (R.msg || !R.link) buscar(false); else { estadoCliente('esperando'); buscar(false); } }
 })();
 </script>
 </body>

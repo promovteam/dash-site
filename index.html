@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-1046';
+var VERSAO_DASH = '2026-09-28-1353';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4533,6 +4533,22 @@ function abrirFormVendaGoogle(dados) {
   });
   window.open(FORM_VENDA_URL + (partes.length ? '?usp=pp_url&' + partes.join('&') : ''), '_blank');
 }
+// a venda anterior dessa pessoa na planilha (mesmo celular ou mesmo nome): completa o que estiver vazio na tela de venda (28/09/2026)
+function _vendaAnteriorDe(cel, nome) {
+  if (typeof PAG === 'undefined' || !PAG.rows || !PAG.rows.length) return null;
+  var t8 = ldTel8(cel || ''), kN = v2nomeChave(nome || ''), m = null;
+  PAG.rows.forEach(function(p) {
+    if (!((t8 && ldTel8(p.celular || '') === t8) || (kN && v2nomeChave(p.nome || '') === kN))) return;
+    if (!m || (p.date && (!m.date || p.date > m.date))) m = p;
+  });
+  if (!m) return null;
+  var ex = m.extras || {}, pega = function(re) { var v = ''; Object.keys(ex).forEach(function(k) { if (!v && ex[k] && re.test(v2norm(k))) v = ex[k]; }); return v; };
+  var o = { quando: m.date ? ('0' + m.date.getDate()).slice(-2) + '/' + ('0' + (m.date.getMonth() + 1)).slice(-2) : '',
+    cpf: m.cpf, email: m.email, insta: m.insta, programa: _programaForms(m.programa) || m.programa, valor: m.valor > 0 ? v2moeda(m.valor) : '', forma: m.forma,
+    rg: pega(/\brg\b|identidade/), nasc: pega(/nascimento/), civil: pega(/estado civil/), prof: pega(/profiss/), endereco: pega(/endere/), nicho: pega(/nicho/) };
+  Object.keys(o).forEach(function(k) { if (!o[k] || /__other_option__/.test(o[k])) delete o[k]; });
+  return Object.keys(o).length > 1 ? o : null;
+}
 function abrirFormVenda(dados) {
   if (soOlhar()) return;
   dados = dados || {};
@@ -4567,16 +4583,17 @@ function abrirFormVenda(dados) {
     dupla: dados.dupla === 'Sim' ? 'Sim' : '', duplaNome: dados.duplaNome || '', duplaCel: dados.duplaCel || '', duplaEmail: dados.duplaEmail || '',
     forma: dados.forma || '', parcelas: dados.parcelas || '', valorParcela: dados.valorParcela || '', recorrente: dados.recorrente || '', valorMensal: dados.valorMensal || '' };
   Object.keys(mapa).forEach(function(k) { if (mapa[k]) partes.push(k + '=' + encodeURIComponent(String(mapa[k]))); });
+  var _preHash = ''; try { var _pre = _vendaAnteriorDe(dados.cel, dados.nome); if (_pre) _preHash = '#pre=' + encodeURIComponent(JSON.stringify(_pre)); } catch (ePre) {}
   var cx = document.getElementById('modal-venda');
   if (!cx) return;
   cx.innerHTML = '<div style="width:min(760px,96vw);height:min(92vh,900px);background:#0e0e20;border-radius:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 60px rgba(0,0,0,.6);">'
     + '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);">'
     +   '<b style="flex:1;font-size:.85rem;">💰 Registrar venda' + (dados.nome ? ' — ' + dados.nome : '') + '</b>'
-    +   '<span class="hint">' + (dados.bloqueio ? 'com os dados do bloqueio · ' : '') + 'cole a resposta do lead e os campos se preenchem sozinhos · Registrar venda manda direto para a planilha</span>'
+    +   '<span class="hint">' + (dados.bloqueio ? 'com os dados do bloqueio · ' : '') + 'o que o cliente mandou pela Clint entra sozinho · confira e registre</span>'
     +   '<span class="hint" style="cursor:pointer;text-decoration:underline;" onclick="abrirFormVendaGoogle()" title="Abre o Google Forms de verdade, já preenchido">ou abrir no Google Forms</span>'
     +   '<span class="hint" style="cursor:pointer;text-decoration:underline;" onclick="fecharFormVenda();avisoRapido(\'ok — o botão 💰 fica na ficha para preencher depois\')">preencher depois</span>'
     +   '<button class="close-x" onclick="fecharFormVenda()">✕</button></div>'
-    + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
+    + '<iframe id="venda-frame" src="formulario.html?' + partes.join('&') + _preHash + '" style="width:100%;height:calc(100% - 46px);border:0;background:#080816;"></iframe></div>';
   cx.style.display = 'flex';
 }
 // ===== 🔒 QUEM DEU BLOQUEIO / ENTRADA (Bruno 21/08/2026) =====
@@ -19023,10 +19040,18 @@ function cadastroCopiarLink(bt) {
   var p = ['n=' + encodeURIComponent(String(nome).split(' ')[0] || ''), 'c=' + encodeURIComponent((r && r.closer) || ''), 'p=' + encodeURIComponent((r && r.produto) || '')];
   try { var wz = dspClintNumero(); if (wz) p.push('w=' + wz); } catch (e) {}
   if (r && /cadeira/i.test(r.produto || '')) p.push('d=1');
-  var url = new URL('cadastro.html', location.href).href.split('?')[0].replace(/index\.html$/, '') + '?' + p.join('&');
+  // o que já sabemos do lead vai depois do # (não passa por servidor): a página abre preenchida, o cliente só confere e completa
+  var hash = '';
+  try {
+    var t8 = r ? ldTel8(r.telefone) : '', l = t8 ? (LD.rows || []).filter(function(x) { return x.tel8 === t8; })[0] : null;
+    var dd = { nome: nome, cel: (r && r.telefone) || (l && l.tel) || '', email: (l && l.email) || '', insta: l ? _instaHandle(l.insta) : '', nicho: (l && l.nicho) || '', prog: (r && r.produto) || '', valor: (r && r.valor > 0) ? v2moeda(r.valor) : '' };
+    Object.keys(dd).forEach(function(k) { if (!dd[k]) delete dd[k]; });
+    hash = '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(dd)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  } catch (eH) {}
+  var url = new URL('cadastro.html', location.href).href.split('?')[0].replace(/index\.html$/, '') + '?' + p.join('&') + hash;
   url = url.replace(/\/cadastro\.html/, '/cadastro.html');
   var msg = 'Oi' + (nome ? ', ' + String(nome).split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
-  var ok = function() { try { avisoRapido('🔗 Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente mandar os dados, cole na tela 💰 Registrar venda.'); } catch (e) {} if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado'; setTimeout(function() { bt.textContent = t0; }, 2500); } };
+  var ok = function() { try { avisoRapido('🔗 Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente enviar, é só abrir 💰 Registrar venda: os dados entram sozinhos.'); } catch (e) {} if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado'; setTimeout(function() { bt.textContent = t0; }, 2500); } };
   (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
 }
 function ehExecutivo() {
