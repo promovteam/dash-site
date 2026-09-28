@@ -2628,7 +2628,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-28-1025';
+var VERSAO_DASH = '2026-09-28-1031';
 var _versaoNova = null;
 
 // =====================================================================
@@ -19640,6 +19640,7 @@ var ACESSOS = [
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
   { nome: 'Ismael',        pin: '6180' },
+  { nome: 'Luana',         pin: '9113' },   // acesso criado em 28/09/2026 (Bruno: "crie um acesso para luana, com senha")
   { nome: 'Adm',           pin: '8520', adm: true },     // acesso geral; não vira "Você" sozinho
   { nome: 'Visitante',     pin: '0000', soOlha: true }   // vê tudo, não mexe em nada
 ];
@@ -21271,6 +21272,36 @@ function plPainelClosers(p, d) {
   return '<div class="px-wrap"><div class="px-titulo"><h3>🏆 Acompanhamento por closer</h3><span class="hint">' + p.rot.replace(/</g, '&lt;') + ' · ▲▼ compara com o período anterior · clique nos números para ver quem são</span></div><div class="px-grid">' + cards + '</div></div>';
 }
 
+// 🕘 LINHA DO DIA (28/09/2026): das 8h às 21h, cada reunião de hoje no horário dela, colorida pelo status; clique abre a ficha
+function plLinhaDoDia(t) {
+  var rows = (t.l.todas || []).slice(), H0 = 8 * 60, H1 = 21 * 60, span = H1 - H0, esc = function(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var itens = [], semHora = 0;
+  rows.forEach(function(r) {
+    var hh = plHoraDaLinha(r); if (hh === null) semHora++; if (!hh) return;
+    var m = parseInt(hh.slice(0, 2), 10) * 60 + parseInt(hh.slice(3, 5), 10); if (isNaN(m)) return;
+    var sn = r.sn || '', cls = sn === 'vendido' ? 'vd' : sn === 'no show' ? 'ns' : /bloqueio|entrada/.test(sn) ? 'bl' : _fsRealizada(sn) ? 're' : 'ag';
+    itens.push({ r: r, m: m, hh: hh, cls: cls });
+  });
+  // os horários vêm da agenda: se a semana ainda não chegou, pede e redesenha o Placar quando vier
+  if (semHora && !PLACAR._linhaPediu) {
+    PLACAR._linhaPediu = true;
+    try { plAgEventos(new Date(), function() { try { if (telaVisivel('s-placar')) renderPlacar(); } catch (e) {} }); } catch (eA) {}
+  }
+  if (!itens.length) return semHora ? '<div class="pl-ldia"><div class="pl-ldia-h"><b>🕘 Linha do dia</b><span class="mv-brilho-txt">lendo os horários na agenda…</span></div></div>' : '';
+  itens.sort(function(a, b) { return a.m - b.m; });
+  var pilha = {}, h = '<div class="pl-ldia"><div class="pl-ldia-h"><b>🕘 Linha do dia</b><span>' + itens.length + ' reuniões · <i class="ag"></i>agendada <i class="re"></i>compareceu <i class="vd"></i>vendeu <i class="bl"></i>bloqueio <i class="ns"></i>no-show</span></div><div class="pl-ldia-trilho">';
+  for (var hr = 8; hr <= 21; hr++) h += '<span class="pl-ldia-hr" style="left:' + ((hr * 60 - H0) / span * 100).toFixed(2) + '%">' + hr + 'h</span>';
+  var ag = new Date(), am = ag.getHours() * 60 + ag.getMinutes();
+  if (am >= H0 && am <= H1) h += '<span class="pl-ldia-agora" style="left:' + ((am - H0) / span * 100).toFixed(2) + '%"><em>agora</em></span>';
+  itens.forEach(function(o) {
+    var slot = Math.round(o.m / 15), n = pilha[slot] = (pilha[slot] || 0) + 1;
+    var iR = o.r._agenda ? -1 : v2reg(o.r), x = Math.max(0, Math.min(100, (o.m - H0) / span * 100));
+    var tit = o.hh + ' · ' + (o.r.nome || '') + ' — ' + (o.r.status || '') + ' · closer ' + String(o.r.closer || '—').split(' ')[0] + (o.r.sdr ? ' · SDR ' + String(plPessoa(o.r.sdr) || '').split(' ')[0] : '');
+    h += '<button type="button" class="pl-ldia-pt ' + o.cls + '" style="left:' + x.toFixed(2) + '%;bottom:' + (10 + (n - 1) * 17) + 'px" title="' + esc(tit) + '" aria-label="' + esc(tit) + '"' + (iR >= 0 ? ' onclick="abrirLead(' + iR + ')"' : '') + '>' + (o.r.closer ? tmMini(o.r.closer) : '') + '</button>';
+  });
+  return h + '</div></div>';
+}
+
 function renderPlacar() {
   var el = document.getElementById('placar-corpo');
   if (!el) return;
@@ -21284,21 +21315,41 @@ function renderPlacar() {
     + '<div class="pl-chips">' + chip('hoje', '📆 Hoje') + chip('ontem', 'Ontem') + chip('semana', 'Semana') + chip('mes', 'Mês')
     + '<button class="pl-chip' + (PLACAR.per === 'datas' ? ' on' : '') + '" id="pl-chip-datas" onclick="plAbrirDatas(this)">📅 ' + (PLACAR.per === 'datas' && PLACAR.de && PLACAR.ate ? PLACAR.de.slice(8, 10) + '/' + PLACAR.de.slice(5, 7) + ' – ' + PLACAR.ate.slice(8, 10) + '/' + PLACAR.ate.slice(5, 7) : 'Período…') + ' ▾</button></div>'
     + (PLACAR.tv ? '' : '<a class="pl-tv" href="' + location.pathname + '#painel=placar" target="_blank" title="Abre numa aba limpa, letra grande, atualizando sozinho — para deixar num monitor">⛶ modo TV</a>'
-        + '<a class="pl-tv" href="javascript:void(0)" onclick="agSimular()" title="Mostra, só na sua tela, tudo o que acontece quando uma reunião é marcada — não grava nada">🎬 simular reunião marcada</a>'
-        + '<a class="pl-tv" href="javascript:void(0)" onclick="plSimularVenda()" title="Mostra, só na sua tela, a festa de uma venda — não grava nada">🎬 simular venda</a>')
+        + '<details class="pl-mais"><summary class="pl-tv" title="Mais opções">⋯ Mais</summary><div class="pl-mais-m">'
+        +   '<button type="button" onclick="this.closest(\'details\').open=false;agSimular()" title="Mostra, só na sua tela, tudo o que acontece quando uma reunião é marcada — não grava nada">🎬 Simular reunião marcada</button>'
+        +   '<button type="button" onclick="this.closest(\'details\').open=false;plSimularVenda()" title="Mostra, só na sua tela, a festa de uma venda — não grava nada">🎬 Simular venda</button>'
+        + '</div></details>')
     + '</div>';
   // a taxa de no-show e sobre as que JA TEM RESULTADO (compareceu + no-show): se entrassem as
   // pendentes, a taxa cairia sozinha durante o dia e subiria no fim, o que confunde
   var taxaNs = (t.re + t.ns) ? Math.round(t.ns / (t.re + t.ns) * 100) : null;
+  // 28/09/2026 (Bruno: "pode melhorar a experiência total"): cada número compara com o período anterior ATÉ O MESMO PONTO
+  var cmpT = null, cmpRot = '';
+  try {
+    var agoraMs = Date.now(), corte = Math.min(p.fim, agoraMs), dur = corte - p.ini, pa = null;
+    if (PLACAR.per === 'hoje') { pa = { ini: p.ini - 864e5, fim: p.ini - 864e5 + dur }; cmpRot = 'vs ontem'; }
+    else if (PLACAR.per === 'ontem') { pa = { ini: p.ini - 864e5, fim: p.ini }; cmpRot = 'vs anteontem'; }
+    else if (PLACAR.per === 'semana') { pa = { ini: p.ini - 7 * 864e5, fim: p.ini - 7 * 864e5 + dur }; cmpRot = 'vs semana passada'; }
+    else if (PLACAR.per === 'mes') { var m0 = new Date(p.ini); var ant = new Date(m0.getFullYear(), m0.getMonth() - 1, 1).getTime(); pa = { ini: ant, fim: Math.min(ant + dur, p.ini) }; cmpRot = 'vs mês passado'; }
+    if (pa) { pa.rot = cmpRot; cmpT = plCalcular(pa).tot; PLACAR.ultimo = d; }
+  } catch (eCmp) { cmpT = null; }
+  var plDl = function(k, menosMelhor) {
+    if (!cmpT) return '';
+    var a = t[k] || 0, b = cmpT[k] || 0, df = a - b;
+    if (!df) return '<em class="pl-dl eq">= ' + cmpRot + '</em>';
+    var bom = menosMelhor ? df < 0 : df > 0;
+    return '<em class="pl-dl ' + (bom ? 'up' : 'dn') + '">' + (df > 0 ? '▲ +' : '▼ ') + df + ' ' + cmpRot + '</em>';
+  };
   var doDia = PLACAR.per === 'hoje' ? ' DO DIA' : '';
   var noPer = PLACAR.per === 'hoje' ? 'hoje' : 'no período';
   h += '<div class="pl-resumo cinco">'
-    + '<div class="pl-kpi k1" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'marc\')"><small>📅 MARCAÇÕES' + doDia + '</small><b style="color:#f6a350;" data-n="' + t.marc + '">' + t.marc + '</b><i>reuniões que a equipe marcou ' + noPer + ' · clique para ver</i></div>'
-    + '<div class="pl-kpi k0" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'todas\')"><small>🗓 REUNIÕES' + doDia + '</small><b style="color:#b98aff;" data-n="' + t.todas + '">' + t.todas + '</b><i>' + (t.pend ? '<span style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();plVer(\'time\',\'\',\'pend\')">⏳ ' + t.pend + ' ainda sem resultado</span>' : 'estavam na agenda ' + noPer) + '</i></div>'
-    + '<div class="pl-kpi k3" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'ns\')"><small>🤦 NO-SHOW</small><b style="color:' + (t.ns ? '#ff6b6b' : '#3ddc97') + ';" data-n="' + t.ns + '">' + t.ns + '</b><i>' + (taxaNs !== null ? taxaNs + '% das que já tiveram resultado' : 'ninguém faltou') + '</i></div>'
-    + '<div class="pl-kpi k2" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'re\')"><small>✅ COMPARECEU</small><b style="color:#6ea8ff;" data-n="' + t.re + '">' + t.re + '</b><i>compareceram à reunião ' + noPer + '</i></div>'
-    + '<div class="pl-kpi k4" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'vd\')"><small>💰 VENDIDO</small><b style="color:#3ddc97;" data-n="' + t.vd + '">' + t.vd + '</b><i>' + (t.vdV ? v2mil(t.vdV) + ' vendidos' : 'nenhuma venda ainda') + '</i></div>'
+    + '<div class="pl-kpi k1" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'marc\')"><small>📅 MARCAÇÕES' + doDia + '</small><b style="color:#f6a350;" data-n="' + t.marc + '">' + t.marc + '</b>' + plDl('marc') + '<i>reuniões que a equipe marcou ' + noPer + ' · clique para ver</i></div>'
+    + '<div class="pl-kpi k0" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'todas\')"><small>🗓 REUNIÕES' + doDia + '</small><b style="color:#b98aff;" data-n="' + t.todas + '">' + t.todas + '</b>' + plDl('todas') + '<i>' + (t.pend ? '<span style="cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();plVer(\'time\',\'\',\'pend\')">⏳ ' + t.pend + ' ainda sem resultado</span>' : 'estavam na agenda ' + noPer) + '</i></div>'
+    + '<div class="pl-kpi k3" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'ns\')"><small>🤦 NO-SHOW</small><b style="color:' + (t.ns ? '#ff6b6b' : '#3ddc97') + ';" data-n="' + t.ns + '">' + t.ns + '</b>' + plDl('ns', true) + '<i>' + (taxaNs !== null ? taxaNs + '% das que já tiveram resultado' : 'ninguém faltou') + '</i></div>'
+    + '<div class="pl-kpi k2" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'re\')"><small>✅ COMPARECEU</small><b style="color:#6ea8ff;" data-n="' + t.re + '">' + t.re + '</b>' + plDl('re') + '<i>compareceram à reunião ' + noPer + '</i></div>'
+    + '<div class="pl-kpi k4" style="cursor:pointer;" title="clique para ver quais" onclick="plVer(\'time\',\'\',\'vd\')"><small>💰 VENDIDO</small><b style="color:#3ddc97;" data-n="' + t.vd + '">' + t.vd + '</b>' + plDl('vd') + '<i>' + (t.vdV ? v2mil(t.vdV) + ' vendidos' : 'nenhuma venda ainda') + '</i></div>'
     + '</div>';
+  if (PLACAR.per === 'hoje') { try { h += plLinhaDoDia(t); } catch (eLd) {} }
   // ALERTA: SDR ativo que ainda nao marcou nenhuma reuniao hoje (pedido do Bruno 02/09/2026)
   if (PLACAR.per === 'hoje') {
     var semMarcar = d.sdrs.filter(function(x){ return !x.marc && !x.closer; }).map(function(x){ return x.nome; });
@@ -26443,6 +26494,36 @@ function rlImprimir() {
   .plv-it { grid-template-columns:52px minmax(0,1fr); }
   .plv-dir { grid-column:2; flex-direction:row; align-items:center; justify-content:flex-start; }
 }
+</style>
+<style>
+/* 🏁 Placar — experiência (28/09/2026) */
+.pl-mais { position:relative; }
+.pl-mais > summary { list-style:none; display:inline-flex; align-items:center; }
+.pl-mais > summary::-webkit-details-marker { display:none; }
+.pl-mais-m { position:absolute; right:0; top:calc(100% + 6px); z-index:40; min-width:230px; display:flex; flex-direction:column; gap:4px; padding:6px; border-radius:14px;
+  background:#151923; border:1px solid rgba(255,255,255,.12); box-shadow:0 18px 40px rgba(0,0,0,.55); }
+.pl-mais-m button { text-align:left; font:inherit; font-size:.76rem; font-weight:800; color:var(--text); background:transparent; border:0; border-radius:10px; padding:9px 11px; cursor:pointer; }
+.pl-mais-m button:hover, .pl-mais-m button:focus-visible { background:rgba(255,255,255,.07); outline:none; }
+.pl-dl { display:inline-block; margin-top:6px; font-style:normal; font-size:.62rem; font-weight:900; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+.pl-dl.up { color:#3ddc97; background:rgba(61,220,151,.12); } .pl-dl.dn { color:#ff6b6b; background:rgba(255,107,107,.12); } .pl-dl.eq { color:var(--muted); background:rgba(255,255,255,.06); }
+.pl-ldia { margin:0 0 16px; padding:12px 16px 10px; border-radius:16px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); }
+.pl-ldia-h { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+.pl-ldia-h b { font-size:.8rem; font-weight:900; }
+.pl-ldia-h span { font-size:.64rem; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.pl-ldia-h i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-left:6px; }
+.pl-ldia-trilho { position:relative; height:96px; margin:0 8px; border-bottom:1px solid rgba(255,255,255,.12); }
+.pl-ldia-hr { position:absolute; bottom:-18px; transform:translateX(-50%); font-size:.58rem; color:var(--muted); font-weight:800; }
+.pl-ldia-hr::before { content:''; position:absolute; left:50%; bottom:18px; width:1px; height:96px; background:rgba(255,255,255,.05); }
+.pl-ldia-agora { position:absolute; top:-4px; bottom:0; width:2px; margin-left:-1px; background:#ff6b6b; box-shadow:0 0 10px rgba(255,107,107,.7); }
+.pl-ldia-agora em { position:absolute; top:-12px; left:50%; transform:translateX(-50%); font-style:normal; font-size:.52rem; font-weight:900; letter-spacing:.8px; text-transform:uppercase; color:#ff6b6b; }
+.pl-ldia-pt { position:absolute; width:16px; height:16px; margin-left:-8px; padding:0; border-radius:50%; border:2px solid var(--c); background:var(--c); cursor:pointer; overflow:hidden;
+  box-shadow:0 2px 6px rgba(0,0,0,.5); transition:transform .15s ease; --c:#ffd166; }
+.pl-ldia-pt:hover, .pl-ldia-pt:focus-visible { transform:scale(1.6); z-index:3; outline:none; }
+.pl-ldia-pt .tm-mini { width:100% !important; height:100% !important; margin:0 !important; border:0 !important; display:block; }
+.pl-ldia-pt.ag, .pl-ldia-h i.ag { --c:#ffd166; background:#ffd166; } .pl-ldia-pt.re, .pl-ldia-h i.re { --c:#6ea8ff; background:#6ea8ff; }
+.pl-ldia-pt.vd, .pl-ldia-h i.vd { --c:#3ddc97; background:#3ddc97; } .pl-ldia-pt.bl, .pl-ldia-h i.bl { --c:#b98aff; background:#b98aff; }
+.pl-ldia-pt.ns, .pl-ldia-h i.ns { --c:#ff6b6b; background:#ff6b6b; }
+@media (max-width:620px) { .pl-ldia-hr:nth-child(odd) { display:none; } }
 </style>
 </body>
 </html>
