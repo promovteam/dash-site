@@ -2625,7 +2625,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-27-1454';
+var VERSAO_DASH = '2026-09-27-2127';
 var _versaoNova = null;
 
 // =====================================================================
@@ -16572,7 +16572,7 @@ function gvPlayerLigar(pl, x, vid) {
     var g = pl.parentNode; if (g && g.id === 'gv-pip-guarda') { try { pl.pause(); } catch (e) {} g.remove(); }
   });
   clearTimeout(pl._tDemora);
-  pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok')) gvPlayerFalhou(pl, 'demora'); }, 25000);
+  pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok') && !pl._falhou) gvPlayerFalhou(pl, 'demora'); }, 25000);
   try { gvCtlLigar(pl); } catch (eC) {}   // barra, velocidade (padrão 1,5x) e a fala de agora
   if (pl.readyState >= 2) pronto();   // veio já carregado (baixou enquanto o mouse estava em cima do cartão)
   try { var p = pl.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
@@ -16617,6 +16617,7 @@ function gvPlayerAdotar(novo, vid) {
 }
 function gvPlayerFalhou(pl, motivo) {
   var box = pl && pl.parentNode; if (!box || box.id === 'gv-pip-guarda') return;
+  if (motivo === 'demora' && pl._falhou) return;   // já deu erro: a tela de erro fica
   var velho = box.querySelector('.gv-falhou'); if (velho) { if (motivo !== 'erro') return; velho.remove(); }
   if (motivo === 'erro') { pl._falhou = true; var c = box.querySelector('.gv-carrega'); if (c) c.remove(); }
   var x = GRAV._aberto && GRAV._aberto.x, vid = x && (x.rec || [])[0]; if (!vid) return;
@@ -16629,9 +16630,23 @@ function gvPlayerFalhou(pl, motivo) {
       fa.querySelector('b').textContent = '🔒 Esta gravação está no Drive de ' + dono;
       fa.querySelector('span').innerHTML = 'Para abrir aqui dentro, ' + gravEsc(String(dono).split(' ')[0]) + ' precisa compartilhar a pasta <b>Meet Recordings</b> do Drive dele(a) como <b>Qualquer pessoa com o link</b> (Leitor). Uma vez só — as próximas já entram liberadas.';
     };
+    // 27/09/2026 (Bruno: "alguns ainda dão erro"): a tela diz o MOTIVO que o Google deu (para o print dizer o que corrigir)
+    var motivo = function(txt) {
+      var fa = box.querySelector('.gv-falhou'); if (!fa || !txt) return;
+      var m = fa.querySelector('.gv-motivo'); if (!m) { fa.insertAdjacentHTML('beforeend', '<small class="gv-motivo"></small>'); m = fa.querySelector('.gv-motivo'); }
+      m.textContent = 'Motivo do Google: ' + txt;
+    };
     fetch(gvPlayerSrc(vid), { headers: { Range: 'bytes=0-1' } })
-      .then(function(r) { return r.status === 404 ? 'nao-publico' : (r.status === 403 && x.vs === 'acesso') ? 'sem acesso' : r.status === 502 ? r.text() : ''; })
-      .catch(function() { return x.vs === 'acesso' ? 'sem acesso' : ''; })
+      .then(function(r) {
+        if (r.ok) { motivo('respondeu normal agora (' + r.status + ') — clique em Tentar de novo'); return ''; }
+        return r.text().then(function(txt) {
+          var t = String(txt || '');
+          if (/automated queries|unusual traffic|Sorry\.\.\./i.test(t)) motivo('bloqueio por tráfego automático nesta internet (' + r.status + ') — passa sozinho');
+          else { var jm = ''; try { jm = JSON.parse(t).error.message; } catch (eJ) { jm = t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 120); } motivo(r.status + ' — ' + jm); }
+          return r.status === 404 ? 'nao-publico' : (r.status === 403 && x.vs === 'acesso') ? 'sem acesso' : r.status === 502 ? t : '';
+        });
+      })
+      .catch(function(eF) { motivo('o Google não deixou ler a resposta — costuma ser bloqueio por tráfego automático nesta internet (' + ((eF && eF.message) || 'rede') + ')'); return x.vs === 'acesso' ? 'sem acesso' : ''; })
       .then(function(t) {
         if (t === 'nao-publico' && GV_CHAVE && !pl._tentouLiberar) {
           // (27/09/2026: "esse tempo tem como melhorar?") gravação nova ainda fechada: o robô libera AGORA, sem esperar a hora cheia
@@ -16667,7 +16682,7 @@ function gvPlayerRecarregar() {
   if (GV_CHAVE) { pl.removeAttribute('src'); try { pl.load(); } catch (eL) {} pl.src = srcN; } else pl.src = srcN + '&n=' + Date.now();
   if (seg) pl.addEventListener('loadedmetadata', function () { try { pl.currentTime = seg; } catch (e) {} }, { once: true });
   clearTimeout(pl._tDemora);
-  pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok')) gvPlayerFalhou(pl, 'demora'); }, 25000);
+  pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok') && !pl._falhou) gvPlayerFalhou(pl, 'demora'); }, 25000);
   try { var p = pl.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
 }
 // "fora da tela" com o player do dash: a janelinha do próprio navegador, por cima de tudo (Chrome, Edge e Safari)
@@ -23700,6 +23715,7 @@ body:has(.modal-overlay.open) #gv { z-index:150; }   /* a gravação desce para 
 .gv-video video.gv-player.ok { opacity:1; }
 .gv-video:has(video.gv-player) .gv-carrega { z-index:2; }
 .gv-video .gv-falhou { z-index:4; background:rgba(8,10,14,.86); }
+.gv-falhou .gv-motivo { display:block; max-width:92%; margin-top:6px; font-size:.64rem; color:rgba(255,255,255,.55); font-weight:600; overflow-wrap:anywhere; }
 .gv-ctl { display:flex; flex-direction:column; gap:9px; margin-top:10px; padding:10px 12px; border-radius:14px; background:rgba(255,255,255,.035); border:1px solid var(--border); }
 .gv-ctl-barra { position:relative; height:10px; border-radius:99px; background:rgba(255,255,255,.08); cursor:pointer; }
 .gv-ctl-barra:hover { height:12px; margin:-1px 0; }
