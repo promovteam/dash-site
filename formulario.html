@@ -554,6 +554,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <textarea id="b-colar" placeholder="Cole aqui o texto do lead, do jeito que ele mandou:&#10;Nome completo: ...&#10;CPF: ...&#10;Celular: ...&#10;E-mail: ...&#10;(uma linha por campo — os campos abaixo se preenchem sozinhos)"></textarea>
       <div class="colar-row">
         <button type="button" class="btn" onclick="preencherColado('b')">✨ Preencher com o texto</button>
+        <button type="button" class="btn" style="background:rgba(61,220,151,.14);color:#3ddc97;border:1px solid rgba(61,220,151,.45);" onclick="copiarLinkBloqueio(this)" title="Copia a mensagem com o link — o cliente preenche nome, CPF e contato no celular e tudo volta para cá sozinho">📲 Pedir os dados ao cliente</button>
         <span class="colar-msg" id="b-colar-msg">Pode colar com TITULAR e SEGUNDA CADEIRA separados</span>
       </div>
     </div>
@@ -649,7 +650,7 @@ var FORM_VENDA_CAMPOS = {
   programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
   nicho: 'entry.1257400668', obs: 'entry.589500904'
 };
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec';
 
 var currentStep = 1;
 var currentMode = 'venda'; // 'venda' or 'bloqueio'
@@ -1021,6 +1022,7 @@ function submitVenda() {
     link_clint: document.getElementById('v-clint').value,
     observacao: [document.getElementById('v-obs').value, _pgtoExtra()].filter(Boolean).join('\n'),
     teve_bloqueio: window.__teveBloqueio || '',
+    forcarRepetida: window.__forcarRepetida ? true : '',   // o closer confirmou "é outra venda" (29/09/2026)
     pedidoId: (window.__pedidoId = 'v' + Date.now() + Math.random().toString(36).slice(2, 7)),
     nome: document.getElementById('c-nome').value,
     cpf: document.getElementById('c-cpf').value,
@@ -1062,16 +1064,33 @@ function submitVenda() {
       var sc = document.createElement('script');
       window[cb] = function(res) {
         try { sc.remove(); } catch (e) {} try { delete window[cb]; } catch (e) {}
-        if (!res || !res.pronto) { if (tentativas < 30) return setTimeout(consultar, 2000); res = { success: false, error: 'o robô não respondeu em 1 minuto' }; }
+        if (!res || !res.pronto) { if (tentativas < 45) return setTimeout(consultar, 2000); res = { success: false, demorou: true }; }
         document.getElementById('sending').classList.remove('show');
         document.getElementById('form-venda').style.display = 'none';
         document.getElementById('prog-bar').style.display = 'none';
         document.getElementById('prog-l').style.display = 'none';
         if (res.success) {
+          window.__forcarRepetida = false;
           document.getElementById('success-title').textContent = 'Venda registrada!';
           document.getElementById('success-msg').innerHTML = 'A venda de <b>' + document.getElementById('c-nome').value + '</b> entrou no formulário de fechamento (planilha da entrega + contrato), como se tivesse sido preenchida lá.'
             + (res.faltou && res.faltou.length ? '<br><br><span style="color:var(--red);">Campos que o formulário não aceitou (confira na planilha): ' + res.faltou.join('; ') + '</span>' : '')
             + (res.semResposta && res.semResposta.length ? '<br><br><span style="color:#f6a350;">Ficaram em branco no Google Forms (o dash ainda não sabe preencher): ' + res.semResposta.join('; ') + '</span>' : '');
+        } else if (res.repetida) {
+          // 29/09/2026 (Bruno: "não ter duplo envio"): já tem formulário de pagamento dessa pessoa
+          var rp = res.repetida;
+          document.getElementById('success-title').textContent = 'Essa venda já foi registrada';
+          document.querySelector('#success .success-icon').textContent = '⚠️';
+          document.getElementById('success-msg').innerHTML = 'Já existe formulário de pagamento de <b>' + (rp.nome || document.getElementById('c-nome').value) + '</b> em <b>' + rp.quando + '</b>' + (rp.vendedor ? ' (' + rp.vendedor + ')' : '') + '.<br><b>Não enviei de novo</b> — assim não sai contrato nem aviso repetido.'
+            + '<br><br><span class="hint">Se for mesmo uma venda nova (outro programa, outra compra), envie assim:</span>'
+            + '<br><button type="button" class="btn" style="margin-top:10px;background:var(--surface);color:var(--text);border:1px solid var(--border);" onclick="window.__forcarRepetida=true;voltarParaTela();submitVenda();">É outra venda — enviar mesmo assim</button>';
+        } else if (res.demorou) {
+          // o robô não confirmou em ~1,5 min: a venda PODE ter entrado — não mandar abrir o Google Forms na hora
+          // (foi assim que a venda da Vanessa entrou 2 vezes em 28/09)
+          document.getElementById('success-title').textContent = 'O robô está demorando para confirmar';
+          document.querySelector('#success .success-icon').textContent = '⏳';
+          document.getElementById('success-msg').innerHTML = 'A venda <b>pode ter entrado sim</b> — <b>não registre de novo</b>. Estou conferindo na planilha de pagamentos…'
+            + '<div id="conf-venda" class="hint" style="margin-top:10px;"></div>';
+          conferirVendaNaPlanilha(payload, 0);
         } else {
           document.getElementById('success-title').textContent = 'Não deu para enviar';
           document.querySelector('#success .success-icon').textContent = '!';
@@ -1285,12 +1304,14 @@ function separarEndereco(texto) {
 }
 // 🔗 LINK DE CADASTRO PARA O CLIENTE (Bruno 28/09/2026: "gere algo que o próprio lead responda através de um link externo, simples e fácil")
 // copia a mensagem pronta com o link da página cadastro.html; o cliente preenche e manda de volta no formato que esta tela entende
-// código curto do link de cadastro: 6 letras/números sem os que confundem (0/O, 1/I/L)
-function linkCurtoCodigo() {
-  var abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', k = '', n = new Uint32Array(6);
-  try { crypto.getRandomValues(n); } catch (e) { for (var j = 0; j < 6; j++) n[j] = Math.floor(Math.random() * 1e9); }
-  for (var i = 0; i < 6; i++) k += abc.charAt(n[i] % abc.length);
-  return k;
+// código do link de cadastro: o primeiro nome do cliente + 5 letras/números (sem 0/O/1/I/L), ex.: emilene-k7q2m
+// (Bruno 29/09/2026: o link pode colocar um nome específico no fim?)
+function linkCurtoCodigo(nome) {
+  var abc = 'abcdefghjkmnpqrstuvwxyz23456789', k = '', n = new Uint32Array(5);
+  try { crypto.getRandomValues(n); } catch (e) { for (var j = 0; j < 5; j++) n[j] = Math.floor(Math.random() * 1e9); }
+  for (var i = 0; i < 5; i++) k += abc.charAt(n[i] % abc.length);
+  var p = String(nome || '').trim().split(/\s+/)[0].normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16);
+  return (p ? p + '-' : '') + k;
 }
 // confere (sem pressa) se o código já está na aba Links; avisa se não entrou depois de ~25 s
 function linkCurtoConferir(codigo, cb) {
@@ -1306,6 +1327,69 @@ function linkCurtoConferir(codigo, cb) {
       + '&sheet=Links&headers=1&tq=' + encodeURIComponent("select A where A = '" + codigo + "'") + '&_=' + Date.now();
     document.body.appendChild(sc);
   })();
+}
+// confere na planilha de pagamentos (últimas respostas) se a venda entrou — mesmo CPF/CNPJ ou mesmo celular (29/09/2026)
+function conferirVendaNaPlanilha(pl, vez) {
+  var cx = document.getElementById('conf-venda'); if (!cx) return;
+  var cpf = String((pl.tipo_cliente === 'PJ' && pl.cnpj) ? pl.cnpj : pl.cpf || '').replace(/\D/g, ''), t8 = String(pl.celular || '').replace(/\D/g, '').slice(-8);
+  cx.textContent = 'Conferindo na planilha… (' + (vez + 1) + 'ª vez)';
+  var nm = 'cv' + Date.now(), sc = document.createElement('script'), feito = false;
+  var fim = function(achou) {
+    if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[nm] = function() {};
+    if (achou) {
+      document.getElementById('success-title').textContent = 'Venda registrada!';
+      document.querySelector('#success .success-icon').textContent = '✓';
+      document.getElementById('success-msg').innerHTML = 'Conferi na planilha: a venda de <b>' + (pl.nome || '') + '</b> <b>entrou</b> no formulário de pagamento. Não precisa enviar de novo.';
+      try { if (window.parent !== window) window.parent.postMessage({ tipo: 'vendaRegistrada', nome: pl.nome, celular: pl.celular, programa: pl.programa, valor: pl.valor_total, vendedor: pl.vendedor, sdr: pl.sdr }, '*'); } catch (e) {}
+      return;
+    }
+    if (vez < 3) { cx.innerHTML = 'Ainda não apareceu. Confiro de novo em 30 segundos… <a href="#" onclick="event.preventDefault();conferirVendaNaPlanilha(window.__ultimoPayload,' + (vez + 1) + ')">conferir agora</a>'; window.__ultimoPayload = pl; clearTimeout(window.__tConf); window.__tConf = setTimeout(function() { conferirVendaNaPlanilha(pl, vez + 1); }, 30000); return; }
+    cx.innerHTML = 'Não achei a venda na planilha depois de ~2 minutos. Agora sim, registre pelo Google Forms (abre já preenchido):'
+      + '<br><button type="button" class="btn" style="margin-top:10px;" onclick="try{window.parent.postMessage({tipo:\'vendaFalhou\',erro:\'o robô não confirmou\'},\'*\')}catch(e){}">📝 Abrir o Google Forms</button>';
+  };
+  window[nm] = function(r) {
+    var ok = false;
+    try { (r.table.rows || []).forEach(function(l) { var c = String((l.c[1] || {}).v || '').replace(/\D/g, ''), t = String((l.c[2] || {}).v || '').replace(/\D/g, '').slice(-8); if ((cpf.length >= 11 && c === cpf) || (t8.length === 8 && t === t8)) ok = true; }); } catch (e) {}
+    fim(ok);
+  };
+  sc.onerror = function() { fim(false); };
+  setTimeout(function() { fim(false); }, 15000);
+  sc.src = 'https://docs.google.com/spreadsheets/d/1xJykoW0UHr5hA-ELo5nV8uBkYykRG6OQdmMvDlUnhVg/gviz/tq?tqx=out:json;responseHandler:' + nm
+    + '&gid=1224124229&headers=1&tq=' + encodeURIComponent('select A, E, K order by A desc limit 25') + '&_=' + Date.now();
+  document.body.appendChild(sc);
+}
+// 🔒 LINK DO BLOQUEIO/ENTRADA (Bruno 29/09/2026: "link de bloqueio de oferta e entrada também, com os dados necessários"):
+// o cliente preenche só nome, CPF, celular, e-mail, Instagram (e a 2ª cadeira); programa e valor do bloqueio vão junto
+function copiarLinkBloqueio(bt) {
+  var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function(p){ if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
+  var g = function(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  var msgEl = document.getElementById('b-colar-msg');
+  var nome = g('b-nome') || q.nome || '', vend = g('b-vendedor') || q.vendedor || '', prog = g('b-programa') || q.programa || '';
+  var falta = []; if (!prog) falta.push('o programa'); if (!g('b-bloqueio-valor')) falta.push('o valor do bloqueio/entrada');
+  if (falta.length) { if (msgEl) { msgEl.textContent = '⚠️ Preencha ' + falta.join(' e ') + ' antes — vai junto no link para o cliente'; msgEl.style.color = 'var(--red)'; } var f0 = document.getElementById(prog ? 'b-bloqueio-valor' : 'b-programa'); if (f0) { f0.focus(); f0.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return; }
+  var dupla = document.getElementById('bdupla-s') && document.getElementById('bdupla-s').checked;
+  var sub = (document.querySelector('input[name="subtipo"]:checked') || {}).value || 'Bloqueio de oferta';
+  var pg = g('b-pagamento'), cond = [(/entrada/i.test(sub) ? 'Entrada de ' : 'Bloqueio de ') + g('b-bloqueio-valor')];
+  if (pg && !/^nao sei$/.test(_semAcento(pg))) cond.push(pg + ((pg === 'Cartão de crédito' || pg === 'Boleto') && g('b-parcelas') ? ' ' + g('b-parcelas').replace(/x$/i, '') + 'x' + (g('b-parcela-valor') ? ' de ' + g('b-parcela-valor') : '') : '') + (pg === 'Cartão recorrente' && g('b-recorrente-vezes') ? ' ' + g('b-recorrente-vezes') + 'x' + (g('b-recorrente-valor') ? ' de ' + g('b-recorrente-valor') : '') : ''));
+  var dd = { nome: nome, cel: g('b-cel') || q.cel || '', email: g('b-email') || q.email || '', insta: g('b-insta') || q.insta || '', cpf: g('b-cpf'), prog: prog, valor: g('b-valor') || q.valor || '', pgto: cond.join(' · ') };
+  if (dupla) { dd.dn = g('b-dupla-nome'); dd.dc = g('b-dupla-cel'); dd.de = g('b-dupla-email'); dd.dcpf = g('b-dupla-cpf'); dd.drg = g('b-dupla-rg'); dd.dend = g('b-dupla-endereco'); }
+  Object.keys(dd).forEach(function(k) { if (!dd[k]) delete dd[k]; });
+  var p = ['n=' + encodeURIComponent(nome.split(' ')[0] || ''), 'c=' + encodeURIComponent(vend), 'p=' + encodeURIComponent(prog), 'm=b'];
+  if (q.wz) p.push('w=' + encodeURIComponent(String(q.wz).replace(/\D/g, '')));
+  if (dupla) p.push('d=1');
+  var hash = ''; try { hash = '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(dd)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); } catch (eH) {}
+  var url = new URL('cadastro.html', location.href).href.split('?')[0] + '?' + p.join('&') + hash;
+  var codigo = linkCurtoCodigo(nome), curto = url.split('cadastro.html')[0] + 'seus-dados?' + codigo;
+  try { sendToGASSimple({ action: 'storeLink', id: codigo, dados: JSON.stringify({ u: url.slice(url.indexOf('cadastro.html')) }) }, function() {}); } catch (eSl) { curto = url; }
+  var msgLonga = 'Oi' + (nome ? ', ' + nome.split(' ')[0] : '') + '! Para garantir a sua vaga, preencha seus dados neste link — é rapidinho 👇\n' + url;
+  var msg = msgLonga.replace(url, curto);
+  if (curto !== url) linkCurtoConferir(codigo, function(ok) {
+    if (ok || !msgEl) return;
+    msgEl.innerHTML = '⚠️ O link curto não foi guardado. <a href="#" style="color:#ffd166;font-weight:800;">Copiar o link completo</a> e mande esse no lugar.';
+    msgEl.querySelector('a').onclick = function(ev) { ev.preventDefault(); (navigator.clipboard ? navigator.clipboard.writeText(msgLonga) : Promise.reject()).then(function() { msgEl.textContent = '✓ Link completo copiado — cole na conversa da Clint.'; }).catch(function() { prompt('Copie a mensagem:', msgLonga); }); };
+  });
+  var ok = function() { if (msgEl) { msgEl.style.color = ''; msgEl.textContent = '✓ Mensagem copiada — cole na conversa da Clint. Quando o cliente enviar, os dados entram aqui sozinhos.'; } if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado — cole na Clint'; setTimeout(function(){ bt.textContent = t0; }, 2800); } try { if (window.__bloqLinkEnviado) window.__bloqLinkEnviado(); } catch (eP) {} };
+  (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
 }
 function copiarLinkCadastro(bt) {
   var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function(p){ if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
@@ -1335,7 +1419,7 @@ function copiarLinkCadastro(bt) {
   var url = new URL('cadastro.html', location.href).href.split('?')[0] + '?' + p.join('&') + hash;
   // 🔗 link CURTO (Bruno 29/09/2026: "achei esse link muito longo"): o endereço completo fica guardado na aba Links
   // (storeLink do robô) e o cliente recebe só c.html?k=CODIGO — a c.html busca e abre o cadastro preenchido
-  var codigo = linkCurtoCodigo(), curto = url.split('cadastro.html')[0] + 'c.html?k=' + codigo;
+  var codigo = linkCurtoCodigo(nome), curto = url.split('cadastro.html')[0] + 'seus-dados?' + codigo;   // Bruno 29/09/2026: "tipo seus dados"
   try { sendToGASSimple({ action: 'storeLink', id: codigo, dados: JSON.stringify({ u: url.slice(url.indexOf('cadastro.html')) }) }, function() {}); } catch (eSl) { curto = url; }
   var msgLonga = 'Oi' + (nome ? ', ' + nome.split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
   var msg = msgLonga.replace(url, curto);
@@ -1449,7 +1533,7 @@ function preencherColado(p) {   // p = 'c' (venda) ou 'b' (bloqueio)
     if (msg) msg.textContent = ids.length ? '✓ ' + ids.length + ' campos preenchidos' + (t.endereco ? ' · confira o endereço' : '') + (temDupla ? ' · dupla incluída' : '') : 'Não achei "Campo: valor" no texto';
   } else {
     _poeColado('b-nome', t.nome, ids); _poeColado('b-cpf', _cpfColado(t.cpf), ids); _poeColado('b-cel', _telColado(t.cel), ids); _poeColado('b-email', t.email, ids); _poeColado('b-insta', _instaColado(t.insta), ids);
-    if (temDupla) { try { document.getElementById('bdupla-s').checked = true; toggleDuplaB(); } catch (er) {} _poeColado('b-dupla-nome', d.dupla.nome, ids); _poeColado('b-dupla-cel', _telColado(d.dupla.cel), ids); _poeColado('b-dupla-email', d.dupla.email, ids); }
+    if (temDupla) { try { document.getElementById('bdupla-s').checked = true; toggleDuplaB(); } catch (er) {} _poeColado('b-dupla-nome', d.dupla.nome, ids); _poeColado('b-dupla-cel', _telColado(d.dupla.cel), ids); _poeColado('b-dupla-email', d.dupla.email, ids); _poeColado('b-dupla-cpf', _cpfColado(d.dupla.cpf), ids); _poeColado('b-dupla-rg', d.dupla.rg, ids); _poeColado('b-dupla-endereco', d.dupla.endereco, ids); }
     if (msg) msg.textContent = ids.length ? '✓ ' + ids.length + ' campos preenchidos' + (temDupla ? ' · dupla incluída' : '') : 'Não achei "Campo: valor" no texto';
   }
   setTimeout(function(){ ids.forEach(function(id){ var el = document.getElementById(id); if (el) el.classList.remove('preenchido'); }); }, 4000);
@@ -2161,6 +2245,41 @@ function precoTabela(p) {
     val.addEventListener('input', function (e) { if (e.isTrusted) delete val.dataset.auto; });
     if (!String(val.value || '').trim()) pore();   // abriu com o programa e sem valor
   });
+})();
+</script>
+<script>
+// 🔒 BLOQUEIO/ENTRADA: a resposta do cliente na Clint entra sozinha (29/09/2026) — ao abrir e, com o link enviado, a cada minuto
+(function () {
+  var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function (p) { if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
+  if (q.modo !== 'bloqueio' || String(q.cel || '').replace(/\D/g, '').length < 8 || typeof GAS_URL === 'undefined') return;
+  var msgEl = document.getElementById('b-colar-msg'), ultima = '', rodadas = 0, tP = 0, esperando = false;
+  var quando = function (t) { var d = new Date(t); if (isNaN(d)) return ''; var hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); return d.toDateString() === new Date().toDateString() ? 'hoje às ' + hm : ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' às ' + hm; };
+  var textoDe = function (m) { var t = String(m.texto || ''); if (/^\s*\{/.test(t)) { try { var o = JSON.parse(t); t = o.text || o.body || o.caption || o.message || ''; } catch (e) {} } return String(t || ''); };
+  var doCliente = function (m) { return /customer|contact|client|lead/i.test(String(m.tipo || '')) || (!m.tipo && !m.user_id); };
+  function agendar() { clearTimeout(tP); if (!esperando || rodadas >= 30) return; tP = setTimeout(function () { if (document.hidden) { agendar(); return; } rodadas++; buscar(); }, 60000); }
+  function buscar() {
+    var cb = 'bq' + Date.now(), sc = document.createElement('script'), feito = false;
+    var fim = function (res) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[cb] = function () {}; tratar(res); };
+    window[cb] = fim; sc.onerror = function () { fim(null); }; setTimeout(function () { fim(null); }, 45000);
+    var cid = (String(q.clint || '').match(/contacts\/([\w-]+)/) || [])[1] || '';
+    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 60 }));
+    document.body.appendChild(sc);
+  }
+  function tratar(res) {
+    if (!res || !res.success) { agendar(); return; }
+    var msgs = []; (res.chats || []).forEach(function (c) { (c.mensagens || []).forEach(function (m) { msgs.push(m); }); });
+    msgs.sort(function (a, b) { return new Date(a.quando) - new Date(b.quando); });
+    var cli = msgs.filter(doCliente), x = null;
+    for (var i = cli.length - 1; i >= 0 && !x; i--) { var t = textoDe(cli[i]); if (lerDadosColados(t).n >= 3) x = { texto: t, quando: cli[i].quando }; }
+    if (!x) { agendar(); return; }
+    if (x.quando === ultima) return; ultima = x.quando;
+    var ta = document.getElementById('b-colar'); if (!ta) return;
+    ta.value = x.texto; try { preencherColado('b'); } catch (e) {}
+    esperando = false; clearTimeout(tP);
+    setTimeout(function () { if (msgEl) { msgEl.style.color = '#3ddc97'; msgEl.textContent = '📥 O cliente mandou os dados ' + quando(x.quando) + ' — já preenchi. Confira antes de registrar.'; } }, 300);
+  }
+  window.__bloqLinkEnviado = function () { esperando = true; rodadas = 0; agendar(); };
+  buscar();
 })();
 </script>
 </body>

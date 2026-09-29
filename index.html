@@ -2639,7 +2639,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-29-1051';
+var VERSAO_DASH = '2026-09-29-1306';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4536,8 +4536,26 @@ function _vendedorForms(v) {
   return String(v || '');
 }
 // plano B: o Google Forms de verdade, ja preenchido (usado se o robo nao conseguir responder o formulario)
+// formulário de pagamento dessa pessoa nos últimos 30 dias (mesmo celular, CPF ou nome) — 29/09/2026: "não ter duplo envio"
+function _vendaRecenteNoForm(cel, nome, cpf) {
+  if (typeof PAG === 'undefined' || !PAG.rows) return null;
+  var t8 = ldTel8(cel || ''), c = String(cpf || '').replace(/\D/g, ''), kN = v2nomeChave(nome || ''), lim = Date.now() - 30 * 864e5, m = null;
+  PAG.rows.forEach(function(p) {
+    if (!p.date || p.date.getTime() < lim) return;
+    var ok = (t8 && ldTel8(p.celular || '') === t8) || (c.length >= 11 && String(p.cpf || '').replace(/\D/g, '') === c) || (kN && v2nomeChave(p.nome || '') === kN);
+    if (ok && (!m || p.date > m.date)) m = p;
+  });
+  return m;
+}
 function abrirFormVendaGoogle(dados) {
   dados = dados || _vendaAberta || {};
+  var _rec = dados._confirmouRepetida ? null : _vendaRecenteNoForm(dados.cel, dados.nome, dados.cpf);
+  if (_rec) {
+    confirmarBonito('Essa venda já foi registrada?',
+      'Já existe formulário de pagamento de <b>' + String(_rec.nome || dados.nome || '').replace(/</g, '&lt;') + '</b> em <b>' + _rec.date.toLocaleDateString('pt-BR') + '</b>' + (_rec.vendedor ? ' (' + String(_rec.vendedor).replace(/</g, '&lt;') + ')' : '') + '.<br><br>Se for a <b>mesma venda, não envie de novo</b> — sai contrato e aviso repetidos. Só abra se for uma venda nova.',
+      '📝 Abrir mesmo assim', function() { dados._confirmouRepetida = true; abrirFormVendaGoogle(dados); });
+    return;
+  }
   var partes = [];
   Object.keys(FORM_VENDA_CAMPOS).forEach(function(k) {
     if (dados[k] && FORM_VENDA_CAMPOS[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(String(dados[k])));
@@ -4883,6 +4901,7 @@ function abrirFormBloqueio(dados) {
   if (!dados.valor && dados.programa) { var vp = valorPadraoDoProduto(dados.programa); if (vp) dados.valor = v2moeda(vp); }
   if (!dados.dupla && /cadeira/i.test(dados.programa || '')) dados.dupla = 'Sim';
   var partes = ['embed=1', 'modo=bloqueio'];
+  try { var wzB = dspClintNumero(); if (wzB) partes.push('wz=' + wzB); } catch (eWz) {}   // link do cliente volta para o WhatsApp da Promov (29/09/2026)
   ['nome', 'cel', 'email', 'insta', 'vendedor', 'sdr', 'programa', 'clint', 'valor', 'dupla'].forEach(function(k) {
     if (dados[k]) partes.push(k + '=' + encodeURIComponent(String(dados[k])));
   });
@@ -15174,23 +15193,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxMbq5MdpGDO7X5wRipsa6x6Vk6myQNktc9tylpDIwwejM2tPnNfsydNxtRgCfMCsbn/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxb5MKVnAFFNGrwwILbjBmMh258ydewX12zsOrgkLtaprmikKKXeDYplt-My3EbDz0d/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
@@ -19146,12 +19165,14 @@ function agUsarDaLista(i) {
 // so Bruno e Adm trocam a pessoa ligada a uma reuniao (Bruno 23/08/2026)
 // 🤝 Executivo = time de Customer Success (Bruno 28/09/2026: "transforme o acesso da Juliane em executivo")
 // 🔗 link da página de cadastro para o cliente preencher (28/09/2026) — mesma mensagem da tela de venda
-// código curto do link de cadastro: 6 letras/números sem os que confundem (0/O, 1/I/L)
-function linkCurtoCodigo() {
-  var abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', k = '', n = new Uint32Array(6);
-  try { crypto.getRandomValues(n); } catch (e) { for (var j = 0; j < 6; j++) n[j] = Math.floor(Math.random() * 1e9); }
-  for (var i = 0; i < 6; i++) k += abc.charAt(n[i] % abc.length);
-  return k;
+// código do link de cadastro: o primeiro nome do cliente + 5 letras/números (sem 0/O/1/I/L), ex.: emilene-k7q2m
+// (Bruno 29/09/2026: o link pode colocar um nome específico no fim?)
+function linkCurtoCodigo(nome) {
+  var abc = 'abcdefghjkmnpqrstuvwxyz23456789', k = '', n = new Uint32Array(5);
+  try { crypto.getRandomValues(n); } catch (e) { for (var j = 0; j < 5; j++) n[j] = Math.floor(Math.random() * 1e9); }
+  for (var i = 0; i < 5; i++) k += abc.charAt(n[i] % abc.length);
+  var p = String(nome || '').trim().split(/\s+/)[0].normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16);
+  return (p ? p + '-' : '') + k;
 }
 // confere (sem pressa) se o código entrou na aba Links; avisa se não entrou depois de ~25 s
 function linkCurtoConferir(codigo, cb) {
@@ -19197,7 +19218,7 @@ function cadastroCopiarLink(bt) {
   url = url.replace(/\/cadastro\.html/, '/cadastro.html');
   // 🔗 link CURTO (Bruno 29/09/2026: "achei esse link muito longo, queria algo mais simples e direto"): o endereço
   // completo fica guardado na aba Links (storeLink do robô); o cliente recebe só c.html?k=CODIGO
-  var codigo = linkCurtoCodigo(), curto = url.split('cadastro.html')[0] + 'c.html?k=' + codigo;
+  var codigo = linkCurtoCodigo(nome), curto = url.split('cadastro.html')[0] + 'seus-dados?' + codigo;   // Bruno 29/09/2026: "tipo seus dados"
   try { sendToGAS({ action: 'storeLink', id: codigo, dados: JSON.stringify({ u: url.slice(url.indexOf('cadastro.html')) }) }); } catch (eSl) { curto = url; }
   var msgLonga = 'Oi' + (nome ? ', ' + String(nome).split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
   var msg = msgLonga.replace(url, curto);
@@ -26767,6 +26788,45 @@ function rlImprimir() {
 .av-ns em { flex:none; font-style:normal; font-size:.6rem; font-weight:900; color:#ff9a5a; text-transform:uppercase; letter-spacing:.5px; }
 .av-ns-bt { flex:none; font:inherit; font-size:.64rem; font-weight:800; padding:4px 9px; border-radius:999px; border:1px solid rgba(255,154,90,.5); background:transparent; color:#ffb27a; cursor:pointer; text-decoration:none; }
 .av-ns-bt:hover { background:rgba(255,154,90,.14); }
+</style>
+<script>
+// 📵 WHATSAPP DO ROBÔ FORA DO AR (Bruno 29/09/2026: "não enviou as mensagens da última venda pelo WhatsApp"):
+// o robô (v174) guarda os avisos que falharam e manda quando o número voltar; aqui só avisa quem cuida (ADM), a cada 10 min
+function zapSaudeConferir() {
+  if (typeof ehAdm !== 'function' || !ehAdm()) return;
+  var nm = 'zs' + Date.now(), sc = document.createElement('script'), feito = false;
+  var fim = function(d) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[nm] = function() {}; zapSaudeMostrar(d); };
+  window[nm] = fim; sc.onerror = function() { fim(null); }; setTimeout(function() { fim(null); }, 40000);
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nm + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'zapSaude' }));
+  document.body.appendChild(sc);
+}
+function zapSaudeMostrar(d) {
+  if (!d || !d.success || typeof d.ligado !== 'boolean') return;   // robô antigo (sem zapSaude) ou sem resposta: não afirma nada
+  var el = document.getElementById('zap-fora'), fora = !!d.foraDesde || !d.ligado;
+  if (!fora) { if (el) el.remove(); return; }
+  var fech = 0; try { fech = +localStorage.getItem('v2ZapForaFechado') || 0; } catch (e) {}
+  if (Date.now() - fech < 3600000) return;
+  if (!el) { el = document.createElement('div'); el.id = 'zap-fora'; el.setAttribute('role', 'alert'); document.body.appendChild(el); }
+  var ds = d.foraDesde ? new Date(d.foraDesde) : null, hh = '';
+  if (ds) hh = ('0' + ds.getHours()).slice(-2) + ':' + ('0' + ds.getMinutes()).slice(-2) + (ds.toDateString() !== new Date().toDateString() ? ' de ' + ds.toLocaleDateString('pt-BR').slice(0, 5) : '');
+  var g = d.guardados || 0;
+  el.innerHTML = '<span class="zf-ic" aria-hidden="true">📵</span><div class="zf-tx"><b>' + (d.ligado ? 'O WhatsApp do robô está fora do ar' + (hh ? ' desde ' + hh : '') : 'O WhatsApp do robô está DESLIGADO') + '</b>'
+    + '<span>' + (d.ligado ? (g ? g + ' aviso' + (g > 1 ? 's guardados' : ' guardado') + ' — saem sozinhos quando ele voltar. ' : '') + 'Reconecte o número no painel da uazapi (ler o QR code com o celular da Promov).' : 'Nenhum aviso está saindo — ligue de novo pelo robô.') + '</span></div>'
+    + '<button type="button" aria-label="Esconder por 1 hora">✕</button>';
+  el.querySelector('button').onclick = function() { try { localStorage.setItem('v2ZapForaFechado', String(Date.now())); } catch (e) {} el.remove(); };
+}
+setTimeout(zapSaudeConferir, 20000);
+setInterval(zapSaudeConferir, 10 * 60000);
+</script>
+<style>
+#zap-fora { position:fixed; left:50%; top:10px; transform:translateX(-50%); z-index:9600; display:flex; align-items:center; gap:12px; width:max-content; max-width:min(680px, calc(100vw - 32px));
+  padding:10px 12px 10px 14px; border-radius:14px; background:rgba(58,14,20,.97); border:1px solid rgba(255,107,107,.7); color:#ffd9d9; box-shadow:0 14px 34px rgba(0,0,0,.55); }
+#zap-fora .zf-ic { font-size:1.3rem; }
+#zap-fora .zf-tx { display:flex; flex-direction:column; gap:2px; min-width:0; }
+#zap-fora .zf-tx b { color:#ff8a8a; font-size:.84rem; }
+#zap-fora .zf-tx span { font-size:.74rem; line-height:1.4; }
+#zap-fora button { flex:none; border:0; background:rgba(255,255,255,.08); color:#ffd9d9; border-radius:9px; width:28px; height:28px; cursor:pointer; font-weight:800; }
+#zap-fora button:focus-visible { outline:2px solid #ffd166; outline-offset:2px; }
 </style>
 </body>
 </html>

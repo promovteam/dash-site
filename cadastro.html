@@ -123,6 +123,7 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
 .pre-ok { display:inline-flex; align-items:center; gap:6px; margin-top:10px; font-size:.76rem; font-weight:700; color:var(--ok); }
 .campo.falta input, .campo.falta select { border-color:rgba(246,163,80,.75); background:rgba(246,163,80,.07); }
 .campo.falta > label::after { content:'falta'; margin-left:auto; font-size:.64rem; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--accent); }
+.lado:has(> .campo[hidden]) { grid-template-columns:1fr; }
 .rev-nota { padding:0 14px 12px; font-size:.76rem; color:var(--muted); }
 .rodape { margin-top:26px; text-align:center; font-size:.7rem; color:#5d6372; }
 @media (min-width:600px) { .card { padding:26px 24px; } }
@@ -257,7 +258,7 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var Q = new URLSearchParams(location.search);
-  var P = { n: (Q.get('n') || '').trim(), w: (Q.get('w') || '').replace(/\D/g, ''), p: (Q.get('p') || '').trim(), c: (Q.get('c') || '').trim(), d: Q.get('d') === '1' };
+  var P = { n: (Q.get('n') || '').trim(), w: (Q.get('w') || '').replace(/\D/g, ''), p: (Q.get('p') || '').trim(), c: (Q.get('c') || '').trim(), d: Q.get('d') === '1', b: Q.get('m') === 'b' };
   // o que o closer já sabe vem depois do # (não passa por servidor): nome, contato, programa e condições (28/09/2026)
   var H = {};
   try { var mh = location.hash.match(/[#&]d=([A-Za-z0-9\-_]+)/); if (mh) { var b64 = mh[1].replace(/-/g, '+').replace(/_/g, '/'); while (b64.length % 4) b64 += '='; H = JSON.parse(decodeURIComponent(escape(atob(b64)))) || {}; } } catch (e) { H = {}; }
@@ -273,6 +274,17 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
   if (P.n) $('ola-t').innerHTML = 'Oi, <em>' + esc(P.n.split(' ')[0]) + '</em>! Seus dados para o contrato';
   $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para o ' + prog : '') + '. ' : '') + 'Leva uns 2 minutinhos — cada informação é conferida na hora, para o contrato e a nota fiscal saírem certinhos.';
   if (P.d) $('tem-dupla').checked = true;
+  // 🔒 MODO BLOQUEIO/ENTRADA (Bruno 29/09/2026: "link de bloqueio de oferta e entrada também, com os dados necessários"):
+  // só nome, CPF, celular, e-mail e Instagram (e a segunda cadeira) — sem RG, nascimento, profissão nem endereço do titular
+  if (P.b) {
+    ['nasc', 'rg', 'org', 'civil', 'prof', 'nicho'].forEach(function (id) { var bx = document.querySelector('[data-c="' + id + '"]'); if (bx) bx.hidden = true; });
+    var segT = document.querySelector('.seg'); if (segT && segT.closest('.campo')) segT.closest('.campo').hidden = true;
+    $('d-mesmo').checked = false; $('d-mesmo').closest('label').hidden = true; $('d-end-box').hidden = false;
+    if (P.n) $('ola-t').innerHTML = 'Oi, <em>' + esc(P.n.split(' ')[0]) + '</em>! Seus dados para garantir a sua vaga';
+    $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para reservar o ' + prog : '') + '. ' : '') + 'É rapidinho — só nome, CPF e contato.';
+    $('aceite').parentNode.querySelector('span').innerHTML = 'Confirmo que os dados estão <b>corretos</b> e autorizo o uso deles para <b>registrar a minha reserva</b>.';
+    document.title = 'Reserva Promov';
+  }
   if (prog) {
     $('plano').hidden = false; $('plano-nome').textContent = prog;
     if (H.valor || H.pgto) { $('plano-cond').hidden = false; $('plano-cond').innerHTML = (H.valor ? '<span class="plano-val">' + esc(H.valor) + '</span>' : '') + (H.pgto ? '<span>' + esc(H.pgto) + '</span>' : ''); }
@@ -417,7 +429,7 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
   var CAMPOS = { voce: ['nome', 'cpf', 'nasc', 'rg', 'org', 'civil', 'prof', 'razao', 'cnpj'], contato: ['cel', 'email', 'insta', 'nicho'], endereco: ['cep', 'rua', 'num', 'comp', 'bairro', 'cidade', 'uf'], dupla: ['d-nome', 'd-cpf', 'd-rg', 'd-cel', 'd-email', 'd-end'] };
   var ordem = [], atual = 0;
   function montarPassos() {
-    ordem = ['voce', 'contato', 'endereco'].concat($('tem-dupla').checked ? ['dupla'] : []).concat(['revisao']);
+    ordem = ['voce', 'contato'].concat(P.b ? [] : ['endereco']).concat($('tem-dupla').checked ? ['dupla'] : []).concat(['revisao']);
     $('passos').innerHTML = ordem.map(function (_, i) { return '<span class="' + (i < atual ? 'feito' : i === atual ? 'agora' : '') + '"></span>'; }).join('');
   }
   function ir(i, voltando) {
@@ -475,16 +487,16 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
     };
     var pl = prog ? '<div class="rev-bloco"><h3>Programa</h3><dl><dt>Programa</dt><dd>' + esc(prog) + '</dd>' + (H.valor ? '<dt>Valor</dt><dd>' + esc(H.valor) + '</dd>' : '') + (H.pgto ? '<dt>Pagamento</dt><dd>' + esc(H.pgto) + '</dd>' : '') + '</dl>'
       + '<p class="rev-nota">Algo diferente do combinado? Fale com ' + esc(P.c ? P.c.split(' ')[0] : 'a Promov') + ' antes de enviar.</p></div>' : '';
-    $('rev').innerHTML = pl + bloco(tipo === 'PJ' ? 'Titular e empresa' : 'Titular', D.t, 'voce') + bloco('Contato', D.c, 'contato') + bloco('Endereço', [['Endereço', endereco()]], 'endereco') + (D.d ? bloco('Segunda cadeira', D.d, 'dupla') : '');
+    $('rev').innerHTML = pl + bloco(tipo === 'PJ' ? 'Titular e empresa' : 'Titular', D.t, 'voce') + bloco('Contato', D.c, 'contato') + (P.b ? '' : bloco('Endereço', [['Endereço', endereco()]], 'endereco')) + (D.d ? bloco('Segunda cadeira', D.d, 'dupla') : '');
   }
   $('rev').addEventListener('click', function (e) { var b = e.target.closest('[data-ir]'); if (b) ir(ordem.indexOf(b.dataset.ir), true); });
   function texto() {
-    var D = dados(), L = ['*Cadastro para contrato — Promov*', ''];
+    var D = dados(), L = [P.b ? '*Dados para a reserva da vaga — Promov*' : '*Cadastro para contrato — Promov*', ''];
     if (prog) { L.push('PEDIDO', 'Programa: ' + prog); if (H.valor) L.push('Valor total: ' + H.valor); if (H.pgto) L.push('Pagamento: ' + H.pgto); L.push(''); }
     L.push('TITULAR');
     D.t.concat(D.c, D.en).forEach(function (x) { if (x[1]) L.push(x[0] + ': ' + x[1]); });
     if (D.d) { L.push('', 'SEGUNDA CADEIRA'); D.d.forEach(function (x) { if (x[1]) L.push(x[0] + ': ' + x[1]); }); }
-    L.push('', '✅ Confirmo que os dados estão corretos e autorizo o uso para o contrato e a nota fiscal.');
+    L.push('', P.b ? '✅ Confirmo que os dados estão corretos.' : '✅ Confirmo que os dados estão corretos e autorizo o uso para o contrato e a nota fiscal.');
     return L.join('\n');
   }
   function linkZap() { return 'https://wa.me/' + (P.w || '') + '?text=' + encodeURIComponent(texto()); }
@@ -508,7 +520,7 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
   });
 
   // ---------- rascunho: se fechar a página, continua de onde parou ----------
-  var CHAVE = 'promovCadastro:' + (P.n || '') + ':' + (P.c || '');
+  var CHAVE = 'promovCadastro:' + (P.n || '') + ':' + (P.c || '') + (P.b ? ':b' : '');
   var IDS = ['nome','cpf','nasc','rg','org','civil','prof','razao','cnpj','cel','email','insta','nicho','cep','rua','num','comp','bairro','cidade','uf','d-nome','d-cpf','d-rg','d-cel','d-email','d-end'];
   var tSalvar = 0;
   function salvar() {
@@ -564,7 +576,7 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
       });
     });
     if (!volta) comeco = primeiro < 0 ? ordem.length - 1 : primeiro;
-    $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? ' para o ' + prog : '') + '. ' : '')
+    $('ola-p').textContent = (P.c ? P.c.split(' ')[0] + ' pediu seus dados' + (prog ? (P.b ? ' para reservar o ' : ' para o ') + prog : '') + '. ' : '')
       + (falta ? 'Já preenchemos o que temos — só falta completar ' + (falta === 1 ? '1 informação' : falta + ' informações') + '.' : 'Já preenchemos tudo o que temos — é só conferir e enviar.');
     var sBadge = document.createElement('div'); sBadge.className = 'pre-ok'; sBadge.textContent = '✓ ' + n + ' campo' + (n > 1 ? 's' : '') + ' já preenchido' + (n > 1 ? 's' : '') + ' pela Promov'; $('ola').appendChild(sBadge);
   })();
