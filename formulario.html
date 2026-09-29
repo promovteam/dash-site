@@ -393,7 +393,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
 
     <div class="divider"></div>
 
-    <div class="f">
+    <div class="f" id="dupla-pergunta">
       <label>Possui dupla (2ª cadeira)?</label>
       <div class="opt-row opt-sm">
         <div class="opt-item"><input type="radio" name="dupla" id="dupla-n" value="Não" checked onchange="toggleDupla()"><label for="dupla-n">Não</label></div>
@@ -585,7 +585,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <label>Instagram</label>
       <input type="text" id="b-insta" placeholder="@usuario">
     </div>
-    <div class="f">
+    <div class="f" id="bdupla-pergunta">
       <label>Segunda cadeira (dupla)?</label>
       <div class="opt-row opt-sm">
         <div class="opt-item"><input type="radio" name="bdupla" id="bdupla-n" value="Não" checked onchange="toggleDuplaB()"><label for="bdupla-n">Não</label></div>
@@ -818,12 +818,25 @@ function togglePJ() {
   document.getElementById('pj-fields').style.display = document.getElementById('tipo-pj').checked ? 'block' : 'none';
 }
 
+// Legado (Legado Club e Mentoria Legado Digital) não tem segunda cadeira (Bruno 29/09/2026): a pergunta some e fica "Não"
+function _semDupla(idPrograma) { var s = document.getElementById(idPrograma); return !!(s && /legado|club/i.test(s.value || '')); }
 function toggleDupla() {
+  var sem = _semDupla('v-programa'), q = document.getElementById('dupla-pergunta');
+  if (sem) document.getElementById('dupla-n').checked = true;
+  if (q) q.style.display = sem ? 'none' : '';
   document.getElementById('dupla-fields').style.display = document.getElementById('dupla-s').checked ? 'block' : 'none';
 }
 function toggleDuplaB() {
+  var sem = _semDupla('b-programa'), q = document.getElementById('bdupla-pergunta');
+  if (sem) document.getElementById('bdupla-n').checked = true;
+  if (q) q.style.display = sem ? 'none' : '';
   document.getElementById('bdupla-fields').style.display = document.getElementById('bdupla-s').checked ? 'block' : 'none';
 }
+(function () {
+  var a = document.getElementById('v-programa'), b = document.getElementById('b-programa');
+  if (a) a.addEventListener('change', toggleDupla);
+  if (b) b.addEventListener('change', toggleDuplaB);
+})();
 
 // =====================================================================
 // TOGGLES — BLOQUEIO
@@ -1004,7 +1017,7 @@ function submitVenda() {
 
   var pgto = document.getElementById('v-pagamento').value;
   var tipo = document.getElementById('tipo-pj').checked ? 'PJ' : 'PF';
-  var temDupla = document.getElementById('dupla-s').checked;
+  var temDupla = document.getElementById('dupla-s').checked && !_semDupla('v-programa');
 
   // Ler comprovante como base64 se tiver
   var fileInput = document.getElementById('v-comprovante');
@@ -1376,7 +1389,7 @@ function copiarLinkBloqueio(bt) {
   var nome = g('b-nome') || q.nome || '', vend = g('b-vendedor') || q.vendedor || '', prog = g('b-programa') || q.programa || '';
   var falta = []; if (!prog) falta.push('o programa'); if (!g('b-bloqueio-valor')) falta.push('o valor do bloqueio/entrada');
   if (falta.length) { if (msgEl) { msgEl.textContent = '⚠️ Preencha ' + falta.join(' e ') + ' antes — vai junto no link para o cliente'; msgEl.style.color = 'var(--red)'; } var f0 = document.getElementById(prog ? 'b-bloqueio-valor' : 'b-programa'); if (f0) { f0.focus(); f0.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return; }
-  var dupla = document.getElementById('bdupla-s') && document.getElementById('bdupla-s').checked;
+  var dupla = document.getElementById('bdupla-s') && document.getElementById('bdupla-s').checked && !_semDupla('b-programa');
   var sub = (document.querySelector('input[name="subtipo"]:checked') || {}).value || 'Bloqueio de oferta';
   var pg = g('b-pagamento'), cond = [(/entrada/i.test(sub) ? 'Entrada de ' : 'Bloqueio de ') + g('b-bloqueio-valor')];
   if (pg && !/^nao sei$/.test(_semAcento(pg))) cond.push(pg + ((pg === 'Cartão de crédito' || pg === 'Boleto') && g('b-parcelas') ? ' ' + g('b-parcelas').replace(/x$/i, '') + 'x' + (g('b-parcela-valor') ? ' de ' + g('b-parcela-valor') : '') : '') + (pg === 'Cartão recorrente' && g('b-recorrente-vezes') ? ' ' + g('b-recorrente-vezes') + 'x' + (g('b-recorrente-valor') ? ' de ' + g('b-recorrente-valor') : '') : ''));
@@ -1404,7 +1417,7 @@ function copiarLinkCadastro(bt) {
   var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function(p){ if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
   var g = function(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
   var nome = g('c-nome') || q.nome || '', vend = g('v-vendedor') || q.vendedor || '', prog = g('v-programa') || q.programa || '';
-  var dupla = document.getElementById('dupla-s') && document.getElementById('dupla-s').checked;
+  var dupla = document.getElementById('dupla-s') && document.getElementById('dupla-s').checked && !_semDupla('v-programa');
   var p = ['n=' + encodeURIComponent(nome.split(' ')[0] || ''), 'c=' + encodeURIComponent(vend), 'p=' + encodeURIComponent(prog)];
   if (q.wz) p.push('w=' + encodeURIComponent(String(q.wz).replace(/\D/g, '')));
   if (dupla) p.push('d=1');
@@ -1558,7 +1571,7 @@ function preencherColado(p) {   // p = 'c' (venda) ou 'b' (bloqueio)
 function _programaFormsF(p) {
   var t = _semAcento(p).replace(/\s+/g, ' ').trim(); if (!t) return '';
   var base = /club/.test(t) ? 'Legado Club' : /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : (/spark/.test(t) && /semest/.test(t)) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : String(p || '');
-  if (/cadeira/.test(t)) base += (base === 'Growth anual') ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA';
+  if (/cadeira/.test(t) && !/^Legado/.test(base)) base += (base === 'Growth anual') ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA';   // Legado não tem 2ª cadeira
   return base;
 }
 function _vendedorFormsF(v) { var t = _semAcento(v); if (/bruno/.test(t)) return 'Bruno Pardim'; if (/tony/.test(t)) return 'Tony Londe'; return String(v || '').trim(); }
@@ -1581,7 +1594,7 @@ function dadosParaForms() {
   if (entrada && g('v-entrada-valor')) det.push('entrada ' + g('v-entrada-valor') + (g('v-entrada-forma') ? ' (' + g('v-entrada-forma') + ')' : ''));
   var bvF = g('v-boleto-venc'), mBF = bvF.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (pgto === 'Boleto' && bvF) det.push('1º vencimento ' + (mBF ? mBF[3] + '/' + mBF[2] + '/' + mBF[1] : bvF));
-  var dupla = document.getElementById('dupla-s') && document.getElementById('dupla-s').checked;
+  var dupla = document.getElementById('dupla-s') && document.getElementById('dupla-s').checked && !_semDupla('v-programa');
   if (dupla) det.push('dupla: ' + [g('c-dupla-nome'), g('c-dupla-cel'), g('c-dupla-email')].filter(Boolean).join(' '));
   if (pj) det.push('PJ: ' + g('c-razao') + (g('c-cnpj') ? ' CNPJ ' + g('c-cnpj') : ''));
   var nasc = g('c-nasc'), mN = nasc.match(/^(\d{4})-(\d{2})-(\d{2})$/);
