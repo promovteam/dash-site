@@ -169,6 +169,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option value="">Selecione...</option>
         <option>Bruno</option>
         <option>Tony</option>
+        <option>Wesllene</option>
+        <option>Sarah</option>
         <option>Guilherme</option>
       </select>
     </div>
@@ -193,6 +195,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option>Growth</option>
         <option>Growth + 2ª cadeira</option>
         <option>Mentoria Legado Digital</option>
+        <option>Legado Club</option>
       </select>
     </div>
     <div class="f">
@@ -463,6 +466,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option value="">Selecione...</option>
         <option>Bruno</option>
         <option>Tony</option>
+        <option>Wesllene</option>
+        <option>Sarah</option>
         <option>Guilherme</option>
       </select>
     </div>
@@ -487,6 +492,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option>Growth</option>
         <option>Growth + 2ª cadeira</option>
         <option>Mentoria Legado Digital</option>
+        <option>Legado Club</option>
       </select>
     </div>
     <div class="f">
@@ -1270,7 +1276,7 @@ function separarEndereco(texto) {
   var t = ' ' + String(texto || '').replace(/\s+/g, ' ').trim() + ' ';
   var mCep = t.match(/\b(\d{5})[-. ]?(\d{3})\b/);
   if (mCep) { r.cep = mCep[1] + '-' + mCep[2]; t = t.replace(mCep[0], ' '); }
-  t = t.replace(/\bcep\b\s*:?\s*/i, ' ');
+  t = t.replace(/\bcep\b\s*:?\s*/i, ' ').replace(/\(\s*\)/g, ' ');
   // UF: sigla maiuscula isolada ou nome do estado
   var mUf = t.match(/(?:^|[\s,\-\/])(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PE|PI|PR|RJ|RN|RS|RO|RR|SC|SP|SE|TO)(?=$|[\s,.\-\/])/);
   if (mUf) { r.uf = mUf[1]; t = t.replace(mUf[0], ' '); }
@@ -1292,8 +1298,11 @@ function separarEndereco(texto) {
   if (mN) { r.rua = mN[1].trim(); r.num = mN[2].toUpperCase() === 'S/N' ? 'S/N' : mN[2]; }
   var resto = partes.join(', ');
   if (!r.num) { var mN2 = resto.match(/^\s*(?:n[º°o]?\.?\s*)?(\d{1,6}|s\/n)\b\s*[,\-]?\s*/i); if (mN2) { r.num = mN2[1].toUpperCase() === 'S/N' ? 'S/N' : mN2[1]; resto = resto.slice(mN2[0].length); } }
-  var mC = resto.match(/\b(apto?\.?|apartamento|ap\.?|bloco|bl\.?|casa|sala|loja|lote|lt\.?|qd\.?|quadra|cond(?:om[ií]nio)?|torre|andar|conj(?:unto)?|fundos|edif[ií]cio|ed\.)\b[^,\-]*/i);
-  if (mC) { r.comp = mC[0].trim(); resto = resto.replace(mC[0], ' '); }
+  // 29/09/2026: endereço de quadra/lote ("Qd. 6, Lt. 53, S/N, casa 1") — S/N é o número e o complemento junta tudo
+  if (!r.num && /(^|[\s,])s\/?n([\s,.]|$)/i.test(resto)) { r.num = 'S/N'; resto = resto.replace(/(^|[\s,])s\/?n(?=[\s,.]|$)/i, ' '); }
+  var reC = /(?:^|[\s,])((?:apto?\.?|apartamento|ap\.?|bloco|bl\.?|casa|sala|loja|lote|lt\.?|qd\.?|quadra|cond(?:om[ií]nio)?|torre|andar|conj(?:unto)?|fundos|edif[ií]cio|ed\.)\s*[^,\-.]*)/ig, mCs = [], mC;
+  while ((mC = reC.exec(resto))) mCs.push(mC[1].replace(/[.\s]+$/, '').trim());
+  if (mCs.length) { r.comp = mCs.join(', '); mCs.forEach(function(c) { resto = resto.replace(c, ' '); }); }
   var segs = resto.split(/\s*[,\-–\/]\s*/).map(function(p){ return p.trim(); }).filter(Boolean);
   if (segs.length >= 2) { r.bairro = segs[0]; r.cidade = segs[segs.length - 1]; }
   else if (segs.length === 1) {
@@ -1433,7 +1442,7 @@ function copiarLinkCadastro(bt) {
   (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
 }
 function lerDadosColados(texto) {
-  var out = { titular: {}, dupla: {}, n: 0 }, quem = 'titular';
+  var out = { titular: {}, dupla: {}, n: 0 }, quem = 'titular', ultimaChave = '';
   var chaves = [
     ['nome', /^(nome( completo)?|nome do (mentorado|cliente|titular)|mentorad[oa]|titular)$/],
     ['cnpj', /^cnpj( da empresa)?$/],
@@ -1468,9 +1477,15 @@ function lerDadosColados(texto) {
     if (m) { chave = _semAcento(m[1]).replace(/\(.*?\)/g, '').replace(/[^a-z0-9\/@º ]/g, ' ').replace(/\s+/g, ' ').trim(); val = m[2].trim(); }
     else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) { chave = 'email'; val = s; }
     else if (/^\+?[\d\s().\-]{8,}$/.test(s) && s.replace(/\D/g, '').length >= 8) { chave = 'celular'; val = s; }
-    else return;
-    if (!val) return;
-    for (var i = 0; i < chaves.length; i++) if (chaves[i][1].test(chave)) { out[quem][chaves[i][0]] = val; out.n++; return; }
+    else {
+      // linha sem "Campo:" logo depois do endereço = o endereço continuou na linha de baixo (29/09/2026: o CEP da
+      // Thaynara estava na 2ª linha "Residencial Brisas da Mata (CEP 74475-343)" e se perdia)
+      if (ultimaChave === 'endereco' && out[quem].endereco) out[quem].endereco += ' ' + s;
+      return;
+    }
+    if (!val) { ultimaChave = ''; return; }
+    for (var i = 0; i < chaves.length; i++) if (chaves[i][1].test(chave)) { out[quem][chaves[i][0]] = val; out.n++; ultimaChave = chaves[i][0]; return; }
+    ultimaChave = '';
   });
   return out;
 }
@@ -1542,7 +1557,7 @@ function preencherColado(p) {   // p = 'c' (venda) ou 'b' (bloqueio)
 // ---- abre o Google Forms de verdade ja preenchido; a pessoa confere, anexa o comprovante e clica em Enviar la ----
 function _programaFormsF(p) {
   var t = _semAcento(p).replace(/\s+/g, ' ').trim(); if (!t) return '';
-  var base = /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : (/spark/.test(t) && /semest/.test(t)) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : String(p || '');
+  var base = /club/.test(t) ? 'Legado Club' : /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : (/spark/.test(t) && /semest/.test(t)) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : String(p || '');
   if (/cadeira/.test(t)) base += (base === 'Growth anual') ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA';
   return base;
 }
@@ -2225,6 +2240,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 // Escolheu o programa → o valor total já vem (se o closer digitar outro valor, a tela respeita e não troca mais).
 function precoTabela(p) {
   var t = _semAcento(p), d = /cadeira|dupla/.test(t);
+  if (/club/.test(t)) return 997;   // Legado Club (anual) — 29/09/2026
   if (/growth/.test(t)) return d ? 50364 : 43164;
   if (/spark/.test(t) && !/semest/.test(t)) return d ? 29964 : 23964;
   return 0;

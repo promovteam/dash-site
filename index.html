@@ -1656,6 +1656,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
         <button class="chart-chip" id="vg-lista" onclick="vistaPag('lista')">☰ Lista</button>
       </div>
       <span class="fi-label" id="pag-count"></span>
+      <button class="btn" style="padding:9px 16px;background:rgba(61,220,151,.14);color:#3ddc97;border:1px solid rgba(61,220,151,.45);font-weight:800;" onclick="abrirVendaSemReuniao()" title="Venda que não passou por reunião (ex.: Legado Club direto) — abre a tela de venda em branco">💰 Venda sem reunião</button>
     </div>
 
     <div class="filtro-inline">
@@ -2639,7 +2640,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-29-1334';
+var VERSAO_DASH = '2026-09-29-1354';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4526,7 +4527,7 @@ var FORM_VENDA_CAMPOS = {
 function _programaForms(p) {
   var t = v2norm(p);
   if (!t) return '';
-  var base = /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : /spark/.test(t) && /semest/.test(t) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : '';
+  var base = /club/.test(t) ? 'Legado Club' : /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : /spark/.test(t) && /semest/.test(t) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : '';
   if (!base) return '';
   return base + (/cadeira/.test(t) ? (base === 'Growth anual' ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA') : '');
 }
@@ -4577,6 +4578,12 @@ function _vendaAnteriorDe(cel, nome) {
     rg: pega(/\brg\b|identidade/), nasc: pega(/nascimento/), civil: pega(/estado civil/), prof: pega(/profiss/), endereco: pega(/endere/), nicho: pega(/nicho/) };
   Object.keys(o).forEach(function(k) { if (!o[k] || /__other_option__/.test(o[k])) delete o[k]; });
   return Object.keys(o).length > 1 ? o : null;
+}
+// 💰 VENDA SEM REUNIÃO (Bruno 29/09/2026: "como faço para gerar um pedido de Legado Club sem ter agendado reunião"):
+// abre a mesma tela de venda, em branco — cola os dados que o cliente mandou e registra. Entra no formulário de pagamento
+// (Pagamentos, Placar, entrega avisada); como não há reunião, não entra nos números de reuniões da Visão Geral.
+function abrirVendaSemReuniao() {
+  abrirFormVenda({ vendedor: _vendedorLogado(), obs: 'Venda sem reunião (direta)' });
 }
 function abrirFormVenda(dados) {
   if (soOlhar()) return;
@@ -4882,6 +4889,7 @@ function abrirFormVendaReuniao() {
 // 💲 tabela de preços (Bruno 29/09/2026): Spark Anual 23.964 · Spark + 2ª cadeira 29.964 · Growth 43.164 · Growth + 2ª cadeira 50.364
 function precoTabela(produto) {
   var t = v2norm(produto), d = /cadeira|dupla/.test(t);
+  if (/club/.test(t)) return 997;   // Legado Club (anual) — 29/09/2026
   if (/growth/.test(t)) return d ? 50364 : 43164;
   if (/spark/.test(t) && !/semest/.test(t)) return d ? 29964 : 23964;
   return 0;
