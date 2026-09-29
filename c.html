@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d11">
+<meta name="robots" content="noindex">
+<title>Cadastro Promov</title>
+<meta property="og:title" content="Cadastro Promov">
+<meta property="og:description" content="Seus dados para o contrato — leva uns 2 minutinhos.">
+<meta property="og:type" content="website">
+<!--
+  🔗 LINK CURTO DO CADASTRO (Bruno 29/09/2026: "achei esse link muito longo, queria algo mais simples e direto").
+  O closer copia promovteam.github.io/dash-site/c.html?k=CODIGO. O dash guardou, na aba "Links" da planilha
+  principal (pelo storeLink do robô), o endereço completo da página de cadastro já preenchida. Esta página
+  procura o código e abre esse endereço. Só abre cadastro.html (nada de outro site).
+-->
+<style>
+  :root { --bg:#0b0d11; --text:#f1f2f5; --text2:#c3c7d1; --muted:#8b91a0; --accent:#f6a350; --accent2:#ffd166; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body { background:var(--bg); color:var(--text); font:15px/1.5 Inter, system-ui, -apple-system, sans-serif; display:grid; place-items:center; padding:24px;
+    background-image:radial-gradient(90% 60% at 50% -10%, rgba(246,163,80,.13), transparent 60%); }
+  .caixa { text-align:center; max-width:340px; }
+  .marca { font:900 1.6rem/1 'Arial Narrow', Inter, sans-serif; letter-spacing:2px; margin-bottom:26px; }
+  .marca i { font-style:normal; color:var(--accent); }
+  .gira { width:34px; height:34px; margin:0 auto 16px; border-radius:50%; border:3px solid rgba(255,255,255,.14); border-top-color:var(--accent); animation:gira .8s linear infinite; }
+  @keyframes gira { to { transform:rotate(360deg); } }
+  p { color:var(--text2); }
+  .bt { display:inline-block; margin-top:18px; padding:14px 20px; border-radius:14px; border:0; font:inherit; font-weight:800; color:#1a1206; background:linear-gradient(135deg, var(--accent2), var(--accent)); text-decoration:none; }
+  [hidden] { display:none !important; }
+  @media (prefers-reduced-motion:reduce) { .gira { animation:none; } }
+</style>
+</head>
+<body>
+<div class="caixa">
+  <div class="marca">PROMOV<i>.</i></div>
+  <div id="carregando"><div class="gira" aria-hidden="true"></div><p>Abrindo o seu cadastro…</p></div>
+  <div id="falhou" hidden>
+    <p>Não encontrei os dados deste link. Você pode preencher assim mesmo — leva uns 2 minutinhos.</p>
+    <a class="bt" href="cadastro.html">Preencher meus dados</a>
+  </div>
+</div>
+<script>
+(function () {
+  var PLANILHA = '1xJykoW0UHr5hA-ELo5nV8uBkYykRG6OQdmMvDlUnhVg';
+  var k = (new URLSearchParams(location.search).get('k') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  var falhar = function () { document.getElementById('carregando').hidden = true; document.getElementById('falhou').hidden = false; };
+  if (k.length < 5) { falhar(); return; }
+  var tentativa = 0;
+  function buscar() {
+    tentativa++;
+    var cb = 'cad' + Date.now(), s = document.createElement('script'), feito = false;
+    var fim = function (u) {
+      if (feito) return; feito = true;
+      try { s.remove(); } catch (e) {} window[cb] = function () {};
+      // só abre a página de cadastro deste site
+      if (u && /^cadastro\.html(\?[^#\s]*)?(#[\w=&%\-.]*)?$/.test(u)) { location.replace(u); return; }
+      if (tentativa < 6) setTimeout(buscar, 2500); else falhar();   // o dash acabou de guardar: espera um pouco
+    };
+    window[cb] = function (r) {
+      var u = '';
+      try { var linhas = r.table.rows; if (linhas.length) u = JSON.parse(linhas[linhas.length - 1].c[0].v).u || ''; } catch (e) {}
+      fim(u);
+    };
+    s.onerror = function () { fim(''); };
+    setTimeout(function () { fim(''); }, 12000);
+    s.src = 'https://docs.google.com/spreadsheets/d/' + PLANILHA + '/gviz/tq?tqx=out:json;responseHandler:' + cb
+      + '&sheet=Links&headers=1&tq=' + encodeURIComponent("select B where A = '" + k + "'") + '&_=' + Date.now();
+    document.body.appendChild(s);
+  }
+  buscar();
+})();
+</script>
+</body>
+</html>

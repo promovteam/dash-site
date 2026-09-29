@@ -188,6 +188,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option value="">Selecione...</option>
         <option>Spark Anual</option>
         <option>Spark Semestral</option>
+        <option>Spark Anual + 2ª cadeira</option>
         <option>Spark Semestral + 2ª cadeira</option>
         <option>Growth</option>
         <option>Growth + 2ª cadeira</option>
@@ -481,6 +482,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option value="">Selecione...</option>
         <option>Spark Anual</option>
         <option>Spark Semestral</option>
+        <option>Spark Anual + 2ª cadeira</option>
         <option>Spark Semestral + 2ª cadeira</option>
         <option>Growth</option>
         <option>Growth + 2ª cadeira</option>
@@ -1283,6 +1285,28 @@ function separarEndereco(texto) {
 }
 // 🔗 LINK DE CADASTRO PARA O CLIENTE (Bruno 28/09/2026: "gere algo que o próprio lead responda através de um link externo, simples e fácil")
 // copia a mensagem pronta com o link da página cadastro.html; o cliente preenche e manda de volta no formato que esta tela entende
+// código curto do link de cadastro: 6 letras/números sem os que confundem (0/O, 1/I/L)
+function linkCurtoCodigo() {
+  var abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', k = '', n = new Uint32Array(6);
+  try { crypto.getRandomValues(n); } catch (e) { for (var j = 0; j < 6; j++) n[j] = Math.floor(Math.random() * 1e9); }
+  for (var i = 0; i < 6; i++) k += abc.charAt(n[i] % abc.length);
+  return k;
+}
+// confere (sem pressa) se o código já está na aba Links; avisa se não entrou depois de ~25 s
+function linkCurtoConferir(codigo, cb) {
+  var t = 0;
+  (function olhar() {
+    t++;
+    var nm = 'lk' + Date.now(), sc = document.createElement('script'), feito = false;
+    var fim = function(achou) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[nm] = function() {}; if (achou) cb(true); else if (t < 5) setTimeout(olhar, 5000); else cb(false); };
+    window[nm] = function(r) { var ok = false; try { ok = r.table.rows.length > 0; } catch (e) {} fim(ok); };
+    sc.onerror = function() { fim(false); };
+    setTimeout(function() { fim(false); }, 10000);
+    sc.src = 'https://docs.google.com/spreadsheets/d/1xJykoW0UHr5hA-ELo5nV8uBkYykRG6OQdmMvDlUnhVg/gviz/tq?tqx=out:json;responseHandler:' + nm
+      + '&sheet=Links&headers=1&tq=' + encodeURIComponent("select A where A = '" + codigo + "'") + '&_=' + Date.now();
+    document.body.appendChild(sc);
+  })();
+}
 function copiarLinkCadastro(bt) {
   var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function(p){ if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
   var g = function(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
@@ -1309,7 +1333,18 @@ function copiarLinkCadastro(bt) {
   Object.keys(dd).forEach(function(k) { if (!dd[k]) delete dd[k]; });
   var hash = ''; try { hash = '#d=' + btoa(unescape(encodeURIComponent(JSON.stringify(dd)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); } catch (eH) {}
   var url = new URL('cadastro.html', location.href).href.split('?')[0] + '?' + p.join('&') + hash;
-  var msg = 'Oi' + (nome ? ', ' + nome.split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
+  // 🔗 link CURTO (Bruno 29/09/2026: "achei esse link muito longo"): o endereço completo fica guardado na aba Links
+  // (storeLink do robô) e o cliente recebe só c.html?k=CODIGO — a c.html busca e abre o cadastro preenchido
+  var codigo = linkCurtoCodigo(), curto = url.split('cadastro.html')[0] + 'c.html?k=' + codigo;
+  try { sendToGASSimple({ action: 'storeLink', id: codigo, dados: JSON.stringify({ u: url.slice(url.indexOf('cadastro.html')) }) }, function() {}); } catch (eSl) { curto = url; }
+  var msgLonga = 'Oi' + (nome ? ', ' + nome.split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
+  var msg = msgLonga.replace(url, curto);
+  if (curto !== url) linkCurtoConferir(codigo, function(ok) {
+    if (ok) return;
+    var m = document.getElementById('c-colar-msg'); if (!m) return;
+    m.innerHTML = '⚠️ O link curto não foi guardado. <a href="#" style="color:#ffd166;font-weight:800;">Copiar o link completo</a> e mande esse no lugar.';
+    m.querySelector('a').onclick = function(ev) { ev.preventDefault(); (navigator.clipboard ? navigator.clipboard.writeText(msgLonga) : Promise.reject()).then(function() { m.textContent = '✓ Link completo copiado — cole na conversa da Clint.'; }).catch(function() { prompt('Copie a mensagem:', msgLonga); }); };
+  });
   var ok = function() { var m = document.getElementById('c-colar-msg'); if (m) m.textContent = '✓ Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente enviar, os dados entram aqui sozinhos.'; if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado — cole na Clint'; setTimeout(function(){ bt.textContent = t0; }, 2800); } try { if (window.__preLinkEnviado) window.__preLinkEnviado(); } catch (eP) {} };
   (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
 }
@@ -1733,15 +1768,30 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
   // quem colou o texto: confere tudo o que entrou
   var _pc = window.preencherColado;
   if (typeof _pc === 'function') window.preencherColado = function (p) { var r = _pc.apply(this, arguments); if (p === 'c') setTimeout(function () { Object.keys(REGRAS).forEach(function (id) { if ($(id) && String($(id).value).trim()) marcar(id); }); }, 50); return r; };
-  function problemas() { var l = []; Object.keys(REGRAS).forEach(function (id) { var el = $(id); if (!el) return; if (!marcar(id)) l.push(el); }); return l; }
+  // 29/09/2026 (Bruno: "aqui não está passando para frente"): o Próximo da parte 2 conferia também o CEP, que fica na
+  // parte 3 (ainda vazio e escondido) — a tela "travava" sem mostrar nada. Agora cada Próximo confere só a própria parte,
+  // e o Registrar venda leva até a parte do primeiro campo com problema.
+  function passoDe(el) { var sec = el && el.closest && el.closest('[id^="v-step"]'); return sec ? +sec.id.replace('v-step', '') : 0; }
+  function problemas(passo) {
+    var l = [];
+    Object.keys(REGRAS).forEach(function (id) {
+      var el = $(id); if (!el) return;
+      if (passo && passoDe(el) !== passo) return;
+      if (el.closest('#pj-fields') && !pj()) return;
+      if (el.closest('#dupla-fields') && !dupla()) return;
+      if (!marcar(id)) l.push(el);
+    });
+    return l;
+  }
   function barrar(l) {
     if (!l.length) return false;
-    if (typeof currentStep !== 'undefined' && currentStep !== 2) { try { document.getElementById('v-step' + currentStep).style.display = 'none'; document.getElementById('v-step2').style.display = 'block'; currentStep = 2; updateProgress(); } catch (e) {} }
-    l[0].focus(); l[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    var n = passoDe(l[0]);
+    if (n && typeof currentStep !== 'undefined' && currentStep !== n) { try { document.getElementById('v-step' + currentStep).style.display = 'none'; document.getElementById('v-step' + n).style.display = 'block'; currentStep = n; updateProgress(); } catch (e) {} }
+    setTimeout(function () { try { l[0].focus({ preventScroll: true }); } catch (e) { l[0].focus(); } l[0].scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 40);
     return true;
   }
   var _go = window.vendaGoStep;
-  if (typeof _go === 'function') window.vendaGoStep = function (n) { if (typeof currentStep !== 'undefined' && currentStep === 2 && n > 2 && barrar(problemas())) return; return _go.apply(this, arguments); };
+  if (typeof _go === 'function') window.vendaGoStep = function (n) { if (typeof currentStep !== 'undefined' && n > currentStep && barrar(problemas(currentStep))) return; return _go.apply(this, arguments); };
   var _sv = window.submitVenda;
   if (typeof _sv === 'function') window.submitVenda = function () { if (barrar(problemas())) return; return _sv.apply(this, arguments); };
 })();
@@ -2084,6 +2134,33 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 
   faltas();
   if (cel8) { if (R.msg || !R.link) buscar(false); else { estadoCliente('esperando'); buscar(false); } }
+})();
+</script>
+<script>
+// 💲 TABELA DE PREÇOS (Bruno 29/09/2026): Spark Anual 23.964 · Spark + 2ª cadeira 29.964 · Growth 43.164 · Growth + 2ª cadeira 50.364.
+// Escolheu o programa → o valor total já vem (se o closer digitar outro valor, a tela respeita e não troca mais).
+function precoTabela(p) {
+  var t = _semAcento(p), d = /cadeira|dupla/.test(t);
+  if (/growth/.test(t)) return d ? 50364 : 43164;
+  if (/spark/.test(t) && !/semest/.test(t)) return d ? 29964 : 23964;
+  return 0;
+}
+(function () {
+  var reais = function (n) { return 'R$ ' + n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
+  [['v-programa', 'v-valor'], ['b-programa', 'b-valor']].forEach(function (par) {
+    var sel = document.getElementById(par[0]), val = document.getElementById(par[1]);
+    if (!sel || !val) return;
+    var pore = function () {
+      var pr = precoTabela(sel.value);
+      if (!pr) { if (val.dataset.auto) { val.value = ''; delete val.dataset.auto; } return; }   // programa fora da tabela: tira o valor automático
+      if (String(val.value || '').trim() && !val.dataset.auto) return;   // valor digitado pelo closer: não troca
+      val.value = reais(pr); val.dataset.auto = '1';
+      try { val.dispatchEvent(new Event('input')); } catch (e) {}
+    };
+    sel.addEventListener('change', pore);
+    val.addEventListener('input', function (e) { if (e.isTrusted) delete val.dataset.auto; });
+    if (!String(val.value || '').trim()) pore();   // abriu com o programa e sem valor
+  });
 })();
 </script>
 </body>

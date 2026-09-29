@@ -2639,7 +2639,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-29-0757';
+var VERSAO_DASH = '2026-09-29-1051';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4861,7 +4861,15 @@ function abrirFormVendaReuniao() {
 // grava na aba "Bloqueio e Entrada" da planilha de vendas, poe a reuniao nesse
 // status e avisa a entrega.
 // preco mais comum de um programa na aba Vendas (quando a reuniao nao tem valor)
+// 💲 tabela de preços (Bruno 29/09/2026): Spark Anual 23.964 · Spark + 2ª cadeira 29.964 · Growth 43.164 · Growth + 2ª cadeira 50.364
+function precoTabela(produto) {
+  var t = v2norm(produto), d = /cadeira|dupla/.test(t);
+  if (/growth/.test(t)) return d ? 50364 : 43164;
+  if (/spark/.test(t) && !/semest/.test(t)) return d ? 29964 : 23964;
+  return 0;
+}
 function valorPadraoDoProduto(produto) {
+  var tb = precoTabela(produto); if (tb) return tb;   // programa da tabela: preço oficial; os outros, o valor mais comum na planilha
   var alvo = v2norm(produto); if (!alvo) return 0;
   var c = {};
   (V2.rows || []).forEach(function(r){ if (r.valor > 0 && v2norm(r.produto) === alvo) c[r.valor] = (c[r.valor] || 0) + 1; });
@@ -19138,6 +19146,28 @@ function agUsarDaLista(i) {
 // so Bruno e Adm trocam a pessoa ligada a uma reuniao (Bruno 23/08/2026)
 // 🤝 Executivo = time de Customer Success (Bruno 28/09/2026: "transforme o acesso da Juliane em executivo")
 // 🔗 link da página de cadastro para o cliente preencher (28/09/2026) — mesma mensagem da tela de venda
+// código curto do link de cadastro: 6 letras/números sem os que confundem (0/O, 1/I/L)
+function linkCurtoCodigo() {
+  var abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', k = '', n = new Uint32Array(6);
+  try { crypto.getRandomValues(n); } catch (e) { for (var j = 0; j < 6; j++) n[j] = Math.floor(Math.random() * 1e9); }
+  for (var i = 0; i < 6; i++) k += abc.charAt(n[i] % abc.length);
+  return k;
+}
+// confere (sem pressa) se o código entrou na aba Links; avisa se não entrou depois de ~25 s
+function linkCurtoConferir(codigo, cb) {
+  var t = 0;
+  (function olhar() {
+    t++;
+    var nm = 'lk' + Date.now(), sc = document.createElement('script'), feito = false;
+    var fim = function(achou) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[nm] = function() {}; if (achou) cb(true); else if (t < 5) setTimeout(olhar, 5000); else cb(false); };
+    window[nm] = function(r) { var ok = false; try { ok = r.table.rows.length > 0; } catch (e) {} fim(ok); };
+    sc.onerror = function() { fim(false); };
+    setTimeout(function() { fim(false); }, 10000);
+    sc.src = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/gviz/tq?tqx=out:json;responseHandler:' + nm
+      + '&sheet=Links&headers=1&tq=' + encodeURIComponent("select A where A = '" + codigo + "'") + '&_=' + Date.now();
+    document.body.appendChild(sc);
+  })();
+}
 function cadastroCopiarLink(bt) {
   var r = null; try { r = _v2reg[_fichaAtual]; } catch (e) {}
   var nome = (r && r.nome) || ((document.getElementById('fl-nome') || {}).textContent || '').trim();
@@ -19165,7 +19195,17 @@ function cadastroCopiarLink(bt) {
   } catch (eH) {}
   var url = new URL('cadastro.html', location.href).href.split('?')[0].replace(/index\.html$/, '') + '?' + p.join('&') + hash;
   url = url.replace(/\/cadastro\.html/, '/cadastro.html');
-  var msg = 'Oi' + (nome ? ', ' + String(nome).split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
+  // 🔗 link CURTO (Bruno 29/09/2026: "achei esse link muito longo, queria algo mais simples e direto"): o endereço
+  // completo fica guardado na aba Links (storeLink do robô); o cliente recebe só c.html?k=CODIGO
+  var codigo = linkCurtoCodigo(), curto = url.split('cadastro.html')[0] + 'c.html?k=' + codigo;
+  try { sendToGAS({ action: 'storeLink', id: codigo, dados: JSON.stringify({ u: url.slice(url.indexOf('cadastro.html')) }) }); } catch (eSl) { curto = url; }
+  var msgLonga = 'Oi' + (nome ? ', ' + String(nome).split(' ')[0] : '') + '! Para agilizar o seu contrato, preencha seus dados neste link — leva uns 2 minutinhos 👇\n' + url;
+  var msg = msgLonga.replace(url, curto);
+  if (curto !== url) linkCurtoConferir(codigo, function(achou) {
+    if (achou) return;
+    try { caixaPromov({ ico: '⚠️', titulo: 'O link curto não foi guardado', texto: 'O robô não confirmou o link curto que você copiou. Mande o link completo no lugar dele.',
+      botoes: [{ t: 'Fechar' }, { t: '📋 Copiar o link completo', cls: 'primary', ao: function() { (navigator.clipboard ? navigator.clipboard.writeText(msgLonga) : Promise.reject()).then(function() { avisoRapido('✓ Link completo copiado — cole na conversa da Clint'); }).catch(function() { prompt('Copie a mensagem:', msgLonga); }); } }] }); } catch (eCx) {}
+  });
   var ok = function() { try { avisoRapido('🔗 Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente enviar, é só abrir 💰 Registrar venda: os dados entram sozinhos.'); } catch (e) {} if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado'; setTimeout(function() { bt.textContent = t0; }, 2500); } };
   (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
 }
