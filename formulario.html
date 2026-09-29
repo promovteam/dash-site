@@ -1393,7 +1393,7 @@ function copiarLinkBloqueio(bt) {
   var sub = (document.querySelector('input[name="subtipo"]:checked') || {}).value || 'Bloqueio de oferta';
   var pg = g('b-pagamento'), cond = [(/entrada/i.test(sub) ? 'Entrada de ' : 'Bloqueio de ') + g('b-bloqueio-valor')];
   if (pg && !/^nao sei$/.test(_semAcento(pg))) cond.push(pg + ((pg === 'Cartão de crédito' || pg === 'Boleto') && g('b-parcelas') ? ' ' + g('b-parcelas').replace(/x$/i, '') + 'x' + (g('b-parcela-valor') ? ' de ' + g('b-parcela-valor') : '') : '') + (pg === 'Cartão recorrente' && g('b-recorrente-vezes') ? ' ' + g('b-recorrente-vezes') + 'x' + (g('b-recorrente-valor') ? ' de ' + g('b-recorrente-valor') : '') : ''));
-  var dd = { nome: nome, cel: g('b-cel') || q.cel || '', email: g('b-email') || q.email || '', insta: g('b-insta') || q.insta || '', cpf: g('b-cpf'), prog: prog, valor: g('b-valor') || q.valor || '', pgto: cond.join(' · ') };
+  var dd = { k: String(q.cel || g('b-cel') || '').replace(/\D/g, '').slice(-8), nome: nome, cel: g('b-cel') || q.cel || '', email: g('b-email') || q.email || '', insta: g('b-insta') || q.insta || '', cpf: g('b-cpf'), prog: prog, valor: g('b-valor') || q.valor || '', pgto: cond.join(' · ') };
   if (dupla) { dd.dn = g('b-dupla-nome'); dd.dc = g('b-dupla-cel'); dd.de = g('b-dupla-email'); dd.dcpf = g('b-dupla-cpf'); dd.drg = g('b-dupla-rg'); dd.dend = g('b-dupla-endereco'); }
   Object.keys(dd).forEach(function(k) { if (!dd[k]) delete dd[k]; });
   var p = ['n=' + encodeURIComponent(nome.split(' ')[0] || ''), 'c=' + encodeURIComponent(vend), 'p=' + encodeURIComponent(prog), 'm=b'];
@@ -1429,7 +1429,7 @@ function copiarLinkCadastro(bt) {
   var bvL = g('v-boleto-venc'), mBL = bvL.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (pg === 'Boleto' && bvL) cond.push('1º vencimento ' + (mBL ? mBL[3] + '/' + mBL[2] + '/' + mBL[1] : bvL));
   if (document.getElementById('v-ent-s') && document.getElementById('v-ent-s').checked && g('v-entrada-valor')) cond.push('entrada de ' + g('v-entrada-valor') + (g('v-entrada-forma') ? ' (' + g('v-entrada-forma') + ')' : ''));
-  var dd = { nome: nome, cel: g('c-cel') || q.cel || '', email: g('c-email') || q.email || '', insta: g('c-insta') || q.insta || '', nicho: g('c-nicho') || q.nicho || '', prog: prog, valor: g('v-valor') || q.valor || '', pgto: cond.join(' · ') };
+  var dd = { k: String(q.cel || g('c-cel') || '').replace(/\D/g, '').slice(-8), nome: nome, cel: g('c-cel') || q.cel || '', email: g('c-email') || q.email || '', insta: g('c-insta') || q.insta || '', nicho: g('c-nicho') || q.nicho || '', prog: prog, valor: g('v-valor') || q.valor || '', pgto: cond.join(' · ') };
   if (dupla) { dd.dn = g('c-dupla-nome'); dd.dc = g('c-dupla-cel'); dd.de = g('c-dupla-email'); dd.dcpf = g('c-dupla-cpf'); dd.drg = g('c-dupla-rg'); dd.dend = g('c-dupla-endereco'); }
   // tudo o que já está na tela vai junto: o cliente só completa o que falta (Bruno 28/09/2026)
   var nascV = g('c-nasc'), mNa = nascV.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -2158,7 +2158,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
     window[cb] = fim; sc.onerror = function () { fim({ success: false, error: 'sem resposta do robô' }); };
     setTimeout(function () { fim({ success: false, error: 'o robô demorou demais' }); }, 45000);
     var cid = (String(q.clint || '').match(/contacts\/([\w-]+)/) || [])[1] || '';
-    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 80 }));
+    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 80, comCadastro: true }));
     document.body.appendChild(sc);
   }
   function tratar(res, manual) {
@@ -2291,7 +2291,7 @@ function precoTabela(p) {
     var fim = function (res) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[cb] = function () {}; tratar(res); };
     window[cb] = fim; sc.onerror = function () { fim(null); }; setTimeout(function () { fim(null); }, 45000);
     var cid = (String(q.clint || '').match(/contacts\/([\w-]+)/) || [])[1] || '';
-    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 60 }));
+    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 60, comCadastro: true }));
     document.body.appendChild(sc);
   }
   function tratar(res) {
