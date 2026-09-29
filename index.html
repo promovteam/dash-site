@@ -2639,7 +2639,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-29-1306';
+var VERSAO_DASH = '2026-09-29-1332';
 var _versaoNova = null;
 
 // =====================================================================
@@ -9408,16 +9408,40 @@ window.__gvizDSP = function(res) {
   } catch (e) { DSP.erro = String(e && e.message || e); DSP.carregado = true; }
   try { dspRedesenhar(); } catch (e2) {}
 };
+// "28/09/2026 18:46" → hora certa (0 se não der para ler)
+function dspQuando(t) { var m = String(t || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\D+(\d{1,2}):(\d{2}))?/); return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime() : 0; }
+// disparo "dono" de um clique: o mais recente que saiu antes do clique, entre os disparos que tinham esse telefone
+function dspDonoDe(tel8, t) {
+  if (!DSP._donos || DSP._donosQ !== DSP.quando) { DSP._donos = {}; DSP._donosQ = DSP.quando; (DSP.rows || []).forEach(function(x) { if (x.tel8 && x.dia) (DSP._donos[x.tel8] || (DSP._donos[x.tel8] = [])).push(x.dia.getTime()); }); }
+  var d = 0; (DSP._donos[tel8] || []).forEach(function(i) { if (i <= t && i > d) d = i; });
+  return d;
+}
 // o que aconteceu com UMA pessoa da lista depois do disparo
+// 29/09/2026 (Bruno: "essa mostra como venda no disparo, mas ela não veio com a mensagem"): agendamento e venda só
+// contam para o disparo se a pessoa VEIO PELO LINK (a frase "Vim pela mensagem de vocês…"), com a reunião marcada DEPOIS
+// do clique e no disparo mais recente antes dele (a mesma pessoa não conta em dois disparos). Quem só "falou na Clint"
+// (muitas vezes a conversa normal com a SDR) e marcou/comprou fica como "outro caminho" — aparece, mas não entra na conta.
 function dspPessoa(c, ini, fim, formPor) {
   var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
-  var o = { c: c, recebeu: !!c.nossaEm, resp: !!c.falouEm, link: !!c.linkEm, form: false, ag: false, comp: false, vd: false, valor: 0, antes: 0, reuniao: null };
+  // "falou com a gente" = escreveu DEPOIS que a nossa mensagem chegou (antes contava até o "EU PRÉ AGENDEI…" do site
+  // e conversa com a SDR que aconteceu antes do disparo chegar)
+  var tn = dspQuando(c.nossaEm), tf = dspQuando(c.falouEm);
+  var o = { c: c, recebeu: !!c.nossaEm, resp: !!(tn && tf && tf >= tn - 60000), link: !!c.linkEm, form: false, ag: false, comp: false, vd: false, valor: 0, antes: 0, reuniao: null,
+    agOutro: false, vdOutro: false, valorOutro: 0, reuniaoOutro: null, outroDisparo: false };
+  var tl = c.linkEm ? dspQuando(c.linkEm) : 0;
+  var doDisparo = !!tl && dspDonoDe(c.tel8, tl) === ini;
+  if (tl && !doDisparo) o.outroDisparo = true;   // clicou no link, mas de um disparo mais novo — conta lá
   var linhas = []; try { linhas = ldReunioes({ tel8: c.tel8 }); } catch (e) {}
   linhas.forEach(function(r) {
     var quando = r.carimboT || (r.date ? r.date.getTime() : 0);     // o momento em que MARCARAM (sem carimbo: o dia da reunião)
     if (!quando) return;
     if (quando < ini) { o.antes++; return; }
     if (quando >= fim) return;
+    if (!doDisparo || quando < tl - 10 * 60000) {   // marcou sem ter vindo pelo link deste disparo
+      o.agOutro = true; o.reuniaoOutro = r;
+      if (r.sn === 'vendido') { o.vdOutro = true; o.valorOutro += (r.valor || 0); }
+      return;
+    }
     o.ag = true; o.reuniao = r;
     if (REAL.indexOf(r.sn) !== -1) o.comp = true;
     if (r.sn === 'vendido') { o.vd = true; o.valor += (r.valor || 0); }
@@ -9488,8 +9512,9 @@ function renderDisparos() {
     g.lista.forEach(function(c) { naLista[c.tel8] = 1; });
     (LD.rows || []).forEach(function(l) { if (l.tel8 && naLista[l.tel8] && l.date) (formPor[l.tel8] || (formPor[l.tel8] = [])).push(l.date.getTime()); });
     var ps = g.lista.map(function(c) { return dspPessoa(c, ini, fim, formPor); });
-    var r = { g: g, ini: ini, fim: fim, ps: ps, n: ps.length, rec: 0, link: 0, resp: 0, form: 0, ag: 0, comp: 0, vd: 0, valor: 0, antes: 0, conf: 0 };
+    var r = { g: g, ini: ini, fim: fim, ps: ps, n: ps.length, rec: 0, link: 0, resp: 0, form: 0, ag: 0, comp: 0, vd: 0, valor: 0, antes: 0, conf: 0, agOutro: 0, vdOutro: 0, valorOutro: 0 };
     ps.forEach(function(o) {
+      if (o.agOutro && !o.ag) r.agOutro++; if (o.vdOutro && !o.vd) { r.vdOutro++; r.valorOutro += o.valorOutro; }
       if (o.recebeu) r.rec++; if (o.link) r.link++; if (o.resp) r.resp++; if (o.form) r.form++; if (o.ag) r.ag++;
       if (o.comp) r.comp++; if (o.vd) r.vd++; r.valor += o.valor; if (o.antes) r.antes++; if (o.c.confEm) r.conf++;
     });
@@ -9520,9 +9545,9 @@ function renderDisparos() {
     ['🔗', 'Vieram pelo link', r.link, '#ff9a5a', 'chegaram com a frase pronta do link — com certeza do disparo'],
     ['💬', 'Falaram com a gente', r.resp, '#5ad1e6', 'responderam na Clint depois do disparo'],
     ['📝', 'Preencheram o formulário', r.form, '#6ea8ff', 'diagnóstico do site'],
-    ['📅', 'Agendaram', r.ag, '#b98aff', 'reunião marcada depois do disparo'],
+    ['📅', 'Agendaram', r.ag, '#b98aff', 'vieram pelo link e marcaram' + (r.agOutro ? ' · +' + r.agOutro + ' por outro caminho (não conta)' : '')],
     ['✅', 'Compareceram', r.comp, '#3ddc97', pc(r.comp, r.ag) + ' de quem agendou'],
-    ['💰', 'Compraram', r.vd, '#ffd166', r.valor ? v2mil(r.valor) + ' vendidos' : 'nenhuma venda ainda']
+    ['💰', 'Compraram', r.vd, '#ffd166', (r.valor ? v2mil(r.valor) + ' vendidos' : 'nenhuma venda pelo disparo ainda') + (r.vdOutro ? ' · +' + r.vdOutro + ' por outro caminho (não conta)' : '')]
   ];
   var maxN = Math.max(1, r.n);
   h += '<div class="dsp-principal"><div class="panel dsp-funil"><div class="dsp-ftit"><h3>' + dspEsc(r.g.nome) + '</h3>' + faseTxt(r)
@@ -9574,7 +9599,7 @@ function renderDisparos() {
   var cor = ['var(--muted)', '#5ad1e6', '#6ea8ff', '#b98aff', '#3ddc97', '#ffd166'];
   var filtros = [['mov', 'Quem se mexeu', function(o) { return o.nivel > 0 || o.link; }], ['fechou', '💰 Compraram', function(o) { return o.vd; }],
     ['ag', '📅 Agendaram', function(o) { return o.ag; }], ['link', '🔗 Vieram pelo link', function(o) { return o.link; }], ['resp', '💬 Falaram na Clint', function(o) { return o.resp; }],
-    ['semresp', 'Receberam e não responderam', function(o) { return o.recebeu && !o.resp && !o.ag; }], ['todos', 'Todos', function() { return true; }]];
+    ['semresp', 'Receberam e não responderam', function(o) { return o.recebeu && !o.resp && !o.ag && !o.agOutro; }], ['outro', '↪ Outro caminho', function(o) { return (o.agOutro || o.vdOutro) && !o.ag; }], ['todos', 'Todos', function() { return true; }]];
   var fA = filtros.filter(function(f) { return f[0] === DSP.filtro; })[0] || filtros[0];
   var lista = ps.filter(fA[2]), mostrar = DSP.todos ? lista : lista.slice(0, 30);
   h += '<div class="panel"><div class="dsp-ftit"><h3>👥 As pessoas da lista</h3><span class="hint" style="margin:0;">da que mais avançou para a que menos</span></div>'
@@ -9590,8 +9615,9 @@ function renderDisparos() {
       + '<div class="dsp-pontos" title="respondeu · formulário · agendou · compareceu · comprou">' + pontos + '</div>'
       + '<div class="dsp-pst"><b style="color:' + cor[o.nivel] + ';">' + rot[o.nivel] + (o.vd && o.valor ? ' · ' + v2mil(o.valor) : '') + '</b>'
       + (o.link ? '<span class="dsp-selo">🔗 veio pelo link</span>' : '')
+      + ((o.agOutro || o.vdOutro) && !o.ag ? '<span class="dsp-selo" style="background:rgba(154,163,178,.14);color:#aab1c0;border-color:rgba(154,163,178,.35);" title="' + (o.outroDisparo ? 'Veio pelo link de um disparo mais novo — conta lá' : 'Está na lista, mas não veio pela frase do disparo — não entra na conta do disparo') + '">↪ ' + (o.outroDisparo ? 'contou no disparo mais novo' : (o.vdOutro ? 'comprou' : 'marcou') + ' por outro caminho · não conta') + '</span>' : '')
       + (o.resp && o.c.falouTxt ? '<small>“' + dspEsc(o.c.falouTxt.slice(0, 90)) + '”</small>' : (o.recebeu && !o.resp ? '<small>recebeu ' + dspEsc(o.c.nossaEm.replace(/\/\d{4}/, '')) + ' · sem resposta</small>' : ''))
-      + (rr && rr.date ? '<small>📅 ' + rr.date.toLocaleDateString('pt-BR') + (rr.closer ? ' · ' + dspEsc(rr.closer) : '') + '</small>' : '') + '</div></div>';
+      + ((rr || o.reuniaoOutro) && (rr || o.reuniaoOutro).date ? '<small>📅 ' + (rr || o.reuniaoOutro).date.toLocaleDateString('pt-BR') + ((rr || o.reuniaoOutro).closer ? ' · ' + dspEsc((rr || o.reuniaoOutro).closer) : '') + (!rr && o.reuniaoOutro && o.reuniaoOutro.origem ? ' · origem ' + dspEsc(o.reuniaoOutro.origem) : '') + '</small>' : '') + '</div></div>';
   });
   h += '</div>';
   if (!DSP.todos && lista.length > mostrar.length) h += '<div style="text-align:center;margin-top:12px;"><button class="btn" onclick="DSP.todos=true;renderDisparos();">▼ mostrar as ' + lista.length + '</button></div>';
