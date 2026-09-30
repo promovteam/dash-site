@@ -23,6 +23,42 @@
     var d = { q: 'growth', w: (screen && screen.width) || 0, m: /Mobi|Android|iPhone/i.test(navigator.userAgent || '') ? 1 : 0 };
     fetch(GAS_URL, { method: 'POST', mode: 'no-cors', keepalive: true, body: new URLSearchParams({ payload: JSON.stringify({ action: 'storeLink', id: 'abriu:' + k, dados: JSON.stringify(d) }) }) }).catch(function () {});
   } catch (e) {} })();
+  // ✍️ PERSONALIZADA (Bruno 30/09/2026: "dá para personalizar com o nome do lead, já que está ligado ao lead?"):
+  // o código do link acha na aba Links o nome do lead e o closer (gravados pelo dash) e a página mostra
+  // "Preparada para Fulana", "Fulana, vamos construir…" e o especialista. &pdf=1 abre já pronta para salvar em PDF.
+  (function () { try {
+    var q = location.search.replace(/^\?/, '').split('&'), k = (q[0] || '').toLowerCase().replace(/[^a-z0-9-]/g, ''), pdf = q.indexOf('pdf=1') > 0;
+    if (k.length < 5) return;
+    var P = null, feito = false, PROG = 'Programa Growth';
+    var cap = function (t) { return String(t || '').toLowerCase().replace(/(^|\s)([a-zà-ú])/g, function (m, a, b) { return a + b.toUpperCase(); }).replace(/ (Da|De|Do|Das|Dos|E) /g, function (m) { return m.toLowerCase(); }); };
+    function aplicar() {
+      var sh = document.getElementById('sheet'); if (!sh || !P || !P.n || feito) return !!feito;
+      var n = cap(String(P.n).trim()), pn = n.split(' ')[0];
+      var folhas = Array.prototype.filter.call(sh.querySelectorAll('div,h1,h3,span'), function (e) { return !e.children.length; });
+      var sp = folhas.filter(function (e) { return e.tagName === 'SPAN' && e.parentElement && e.parentElement.tagName === 'H1'; })[0], h1 = sp ? sp.parentElement : sh.querySelector('h1');
+      if (h1 && !document.getElementById('prop-para')) { var d = document.createElement('div'); d.id = 'prop-para'; d.style.cssText = "font-family:'Montserrat',sans-serif;font-size:16px;font-weight:600;color:#12151C;margin:16px 0 0;"; d.innerHTML = 'Preparada para <b style=\"color:#E6175B\"></b>'; d.querySelector('b').textContent = n; h1.parentNode.insertBefore(d, h1.nextSibling); }
+      folhas.forEach(function (e) { if (e.tagName === 'H3' && /^Vamos construir/.test(e.textContent.trim())) e.textContent = pn + ', v' + e.textContent.trim().slice(1); });
+      if (P.c) folhas.forEach(function (e) { if (/^Promov · /.test(e.textContent.trim()) && !e.getAttribute('data-esp')) { var t = e.textContent.trim(); e.setAttribute('data-esp', '1'); e.textContent = cap(P.c); var s2 = document.createElement('div'); s2.style.cssText = 'font-size:11px;font-weight:700;opacity:.85;margin-top:4px;letter-spacing:.04em;'; s2.textContent = t; e.parentNode.insertBefore(s2, e.nextSibling); } });
+      document.title = 'Proposta para ' + pn + ' · ' + PROG + ' — Promov';
+      feito = true;
+      if (pdf) setTimeout(function () { window.print(); }, 1200);
+      return true;
+    }
+    var t0 = Date.now(), iv = setInterval(function () { if (aplicar() || Date.now() - t0 > 40000) clearInterval(iv); }, 200);
+    // sem resposta da planilha em 8 s: usa o primeiro nome que está no próprio código (sem acento)
+    setTimeout(function () { if (!P && k.indexOf('-') > 1) P = { n: k.split('-')[0] }; }, 8000);
+    var cb = 'propNome' + Date.now();
+    window[cb] = function (r) { try { var l = r.table.rows; if (l.length) { var o = JSON.parse(l[l.length - 1].c[0].v); if (o && o.n) P = o; } } catch (e) {} };
+    var s = document.createElement('script');
+    s.src = 'https://docs.google.com/spreadsheets/d/1xJykoW0UHr5hA-ELo5nV8uBkYykRG6OQdmMvDlUnhVg/gviz/tq?tqx=out:json;responseHandler:' + cb + '&sheet=Links&headers=1&tq=' + encodeURIComponent("select B where A = 'prop:" + k + "'");
+    (document.head || document.documentElement).appendChild(s);
+  } catch (e) {} })();
+  // ⬇ Baixar PDF baixa direto o PDF corrido (sem a tela de imprimir) — Bruno 30/09/2026: "que já baixe no navegador"
+  (function () { var t0 = Date.now(), iv = setInterval(function () {
+    var b = document.getElementById('pdf-btn'); if (Date.now() - t0 > 60000) clearInterval(iv); if (!b || b.getAttribute('data-dl')) return;
+    b.setAttribute('data-dl', '1'); clearInterval(iv);
+    b.onclick = function (e) { if (e) e.preventDefault(); var a = document.createElement('a'); a.href = 'propostas/proposta-growth.pdf'; a.download = 'Proposta Promov - Programa Growth.pdf'; document.body.appendChild(a); a.click(); a.remove(); };
+  }, 300); })();
   </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
