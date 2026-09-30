@@ -552,6 +552,13 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .fi-label { font-size:.64rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted); }
 
 /* Pesquisa: cards redondos */
+#someu-faixa { position:sticky; top:6px; z-index:40; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 14px; padding:10px 16px; border-radius:14px;
+  background:linear-gradient(90deg, rgba(246,163,80,.22), rgba(246,163,80,.08)); border:1px solid rgba(246,163,80,.55); color:var(--text); font-size:.84rem; font-weight:700;
+  box-shadow:0 8px 22px rgba(0,0,0,.28); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+#someu-faixa .sm-sub { color:var(--text-secondary); font-weight:600; font-size:.74rem; }
+#someu-faixa button { margin-left:auto; border:1px solid rgba(246,163,80,.6); background:rgba(246,163,80,.16); color:#ffd7a8; border-radius:999px; padding:6px 14px; font-weight:800; font-size:.76rem; cursor:pointer; }
+#someu-faixa button:hover, #someu-faixa button:focus-visible { background:rgba(246,163,80,.3); outline:none; }
+#btn-someu.on { background:linear-gradient(135deg,#f6a350,#e98b3a); color:#1a1206; border-color:transparent; }
 .pesq-cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:14px; }
 .pcard { display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:24px 16px; }
 .pcard .avatar.pgrande { width:64px; height:64px; font-size:1.15rem; box-shadow:0 10px 26px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.3); }
@@ -1399,11 +1406,15 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
     <button class="toggle-btn" onclick="alternarMenu()">☰</button>
     <h1 id="screen-title">Visão Geral<small>Dashboard Comercial — Julho 2026</small></h1>
     <div class="topbar-right">
+      <button class="btn" id="btn-someu" onclick="soMeuAlternar()" title="Mostrar só o que é seu (reuniões, vendas, leads, pagamentos) ou tudo" style="display:none;">👤 Só o meu</button>
       <button class="btn" id="btn-filtros" onclick="abrirFiltros()">⚙ Filtros</button>
       <button class="btn bt-ext" title="Extensão da Clint — baixar a extensão que coloca este dash dentro da Clint" aria-label="Extensão da Clint" onclick="abrirExtensaoClint()">🧩</button>
       <button class="btn" title="Buscar a versão mais nova do dash" onclick="atualizarDash()">↻</button>
     </div>
   </div>
+
+  <!-- 👤 SÓ O MEU: faixa que avisa que o dash está filtrado para a pessoa (Bruno 30/09/2026) -->
+  <div id="someu-faixa" role="status" style="display:none;"></div>
 
   <!-- ============ VISÃO GERAL ============ -->
   <section class="screen active" id="s-visao">
@@ -2647,7 +2658,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-1426';
+var VERSAO_DASH = '2026-09-30-1519';
 var _versaoNova = null;
 
 // =====================================================================
@@ -2997,8 +3008,91 @@ function _fPassa(grupo, valorDaLinha) {
   var vn = v2norm(valorDaLinha || '');
   return sel.some(function(s){ return grupo === 'prod' ? vn.indexOf(s) !== -1 : vn === s; });
 }
+// ===== 👤 SÓ O MEU (Bruno 30/09/2026: "poderia ter algo na tela tipo filtrar para mim — todo o dash mostra só o que for
+// da pessoa, mas deixa algo avisando que está filtrado só para você") =====
+// Closer: reuniões e vendas em que é o closer, a própria agenda, pagamentos/contratos em que é o vendedor.
+// SDR: reuniões que marcou, leads de que é dono na Clint, vendas das reuniões dele. Placar e Criativos ficam gerais.
+// Começa ligado para closers e SDRs e desligado para o Bruno (adm); cada um liga/desliga — fica guardado no navegador.
+// Juliane (contratos), Adm e Visitante não têm o botão (veem tudo).
+var SOMEU = { on: false, nome: '', primeiro: '', closerKey: '' };
+function soMeuQuem() {
+  var login = ''; try { login = localStorage.getItem('v2Login') || ''; } catch (e) {}
+  if (!login || typeof ACESSOS === 'undefined') return null;
+  var a = null; ACESSOS.forEach(function(x) { if (x.nome === login) a = x; });
+  if (!a || a.soOlha || a.executivo || a.contratos || login === 'Adm') return null;
+  var p = v2norm(login).split(/\s+/)[0], ck = '';
+  (typeof CLOSERS !== 'undefined' ? CLOSERS : []).forEach(function(c) { if (c.key === p) ck = c.key; });
+  return { nome: login, primeiro: p, closerKey: ck, adm: !!a.adm };
+}
+function soMeuIniciar() {
+  var q = soMeuQuem();
+  SOMEU.nome = q ? q.nome : ''; SOMEU.primeiro = q ? q.primeiro : ''; SOMEU.closerKey = q ? q.closerKey : '';
+  var pref = null; try { pref = localStorage.getItem('v2SoMeu_' + (q ? q.primeiro : '')); } catch (e) {}
+  SOMEU.on = !!q && (pref === null ? !q.adm : pref === '1');
+  soMeuMostrar();
+}
+// o nome da pessoa aparece na planilha de vários jeitos ("Tony Londe", "SS Sarah", "Selina"): vale se uma das palavras for o 1º nome
+function _smEle(v) { if (!SOMEU.primeiro || !v) return false; return v2norm(String(v)).split(/[^a-z0-9]+/).indexOf(SOMEU.primeiro) !== -1; }
+function soMeuLinha(r) { return !SOMEU.on || !!r && (_smEle(r.closer) || _smEle(r.sdr)); }
+// pagamento é da pessoa se ela é o vendedor, ou se a reunião desse cliente (mesmo celular) foi dela (closer ou SDR);
+// o formulário antigo também escrevia "SDR: Nome" na observação
+var _smIdx = { n: -1, m: {} };
+function _smReunioesDoTel(t8) {
+  if (_smIdx.n !== (V2.rows || []).length) {
+    var m = {}; (V2.rows || []).forEach(function(r) { var k = ldTel8(r.telefone || ''); if (k) (m[k] = m[k] || []).push(r); });
+    _smIdx = { n: (V2.rows || []).length, m: m };
+  }
+  return _smIdx.m[t8] || [];
+}
+function soMeuPag(p) {
+  if (!SOMEU.on) return true; if (!p) return false;
+  if (_smEle(p.vendedor)) return true;
+  var t8 = ldTel8(p.celular || '');
+  if (t8 && _smReunioesDoTel(t8).some(function(r) { return _smEle(r.closer) || _smEle(r.sdr); })) return true;
+  var ob = v2norm(p.obs || ''), iS = ob.indexOf('sdr');
+  return iS !== -1 && _smEle(ob.slice(iS + 3, iS + 40).replace(/preenchid.*$/, ''));
+}
+function soMeuLead(l) {
+  if (!SOMEU.on) return true; if (!l) return false;
+  try { if (ldMesmoDono(ldDonoDe(l), SOMEU.nome)) return true; } catch (e) {}
+  var rs = []; try { rs = ldReunioes(l) || []; } catch (e2) {}
+  return rs.some(function(r) { return _smEle(r.closer) || _smEle(r.sdr); });
+}
+function _sm(normal, seu) { return SOMEU.on ? seu : normal; }
+function soMeuMostrar() {
+  var bt = document.getElementById('btn-someu'), fx = document.getElementById('someu-faixa');
+  if (bt) { bt.style.display = SOMEU.primeiro ? '' : 'none'; bt.classList.toggle('on', SOMEU.on); bt.setAttribute('aria-pressed', SOMEU.on ? 'true' : 'false'); }
+  if (fx) {
+    fx.style.display = SOMEU.on ? '' : 'none';
+    if (SOMEU.on) {
+      var pn = SOMEU.nome.split(' ')[0];
+      fx.innerHTML = '<span>👤 Mostrando só o que é seu, ' + dspEsc(pn) + '</span>'
+        + '<span class="sm-sub">reuniões, vendas, leads, pagamentos e contratos · Placar e Criativos continuam do time todo</span>'
+        + '<button type="button" onclick="soMeuAlternar()">Ver tudo</button>';
+    }
+  }
+}
+function soMeuAlternar() {
+  if (!SOMEU.primeiro) return;
+  SOMEU.on = !SOMEU.on;
+  try { localStorage.setItem('v2SoMeu_' + SOMEU.primeiro, SOMEU.on ? '1' : '0'); } catch (e) {}
+  soMeuMostrar();
+  soMeuRedesenhar();
+  try { avisoRapido(SOMEU.on ? '👤 Mostrando só o que é seu' : '👥 Mostrando o time todo'); } catch (e) {}
+}
+function soMeuRedesenhar() {
+  try { if (V2.carregado) renderV2(); } catch (e) {}
+  try { if (LD.carregado) renderLeads(); } catch (e) {}
+  try { if (typeof montarPesquisa === 'function') montarPesquisa(); } catch (e) {}
+  try { if (typeof aplicarFiltroPag === 'function') aplicarFiltroPag(); } catch (e) {}
+  try { if (typeof renderContratos === 'function' && telaVisivel('s-contratos')) renderContratos(); } catch (e) {}
+  try { if (typeof gravDesenhar === 'function' && GRAV.itens && GRAV.itens.length) gravDesenhar(); } catch (e) {}
+  // agenda: o closer vê a agenda dele; ao desligar, volta para todas
+  try { if (SOMEU.closerKey && typeof mudarCloser === 'function' && AG.weekStart) mudarCloser(SOMEU.on ? SOMEU.closerKey : 'ambos'); else if (SOMEU.closerKey && typeof AG !== 'undefined') AG.closer = SOMEU.on ? SOMEU.closerKey : 'ambos'; } catch (e) {}
+}
 function v2fRows(rows) {
   return rows.filter(function(r){
+    if (SOMEU.on && !soMeuLinha(r)) return false;
     if (!_fPassa('prod', r.produto)) return false;
     if (!_fPassa('closer', r.closer)) return false;
     if (!_fPassa('sdr', r.sdr)) return false;
@@ -5212,7 +5306,7 @@ function renderV2() {
       + '<span class="proj-val">' + v2moeda0(pj.proj) + '</span>'
       + '<span class="proj-sub">faltam ' + pj.restam + ' dias úteis · ' + v2moeda0(pj.media) + '/dia</span></div>';
   }
-  h += '<div class="g-label">💰 Faturamento Total</div>'
+  h += '<div class="g-label">' + _sm('💰 Faturamento Total', '💰 Seu faturamento') + '</div>'
     + '<div class="g-value money">' + v2moeda(mc.fat) + '</div>'
     + '<div class="g-sub"><b>' + mc.fe + ' fechamentos</b> · Ticket médio <b>' + v2moeda0(mc.ticket) + '</b></div>'
     + '<div class="g-stats">'
@@ -5229,13 +5323,13 @@ function renderV2() {
         + '<span class="proj-lbl">📈 Projeção do vendido</span>'
         + '<span class="proj-val" style="color:#3ddc97;">' + v2moeda0(projVd) + '</span></div>'
       : '')
-    + '<div class="g-label">✅ Vendido</div>'
+    + '<div class="g-label">' + _sm('✅ Vendido', '✅ Suas vendas') + '</div>'
     + '<div class="g-value money">' + v2moeda(mc.vdV) + '</div>'
     + '<div class="g-sub"><b>' + mc.vd + ' venda' + (mc.vd !== 1 ? 's' : '') + '</b> confirmada' + (mc.vd !== 1 ? 's' : '') + ' · Ticket <b>' + v2moeda0(mc.vd ? mc.vdV / mc.vd : 0) + '</b></div>'
     + ''
     + '<div class="hint">Clique para ver clientes</div></div>';
   h += '<div class="glass click" style="--halo:rgba(110,168,255,.18);--tint:#6ea8ff;" onclick="abrirA(\'bloq\')">'
-    + '<div class="g-label">🔒 Bloqueio + Entrada</div>'
+    + '<div class="g-label">' + _sm('🔒 Bloqueio + Entrada', '🔒 Seus bloqueios + entradas') + '</div>'
     + '<div class="g-value money">' + v2moeda(mc.blV + mc.enV) + '</div>'
     + '<div class="g-rows">'
     + '<div class="g-row"><span>🔒 Bloqueio</span><b>' + mc.blQ + ' · ' + v2moeda0(mc.blV) + '</b></div>'
@@ -5248,7 +5342,7 @@ function renderV2() {
     var hoje = new Date(), vals = [];
     for (var i = 5; i >= 0; i--) {
       var d = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - i);
-      vals.push(V2.rows.filter(function(r){ return fn(r.sn) && r.date && r.date.getFullYear() === d.getFullYear() && r.date.getMonth() === d.getMonth() && r.date.getDate() === d.getDate(); }).length);
+      vals.push(V2.rows.filter(function(r){ return fn(r.sn) && soMeuLinha(r) && r.date && r.date.getFullYear() === d.getFullYear() && r.date.getMonth() === d.getMonth() && r.date.getDate() === d.getDate(); }).length);
     }
     var mx = Math.max.apply(null, vals) || 1;
     var s = '<div class="spark">';
@@ -5272,11 +5366,11 @@ function renderV2() {
   var fPag  = mesRows.filter(function(r){ return r.sn === 'vendido'; }).length;
   function pconv(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; }
   h += '<div class="kpis">';
-  h += mini('Agendadas', fAg, '#f6a350', 'rgba(246,163,80,.14)', 'agendadas', function(){ return true; }, '', '🔜 ' + fFut + ' futuras');
-  h += mini('Realizadas', fReal, '#ffd166', 'rgba(255,209,102,.14)', 'realizadas', isReal, '↳ ' + pconv(fReal, fAg) + ' das agendadas');
-  h += mini('Compareceram', fComp, '#6ea8ff', 'rgba(110,168,255,.14)', 'compareceram', isComp, '↳ ' + pconv(fComp, fReal) + ' das realizadas');
-  h += mini('Fechou em reunião', fFech, '#b98aff', 'rgba(185,138,255,.14)', 'fechamento', isFechouReuniao, '↳ ' + pconv(fFech, fComp) + ' dos que compareceram');
-  h += mini('Pagaram tudo', fPag, '#3ddc97', 'rgba(61,220,151,.14)', 'pagaram', function(sn){ return sn === 'vendido'; }, '↳ ' + pconv(fPag, fFech) + ' dos que fecharam');
+  h += mini(_sm('Agendadas', 'Suas agendadas'), fAg, '#f6a350', 'rgba(246,163,80,.14)', 'agendadas', function(){ return true; }, '', '🔜 ' + fFut + ' futuras');
+  h += mini(_sm('Realizadas', 'Suas realizadas'), fReal, '#ffd166', 'rgba(255,209,102,.14)', 'realizadas', isReal, '↳ ' + pconv(fReal, fAg) + ' das agendadas');
+  h += mini(_sm('Compareceram', 'Compareceram (suas)'), fComp, '#6ea8ff', 'rgba(110,168,255,.14)', 'compareceram', isComp, '↳ ' + pconv(fComp, fReal) + ' das realizadas');
+  h += mini(_sm('Fechou em reunião', 'Fechou (suas)'), fFech, '#b98aff', 'rgba(185,138,255,.14)', 'fechamento', isFechouReuniao, '↳ ' + pconv(fFech, fComp) + ' dos que compareceram');
+  h += mini(_sm('Pagaram tudo', 'Pagaram tudo (suas)'), fPag, '#3ddc97', 'rgba(61,220,151,.14)', 'pagaram', function(sn){ return sn === 'vendido'; }, '↳ ' + pconv(fPag, fFech) + ' dos que fecharam');
   h += '</div>';
 
   // === METAS ===
@@ -5300,6 +5394,7 @@ function renderV2() {
       hist: 'ticket médio ' + v2moeda0(hc.ticket) + ' · ' + v2pct(hc.txRe) + ' de realização · ' + v2pct(hc.txFe) + ' de fechamento'
     };
   });
+  var _hAntesMetas = h.length;   // 👤 só o meu: as metas são da empresa — somem enquanto a pessoa vê só o dela
   h += '<div class="glass" style="--halo:rgba(61,220,151,.1);padding:20px 22px;margin-bottom:22px;">';
   h += '<div class="g-label" style="margin-bottom:12px;">🎯 Metas do mês</div>';
   if (pj) {
@@ -5332,6 +5427,7 @@ function renderV2() {
       + '<span>Falta <b>' + v2mil(falta) + '</b></span></div></div>';
   });
   h += '</div><div class="hint" style="margin-top:12px;">Verde = vendido de verdade · cinza = na mesa (bloqueio + entrada) · risco branco = onde o ritmo leva · clique numa meta para ver o plano</div><div id="meta-plano"></div></div>';
+  if (SOMEU.on) h = h.slice(0, _hAntesMetas) + '<div class="hint" style="margin:0 0 22px;">🎯 As metas do mês são do time todo — aparecem em <a href="#" onclick="event.preventDefault();soMeuAlternar();">Ver tudo</a>.</div>';
 
   // === RESULTADOS DO MÊS: closers em cima, SDRs embaixo ===
   var METAS_RK = [{ k:'P', v:150000, cor:'#ff6b6b' }, { k:'M', v:250000, cor:'#f6a350' }, { k:'G', v:350000, cor:'#3ddc97' }];
@@ -8447,6 +8543,7 @@ function ldFiltrar(rows) {
   var f = LD_F;
   var visto = f.novos ? ldVisto() : 0;
   return rows.filter(function(l) {
+    if (SOMEU.on && !soMeuLead(l)) return false;   // 👤 só o meu
     if (f.novos && !(l.date && l.date.getTime() > visto)) return false;
     if (f.etClint.length) {
       var mc = (CLINT_PAINEL && CLINT_PAINEL.success && l.tel8) ? CLINT_PAINEL.mapa[l.tel8] : null;
@@ -14799,7 +14896,7 @@ function montarTelaSePreciso(s) {
 }
 function montarPesquisa(forcar) {
   if (!forcar && !telaVisivel('s-pesquisa')) { TELA_PENDENTE.pesquisa = true; return; }
-  var rows = V2.rows.slice().sort(function(a,b){ return (b.date || 0) - (a.date || 0); });
+  var rows = V2.rows.filter(soMeuLinha).sort(function(a,b){ return (b.date || 0) - (a.date || 0); });   // 👤 só o meu
   var LIMITE_PESQ = 300;
   var cortou = rows.length > LIMITE_PESQ;
   if (cortou) rows = rows.slice(0, LIMITE_PESQ);
@@ -15100,7 +15197,8 @@ function aplicarFiltroPag() {
     var ok = (_fg.st === 'todos' || tr.getAttribute('data-st') === _fg.st)
       && (_fg.vend === 'todos' || tr.getAttribute('data-vend') === _fg.vend)
       && (_fg.mes === 'todos' || tr.getAttribute('data-mes') === _fg.mes)
-      && (!q || v2norm(tr.textContent).indexOf(q) !== -1);
+      && (!q || v2norm(tr.textContent).indexOf(q) !== -1)
+      && soMeuPag((window._pagOrdenado || [])[i]);   // 👤 só o meu
     tr.style.display = ok ? '' : 'none';
     if (pcards[i]) pcards[i].style.display = ok ? '' : 'none';
     if (ok) { vis++; soma += (window._pagOrdenado[i] || {}).valor || 0; }
@@ -15988,6 +16086,7 @@ function gravDesenhar() {
   // tudo menos o resultado: serve para contar cada atalho
   var base = GRAV.itens.filter(function(x) {
     if (GRAV.closer !== 'todos' && x.k !== GRAV.closer) return false;
+    if (SOMEU.on && !(_smEle(GRAV.closers[x.k] || x.k) || _smEle(gravPartes(x.t).sdr))) return false;   // 👤 só o meu
     if (oF && (gravOrigem(x) || '— sem origem') !== oF) return false;
     if (pF && (gravProduto(x) || '— sem produto') !== pF) return false;
     if (!q) return true;
@@ -18254,7 +18353,7 @@ function renderContratos() {
   if (!cx) return;
   try { _ctrConferirSePrecisa(); } catch (eC) {}
   try { _csDocsCarregar(); } catch (eD) {}
-  var rows = (PAG.rows || []).filter(function(p) { return !/legado/i.test(String(p.programa || '')); })
+  var rows = (PAG.rows || []).filter(function(p) { return !/legado/i.test(String(p.programa || '')) && soMeuPag(p); })
     .sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
   if (!rows.length) { cx.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Ainda carregando as vendas… (ou nenhuma registrada)</div>'; return; }
   var cont = { 'Em produção': 0, 'Aguardando assinatura': 0, 'Concluído': 0, 'Sem contrato': 0, 'Outros': 0 };
@@ -20201,6 +20300,14 @@ var ACESSOS = [
   { nome: 'Adm',           pin: '8520', adm: true },     // acesso geral; não vira "Você" sozinho
   { nome: 'Visitante',     pin: '0000', soOlha: true }   // vê tudo, não mexe em nada
 ];
+// 👤 só o meu: já sabe quem é (e se começa ligado) antes do 1º desenho
+try {
+  soMeuIniciar();
+  if (SOMEU.on && SOMEU.closerKey && typeof AG !== 'undefined') {
+    AG.closer = SOMEU.closerKey;
+    setTimeout(function () { try { closerKeys().forEach(function (ck) { var b = document.getElementById('cl-' + ck); if (b) b.classList.toggle('on', ck === AG.closer); }); var amb = document.getElementById('cl-ambos'); if (amb) amb.classList.toggle('on', AG.closer === 'ambos'); agAtualizarBotaoLado(); } catch (e) {} }, 0);
+  }
+} catch (eSmI) {}
 // visitante: pode olhar, não pode mexer (os botões avisam e não fazem nada)
 function soOlhar() {
   if (localStorage.getItem('v2Login') !== 'Visitante') return false;
@@ -20258,6 +20365,7 @@ function loginConferir() {
   if (!quem) { alert('Senha errada. Tente de novo (ou peça a sua senha para o Bruno).'); return; }
   localStorage.setItem('v2Login', quem.nome);
   try { mostrarAcessoAtual(); } catch (eAc) {}
+  try { soMeuIniciar(); soMeuRedesenhar(); } catch (eSm) {}   // 👤 só o meu: liga/desliga conforme quem entrou
   // o "Você" já entra certo — menos para visitante (não mexe) e Adm (escolhe na mão se quiser)
   if (!quem.soOlha && quem.nome !== 'Adm') localStorage.setItem('v2LeadEu', quem.nome);
   var ov = document.getElementById('tela-login');
