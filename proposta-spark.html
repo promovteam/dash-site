@@ -48,7 +48,7 @@
     // sem resposta da planilha em 8 s: usa o primeiro nome que está no próprio código (sem acento)
     setTimeout(function () { if (!P && k.indexOf('-') > 1) P = { n: k.split('-')[0] }; }, 8000);
     var cb = 'propNome' + Date.now();
-    window[cb] = function (r) { try { var l = r.table.rows; if (l.length) { var o = JSON.parse(l[l.length - 1].c[0].v); if (o && o.n) P = o; } } catch (e) {} };
+    window[cb] = function (r) { try { var l = r.table.rows; if (l.length) { var o = JSON.parse(l[l.length - 1].c[0].v); if (o && o.n) { P = o; var ln = document.getElementById('ld-nome'), l1 = document.getElementById('ld-l1'); if (ln) { ln.textContent = cap(String(o.n).trim()).split(' ')[0] + ','; if (l1) l1.textContent = 'aqui começa o seu'; } } } } catch (e) {} };
     var s = document.createElement('script');
     s.src = 'https://docs.google.com/spreadsheets/d/1xJykoW0UHr5hA-ELo5nV8uBkYykRG6OQdmMvDlUnhVg/gviz/tq?tqx=out:json;responseHandler:' + cb + '&sheet=Links&headers=1&tq=' + encodeURIComponent("select B where A = 'prop:" + k + "'");
     (document.head || document.documentElement).appendChild(s);
@@ -59,7 +59,45 @@
     b.setAttribute('data-dl', '1'); clearInterval(iv);
     b.onclick = function (e) { if (e) e.preventDefault(); var a = document.createElement('a'); a.href = 'propostas/proposta-spark.pdf'; a.download = 'Proposta Promov - Programa Spark.pdf'; document.body.appendChild(a); a.click(); a.remove(); };
   }, 300); })();
+  // 🎬 vídeos do Drive (Bruno 30/09/2026: "não dê opção para abrir no Drive"): tampa o botão de abrir no Drive do player;
+  // o vídeo continua tocando aqui. Os arquivos têm 204 e 314 MB — grandes demais para ficarem no site.
+  (function () { var t0 = Date.now(), iv = setInterval(function () {
+    if (Date.now() - t0 > 60000) clearInterval(iv);
+    Array.prototype.forEach.call(document.querySelectorAll('iframe[src*="drive.google.com"]'), function (f) {
+      if (f.getAttribute('data-tampa')) return; f.setAttribute('data-tampa', '1');
+      var w = document.createElement('div'); w.className = 'drive-wrap';
+      w.style.cssText = 'position:relative;width:' + (f.style.width || '100%') + ';max-width:' + (f.style.maxWidth && f.style.maxWidth !== 'none' ? f.style.maxWidth : '640px') + ';aspect-ratio:16/9;border-radius:' + (f.style.borderRadius || '8px') + ';overflow:hidden;align-self:center;background:#000;';
+      f.parentNode.insertBefore(w, f); w.appendChild(f);
+      // a barra de cima do player (título + botão de abrir no Drive) fica fora da área visível
+      f.style.cssText += ';position:absolute;left:0;top:-56px;width:100%;height:calc(100% + 56px);max-width:none;margin:0;border:0;border-radius:0;aspect-ratio:auto;';
+      var lk = w.querySelector('a.print-video-link'); if (lk) w.parentNode.insertBefore(lk, w.nextSibling);
+    });
+    if (!document.getElementById('drive-print')) { var st = document.createElement('style'); st.id = 'drive-print'; st.textContent = '@media print{.drive-wrap{aspect-ratio:auto !important;overflow:visible !important;background:none !important;max-width:none !important}.drive-wrap iframe{display:none !important}}'; (document.head || document.documentElement).appendChild(st); }
+  }, 400); })();
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;900&display=swap">
+  <style>
+    /* 🎬 abertura enquanto a proposta carrega (Bruno 30/09/2026: "aqui começa o seu legado no digital") */
+    #__bundler_loading { display:none !important; }
+    #__bundler_thumbnail { background:#12151C !important; }
+    .ld { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:30px; padding:24px; color:#FFFFFF; text-align:center;
+      font-family:Montserrat, "Arial Black", system-ui, sans-serif; background:radial-gradient(60% 45% at 50% 40%, rgba(230,23,91,.20), rgba(230,23,91,0) 70%), #12151C; }
+    .ld-logo { display:flex; align-items:center; gap:10px; font-weight:900; font-size:22px; opacity:0; animation:ldIn .7s .1s ease-out forwards; }
+    #__bundler_thumbnail .ld-logo svg { width:34px !important; height:28px !important; }
+    .ld-t span { display:block; opacity:0; transform:translateY(16px); animation:ldUp .9s cubic-bezier(.2,.8,.2,1) forwards; text-wrap:balance; }
+    .ld-nome { font-size:clamp(17px,3.6vw,24px); font-weight:700; color:#D8B574; margin-bottom:6px; animation-delay:.2s !important; }
+    .ld-nome:empty { display:none !important; }
+    .ld-l1 { font-size:clamp(28px,6.2vw,50px); font-weight:900; line-height:1.04; letter-spacing:-.5px; animation-delay:.35s !important; }
+    .ld-l2 { font-size:clamp(32px,7.4vw,60px); font-weight:900; line-height:1.04; letter-spacing:-.5px; color:#E6175B; animation-delay:.6s !important; }
+    .ld-bar { width:min(240px,60vw); height:3px; border-radius:3px; background:rgba(255,255,255,.12); overflow:hidden; opacity:0; animation:ldIn .5s 1s forwards; }
+    .ld-bar i { display:block; width:40%; height:100%; border-radius:3px; background:linear-gradient(90deg,#E6175B,#D8B574); animation:ldBar 1.3s ease-in-out infinite; }
+    .ld-s { font-size:11px; font-weight:700; letter-spacing:.26em; text-transform:uppercase; color:rgba(255,255,255,.55); opacity:0; animation:ldIn .5s 1.1s forwards; }
+    @keyframes ldIn { to { opacity:1; } }
+    @keyframes ldUp { to { opacity:1; transform:none; } }
+    @keyframes ldBar { from { transform:translateX(-100%); } to { transform:translateX(250%); } }
+    @media (prefers-reduced-motion: reduce) { .ld-logo, .ld-t span, .ld-bar, .ld-s { animation:none !important; opacity:1 !important; transform:none !important; } .ld-bar i { animation:none !important; width:100%; } }
+  </style>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #faf9f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -76,7 +114,7 @@
   </noscript>
 </head>
 <body>
-  <div id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#12151C"></rect><text x="50" y="63" text-anchor="middle" font-family="Arial" font-weight="900" font-size="34" fill="#E6175B">P</text></svg></div>
+  <div id="__bundler_thumbnail"><div class="ld" role="status" aria-live="polite"><div class="ld-logo"><svg viewBox="0 0 48 40" aria-hidden="true"><path d="M2 2h12l12 18-12 18H2l12-18z" fill="#FFFFFF"/><path d="M22 2h12l12 18-12 18H22l12-18z" fill="#E6175B"/></svg>Promov</div><div class="ld-t"><span class="ld-nome" id="ld-nome"></span><span class="ld-l1" id="ld-l1">Aqui começa o seu</span><span class="ld-l2">legado no digital</span></div><div class="ld-bar"><i></i></div><div class="ld-s">Preparando a sua proposta</div></div></div>
   <div id="__bundler_loading">Unpacking...</div>
 
   <script>
