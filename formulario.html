@@ -194,6 +194,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option>Spark Semestral + 2ª cadeira</option>
         <option>Growth</option>
         <option>Growth + 2ª cadeira</option>
+        <option>Growth Semestral</option>
         <option>Mentoria Legado Digital</option>
         <option>Legado Club</option>
       </select>
@@ -491,6 +492,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
         <option>Spark Semestral + 2ª cadeira</option>
         <option>Growth</option>
         <option>Growth + 2ª cadeira</option>
+        <option>Growth Semestral</option>
         <option>Mentoria Legado Digital</option>
         <option>Legado Club</option>
       </select>
@@ -656,7 +658,7 @@ var FORM_VENDA_CAMPOS = {
   programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
   nicho: 'entry.1257400668', obs: 'entry.589500904'
 };
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec';
 
 var currentStep = 1;
 var currentMode = 'venda'; // 'venda' or 'bloqueio'
@@ -819,7 +821,8 @@ function togglePJ() {
 }
 
 // Legado (Legado Club e Mentoria Legado Digital) não tem segunda cadeira (Bruno 29/09/2026): a pergunta some e fica "Não"
-function _semDupla(idPrograma) { var s = document.getElementById(idPrograma); return !!(s && /legado|club/i.test(s.value || '')); }
+// sem 2ª cadeira: Legado, Legado Club e Growth Semestral (Bruno 30/09/2026)
+function _semDupla(idPrograma) { var s = document.getElementById(idPrograma), v = (s && s.value) || ''; return /legado|club/i.test(v) || (/growth/i.test(v) && /semest/i.test(v)); }
 function toggleDupla() {
   var sem = _semDupla('v-programa'), q = document.getElementById('dupla-pergunta');
   if (sem) document.getElementById('dupla-n').checked = true;
@@ -1570,7 +1573,7 @@ function preencherColado(p) {   // p = 'c' (venda) ou 'b' (bloqueio)
 // ---- abre o Google Forms de verdade ja preenchido; a pessoa confere, anexa o comprovante e clica em Enviar la ----
 function _programaFormsF(p) {
   var t = _semAcento(p).replace(/\s+/g, ' ').trim(); if (!t) return '';
-  var base = /club/.test(t) ? 'Legado Club' : /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : (/spark/.test(t) && /semest/.test(t)) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : String(p || '');
+  var base = /club/.test(t) ? 'Legado Club' : /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? (/semest/.test(t) ? 'Growth semestral' : 'Growth anual') : (/spark/.test(t) && /semest/.test(t)) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : String(p || '');
   if (/cadeira/.test(t) && !/^Legado/.test(base)) base += (base === 'Growth anual') ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA';   // Legado não tem 2ª cadeira
   return base;
 }
@@ -2257,6 +2260,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 function precoTabela(p) {
   var t = _semAcento(p), d = /cadeira|dupla/.test(t);
   if (/club/.test(t)) return 997;   // Legado Club (anual) — 29/09/2026
+  if (/growth/.test(t) && /semest/.test(t)) return 25000;   // Growth Semestral (30/09/2026) — sem 2ª cadeira
   if (/growth/.test(t)) return d ? 50364 : 43164;
   if (/spark/.test(t) && !/semest/.test(t)) return d ? 29964 : 23964;
   return 0;

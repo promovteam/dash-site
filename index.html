@@ -1768,7 +1768,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
     <div class="dtl-card">
       <div class="g-label">💼 Comercial</div>
       <div class="ag-campo"><label>Produto</label>
-        <select class="edit-in edit-sel ag-in" id="ag-prod" onchange="produtoMudou(this.value)"><option>Programa Spark Anual</option><option>Programa Spark Semestral</option><option>Programa Growth</option><option>Mentoria Legado Digital</option><option>Entrevista WLD João Stecca</option></select>
+        <select class="edit-in edit-sel ag-in" id="ag-prod" onchange="produtoMudou(this.value)"><option>Programa Spark Anual</option><option>Programa Spark Semestral</option><option>Programa Growth</option><option>Programa Growth Semestral</option><option>Mentoria Legado Digital</option><option>Entrevista WLD João Stecca</option></select>
       </div>
       <div class="ag-campo"><label>SDR</label>
         <select class="edit-in edit-sel ag-in" id="ag-sdr"><option>—</option></select>
@@ -2220,7 +2220,7 @@ var _ficha = [
   {ico:'📱', nome:'Telefone / WhatsApp',  valor:'(21) 99368-3149'},
   {ico:'📷', nome:'Instagram',            valor:'@carla.mendes', tipo:'insta'},
   {ico:'🎯', nome:'Produto de interesse', valor:'Programa Spark Anual',
-    opcoes:['Programa Spark Anual','Programa Spark Anual + 2ª cadeira','Programa Spark Semestral','Programa Growth Anual','Mentoria Legado Digital']},
+    opcoes:['Programa Spark Anual','Programa Spark Anual + 2ª cadeira','Programa Spark Semestral','Programa Growth Anual','Programa Growth Semestral','Mentoria Legado Digital']},
   {ico:'📅', nome:'Reunião',              valor:'amanhã · 09h · Bruno Pardim'},
   {ico:'🧲', nome:'Origem',               valor:'Instagram',
     opcoes:['Instagram','Indicação','Recuperação','Ads','Orgânico','Workshop']},
@@ -2451,11 +2451,13 @@ window.addEventListener('resize', function() {
 
 // tabela de preços dos programas — o valor entra sozinho ao escolher o produto
 // 29/09/2026 (Bruno: "os valores dos programas não mudou, mude"): Spark Anual 23.964 (+ 2ª cadeira 29.964) · Growth 43.164 (+ 2ª cadeira 50.364)
-var PRECOS = { spark: 23964, sparkDupla: 29964, sparkSemestral: 13000, growth: 43164, growthDupla: 50364, legado: 3596.40, legadoClub: 997 };
+// 30/09/2026 (Bruno): Growth Semestral R$ 25.000 — não tem 2ª cadeira
+var PRECOS = { spark: 23964, sparkDupla: 29964, sparkSemestral: 13000, growth: 43164, growthDupla: 50364, growthSemestral: 25000, legado: 3596.40, legadoClub: 997 };
 function precoDoProduto(prod) {
   var p = v2norm(prod || ''), dupla = p.indexOf('cadeira') !== -1 || p.indexOf('dupla') !== -1;
   if (p.indexOf('club') !== -1) return PRECOS.legadoClub;   // Legado Club (26/09/2026: vendido a R$ 997 — antes caía no preço do Legado Digital)
   if (p.indexOf('legado') !== -1) return PRECOS.legado;
+  if (p.indexOf('growth') !== -1 && p.indexOf('semestral') !== -1) return PRECOS.growthSemestral;
   if (p.indexOf('growth') !== -1) return dupla ? PRECOS.growthDupla : PRECOS.growth;
   if (p.indexOf('semestral') !== -1) return PRECOS.sparkSemestral;
   if (p.indexOf('spark') !== -1) return dupla ? PRECOS.sparkDupla : PRECOS.spark;
@@ -2645,7 +2647,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-1212';
+var VERSAO_DASH = '2026-09-30-1247';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3447,7 +3449,7 @@ function montarOpcoesAgenda() {
     el.innerHTML = (comVazio ? '<option>—</option>' : '') + vals.map(function(v){ return '<option>' + v + '</option>'; }).join('');
     if (atual && vals.indexOf(atual) !== -1) el.value = atual;
   }
-  fill('ag-prod', v2mais(v2usados('produto'), ['Entrevista WLD João Stecca']));   // a entrevista entra mesmo antes de aparecer 5 vezes na planilha
+  fill('ag-prod', v2mais(v2usados('produto'), ['Entrevista WLD João Stecca', 'Programa Growth Semestral']));   // a entrevista e o Growth Semestral (30/09/2026) entram mesmo antes de aparecer 5 vezes na planilha
   // a lista deixa de ser fixa: quem aparece na planilha entra sozinho
   // (era por isso que o Ismael não aparecia — ele estava na planilha, não no código)
   fill('ag-sdr', v2mais(OPCOES_PLANILHA.sdr, v2usados('sdr', 1)), true);
@@ -4543,7 +4545,7 @@ var FORM_VENDA_CAMPOS = {
 function _programaForms(p) {
   var t = v2norm(p);
   if (!t) return '';
-  var base = /club/.test(t) ? 'Legado Club' : /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? 'Growth anual' : /spark/.test(t) && /semest/.test(t) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : '';
+  var base = /club/.test(t) ? 'Legado Club' : /legado/.test(t) ? 'Legado Digital' : /growth/.test(t) ? (/semest/.test(t) ? 'Growth semestral' : 'Growth anual') : /spark/.test(t) && /semest/.test(t) ? 'Spark semestral' : /spark/.test(t) ? 'Spark Anual' : '';
   if (!base) return '';
   return base + (/cadeira/.test(t) && !/^Legado/.test(base) ? (base === 'Growth anual' ? '+ SEGUNDA CADEIRA' : ' + SEGUNDA CADEIRA') : '');
 }
@@ -4906,6 +4908,7 @@ function abrirFormVendaReuniao() {
 function precoTabela(produto) {
   var t = v2norm(produto), d = /cadeira|dupla/.test(t);
   if (/club/.test(t)) return 997;   // Legado Club (anual) — 29/09/2026
+  if (/growth/.test(t) && /semest/.test(t)) return 25000;   // Growth Semestral (30/09/2026) — sem 2ª cadeira
   if (/growth/.test(t)) return d ? 50364 : 43164;
   if (/spark/.test(t) && !/semest/.test(t)) return d ? 29964 : 23964;
   return 0;
@@ -15287,23 +15290,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud9CEO1cgDYX01OIouQkk9gt3HcFyPYklASaAqAe-KZL/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLnwcn15c_AhYCxRznWwGahZ-26LGYtNV3Hgth7gXrheloqqPMfK6llDZG7KyrhwX7/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
