@@ -2647,7 +2647,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-1321';
+var VERSAO_DASH = '2026-09-30-1337';
 var _versaoNova = null;
 
 // =====================================================================
@@ -5052,6 +5052,8 @@ window.addEventListener('message', function(ev) {
     .sort(function(a, b){ return (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0); });
   var r = cand[0];
   var mudou = false;
+  // venda sem reunião: não mexe na reunião antiga da pessoa (o robô cria uma linha nova na aba Vendas) — Bruno 30/09/2026
+  if (_vendaAberta && /sem reuni/i.test(_vendaAberta.obs || '')) r = null;
   if (r && r.sn !== 'vendido') {
     // o robo (gatilho do Forms) grava o Vendido na planilha; aqui so a tela e a agenda
     r.status = 'Vendido'; r.sn = 'vendido';
@@ -20355,21 +20357,21 @@ document.addEventListener('visibilitychange', function() {
 _cadaTanto(function(){ if (_visaoCarregada) carregarComentarios(); }, 180000);
 // avisos do closer (reunião nova na agenda dele): confere a cada 2 minutos
 carregarAvisosCloser();
-_cadaTanto(carregarAvisosCloser, 120000);
+_cadaTanto(carregarAvisosCloser, 300000);   // v186: 2 → 5 min (fila do robô)
 // base do site do diagnóstico: relê a cada 3 minutos (leads ao vivo)
-_cadaTanto(function(){ SB.carregado = false; LD._fundido = null; carregarSupabase(); }, 180000);
+_cadaTanto(function(){ SB.carregado = false; LD._fundido = null; carregarSupabase(); }, 300000);   // v186: 3 → 5 min
 // fica de olho: a cada 3 minutos relê a planilha de leads e avisa se chegou alguém;
 // a cada 5 minutos atualiza o painel da Clint (etapas, donos e esperando resposta)
-_cadaTanto(carregarLeads, 180000);
+_cadaTanto(carregarLeads, 600000);   // v186: 3 → 10 min — a planilha de leads tem 14 MB (os leads ao vivo vêm pelo site do diagnóstico, acima)
 _cadaTanto(carregarClintPainel, 300000);
-_cadaTanto(function(){ if (_visaoCarregada) carregarGptMaker(); }, 300000);
+_cadaTanto(function(){ if (_visaoCarregada) carregarGptMaker(); }, 600000);   // v186: 5 → 10 min
 _cadaTanto(function(){ if (_visaoCarregada) carregarTempos(); }, 900000);
 carregarPag();
 setTimeout(carregarAgenda, 800);
 _cadaTanto(carregarV2, 120000);
 _cadaTanto(carregarPag, 300000);
 setTimeout(carregarBloqueios, 2500);
-_cadaTanto(carregarBloqueios, 300000);
+_cadaTanto(carregarBloqueios, 600000);   // v186: 5 → 10 min (quem registra bloqueio recarrega na hora)
 // código todo carregado: tira a tela de espera (a de login aparece por cima se precisar)
 try { var _bs = document.getElementById('boot-splash'); if (_bs) { _bs.style.transition = 'opacity .45s ease'; _bs.style.opacity = '0'; _bs.style.pointerEvents = 'none'; setTimeout(function(){ _bs.remove(); }, 480); } } catch (e) {}
 </script>
@@ -27152,7 +27154,7 @@ function zapSaudeMostrar(d) {
   el.querySelector('button').onclick = function() { try { localStorage.setItem('v2ZapForaFechado', String(Date.now())); } catch (e) {} el.remove(); };
 }
 setTimeout(zapSaudeConferir, 20000);
-setInterval(zapSaudeConferir, 10 * 60000);
+setInterval(zapSaudeConferir, 15 * 60000);   // v186: 10 → 15 min
 </script>
 <style>
 #zap-fora { position:fixed; left:50%; top:10px; transform:translateX(-50%); z-index:9600; display:flex; align-items:center; gap:12px; width:max-content; max-width:min(680px, calc(100vw - 32px));
