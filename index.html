@@ -2645,7 +2645,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-0905';
+var VERSAO_DASH = '2026-09-30-0922';
 var _versaoNova = null;
 
 // =====================================================================
@@ -19313,6 +19313,104 @@ function cadastroCopiarLink(bt) {
   var ok = function() { try { avisoRapido('🔗 Mensagem com o link copiada — cole na conversa da Clint. Quando o cliente enviar, é só abrir 💰 Registrar venda: os dados entram sozinhos.'); } catch (e) {} if (bt) { var t0 = bt.textContent; bt.textContent = '✓ Copiado'; setTimeout(function() { bt.textContent = t0; }, 2500); } };
   (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
 }
+// 📄 PROPOSTAS (Bruno 30/09/2026: "coloque no dash com opção do site e de baixar em PDF", "link próprio, rastreado,
+// vinculado ao lead, que mostre quando ele abrir" e "dá para personalizar com o nome do lead?"). Cada envio gera
+// proposta-<programa>?nome-codigo e grava "prop:codigo" na aba Links (nome, closer, telefone); a página abre com o nome
+// do lead e grava "abriu:codigo" quando ele abre. A ficha mostra "👀 abriu Nx". O PDF padrão é o mesmo para todos;
+// "PDF com o nome" abre a página personalizada já no salvar em PDF.
+var PROP_SITE = 'https://promovteam.github.io/dash-site/';
+var PROPOSTAS = [
+  { k: 'spark', nome: 'Programa Spark', re: /spark/ },
+  { k: 'growth', nome: 'Programa Growth', re: /growth/ },
+  { k: 'legado', nome: 'Mentoria Legado Digital', re: /legado|club/ }
+];
+function _propLead() {
+  var r = null; try { r = _v2reg[_fichaAtual]; } catch (e) {}
+  var nome = (r && r.nome) || ((document.getElementById('fl-nome') || {}).textContent || '').trim();
+  return { r: r, nome: String(nome || '').trim(), t8: r ? ldTel8(r.telefone) : '', closer: (r && r.closer) || '' };
+}
+function _propCloserNome(c) { var t = v2norm(c); return /bruno/.test(t) ? 'Bruno Pardim' : /tony/.test(t) ? 'Tony Londe' : /wesllene/.test(t) ? 'Wesllene Borba' : String(c || '').trim(); }
+function propostaMenu(bt) {
+  var velho = document.getElementById('prop-menu'); if (velho) { velho.remove(); return; }
+  var L = _propLead(), sug = v2norm((L.r && L.r.produto) || '');
+  var m = document.createElement('div'); m.id = 'prop-menu'; m.className = 'prop-menu';
+  var h = '<div class="prop-menu-t">Proposta para ' + dspEsc(L.nome.split(' ')[0] || 'o lead') + '</div>';
+  PROPOSTAS.forEach(function(p) {
+    h += '<div class="prop-linha' + (p.re.test(sug) ? ' sug' : '') + '"><b>' + p.nome + '</b>'
+      + '<button type="button" onclick="event.stopPropagation();propostaCopiar(\'' + p.k + '\',this)">🔗 Copiar link</button>'
+      + '<button type="button" onclick="event.stopPropagation();propostaPdf(\'' + p.k + '\',true)" title="Abre a proposta com o nome do lead para salvar em PDF">📄 PDF com o nome</button>'
+      + '<a href="' + PROP_SITE + 'propostas/proposta-' + p.k + '.pdf" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="PDF padrão, sem nome">⬇ PDF</a></div>';
+  });
+  h += '<div class="prop-menu-rod">O link é só deste lead: quando ele abrir, aparece aqui (👀) e na ficha.</div>';
+  m.innerHTML = h;
+  var head = bt.closest('.modal-head') || document.body; head.appendChild(m);
+  setTimeout(function() { document.addEventListener('click', function fora(e) { if (!m.contains(e.target)) { m.remove(); document.removeEventListener('click', fora); } }); }, 0);
+}
+function _propGravar(k, L) {
+  var codigo = linkCurtoCodigo(L.nome);
+  var d = { q: k, n: L.nome, c: _propCloserNome(L.closer), t: L.t8, por: localStorage.getItem('v2Login') || '' };
+  try { sendToGAS({ action: 'storeLink', id: 'prop:' + codigo, dados: JSON.stringify(d) }); } catch (e) {}
+  return codigo;
+}
+function propostaCopiar(k, bt) {
+  var L = _propLead(), p = PROPOSTAS.filter(function(x) { return x.k === k; })[0];
+  if (!L.nome) { avisoRapido('Abra a ficha de um lead primeiro'); return; }
+  var codigo = _propGravar(k, L), link = PROP_SITE + 'proposta-' + k + '?' + codigo;
+  var msg = 'Oi, ' + L.nome.split(' ')[0] + '! Preparei a sua proposta de participação no ' + p.nome + ' — dá uma olhada com calma 👇\n' + link;
+  var ok = function() { avisoRapido('📄 Link da proposta copiado — cole na Clint. Quando ' + L.nome.split(' ')[0] + ' abrir, aparece 👀 na ficha.'); if (bt) bt.textContent = '✓ Copiado'; setTimeout(function() { try { propostaStatus(true); } catch (e) {} }, 6000); };
+  (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function() { var a = document.createElement('textarea'); a.value = msg; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { prompt('Copie a mensagem:', msg); } a.remove(); });
+}
+// PDF com o nome: grava um código (não conta como abertura — quem está logado no dash não conta) e abre já no "salvar em PDF"
+function propostaPdf(k) {
+  var L = _propLead(); if (!L.nome) { avisoRapido('Abra a ficha de um lead primeiro'); return; }
+  var codigo = _propGravar(k, L), w = window.open('about:blank', '_blank');
+  avisoRapido('📄 Abrindo a proposta com o nome — no quadro de impressão, escolha "Salvar como PDF"');
+  setTimeout(function() { var u = PROP_SITE + 'proposta-' + k + '?' + codigo + '&pdf=1'; if (w) w.location.href = u; else window.open(u, '_blank'); }, 2500);   // dá tempo do robô guardar o nome
+}
+// 👀 situação das propostas deste lead (aba Links: "prop:codigo" com o telefone do lead; "abriu:codigo" a cada abertura)
+var _propStChave = '', _propStQuando = 0;
+function _propGviz(tq, cb) {
+  var nm = 'propSt' + Date.now() + Math.floor(Math.random() * 1000), sc = document.createElement('script'), feito = false;
+  var fim = function(r) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[nm] = function() {}; cb(r); };
+  window[nm] = fim; sc.onerror = function() { fim(null); }; setTimeout(function() { fim(null); }, 12000);
+  sc.src = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/gviz/tq?tqx=out:json;responseHandler:' + nm + '&sheet=Links&headers=1&tq=' + encodeURIComponent(tq) + '&_=' + Date.now();
+  document.body.appendChild(sc);
+}
+function _propQuando(c) {
+  var v = c && c.v, m = String(v || '').match(/Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+))?/);
+  if (!m) return null; return new Date(+m[1], +m[2], +m[3], +(m[4] || 0), +(m[5] || 0));
+}
+function _propFmt(d) { if (!d) return ''; var hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); return d.toDateString() === new Date().toDateString() ? 'hoje ' + hm : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + hm; }
+function propostaStatus(forcar) {
+  var head = document.querySelector('#modal-lead .modal-head'); if (!head) return;
+  var L = _propLead(), chave = L.t8 || v2norm(L.nome);
+  var el = document.getElementById('fl-prop-st');
+  if (!chave) { if (el) el.remove(); return; }
+  if (!forcar && chave === _propStChave && Date.now() - _propStQuando < 60000) return;
+  if (chave !== _propStChave && el) el.innerHTML = '';
+  _propStChave = chave; _propStQuando = Date.now();
+  var filtro = L.t8 ? "B contains '\"t\":\"" + L.t8 + "\"'" : "B contains '\"n\":\"" + L.nome.replace(/'/g, '') + "\"'";
+  _propGviz("select A, B, C where A starts with 'prop:' and " + filtro, function(r) {
+    if (_propStChave !== chave) return;
+    var envios = []; try { r.table.rows.forEach(function(x) { var o = {}; try { o = JSON.parse(x.c[1].v); } catch (e) {} envios.push({ cod: String(x.c[0].v).slice(5), q: o.q, quando: _propQuando(x.c[2]) }); }); } catch (e) {}
+    if (!envios.length) { var e0 = document.getElementById('fl-prop-st'); if (e0) e0.remove(); return; }
+    _propGviz("select A, C where " + envios.map(function(x) { return "A = 'abriu:" + x.cod + "'"; }).join(' or '), function(r2) {
+      if (_propStChave !== chave) return;
+      var ab = {}; try { r2.table.rows.forEach(function(x) { var c = String(x.c[0].v).slice(6), q = _propQuando(x.c[1]); (ab[c] = ab[c] || []).push(q); }); } catch (e) {}
+      var porProg = {};
+      envios.forEach(function(x) { var p = porProg[x.q] = porProg[x.q] || { env: null, ab: [] }; if (!p.env || x.quando > p.env) p.env = x.quando; p.ab = p.ab.concat(ab[x.cod] || []); });
+      var h = Object.keys(porProg).map(function(q) {
+        var p = porProg[q], nomeP = (PROPOSTAS.filter(function(x) { return x.k === q; })[0] || { nome: q }).nome.replace(/^Programa |^Mentoria /, '');
+        p.ab.sort(function(a, b) { return b - a; });
+        return p.ab.length ? '<span class="prop-st ok" title="Enviada ' + _propFmt(p.env) + '">👀 ' + nomeP + ': abriu ' + p.ab.length + 'x · ' + _propFmt(p.ab[0]) + '</span>'
+          : '<span class="prop-st" title="Enviada ' + _propFmt(p.env) + '">📄 ' + nomeP + ': enviada ' + _propFmt(p.env) + ' · ainda não abriu</span>';
+      }).join('');
+      var el2 = document.getElementById('fl-prop-st');
+      if (!el2) { el2 = document.createElement('div'); el2.id = 'fl-prop-st'; el2.className = 'fl-prop-st'; var at = head.querySelector('.fl-atalhos'); head.insertBefore(el2, at ? at.nextSibling : null); }
+      el2.innerHTML = h;
+    });
+  });
+}
 function ehExecutivo() {
   var login = localStorage.getItem('v2Login'), ok = false;
   if (typeof ACESSOS !== 'undefined') ACESSOS.forEach(function(a) { if (a.nome === login && a.executivo) ok = true; });
@@ -23717,6 +23815,19 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
 .fl-atalhos .ig { color:#ff9ac4; border-color:rgba(225,48,108,.45); background:linear-gradient(135deg, rgba(254,218,117,.10), rgba(214,41,118,.16) 55%, rgba(79,91,213,.14)); }
 .fl-atalhos .ig svg { width:15px; height:15px; flex:none; }
 .fl-atalhos .cad { color:#3ddc97; border-color:rgba(61,220,151,.45); background:rgba(61,220,151,.1); }
+.fl-atalhos .prop { color:#ffd166; border-color:rgba(255,209,102,.45); background:rgba(255,209,102,.1); }
+.prop-menu { position:absolute; right:14px; top:calc(100% - 6px); z-index:40; width:min(460px, calc(100vw - 32px)); padding:12px; border-radius:14px; background:var(--panel, #14171d); border:1px solid rgba(255,255,255,.14); box-shadow:0 18px 40px -12px rgba(0,0,0,.8); display:flex; flex-direction:column; gap:8px; }
+.prop-menu-t { font-size:.74rem; font-weight:800; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+.prop-linha { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.08); }
+.prop-linha.sug { border-color:rgba(255,209,102,.5); background:rgba(255,209,102,.06); }
+.prop-linha b { flex:1 1 150px; font-size:.8rem; }
+.prop-linha button, .prop-linha a { padding:6px 10px; border-radius:999px; font:inherit; font-size:.7rem; font-weight:800; cursor:pointer; border:1px solid var(--border); background:rgba(255,255,255,.05); color:var(--text); text-decoration:none; }
+.prop-linha button:hover, .prop-linha a:hover { border-color:rgba(255,255,255,.25); }
+.prop-menu-rod { font-size:.7rem; color:var(--muted); }
+.fl-prop-st { flex:1 1 100%; display:flex; gap:6px; flex-wrap:wrap; padding-left:58px; }
+.prop-st { font-size:.7rem; font-weight:800; padding:4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.12); color:var(--muted); }
+.prop-st.ok { color:#ffd166; border-color:rgba(255,209,102,.45); background:rgba(255,209,102,.08); }
+@media (max-width:760px) { .fl-prop-st { padding-left:0; } }
 /* o topo da ficha fica por cima de um fundo inteiro (antes o que rolava aparecia acima dele — print do Bruno 28/09/2026) */
 #modal-lead .modal-head::before { content:''; position:absolute; left:-40px; right:-40px; bottom:100%; height:44px; background:var(--panel, #14171d); pointer-events:none; }
 #modal-lead .modal-head { box-shadow:0 12px 18px -14px rgba(0,0,0,.85); }
@@ -24055,7 +24166,9 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
     if (ig && !ehVisitante()) h += '<a class="ig" href="https://instagram.com/' + encodeURIComponent(ig) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="@' + ig + ' no Instagram">' + igLogo() + ' @' + ig + '</a>';
     h += '<button type="button" onclick="event.stopPropagation();var b=document.getElementById(\'btn-copiar\');if(b)b.click();">📋 Copiar dados</button>';
     if (!ehVisitante()) h += '<button type="button" class="cad" onclick="event.stopPropagation();cadastroCopiarLink(this)" title="Copia uma mensagem com o link para o cliente preencher os dados do contrato no celular">🔗 Link de cadastro</button>';
+    if (!ehVisitante()) h += '<button type="button" class="prop" onclick="event.stopPropagation();propostaMenu(this)" title="Link da proposta só deste lead (mostra quando ele abrir) e PDF">📄 Proposta</button>';
     if (at.innerHTML !== h) at.innerHTML = h;
+    try { if (!ehVisitante()) propostaStatus(false); } catch (eP) {}
   }
   (function () {
     var li = doc.getElementById('lead-info'); if (!li) return;
