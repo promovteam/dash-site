@@ -178,6 +178,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <label>SDR</label>
       <select id="v-sdr">
         <option value="">Selecione...</option>
+        <option value="">Sem SDR</option>
         <option>Selina</option>
         <option>Ismael</option>
         <option>Sarah</option>
@@ -476,6 +477,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
       <label>SDR</label>
       <select id="b-sdr">
         <option value="">Selecione...</option>
+        <option value="">Sem SDR</option>
         <option>Selina</option>
         <option>Ismael</option>
         <option>Sarah</option>
@@ -658,7 +660,7 @@ var FORM_VENDA_CAMPOS = {
   programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
   nicho: 'entry.1257400668', obs: 'entry.589500904'
 };
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec';
 
 var currentStep = 1;
 var currentMode = 'venda'; // 'venda' or 'bloqueio'
@@ -2422,26 +2424,59 @@ function guruBotaoPagamento(cfg) {
       }, tent === 1 ? 2500 : 3000);
     })();
   }
+  // 237 ofertas na Guru (30/09/2026) — muitas são cópias e links feitos para um cliente só. O programa vem do NOME DA OFERTA
+  // quando ele diz (as ofertas do Spark Semestral ficam no produto "SPARK ANUAL"); oferta de entrada/bloqueio vai para a tela
+  // de bloqueio; oferta de teste some. Primeiro aparecem as do valor digitado e as do preço de tabela; o resto fica em
+  // "ver todas", com busca. Valor que não é de nenhuma oferta: "valor combinado" cria o link na hora.
+  var famO = function (o) { return fam(o.oferta || '') || fam(o.programa || ''); };
+  var famOB = function (o) { return famB(o.oferta || '') || famB(o.programa || ''); };
+  var ehBloq = function (o) { return !!o.bloqueio || /bloqueio|entrada/.test(_semAcento(o.oferta || '')); };
+  function botaoOferta(o) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'btn';
+    b.style.cssText = 'background:var(--card);color:var(--text);border:1px solid var(--border);font-size:.8rem;text-align:left';
+    b.innerHTML = '<b>' + esc(o.oferta) + '</b>' + (o.valor ? ' · ' + reais(o.valor) + (o.parcelas > 1 ? ' · até ' + o.parcelas + 'x' : ' · à vista') : '');
+    b.onclick = function () { pronto(montar(o.url, true), o.oferta + (o.valor ? ' · ' + reais(o.valor) : '')); };
+    return b;
+  }
   function mostrar() {
     var f = cfg.bloqueio ? famB(g(cfg.programa)) : fam(g(cfg.programa));
+    var v = num(g(cfg.valor)), tab = cfg.bloqueio ? 0 : (precoTabela(g(cfg.programa)) || 0);
+    var perto = function (a, b) { return a > 0 && b > 0 && Math.abs(a - b) < 1; };
+    var nota = function (o) { return (perto(o.valor, v) ? 4 : 0) + (perto(o.valor, tab) ? 2 : 0) - (/c[oó]pia/i.test(o.oferta || '') ? 1 : 0); };
     var lista = GURU_CHECKOUTS.map(function (c) { return { programa: c.programa, oferta: c.rotulo, url: c.url, valor: 0, bloqueio: !!c.bloqueio }; }).concat(_guruOfertasCache || [])
-      .filter(function (o) { return !!o.bloqueio === !!cfg.bloqueio && (cfg.bloqueio ? famB(o.programa) : fam(o.programa)) === f; });
+      .filter(function (o) { return !/teste/i.test(o.oferta || '') && ehBloq(o) === !!cfg.bloqueio && (cfg.bloqueio ? famOB(o) : famO(o)) === f; })
+      .sort(function (a, b) { return nota(b) - nota(a) || (b.parcelas || 0) - (a.parcelas || 0) || String(a.oferta).localeCompare(String(b.oferta)); });
     if (!lista.length) { msgEl.textContent = '⚠️ Não achei ' + (cfg.bloqueio ? 'bloqueio/entrada' : 'oferta') + ' da Guru para ' + g(cfg.programa); return; }
     op.innerHTML = ''; op.style.display = 'flex';
-    lista.forEach(function (o) {
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'btn';
-      b.style.cssText = 'background:var(--card);color:var(--text);border:1px solid var(--border);font-size:.8rem;text-align:left';
-      b.innerHTML = '<b>' + esc(o.oferta) + '</b>' + (o.valor ? ' · ' + reais(o.valor) + (o.parcelas > 1 ? ' · até ' + o.parcelas + 'x' : ' · à vista') : '');
-      b.onclick = function () { pronto(montar(o.url, true), o.oferta + (o.valor ? ' · ' + reais(o.valor) : '')); };
-      op.appendChild(b);
-    });
-    var v = num(g(cfg.valor)), base = lista.filter(function (o) { return o.id; }).sort(function (a, b) { return (b.parcelas || 0) - (a.parcelas || 0); })[0];
-    if (v > 0 && base && !lista.some(function (o) { return Math.abs((o.valor || 0) - v) < 1; })) {
+    var base = lista.filter(function (o) { return o.id; })[0];
+    if (v > 0 && base && !lista.some(function (o) { return perto(o.valor, v); })) {
       var bv = document.createElement('button'); bv.type = 'button'; bv.className = 'btn';
       bv.style.cssText = 'font-size:.8rem;text-align:left';
       bv.innerHTML = '💰 <b>Valor combinado: ' + reais(v) + '</b> — cria um link só para esse cliente';
       bv.onclick = function () { combinado(base, v); };
       op.appendChild(bv);
+    }
+    var principais = lista.slice(0, 6);
+    principais.forEach(function (o) { op.appendChild(botaoOferta(o)); });
+    if (lista.length > principais.length) {
+      var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'btn';
+      bt.style.cssText = 'background:transparent;color:var(--muted);border:1px dashed var(--border);font-size:.78rem';
+      bt.textContent = 'Ver todas as ' + lista.length + ' ofertas deste programa';
+      bt.onclick = function () {
+        bt.remove();
+        var bx = document.createElement('input'); bx.type = 'search'; bx.placeholder = 'Procurar oferta (nome ou valor)'; bx.autocomplete = 'off';
+        bx.style.cssText = 'width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem';
+        var cx = document.createElement('div'); cx.style.cssText = 'display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto';
+        var pinta = function () {
+          var t = _semAcento(bx.value || '').trim(), n = num(bx.value);
+          cx.innerHTML = '';
+          lista.slice(principais.length).filter(function (o) { return !t || _semAcento(o.oferta || '').indexOf(t) !== -1 || (n > 0 && String(Math.round(o.valor || 0)).indexOf(String(Math.round(n))) === 0); })
+            .forEach(function (o) { cx.appendChild(botaoOferta(o)); });
+          if (!cx.children.length) cx.innerHTML = '<span class="colar-msg">Nenhuma oferta com isso.</span>';
+        };
+        bx.oninput = pinta; op.appendChild(bx); op.appendChild(cx); pinta(); bx.focus();
+      };
+      op.appendChild(bt);
     }
     msgEl.textContent = cfg.bloqueio ? 'Qual bloqueio/entrada?' : 'Qual oferta?';
   }

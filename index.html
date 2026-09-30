@@ -2647,7 +2647,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-1255';
+var VERSAO_DASH = '2026-09-30-1315';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4600,8 +4600,65 @@ function _vendaAnteriorDe(cel, nome) {
 // 💰 VENDA SEM REUNIÃO (Bruno 29/09/2026: "como faço para gerar um pedido de Legado Club sem ter agendado reunião"):
 // abre a mesma tela de venda, em branco — cola os dados que o cliente mandou e registra. Entra no formulário de pagamento
 // (Pagamentos, Placar, entrega avisada); como não há reunião, não entra nos números de reuniões da Visão Geral.
+// 30/09/2026 (Bruno: "essa venda sem reunião poderia puxar os leads"): antes de abrir a tela em branco, procura a pessoa nos
+// leads (aba de pesquisa) e nas reuniões — escolheu, a tela de venda já abre com nome, celular, e-mail, @, SDR e link da Clint.
 function abrirVendaSemReuniao() {
-  abrirFormVenda({ vendedor: _vendedorLogado(), obs: 'Venda sem reunião (direta)' });
+  if (soOlhar()) return;
+  var velho = document.getElementById('vsr-pick'); if (velho) velho.remove();
+  var ov = document.createElement('div'); ov.className = 'modal-overlay open'; ov.id = 'vsr-pick'; ov.style.zIndex = 240;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:560px;">'
+    + '<div class="modal-head"><div style="flex:1;"><h2 style="margin-bottom:2px;">💰 Venda sem reunião</h2>'
+    + '<span style="font-size:.72rem;color:var(--muted);font-weight:600;">De quem é a venda? Procure nos leads e nas reuniões</span></div>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<input id="vsr-busca" class="edit-in" type="search" autocomplete="off" placeholder="Nome, celular ou @instagram" style="width:100%;text-align:left;" oninput="clearTimeout(window._vsrT);var v=this.value;window._vsrT=setTimeout(function(){vsrBuscar(v);},120);">'
+    + '<div id="vsr-lista" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:52vh;overflow-y:auto;"></div>'
+    + '<button class="btn" style="width:100%;margin-top:12px;background:var(--surface);color:var(--text);border:1px solid var(--border);" onclick="vsrEscolher(-1)">Cliente novo — abrir a tela em branco</button></div>';
+  document.body.appendChild(ov);
+  vsrBuscar('');
+  setTimeout(function() { var i = document.getElementById('vsr-busca'); if (i) i.focus(); }, 60);
+}
+var _vsrAchados = [];
+function vsrBuscar(q) {
+  var el = document.getElementById('vsr-lista'); if (!el) return;
+  var qn = v2norm(String(q || '').replace(/^@+/, '')).trim(), qd = String(q || '').replace(/\D/g, '');
+  var porTel = {}, lista = [];
+  var junta = function(k, o) { if (k && porTel[k]) { var x = porTel[k]; Object.keys(o).forEach(function(c) { if (!x[c] && o[c]) x[c] = o[c]; }); if ((o.date || 0) > (x.date || 0)) x.date = o.date; return; } if (k) porTel[k] = o; lista.push(o); };
+  var bate = function(nome, tel, insta) {
+    if (!qn && !qd) return true;
+    if (qd.length >= 4 && String(tel || '').replace(/\D/g, '').indexOf(qd) !== -1) return true;
+    if (!qn) return false;
+    var n = v2norm(nome || '') + ' ' + v2norm(insta || '');
+    return qn.split(/\s+/).every(function(p) { return n.indexOf(p) !== -1; });
+  };
+  (LD.rows || []).forEach(function(l) {
+    if (!bate(l.nome, l.tel, l.insta)) return;
+    junta(l.tel8 || ldTel8(l.tel), { nome: l.nome, cel: l.tel, email: l.email, insta: l.insta, seg: l.seg, lead: l, date: l.date ? +l.date : 0, onde: 'lead' });
+  });
+  (V2.rows || []).forEach(function(r) {
+    if (!r.nome || !bate(r.nome, r.telefone, '')) return;
+    junta(ldTel8(r.telefone), { nome: r.nome, cel: r.telefone, closer: r.closer, sdr: r.sdr, produto: r.produto, status: r.status, date: r.date ? +r.date : 0, onde: 'reunião' });
+  });
+  lista.sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
+  _vsrAchados = lista.slice(0, qn || qd ? 25 : 8);
+  if (!LD.carregado && !(V2.rows || []).length) { el.innerHTML = '<div style="font-size:.8rem;color:var(--muted);">Carregando os leads…</div>'; return; }
+  if (!_vsrAchados.length) { el.innerHTML = '<div style="font-size:.8rem;color:var(--muted);">Ninguém com esse nome ou número. Confira ou use "Cliente novo".</div>'; return; }
+  el.innerHTML = (qn || qd ? '' : '<div style="font-size:.72rem;color:var(--muted);font-weight:600;">Mais recentes — digite para procurar</div>')
+    + _vsrAchados.map(function(x, i) {
+      var dt = x.date ? new Date(x.date).toLocaleDateString('pt-BR') : '';
+      var info = [x.cel, x.insta ? '@' + String(x.insta).replace(/^@+/, '') : '', x.status || '', x.produto || '', dt].filter(Boolean).map(dspEsc).join(' · ');
+      return '<button type="button" class="btn" onclick="vsrEscolher(' + i + ')" style="text-align:left;background:var(--card);color:var(--text);border:1px solid var(--border);padding:10px 12px;">'
+        + '<b>' + dspEsc(x.nome || '(sem nome)') + '</b><br><span style="font-size:.74rem;color:var(--muted);font-weight:600;">' + info + '</span></button>';
+    }).join('');
+}
+function vsrEscolher(i) {
+  var ov = document.getElementById('vsr-pick'); if (ov) ov.remove();
+  var x = i >= 0 ? _vsrAchados[i] : null;
+  if (!x) { abrirFormVenda({ vendedor: _vendedorLogado(), sdr: 'Sem SDR', obs: 'Venda sem reunião (direta)' }); return; }
+  var l = x.lead || null;   // venda sem reunião = sem SDR (Bruno 30/09/2026)
+  var ck = ''; try { ck = l ? clintLink(l) : clintLink({ tel: x.cel }); } catch (e) {}
+  abrirFormVenda({ nome: x.nome, cel: x.cel, email: x.email || '', insta: _instaHandle(x.insta || ''), seg: x.seg || '',
+    vendedor: _vendedorLogado(), sdr: 'Sem SDR', programa: x.produto || '', clint: ck, obs: 'Venda sem reunião (direta)' });
 }
 function abrirFormVenda(dados) {
   if (soOlhar()) return;
@@ -15290,23 +15347,23 @@ function alternarEdicaoPag() {
 // etiqueta com ?action=ping (deve responder "versao") e trocar o endereço aqui.
 // Endereço atual: implantação de 18/08/2026, código v26 (Meta Ads + base do diagnóstico).
 // Endereços antigos (reserva, código velho):
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (1ª implantação)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (2ª implantação)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (3ª implantação, v7)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (4ª implantação, v8)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (5ª implantação, v9)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (6ª implantação, v11)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (7ª implantação, v12)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (8ª implantação, v13)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (9ª implantação, v15)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (10ª implantação, v16)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (11ª implantação, v17)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (12ª implantação, v19)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (13ª implantação, v21)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (05/09 17h, sem aba697f)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (05/09 18h, sem 89f7ce8)
-// https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec (05/09 19h, sem clintMensagensBrutas)
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzIGmWDgEFljyufypcLtCjnqgk7mA6K8gHfbXII8bpuV_SStWkQcwLTge6Tv4Hewr4W/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (1ª implantação)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (2ª implantação)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (3ª implantação, v7)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (4ª implantação, v8)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (5ª implantação, v9)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (6ª implantação, v11)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (7ª implantação, v12)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (8ª implantação, v13)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (9ª implantação, v15)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (10ª implantação, v16)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (11ª implantação, v17)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (12ª implantação, v19)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (13ª implantação, v21)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (05/09 17h, sem aba697f)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (05/09 18h, sem 89f7ce8)
+// https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec (05/09 19h, sem clintMensagensBrutas)
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyVXuWuCJFMybmISeCcXqJE1ftaewEdlI-3YSpX-lYKKKY1JuwcxCpDZjpN_gC-d2sf/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
 function sendToGAS(data) {
   return new Promise(function(resolve) {
