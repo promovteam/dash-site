@@ -2658,7 +2658,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-1519';
+var VERSAO_DASH = '2026-09-30-1702';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4671,7 +4671,11 @@ function abrirFormVendaGoogle(dados) {
   }
   var partes = [];
   Object.keys(FORM_VENDA_CAMPOS).forEach(function(k) {
-    if (dados[k] && FORM_VENDA_CAMPOS[k]) partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(String(dados[k])));
+    if (!dados[k] || !FORM_VENDA_CAMPOS[k]) return;
+    var vf = String(dados[k]);
+    // valor: "5000,00" (vírgula nos centavos, sem ponto nem R$) — pedido do financeiro 30/09/2026
+    if (k === 'valor') { var nv = parseFloat(vf.replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); if (nv > 0) vf = nv.toFixed(2).replace('.', ','); }
+    partes.push(FORM_VENDA_CAMPOS[k] + '=' + encodeURIComponent(vf));
   });
   window.open(FORM_VENDA_URL + (partes.length ? '?usp=pp_url&' + partes.join('&') : ''), '_blank');
 }
