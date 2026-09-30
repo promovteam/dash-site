@@ -190,7 +190,7 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
     <!-- 2. CONTATO -->
     <div class="etapa" data-etapa="contato">
       <div class="grupo">
-        <div class="campo" data-c="cel"><label for="cel">Celular com WhatsApp</label><input id="cel" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(00) 00000-0000" maxlength="15" enterkeyhint="next"><div class="msg"></div></div>
+        <div class="campo" data-c="cel"><label for="cel">Celular com WhatsApp</label><input id="cel" type="tel" inputmode="tel" autocomplete="tel" placeholder="(00) 00000-0000" maxlength="20" enterkeyhint="next"><div class="msg">Mora fora do Brasil? Comece com + e o código do país.</div></div>
         <div class="campo" data-c="email"><label for="email">E-mail</label><input id="email" type="email" inputmode="email" autocomplete="email" placeholder="voce@email.com" autocapitalize="off" spellcheck="false" enterkeyhint="next"><div class="msg"></div></div>
         <div class="campo" data-c="insta"><label for="insta">Instagram <small>o seu @</small></label><input id="insta" placeholder="@seuperfil" autocapitalize="off" spellcheck="false" enterkeyhint="next"><div class="msg"></div></div>
         <div class="campo" data-c="nicho"><label for="nicho">Seu nicho <small>área de atuação</small></label><input id="nicho" placeholder="Ex.: igreja, saúde, finanças" enterkeyhint="done"><div class="msg"></div></div>
@@ -223,7 +223,7 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
           <div class="campo" data-c="d-cpf"><label for="d-cpf">CPF</label><input id="d-cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14"><div class="msg"></div></div>
           <div class="campo" data-c="d-rg"><label for="d-rg">RG</label><input id="d-rg" placeholder="Número do RG" maxlength="18"><div class="msg"></div></div>
         </div>
-        <div class="campo" data-c="d-cel"><label for="d-cel">Celular</label><input id="d-cel" type="tel" inputmode="tel" placeholder="(00) 00000-0000" maxlength="15"><div class="msg"></div></div>
+        <div class="campo" data-c="d-cel"><label for="d-cel">Celular</label><input id="d-cel" type="tel" inputmode="tel" placeholder="(00) 00000-0000" maxlength="20"><div class="msg"></div></div>
         <div class="campo" data-c="d-email"><label for="d-email">E-mail</label><input id="d-email" type="email" inputmode="email" placeholder="email@exemplo.com" autocapitalize="off" spellcheck="false"><div class="msg"></div></div>
         <label class="check"><input type="checkbox" id="d-mesmo" checked><span><b>Mora no mesmo endereço</b> que eu</span></label>
         <div class="campo" data-c="d-end" id="d-end-box" hidden><label for="d-end">Endereço completo com CEP</label><input id="d-end" placeholder="Rua, número, bairro, cidade, UF, CEP"><div class="msg"></div></div>
@@ -330,7 +330,8 @@ var GAS_URL = 'https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud
   var MASC = {
     cpf: function (v) { var d = dig(v).slice(0, 11); return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2'); },
     cnpj: function (v) { var d = dig(v).slice(0, 14); return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2'); },
-    cel: function (v) { var d = dig(v).replace(/^55(?=\d{10,11}$)/, '').slice(0, 11); if (d.length <= 2) return d ? '(' + d : ''; if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2); if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6); return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7); },
+    cel: function (v) { if (/^\s*\+(?!\s*55)/.test(String(v || ''))) return String(v).replace(/[^\d+ ()-]/g, '').slice(0, 20);   // número de fora: fica como a pessoa digitou
+      var d = dig(v).replace(/^55(?=\d{10,11}$)/, '').slice(0, 11); if (d.length <= 2) return d ? '(' + d : ''; if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2); if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6); return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7); },
     cep: function (v) { var d = dig(v).slice(0, 8); return d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d; },
     nasc: function (v) { var d = dig(v).slice(0, 8); if (d.length > 4) return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4); if (d.length > 2) return d.slice(0, 2) + '/' + d.slice(2); return d; }
   };
@@ -343,6 +344,7 @@ var GAS_URL = 'https://script.google.com/macros/s/AKfycbyrDshTub-m5_h1nmGglwW_Ud
   // ---------- regras de cada campo (vazio = ok) ----------
   function nomeOk(v) { var p = String(v).trim().split(/\s+/).filter(Boolean); if (p.length < 2) return 'Escreva o nome completo (nome e sobrenome)'; if (/[0-9@#$%]/.test(v)) return 'O nome não pode ter números ou símbolos'; return ''; }
   function celOk(v) {
+    if (/^\s*\+(?!\s*55)/.test(String(v || ''))) { var n = dig(v).length; return n >= 8 && n <= 15 ? '' : 'Número de fora do Brasil: + código do país e o número (ex.: +44 7700 900123)'; }
     var d = dig(v).replace(/^55(?=\d{10,11}$)/, '');
     if (d.length !== 11 && d.length !== 10) return 'Celular com DDD: (00) 00000-0000';
     if (DDDS.indexOf(+d.slice(0, 2)) < 0) return 'Esse DDD não existe — confira os dois primeiros números';

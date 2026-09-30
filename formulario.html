@@ -1837,7 +1837,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
   function lev(a, b) { var m = [], i, j; for (i = 0; i <= b.length; i++) m[i] = [i]; for (j = 0; j <= a.length; j++) m[0][j] = j; for (i = 1; i <= b.length; i++) for (j = 1; j <= a.length; j++) m[i][j] = b[i - 1] === a[j - 1] ? m[i - 1][j - 1] : Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1); return m[b.length][a.length]; }
   function cpfOk(v) { var c = dig(v); if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false; for (var t = 9; t < 11; t++) { var s = 0; for (var i = 0; i < t; i++) s += +c[i] * (t + 1 - i); if (+c[t] !== (s * 10) % 11 % 10) return false; } return true; }
   function cnpjOk(v) { var c = dig(v); if (c.length !== 14 || /^(\d)\1{13}$/.test(c)) return false; var k = function (n) { var p = n === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2], s = 0; for (var i = 0; i < n; i++) s += +c[i] * p[i]; var r = s % 11; return r < 2 ? 0 : 11 - r; }; return k(12) === +c[12] && k(13) === +c[13]; }
-  function celErro(v) { var d = dig(v).replace(/^55(?=\d{10,11}$)/, ''); if (d.length !== 10 && d.length !== 11) return 'Celular com DDD: (00) 00000-0000'; if (DDDS.indexOf(+d.slice(0, 2)) < 0) return 'Esse DDD não existe'; if (d.length === 11 && d[2] !== '9') return 'Celular começa com 9 depois do DDD'; return ''; }
+  // número de fora do Brasil (Bruno 30/09/2026: "e quando o lead for de fora"): + código do país e o número, 8 a 15 dígitos
+  function celErro(v) { if (/^\s*\+(?!\s*55)/.test(String(v || ''))) { var n = dig(v).length; return n >= 8 && n <= 15 ? '' : 'Número de fora: + código do país e o número (ex.: +44 7700 900123)'; } var d = dig(v).replace(/^55(?=\d{10,11}$)/, ''); if (d.length !== 10 && d.length !== 11) return 'Celular com DDD: (00) 00000-0000'; if (DDDS.indexOf(+d.slice(0, 2)) < 0) return 'Esse DDD não existe'; if (d.length === 11 && d[2] !== '9') return 'Celular começa com 9 depois do DDD'; return ''; }
   function emailErro(v, id) {
     var e = String(v || '').trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}(\.[a-z]{2,})?$/.test(e)) return 'E-mail inválido — confira o @ e o final';
     var dom = e.split('@')[1], sug = ''; if (DOM.indexOf(dom) < 0) DOM.forEach(function (d) { if (!sug && lev(dom, d) <= 2) sug = d; });
@@ -2376,8 +2377,10 @@ function guruBotaoPagamento(cfg) {
     + '<button type="button" class="btn" id="' + X + '-copiar" style="width:100%;margin-top:6px">📋 Copiar mensagem</button></div>';
   val.closest('.f').parentNode.insertBefore(box, val.closest('.f').nextSibling);
   var msgEl = $(X + '-msg'), op = $(X + '-op');
-  function cel() { var c = g(P + 'cel').replace(/\D/g, '') || String(q.cel || '').replace(/\D/g, ''); return c.length >= 12 && c.indexOf('55') === 0 ? c.slice(2) : c; }
-  function rastros() { return [['src', g(cfg.vendedor) || q.vendedor || ''], ['sck', String(q.cel || cel()).replace(/\D/g, '').slice(-8)]]; }
+  function celBruto() { return g(P + 'cel') || String(q.cel || ''); }
+  // número de fora: não vai no link (a Guru pediria DDI 55); o cliente digita o dele no checkout
+  function cel() { if (/^\s*\+(?!\s*55)/.test(celBruto())) return ''; var c = celBruto().replace(/\D/g, ''); return c.length >= 12 && c.indexOf('55') === 0 ? c.slice(2) : c; }
+  function rastros() { return [['src', g(cfg.vendedor) || q.vendedor || ''], ['sck', String(q.cel || celBruto()).replace(/\D/g, '').slice(-8)]]; }
   function montar(url, comDados) {
     var ps = (comDados ? [['name', g(P + 'nome') || q.nome || ''], ['email', g(P + 'email').toLowerCase()], ['doc', g(P + 'cpf').replace(/\D/g, '')], ['phone', cel()], ['phone_local_code', cel() ? '55' : '']] : []).concat(rastros()).filter(function (x) { return x[1]; });
     return url + (url.indexOf('?') >= 0 ? '&' : '?') + ps.map(function (x) { return x[0] + '=' + encodeURIComponent(x[1]); }).join('&');

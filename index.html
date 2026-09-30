@@ -2645,7 +2645,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-1145';
+var VERSAO_DASH = '2026-09-30-1212';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3663,15 +3663,26 @@ function igAvatar(r, tamanho) {
   var st = 'background:linear-gradient(135deg,' + v2grad(nome) + ');position:relative;'
     + (tamanho ? 'width:' + tamanho + 'px;height:' + tamanho + 'px;font-size:.66rem;' : '');
   return '<div class="avatar" style="' + st + '">' + v2ini(nome)
-    + (foto ? '<img src="' + foto + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+    + (foto ? '<img loading="lazy" decoding="async" src="' + foto + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
     + '</div>';
 }
+// 🖼️ FOTO DO DRIVE PELO ENDEREÇO DIRETO (Bruno 30/09/2026: "que abra vídeos e imagens rápido"): o drive.google.com/thumbnail
+// manda o navegador NÃO guardar a imagem (baixava tudo de novo a cada abertura do dash) e ainda desvia para o endereço do
+// Google — direto é 2 a 3x mais rápido e fica guardado 1 dia. Se a foto não abrir por ele (arquivo fechado), o dash tenta
+// uma vez o endereço antigo antes do plano B de cada tela (tirar a foto, pedir a capa ao robô...).
+function driveImg(id, w) { return id ? 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id) + '=w' + (w || 400) : ''; }
+document.addEventListener('error', function(e) {
+  var im = e.target; if (!im || im.tagName !== 'IMG' || im._driveVolta) return;
+  var m = /^https:\/\/lh3\.googleusercontent\.com\/d\/([^=?#\/]+)=w(\d+)/.exec(im.getAttribute('src') || ''); if (!m) return;
+  im._driveVolta = true; e.stopPropagation();   // o onerror da tela só roda se o endereço antigo também falhar
+  im.src = 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w' + m[2];
+}, true);
 // o rosto da pessoa: a foto guardada no Drive pelo robô
 function igFotoDe(insta) {
   var u = String(insta || '').trim().toLowerCase().replace(/^@+/, '');
   if (!u) return '';
   var pf = IGO.perfil[u];
-  return (pf && pf.foto) ? 'https://drive.google.com/thumbnail?id=' + pf.foto + '&sz=w120' : '';
+  return (pf && pf.foto) ? driveImg(pf.foto, 120) : '';
 }
 function igPedidoDoLead(l) {
   if (!l || !IGO.carregado) return null;
@@ -4281,7 +4292,7 @@ setTimeout(function(){ try { carregarIGOrganico(); } catch (e) {} }, 4000);
 function fotoDoPost(link) {
   var lk = String(link || '').trim();
   var p = POSTS_ORG.porLink[lk] || POSTS_ORG.porCodigo[_igCodigoDash(lk)];
-  return p && p.fotoId ? 'https://drive.google.com/thumbnail?id=' + p.fotoId + '&sz=w400' : '';
+  return p && p.fotoId ? driveImg(p.fotoId, 400) : '';
 }
 // ===== capas dos posts na aba Criativos (Bruno 10/09/2026: o embed do Instagram vinha preto) =====
 // preenche as capas que ainda estao vazias com a foto guardada no Drive
@@ -4429,7 +4440,7 @@ function listarAnunciosEscolha(txt) {
     return '<div class="click" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.05);cursor:pointer;"'
       + ' onmouseover="this.style.background=\'rgba(185,138,255,.14)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'"'
       + ' onclick="salvarAnuncioEscolhido(' + JSON.stringify(x.nome).replace(/"/g, '&quot;') + ')">'
-      + (x.foto ? '<img src="' + x.foto + '" style="width:38px;height:38px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
+      + (x.foto ? '<img loading="lazy" decoding="async" src="' + x.foto + '" style="width:38px;height:38px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
                 : '<span style="width:38px;height:38px;border-radius:8px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;flex-shrink:0;">📣</span>')
       + '<b style="flex:1;font-size:.77rem;">' + x.nome + '</b>'
       + '<span style="color:#b98aff;font-weight:800;font-size:.66rem;">usar →</span></div>';
@@ -9864,7 +9875,7 @@ function renderAnuncios() {
                   +   '<span style="font-size:1.9rem;opacity:.55;">📱</span>'
                   +   '<span style="font-size:.62rem;color:var(--muted);font-weight:700;">' + (temCodigo ? 'buscando a capa…' : 'post do Instagram') + '</span></span>';
               })()
-            : (m.foto ? '<img src="' + m.foto + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : ''))
+            : (m.foto ? '<img loading="lazy" decoding="async" src="' + m.foto + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.querySelector(\'.semfoto\').style.display=\'flex\';this.style.display=\'none\'">' : ''))
       +   (ehPost ? '' : (function(){
               if (m.foto) return '<span class="semfoto" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:1.7rem;opacity:.35;">📣</span>';
               // sem imagem: em vez do megafone, mostra o que aquela origem é
@@ -10541,7 +10552,7 @@ function abrirCriativo(nome, jaTocar, manterPer) {
     + '</div>'
     + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
     +   '<div style="flex:1;min-width:300px;">'
-    +     (!ehPostOrg && m.foto && !player ? '<img src="' + m.foto + '" style="width:100%;border-radius:12px;display:block;">' : '')   // com o player, a foto vira o fundo dele enquanto carrega
+    +     (!ehPostOrg && m.foto && !player ? '<img loading="lazy" decoding="async" src="' + m.foto + '" style="width:100%;border-radius:12px;display:block;">' : '')   // com o player, a foto vira o fundo dele enquanto carrega
     +     (player
           ? '<div id="cri-post" style="margin-top:8px;">'
             + (ehCatalogo ? '<div class="hint">Anúncio de catálogo: a prévia do Facebook mostra etiquetas como {{product.name}} porque o texto é montado na hora da entrega.</div>' : '')
@@ -10698,7 +10709,7 @@ function verLeadsDoAnuncio(chave) {
           + ' style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:11px;background:' + (grande ? 'rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.35)' : 'rgba(255,255,255,.05)') + ';flex-wrap:wrap;cursor:pointer;"'
           + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'">'
           + '<div class="avatar" style="width:32px;height:32px;font-size:.66rem;flex-shrink:0;position:relative;background:linear-gradient(135deg,' + v2grad(l.nome || '?') + ');' + (grande ? 'box-shadow:0 0 0 2px #ffd166;' : '') + '">' + v2ini(l.nome || '?')
-          +   (igFotoDe(l.insta) ? '<img src="' + igFotoDe(l.insta) + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+          +   (igFotoDe(l.insta) ? '<img loading="lazy" decoding="async" src="' + igFotoDe(l.insta) + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
           + '</div>'
           + '<div style="flex:1;min-width:130px;"><b style="font-size:.77rem;">' + (l.nome || '(sem nome)') + '</b>'
           +   (grande ? '<span class="ld-tag" style="margin-left:6px;background:rgba(255,209,102,.18);color:#ffd166;font-weight:800;">👥 ' + (l._igSegN >= 1000 ? Math.round(l._igSegN / 1000) + 'k' : l._igSegN) + '</span>' : '')
@@ -11446,7 +11457,7 @@ function crmQuadro(lista) {
         blocoPost = '<div class="crm-post" title="clique para ver o post aqui dentro do dash"'
           + ' onclick="event.stopPropagation();crmVerPost(' + JSON.stringify(pd.post).replace(/"/g, '&quot;') + ')">'
           // SEM loading="lazy": dentro das colunas roláveis do quadro o "preguiçoso" nunca dispara (bug visto em 30/08)
-          + (fotoPost ? '<img src="' + fotoPost + '" onerror="this.outerHTML=\'<span class=crm-post-sem>📷</span>\'">' : '<span class="crm-post-sem">📷</span>')
+          + (fotoPost ? '<img loading="lazy" decoding="async" src="' + fotoPost + '" onerror="this.outerHTML=\'<span class=crm-post-sem>📷</span>\'">' : '<span class="crm-post-sem">📷</span>')
           + '<div><span class="crm-post-t">veio do post' + ((qd2 && !isNaN(qd2)) ? ' de ' + qd2.toLocaleDateString('pt-BR').slice(0, 5) : '')
           + (infoPost && infoPost.pedidos ? ' · ' + infoPost.pedidos + ' pedidos' : '') + (pd.vezes > 1 ? ' · ' + pd.vezes + 'x' : '') + '</span>'
           + (pd.texto ? '<i>"' + String(pd.texto).slice(0, 60).replace(/"/g, "'") + '"</i>' : '') + '</div></div>';
@@ -11462,7 +11473,7 @@ function crmQuadro(lista) {
         + ' onclick="crmAbrirPerfil(event, \'' + (x.insta || '') + '\')" data-insta="' + (x.insta || '') + '">'
         + '<div class="crm-topo">'
         +   '<div class="avatar" style="width:38px;height:38px;font-size:.7rem;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(nomeReal)
-        +     (fotoP ? '<img src="' + fotoP + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+        +     (fotoP ? '<img loading="lazy" decoding="async" src="' + fotoP + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
         +   '</div>'
         +   '<div style="flex:1;min-width:0;">'
         +     '<b class="crm-nome">' + nomeReal + '</b>'
@@ -11825,7 +11836,7 @@ function crmVerPerfil(insta) {
   ov.innerHTML = '<div class="modal" style="width:min(430px,94vw);padding:20px;">'
     + '<div style="display:flex;align-items:center;gap:14px;">'
     +   '<div class="avatar" style="width:64px;height:64px;font-size:1.05rem;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,' + v2grad(x.nome || u) + ');">' + v2ini(x.nome || u)
-    +     (foto ? '<img src="' + foto.replace('sz=w120', 'sz=w240') + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;">' : '')
+    +     (foto ? '<img loading="lazy" decoding="async" src="' + foto.replace(/=w120$/, '=w240') + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;">' : '')
     +   '</div>'
     +   '<div style="flex:1;min-width:0;">'
     +     '<b style="font-size:1rem;">' + (x.nome || pf.nome || '@' + u) + '</b>'
@@ -11841,7 +11852,7 @@ function crmVerPerfil(insta) {
     + '<div style="margin-top:12px;" onclick="event.stopPropagation();">' + seloEtapaCrm(x) + '</div>'
     + (pd
         ? '<div class="crm-post" style="margin-top:14px;cursor:pointer;" onclick="crmVerPost(' + JSON.stringify(pd.post).replace(/"/g, '&quot;') + ')">'
-          + (fotoPost ? '<img src="' + fotoPost + '" onerror="this.outerHTML=\'<span class=crm-post-sem>📷</span>\'">' : '<span class="crm-post-sem">📷</span>')
+          + (fotoPost ? '<img loading="lazy" decoding="async" src="' + fotoPost + '" onerror="this.outerHTML=\'<span class=crm-post-sem>📷</span>\'">' : '<span class="crm-post-sem">📷</span>')
           + '<div><span class="crm-post-t">veio do post' + ((qd && !isNaN(qd)) ? ' de ' + qd.toLocaleDateString('pt-BR').slice(0, 5) : '') + (pd.vezes > 1 ? ' · comentou ' + pd.vezes + 'x' : '') + '</span>'
           + (pd.texto ? '<i>"' + String(pd.texto).slice(0, 90).replace(/"/g, "'") + '"</i>' : '<i>clique para ver o post aqui dentro</i>') + '</div></div>'
         : '')
@@ -12653,7 +12664,7 @@ function comentSecaoHtml() {
         var quando = x.date ? x.date.toLocaleDateString('pt-BR').slice(0,5) + ' ' + ('0'+x.date.getHours()).slice(-2) + ':' + ('0'+x.date.getMinutes()).slice(-2) : '';
         h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);flex-wrap:wrap;">'
           + '<div class="avatar" style="width:30px;height:30px;font-size:.66rem;position:relative;background:linear-gradient(135deg,' + v2grad(x.nome || x.insta || '?') + ');">' + v2ini(x.nome || x.insta || '?')
-          + (igFotoDe(x.insta) ? '<img src="' + igFotoDe(x.insta) + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+          + (igFotoDe(x.insta) ? '<img loading="lazy" decoding="async" src="' + igFotoDe(x.insta) + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
           + '</div>'
           + '<b style="font-size:.76rem;flex:1;min-width:110px;">' + (x.nome || (x.insta ? '@' + x.insta : 'Sem nome')) + '</b>'
           + (x.seguidores ? '<span class="ld-tag" style="background:rgba(110,168,255,.15);color:#6ea8ff;">👥 ' + x.seguidores + ' seg.</span>' : '')
@@ -12915,7 +12926,7 @@ function abrirFichaLead(i) {
         if (aa.tem && aa.organico) {   // post organico aparece COMO os pagos (foto do print)
           var fo = fotoDoPost(aa.post.link);
           return '<div style="display:flex;align-items:center;gap:9px;justify-content:flex-end;flex-wrap:wrap;">'
-            + (fo ? '<a href="' + (aa.post.link || '#') + '" target="_blank"><img src="' + fo + '" style="width:74px;height:74px;object-fit:cover;border-radius:9px;border:1px solid rgba(61,220,151,.4);"></a>' : '')
+            + (fo ? '<a href="' + (aa.post.link || '#') + '" target="_blank"><img loading="lazy" decoding="async" src="' + fo + '" style="width:74px;height:74px;object-fit:cover;border-radius:9px;border:1px solid rgba(61,220,151,.4);"></a>' : '')
             + '<div style="text-align:right;"><b>📱 ' + aa.txt + '</b>'
             + '<div class="hint" style="margin-top:2px;">post orgânico</div>'
             + '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap;">'
@@ -12958,7 +12969,7 @@ function abrirFichaLead(i) {
         var foto = cri && cri.foto ? cri.foto : '';
         var link = (cri && cri.link) || (m && m.link) || '';
         var txt = '<div style="display:flex;align-items:center;gap:9px;justify-content:flex-end;flex-wrap:wrap;">'
-          + (foto ? '<img src="' + foto + '" style="width:74px;height:74px;object-fit:cover;border-radius:9px;border:1px solid rgba(255,255,255,.14);cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')" title="Clique para ver o anúncio inteiro">' : '')
+          + (foto ? '<img loading="lazy" decoding="async" src="' + foto + '" style="width:74px;height:74px;object-fit:cover;border-radius:9px;border:1px solid rgba(255,255,255,.14);cursor:pointer;" onclick="abrirCriativo(' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')" title="Clique para ver o anúncio inteiro">' : '')
           + '<div style="text-align:right;"><b>' + nm + '</b>'
           + (!foto && LD.modoSimples ? '<div style="font-size:.66rem;color:#f6a350;">abra pelo site para ver a imagem</div>' : '')
           + (m && m.gasto ? '<div style="font-size:.68rem;color:var(--muted);font-weight:600;">R$ ' + Math.round(m.gasto).toLocaleString('pt-BR') + ' investidos neste anúncio</div>' : '')
@@ -14528,18 +14539,18 @@ function mostrarFormularioDoLead(r) {
         if (!fo) return '';
         return '<div style="margin-top:8px;text-align:right;">'
           + '<a href="#" onclick="event.preventDefault();crmVerPost(' + JSON.stringify(pd.post).replace(/"/g, '&quot;') + ')">'
-          + '<img src="' + fo + '" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:1px solid rgba(61,220,151,.4);"'
+          + '<img loading="lazy" decoding="async" src="' + fo + '" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:1px solid rgba(61,220,151,.4);"'
           + ' title="post de onde veio (pelo comentário' + (pd.texto ? ': "' + String(pd.texto).slice(0, 40).replace(/"/g, "'") + '"' : '') + ') — clique para ver aqui dentro"></a></div>';
       })()
     + (a.organico ? (function(){
         var fo = fotoDoPost(a.post && a.post.link);
         return '<div style="margin-top:8px;text-align:right;">'
-          + (fo ? '<a href="' + (a.post.link || '#') + '" target="_blank"><img src="' + fo + '" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:1px solid rgba(61,220,151,.4);" title="post orgânico — clique para abrir"></a>'
+          + (fo ? '<a href="' + (a.post.link || '#') + '" target="_blank"><img loading="lazy" decoding="async" src="' + fo + '" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:1px solid rgba(61,220,151,.4);" title="post orgânico — clique para abrir"></a>'
                 : '<button class="btn-assumir" style="padding:6px 12px;font-size:.7rem;background:rgba(61,220,151,.14);color:#3ddc97;border:1px solid rgba(61,220,151,.4);" onclick="escolherAnuncio(\'' + (l.tel8 || '') + '\')">📷 colar o print do post (vira a foto para todos)</button>')
           + '</div>';
       })() : '')
     + (a.cri && a.cri.foto
-        ? '<div style="margin-top:10px;text-align:center;"><img src="' + a.cri.foto + '" onclick="abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')"'
+        ? '<div style="margin-top:10px;text-align:center;"><img loading="lazy" decoding="async" src="' + a.cri.foto + '" onclick="abrirCriativo(' + JSON.stringify(a.nome).replace(/"/g, '&quot;') + ')"'
           + ' style="max-width:100%;max-height:200px;border-radius:12px;cursor:pointer;border:1px solid rgba(255,255,255,.12);" title="clique para ver o anúncio inteiro"></div>'
         : '')
     + '<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap;">'
@@ -15691,7 +15702,7 @@ function gravCapaImg(vid) {
   if (c) return '<img alt="" data-vid="' + gravEsc(vid) + '" data-pede="1">';   // (a imagem guardada entra pelo gravCapaVigiar — não vai no texto da página)
   if (c === '') return '';   // o robô já disse que este vídeo não tem capa
   if (gravCapaModoRobo()) return '<img alt="" data-vid="' + gravEsc(vid) + '" data-pede="1">';
-  return '<img loading="lazy" alt="" data-vid="' + gravEsc(vid) + '" src="https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w640" onerror="gravCapaFalhou(this)">';
+  return '<img loading="lazy" alt="" data-vid="' + gravEsc(vid) + '" src="' + driveImg(vid, 640) + '" onerror="gravCapaFalhou(this)">';
 }
 function gravCapaFalhou(img) {
   if (img._robo || !img.getAttribute('data-vid')) { img.remove(); return; }
@@ -16249,7 +16260,7 @@ function gravAbrir(i, foco) {
     +     (vid ? '<button class="btn gv-cine-bt" id="gv-cine" onclick="gvCinema()" title="Vídeo maior, conversa ao lado">' + (cine ? '🗗 Sair do cinema' : '⛶ Cinema') + '</button>' : '')
     +   '</div></header>'
     + '<div class="gv-corpo">'
-    +   '<section class="gv-esq"><div class="gv-palco"><div class="gv-video"' + (vid ? ' data-vid="' + gravEsc(vid) + '" style="background-image:url(\'' + (GRAV.capas[vid] || 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w1280') + '\')"' : '') + '>'
+    +   '<section class="gv-esq"><div class="gv-palco"><div class="gv-video"' + (vid ? ' data-vid="' + gravEsc(vid) + '" style="background-image:url(\'' + (GRAV.capas[vid] || driveImg(vid, 1280)) + '\')"' : '') + '>'
     +     (dentro ? '<iframe id="gv-frame" src="about:blank" data-src="https://drive.google.com/file/d/' + encodeURIComponent(vid) + '/preview?autoplay=1" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Gravação" style="display:none"></iframe>'
              + '<video id="gv-player" class="gv-player" controls playsinline autoplay preload="auto" data-src="' + gvPlayerSrc(vid) + '"></video><div class="gv-carrega"><i></i>abrindo o vídeo…</div>'
              + (cel ? '' : '<button type="button" class="gv-fora-bt" onclick="gvForaDaTela()" title="O vídeo sai do dash e fica flutuando por cima de tudo — dá para mexer no dash, no Instagram, na Clint">⧉ Assistir fora da tela</button>')
@@ -19621,14 +19632,14 @@ function agProcurar(txt) {
       + ' onmouseover="this.style.background=\'rgba(110,168,255,.12)\'" onmouseout="this.style.background=\'rgba(255,255,255,.05)\'"'
       + ' onclick="agUsarDaLista(' + i + ');fecharBuscaLead();">'
       + '<div class="avatar" style="width:38px;height:38px;font-size:.72rem;position:relative;flex-shrink:0;background:linear-gradient(135deg,' + v2grad(l.nome || l.insta || '?') + ');">' + v2ini(l.nome || l.insta || '?')
-      +   (igFotoDe(l.insta) ? '<img src="' + igFotoDe(l.insta) + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
+      +   (igFotoDe(l.insta) ? '<img loading="lazy" decoding="async" src="' + igFotoDe(l.insta) + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;">' : '')
       + '</div>'
       + '<div style="flex:1;min-width:0;">'
       +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b style="font-size:.8rem;">' + (l.nome || '(sem nome)') + '</b>' + selo + jaTeve + seloVezes(l) + seloVoltou(l) + seloChance(l, true) + '</div>'
       +   '<div class="hint" style="margin-top:2px;">' + [l.tel, l.insta ? '@' + String(l.insta).replace(/^@/, '') : '', (l.dataTxt || '').slice(0, 10)].filter(Boolean).join(' · ') + '</div>'
       +   '<div style="margin-top:3px;">' + seloAnuncio(l, true) + igSeloLead(l, true) + '</div>'
       + '</div>'
-      + (cri && cri.foto ? '<img src="' + cri.foto + '" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid rgba(255,255,255,.12);">' : '')
+      + (cri && cri.foto ? '<img loading="lazy" decoding="async" src="' + cri.foto + '" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid rgba(255,255,255,.12);">' : '')
       + '<span style="color:#6ea8ff;font-weight:800;font-size:.68rem;flex-shrink:0;">usar →</span>'
       + '</div>';
   }).join('');
@@ -19735,7 +19746,7 @@ function agMostrarOrigem(l) {
   };
   cx.innerHTML = '<div class="dtl-card" style="background:' + (l.soClint ? 'rgba(108,71,255,.09);border:1px solid rgba(108,71,255,.35)' : 'rgba(110,168,255,.07);border:1px solid rgba(110,168,255,.3)') + ';padding:10px 12px;margin-bottom:8px;">'
     + '<div style="display:flex;align-items:center;gap:8px;">'
-    +   (cri && cri.foto ? '<img src="' + cri.foto + '" onclick="abrirCriativo(' + JSON.stringify(l.anuncio || '').replace(/"/g, '&quot;') + ')" title="ver o anúncio" style="width:52px;height:52px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid rgba(255,255,255,.15);">' : '')
+    +   (cri && cri.foto ? '<img loading="lazy" decoding="async" src="' + cri.foto + '" onclick="abrirCriativo(' + JSON.stringify(l.anuncio || '').replace(/"/g, '&quot;') + ')" title="ver o anúncio" style="width:52px;height:52px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid rgba(255,255,255,.15);">' : '')
     +   '<div style="flex:1;min-width:0;"><b style="font-size:.74rem;color:' + (l.soClint ? '#8f6bff' : '#6ea8ff') + ';">📍 de onde veio</b>'
     +     '<div class="hint" style="margin-top:2px;">' + (l.soClint ? 'veio da Clint (não preencheu o diagnóstico) — confira o telefone' : 'preenchido da base — confira antes de agendar') + '</div></div>'
     +   '<span style="cursor:pointer;opacity:.6;font-size:.9rem;" onclick="agLimparLead()" title="não é este lead">✕</span>'
@@ -25693,7 +25704,7 @@ function _rlListaMostrar(filtro, ate) {
   if (fim < vis.length) h += '<button class="btn" id="ma-mais" style="width:100%;margin-top:8px;padding:10px;" onclick="_rlListaMostrar(' + rlE(JSON.stringify(filtro || '')) + ',' + fim + ')">Mostrar mais ' + Math.min(80, vis.length - fim) + ' (faltam ' + (vis.length - fim) + ')</button>';
   box.insertAdjacentHTML('beforeend', h);
 }
-function rlGravCapa(x) { var vid = (x.rec || [])[0]; return vid ? ((GRAV.capas && GRAV.capas[vid]) || ('https://drive.google.com/thumbnail?id=' + encodeURIComponent(vid) + '&sz=w640')) : ''; }
+function rlGravCapa(x) { var vid = (x.rec || [])[0]; return vid ? ((GRAV.capas && GRAV.capas[vid]) || driveImg(vid, 640)) : ''; }
 function rlGravLinha(x) {
   var pt = gravPartes(x.t), st = GRAV_ST[gravStatus(x)] || GRAV_ST.agendada, capa = rlGravCapa(x);
   var dt = x.d ? x.d.slice(8, 10) + '/' + x.d.slice(5, 7) + ' · ' + x.d.slice(11, 16) : '';
@@ -25992,7 +26003,7 @@ function rlCriCard(x, i) {
     : '<div><b>' + x.n + '</b><small>leads</small></div><div><b>' + x.re + '</b><small>reuniões</small></div><div class="g"><b>' + (x.fat ? rlMil(x.fat).replace('R$ ', '') : x.vd) + '</b><small>' + (x.fat ? 'vendeu R$' : 'vendas') + '</small></div>';
   return '<div class="rl-cri rl-st" style="--i:' + i + '" tabindex="0" role="button" onclick="' + abre + '" onkeydown="if(event.key===\'Enter\')this.click()" title="Abrir">'
     + '<div class="rl-cri-m' + (x.foto ? '' : ' sem-img') + '"><span class="rl-cri-sem"><em>' + ico + '</em><small>' + rlE(String(x.rot).slice(0, 120)) + '</small></span>'
-    + (x.foto ? '<img src="' + rlE(x.foto) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add(\'sem-img\');this.remove();">' : '')
+    + (x.foto ? '<img loading="lazy" decoding="async" src="' + rlE(x.foto) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add(\'sem-img\');this.remove();">' : '')
     + '<span class="rl-cri-pos">' + (i + 1) + '</span>' + (x.fora ? '<span class="rl-cri-fora">' + rlE(x.fora) + '</span>' : '')
     + (ehVideo || x.fmt === 'reel' ? '<span class="rl-cri-play">▶</span>' : '')
     + '<div class="rl-cri-t"><small>' + (x.ehPost ? ({ reel: 'reels', carrossel: 'carrossel', foto: 'foto' }[x.fmt] || 'post') + ' · orgânico' : x.tipo === 'organico' ? 'link · orgânico' : (ehVideo ? 'vídeo' : 'imagem') + ' · anúncio') + (cpl ? ' · CPL ' + rlMoeda(cpl) : '') + '</small><b>' + rlE(x.rot) + '</b></div></div>'
