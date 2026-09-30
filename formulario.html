@@ -286,7 +286,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--primary)!important;bo
     </div>
 
     <div class="f">
-      <label>Comprovante de pagamento</label>
+      <label>Comprovante de pagamento <span class="req">*</span></label>
       <div class="file-upload" onclick="document.getElementById('v-comprovante').click()">
         <div class="file-upload-icon">📎</div>
         <div class="file-upload-text">Clique para anexar</div>
@@ -656,7 +656,7 @@ var FORM_VENDA_CAMPOS = {
   programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
   nicho: 'entry.1257400668', obs: 'entry.589500904'
 };
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbw6J_GI2yZb0FxXKFzar_21QbgoUQZ8FdOPwqkLDTGJ6cC0eUUHYiXqudQ_jTFTWk6d/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbyiCUfQkS2BTHjJ5Nv6WLPmzmM0R94mIdP6CpDjJnj9LTx-cJDgbzDSKooHCcd1_mYI/exec';
 
 var currentStep = 1;
 var currentMode = 'venda'; // 'venda' or 'bloqueio'
@@ -2309,6 +2309,29 @@ function precoTabela(p) {
   }
   window.__bloqLinkEnviado = function () { esperando = true; rodadas = 0; agendar(); };
   buscar();
+})();
+</script>
+<script>
+// 🧾 SEM COMPROVANTE NÃO REGISTRA (Bruno 29/09/2026: "que não dê para enviar sem comprovante" — Rosani, Anna Carolina e
+// Smyrna entraram sem). Pelo robô: a tela barra e leva até o anexo. Pelo Google Forms: a pergunta do comprovante é obrigatória lá.
+(function () {
+  var inp = document.getElementById('v-comprovante'); if (!inp) return;
+  var box = inp.closest('.f'), up = box && box.querySelector('.file-upload');
+  var aviso = document.createElement('div');
+  aviso.id = 'v-comp-falta'; aviso.hidden = true; aviso.setAttribute('role', 'alert');
+  aviso.style.cssText = 'margin-top:8px;padding:8px 12px;border-radius:10px;font-size:.8rem;line-height:1.45;color:#ffb3b3;background:var(--red-bg);border:1px solid rgba(255,82,82,.4)';
+  aviso.textContent = 'Anexe o comprovante de pagamento — sem ele a venda não é registrada.';
+  if (box) box.appendChild(aviso);
+  inp.addEventListener('change', function () { if (inp.files && inp.files[0]) { aviso.hidden = true; if (up) up.style.borderColor = ''; } });
+  var _sv = window.submitVenda;
+  if (typeof _sv !== 'function') return;
+  window.submitVenda = function () {
+    if (inp.files && inp.files[0]) return _sv.apply(this, arguments);
+    var sec = inp.closest('[id^="v-step"]'), n = sec ? +sec.id.replace('v-step', '') : 0;
+    if (n && typeof currentStep !== 'undefined' && currentStep !== n) { try { document.getElementById('v-step' + currentStep).style.display = 'none'; sec.style.display = 'block'; currentStep = n; updateProgress(); } catch (e) {} }
+    aviso.hidden = false; if (up) up.style.borderColor = 'var(--red)';
+    setTimeout(function () { (up || inp).scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 40);
+  };
 })();
 </script>
 </body>

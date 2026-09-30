@@ -13,9 +13,10 @@
   📝 CADASTRO DO CLIENTE PROMOV (Bruno 28/09/2026: "remodele o de preenchimento do cliente com experiência fluida e fácil de preencher,
   numa experiência premium e fácil, mas com rigor dos dados, pois serão para contrato e nota").
   O closer manda o link; o cliente preenche no celular, passo a passo, com cada dado conferido na hora (CPF/CNPJ pelos dígitos,
-  CEP pelos Correios/ViaCEP, e-mail com aviso de erro de digitação, celular com DDD válido, data real). No fim, "Enviar pelo WhatsApp"
-  manda tudo no formato que a tela de venda do dash entende (colou → os campos se preenchem sozinhos).
-  Nada é gravado em servidor: os dados vão direto do celular do cliente para a conversa com a Promov.
+  CEP pelos Correios/ViaCEP, e-mail com aviso de erro de digitação, celular com DDD válido, data real).
+  No fim, "Enviar meus dados" (29/09/2026, Bruno: "queria algo que já viesse pronto") manda tudo direto para o robô da Promov
+  (aba "Cadastros" da planilha principal): a tela de venda/bloqueio do closer já abre preenchida e ele recebe um aviso no WhatsApp.
+  Se a internet falhar, a página oferece mandar pelo WhatsApp (o texto sai no formato que a tela de venda entende).
   Parâmetros do link: n = primeiro nome · w = WhatsApp da Promov (com 55) · p = programa · c = closer · d=1 = já abre a segunda cadeira
   Depois do # (28/09/2026): d = JSON em base64 com o que o closer já sabe (nome, cel, email, insta, nicho, prog, valor, pgto, dn/dc/de da dupla):
   a página abre preenchida, mostra "Seu programa" com as condições, e a mensagem volta com o bloco PEDIDO para a tela de venda.
@@ -111,6 +112,10 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
 .fim h2 { font-family:var(--disp); font-weight:800; font-size:2rem; line-height:1.05; }
 .fim p { margin:10px auto 0; color:var(--text2); max-width:38ch; font-size:.92rem; }
 .fim .bt { margin-top:18px; width:100%; }
+.fim .gira2 { width:84px; height:84px; margin:0 auto 16px; border-radius:50%; border:3px solid var(--line2); border-top-color:var(--accent); animation:gira .8s linear infinite; }
+.fim.falhou .ok { background:radial-gradient(circle, rgba(246,163,80,.22), rgba(246,163,80,.04)); border-color:rgba(246,163,80,.6); }
+.fim.falhou .ok svg { color:var(--accent); }
+.fim .bt + .bt { margin-top:10px; }
 .plano { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; margin-top:16px; padding:14px 16px; border-radius:18px;
   border:1px solid rgba(246,163,80,.3); background:linear-gradient(135deg, rgba(246,163,80,.13), rgba(255,209,102,.03)); animation:entra .5s cubic-bezier(.22,1,.36,1) both; }
 .plano-ic { grid-row:span 2; width:42px; height:42px; border-radius:13px; display:grid; place-items:center; background:rgba(246,163,80,.18); color:var(--accent2); }
@@ -236,12 +241,14 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
 
     <!-- 6. FIM -->
     <div class="etapa" data-etapa="fim">
-      <div class="fim">
-        <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-        <h2>Prontinho!</h2>
-        <p id="fim-p">Seus dados foram para o WhatsApp. É só apertar <b>enviar</b> lá na conversa.</p>
-        <a class="bt zap" id="fim-zap" href="#" target="_blank" rel="noopener">Abrir o WhatsApp de novo</a>
-        <button type="button" class="bt" id="fim-copiar" style="margin-top:10px;width:100%;">Copiar os dados</button>
+      <div class="fim" id="fim" aria-live="polite">
+        <div class="gira2" id="fim-gira" aria-hidden="true"></div>
+        <div class="ok" id="fim-ok" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path id="fim-svg" d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <h2 id="fim-t">Enviando…</h2>
+        <p id="fim-p">Só um instante — estamos mandando seus dados para a Promov.</p>
+        <button type="button" class="bt pri" id="fim-tentar" hidden>Tentar de novo</button>
+        <a class="bt zap" id="fim-zap" href="#" target="_blank" rel="noopener" hidden>Enviar pelo WhatsApp</a>
+        <button type="button" class="bt" id="fim-copiar" hidden>Copiar os dados</button>
       </div>
     </div>
   </form>
@@ -255,6 +262,8 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
 </div></div>
 
 <script>
+// robô que recebe os dados (o publicar.sh mantém igual ao do dash) — 29/09/2026: os dados vão direto, sem WhatsApp
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbyiCUfQkS2BTHjJ5Nv6WLPmzmM0R94mIdP6CpDjJnj9LTx-cJDgbzDSKooHCcd1_mYI/exec';
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var Q = new URLSearchParams(location.search);
@@ -446,8 +455,8 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
     document.querySelectorAll('.etapa').forEach(function (e) { var on = e.dataset.etapa === nome; e.classList.toggle('on', on); e.classList.toggle('volta', on && !!voltando); });
     $('etapa-nome').textContent = NOMES[nome]; $('etapa-num').textContent = (atual + 1) + ' de ' + ordem.length;
     $('bt-voltar').hidden = atual === 0;
-    $('bt-seguir').textContent = nome === 'revisao' ? 'Enviar pelo WhatsApp' : 'Continuar';
-    $('bt-seguir').className = 'bt ' + (nome === 'revisao' ? 'zap' : 'pri');
+    $('bt-seguir').textContent = nome === 'revisao' ? 'Enviar meus dados' : 'Continuar';
+    $('bt-seguir').className = 'bt pri';
     if (nome === 'revisao') montarRevisao();
     montarPassos();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -508,18 +517,82 @@ body { min-height:100vh; min-height:100dvh; background:var(--bg); color:var(--te
     return L.join('\n');
   }
   function linkZap() { return 'https://wa.me/' + (P.w || '') + '?text=' + encodeURIComponent(texto()); }
+  // 📝 29/09/2026 (Bruno: "queria algo que já viesse pronto"): os dados vão direto para o robô da Promov — a tela de venda
+  // do closer já abre preenchida e ele recebe um aviso. O WhatsApp fica só de reserva, se a internet falhar.
+  var envio = null;
+  function fimEstado(tipo) {
+    var quem = P.c ? P.c.split(' ')[0] : 'a Promov';
+    $('fim').classList.toggle('falhou', tipo === 'falhou');
+    $('fim-gira').hidden = tipo !== 'enviando'; $('fim-ok').hidden = tipo === 'enviando';
+    $('fim-svg').setAttribute('d', tipo === 'falhou' ? 'M12 7v6M12 17h.01' : 'M5 12.5l4.5 4.5L19 7.5');
+    $('fim-tentar').hidden = $('fim-zap').hidden = $('fim-copiar').hidden = tipo !== 'falhou';
+    if (tipo === 'enviando') { $('fim-t').textContent = 'Enviando…'; $('fim-p').textContent = 'Só um instante — estamos mandando seus dados para a Promov.'; }
+    if (tipo === 'ok') { $('fim-t').textContent = 'Prontinho!'; $('fim-p').innerHTML = 'Seus dados <b>chegaram na Promov</b>. ' + esc(quem === 'a Promov' ? 'A equipe' : quem) + ' já recebeu e segue com você' + (P.b ? ' para garantir a sua vaga.' : ' com o contrato.'); $('etapa-nome').textContent = 'Pronto'; }
+    if (tipo === 'falhou') { $('fim-t').textContent = 'Quase lá'; $('fim-p').innerHTML = 'A internet não deixou os dados chegarem agora. <b>Tente de novo</b> — ou mande pelo WhatsApp, que também funciona.'; $('etapa-nome').textContent = 'Falta enviar'; }
+  }
+  function mandar() {
+    var t = texto(), k = dig(H.k || H.cel || v('cel')).slice(-8), cb = 'cadOk' + Date.now(), tent = 0, feito = false;
+    envio = { t: t, k: k };
+    fimEstado('enviando');
+    var pl = { action: 'cadastroCliente', chave: k, cel: v('cel'), nome: v('nome'), closer: P.c, prog: prog, modo: P.b ? 'bloqueio' : 'venda', texto: t };
+    var postar = function () {
+      try { fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ payload: JSON.stringify(pl) }) }).catch(function () {}); } catch (e) {}
+    };
+    // confere se chegou: pergunta ao robô pela marca desse envio (a mesma conta que ele faz)
+    var conferir = function () {
+      if (feito) return; tent++;
+      var s = document.createElement('script'), nome = cb + tent, fimC = function (ok) {
+        try { s.remove(); } catch (e) {} window[nome] = function () {};
+        if (feito) return;
+        if (ok) { feito = true; fimEstado('ok'); try { localStorage.removeItem(CHAVE); } catch (e) {} return; }
+        if (tent === 4) postar();   // não chegou até agora: manda de novo (o robô ignora repetido)
+        if (tent < 8) setTimeout(conferir, 2500); else { feito = true; fimEstado('falhou'); }
+      };
+      window[nome] = function (r) { fimC(!!(r && r.ok)); };
+      s.onerror = function () { fimC(false); };
+      setTimeout(function () { fimC(false); }, 9000);
+      s.src = GAS_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'cadastroConferir', chave: k, marca: marcaDe(k + '|' + t) }));
+      document.body.appendChild(s);
+    };
+    postar();
+    setTimeout(conferir, 2500);
+  }
+  // mesma marca que o robô calcula (MD5 → base64 web, 16 letras)
+  function marcaDe(t) {
+    function md5(str) {
+      var b = unescape(encodeURIComponent(str)), n = b.length, w = [], i;
+      for (i = 0; i < n; i++) w[i >> 2] |= (b.charCodeAt(i) & 255) << ((i % 4) * 8);
+      w[n >> 2] |= 128 << ((n % 4) * 8); w[(((n + 8) >> 6) << 4) + 14] = n * 8;
+      var a = 1732584193, bb = -271733879, c = -1732584194, d = 271733878;
+      var S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21], K = [];
+      for (i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) | 0;
+      for (var o = 0; o < w.length; o += 16) {
+        var A = a, B = bb, C = c, D = d;
+        for (i = 0; i < 64; i++) {
+          var f, g, r = i >> 4;
+          if (r === 0) { f = (B & C) | (~B & D); g = i; } else if (r === 1) { f = (D & B) | (~D & C); g = (5 * i + 1) % 16; } else if (r === 2) { f = B ^ C ^ D; g = (3 * i + 5) % 16; } else { f = C ^ (B | ~D); g = (7 * i) % 16; }
+          var x = (A + f + K[i] + (w[o + g] | 0)) | 0, sh = S[r * 4 + (i % 4)];
+          A = D; D = C; C = B; B = (B + ((x << sh) | (x >>> (32 - sh)))) | 0;
+        }
+        a = (a + A) | 0; bb = (bb + B) | 0; c = (c + C) | 0; d = (d + D) | 0;
+      }
+      var bytes = ''; [a, bb, c, d].forEach(function (q) { for (var j = 0; j < 4; j++) bytes += String.fromCharCode((q >>> (8 * j)) & 255); });
+      return bytes;
+    }
+    return btoa(md5(t)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '').slice(0, 16);
+  }
   function enviar() {
     for (var i = 0; i < ordem.length - 1; i++) if (!etapaOk(ordem[i])) { ir(i, true); return; }
     if (!$('aceite').checked) { $('aceite-msg').textContent = 'Marque a confirmação para enviar'; $('aceite-msg').style.color = 'var(--err)'; return; }
-    var url = linkZap();
-    $('fim-zap').href = url;
-    $('fim-p').innerHTML = 'Seus dados foram para o WhatsApp' + (P.w ? ' da Promov' : '') + '. É só apertar <b>enviar</b> lá na conversa.' + (P.w ? '' : ' Se abrir a lista de conversas, escolha a conversa com a Promov.');
+    $('fim-zap').href = linkZap();
     document.querySelectorAll('.etapa').forEach(function (e) { e.classList.toggle('on', e.dataset.etapa === 'fim'); });
     $('acoes').hidden = true; $('passos').innerHTML = ordem.map(function () { return '<span class="feito"></span>'; }).join('');
-    $('etapa-nome').textContent = 'Pronto'; $('etapa-num').textContent = '';
-    try { localStorage.removeItem(CHAVE); } catch (e) {}
-    window.open(url, '_blank') || (location.href = url);
+    $('etapa-nome').textContent = 'Enviando'; $('etapa-num').textContent = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    mandar();
   }
+  $('fim-tentar').addEventListener('click', mandar);
+  $('fim-zap').addEventListener('click', function () { try { localStorage.removeItem(CHAVE); } catch (e) {} });
   $('aceite').addEventListener('change', function () { $('aceite-msg').textContent = ''; });
   $('fim-copiar').addEventListener('click', function () {
     var t = texto(), b = this;
