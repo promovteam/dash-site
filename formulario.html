@@ -656,7 +656,7 @@ var FORM_VENDA_CAMPOS = {
   programa: 'entry.1389741025', teveEntrada: 'entry.585138525', teveBloqueio: 'entry.70779333', valor: 'entry.978346318',
   nicho: 'entry.1257400668', obs: 'entry.589500904'
 };
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbzEghMBRRzC9lcr49Lc3Tta0OcN9c4Qqm0_tZrgGukyfToRpTLTpyae2_XQ1CsPSdrr/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycby0hHRSZv4rPCAyKJasozAyGNCtLJBxla9StFC9EEaC0qM49aTZSbJHK3tb5eG92PcN/exec';
 
 var currentStep = 1;
 var currentMode = 'venda'; // 'venda' or 'bloqueio'
@@ -2347,44 +2347,124 @@ function precoTabela(p) {
 })();
 </script>
 <script>
-// 💳 LINK DE PAGAMENTO DA GURU (Bruno 30/09/2026: "será que dá até para puxar o link para pessoa pagar?")
-// Checkouts da Guru de cada programa. O link sai com nome, e-mail, CPF e celular do cliente já preenchidos
-// (parâmetros name, email, doc, phone, phone_local_code da Guru) e com src = closer e sck = celular do lead:
-// quando a pessoa paga, a Guru avisa o robô (v178) e ele sabe de quem é a venda.
-var GURU_CHECKOUTS = [
-  // { programa: 'Spark Anual', rotulo: 'Spark Anual — R$ 23.964', url: 'https://pay.ideiaspromov.com/...' },
-];
-(function () {
+// 💳 LINK DE PAGAMENTO DA GURU (Bruno 30/09/2026: "será que dá até para puxar o link para pessoa pagar?",
+// "tenho várias ofertas diferentes, como faço?" e "todos que têm bloqueio são quando a pessoa decide fazer bloqueio ou entrada").
+// O robô (v178, guruOfertas) lê as ofertas da Guru sozinho. Na venda aparecem as ofertas do programa; no bloqueio/entrada,
+// os produtos de BLOQUEIO. O link sai com nome, e-mail, CPF e celular do cliente (parâmetros da Guru) e com src = closer e
+// sck = celular do lead — quando a pessoa paga, o robô sabe de quem é. Valor combinado que não é de nenhuma oferta: o robô
+// cria uma oferta dinâmica com esse valor (guruLinkCriar) e devolve o link personalizado.
+var GURU_CHECKOUTS = [];   // links fixos extras, se precisar: { programa, rotulo, url, bloqueio }
+var _guruOfertasCache = null;
+function guruBotaoPagamento(cfg) {
   var $ = function (id) { return document.getElementById(id); };
-  var val = $('v-valor'); if (!val || !GURU_CHECKOUTS.length) return;
+  var val = $(cfg.valor); if (!val || typeof GAS_URL === 'undefined') return;
+  var P = cfg.p, X = cfg.id;   // P = 'c-' (venda) ou 'b-' (bloqueio)
   var fam = function (t) { t = _semAcento(t); var d = /cadeira|dupla/.test(t); return (/club/.test(t) ? 'club' : /legado/.test(t) ? 'legado' : /growth/.test(t) ? 'growth' : /spark/.test(t) ? (/semest/.test(t) ? 'semestral' : 'spark') : '') + (d ? '+2' : ''); };
+  // no bloqueio o produto é do programa em geral ("SPARK | BLOQUEIO" serve para Spark anual e semestral)
+  var famB = function (t) { return fam(t).replace('+2', '').replace('semestral', 'spark'); };
+  var reais = function (n) { return 'R$ ' + Number(n || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
+  var num = function (t) { t = String(t || '').replace(/[^\d,.]/g, ''); if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, '').replace(',', '.'); else t = t.replace(/[.,]/g, ''); return parseFloat(t) || 0; };
+  var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function (p) { if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
+  var g = function (id) { var el = $(id); return el ? String(el.value || '').trim() : ''; };
   var box = document.createElement('div');
-  box.className = 'f'; box.id = 'guru-link-box';
-  box.innerHTML = '<button type="button" class="btn" id="guru-link-bt" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);">💳 Copiar link de pagamento (Guru)</button><div id="guru-link-op" style="display:none;margin-top:8px;gap:6px;flex-direction:column"></div><div class="colar-msg" id="guru-link-msg" style="margin-top:6px"></div>';
+  box.className = 'f guru-box'; box.id = X + '-box'; box.style.display = _guruOfertasCache ? '' : 'none';   // aparece quando o robô lê as ofertas da Guru
+  box.innerHTML = '<button type="button" class="btn" id="' + X + '-bt" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);">💳 ' + cfg.titulo + '</button>'
+    + '<div id="' + X + '-op" style="display:none;margin-top:8px;gap:6px;flex-direction:column"></div>'
+    + '<div class="colar-msg" id="' + X + '-msg" style="margin-top:6px"></div>'
+    + '<div id="' + X + '-pronto" style="display:none;margin-top:8px"><textarea id="' + X + '-tx" readonly style="width:100%;min-height:92px;font-size:.78rem;border-radius:10px;padding:8px;background:var(--card);color:var(--text);border:1px solid var(--border)"></textarea>'
+    + '<button type="button" class="btn" id="' + X + '-copiar" style="width:100%;margin-top:6px">📋 Copiar mensagem</button></div>';
   val.closest('.f').parentNode.insertBefore(box, val.closest('.f').nextSibling);
-  function copiar(ck) {
-    var g = function (id) { var el = $(id); return el ? String(el.value || '').trim() : ''; };
-    var cel = g('c-cel').replace(/\D/g, ''); if (cel.length >= 12 && cel.indexOf('55') === 0) cel = cel.slice(2);
-    var ps = [['name', g('c-nome') || q.nome || ''], ['email', g('c-email').toLowerCase()], ['doc', g('c-cpf').replace(/\D/g, '')], ['phone', cel], ['phone_local_code', cel ? '55' : ''],
-      ['src', g('v-vendedor')], ['sck', String(q.cel || cel || '').replace(/\D/g, '').slice(-8)]].filter(function (x) { return x[1]; });
-    var url = ck.url + (ck.url.indexOf('?') >= 0 ? '&' : '?') + ps.map(function (x) { return x[0] + '=' + encodeURIComponent(x[1]); }).join('&');
-    var nome = (g('c-nome') || q.nome || '').split(' ')[0];
-    var msg = 'Oi' + (nome ? ', ' + nome : '') + '! Aqui está o link para o pagamento do ' + (g('v-programa') || ck.programa) + ' 👇\n' + url + '\n\nSeus dados já vão preenchidos — é só conferir e pagar.';
-    var ok = function () { $('guru-link-msg').textContent = '✓ Link copiado (' + ck.rotulo + ') — cole na conversa da Clint. Quando a pessoa pagar, o robô avisa e a venda já abre preenchida.'; };
-    (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function () { prompt('Copie a mensagem:', msg); ok(); });
+  var msgEl = $(X + '-msg'), op = $(X + '-op');
+  function cel() { var c = g(P + 'cel').replace(/\D/g, '') || String(q.cel || '').replace(/\D/g, ''); return c.length >= 12 && c.indexOf('55') === 0 ? c.slice(2) : c; }
+  function rastros() { return [['src', g(cfg.vendedor) || q.vendedor || ''], ['sck', String(q.cel || cel()).replace(/\D/g, '').slice(-8)]]; }
+  function montar(url, comDados) {
+    var ps = (comDados ? [['name', g(P + 'nome') || q.nome || ''], ['email', g(P + 'email').toLowerCase()], ['doc', g(P + 'cpf').replace(/\D/g, '')], ['phone', cel()], ['phone_local_code', cel() ? '55' : '']] : []).concat(rastros()).filter(function (x) { return x[1]; });
+    return url + (url.indexOf('?') >= 0 ? '&' : '?') + ps.map(function (x) { return x[0] + '=' + encodeURIComponent(x[1]); }).join('&');
   }
-  $('guru-link-bt').onclick = function () {
-    var f = fam($('v-programa').value), op = $('guru-link-op');
-    if (!f) { $('guru-link-msg').textContent = '⚠️ Escolha o programa primeiro'; return; }
-    var lista = GURU_CHECKOUTS.filter(function (c) { return fam(c.programa) === f; });
-    if (!lista.length) { $('guru-link-msg').textContent = '⚠️ Ainda não tenho o link da Guru para ' + $('v-programa').value; return; }
-    if (lista.length === 1) { op.style.display = 'none'; copiar(lista[0]); return; }
+  function pronto(url, rotulo) {
+    var nome = (g(P + 'nome') || q.nome || '').split(' ')[0];
+    var msg = 'Oi' + (nome ? ', ' + nome : '') + '! Aqui está o link para ' + (cfg.bloqueio ? 'garantir a sua vaga no ' : 'o pagamento do ') + (g(cfg.programa) || 'programa') + ' 👇\n' + url + '\n\nSeus dados já vão preenchidos — é só conferir e pagar.';
+    op.style.display = 'none'; $(X + '-pronto').style.display = 'block'; $(X + '-tx').value = msg;
+    msgEl.textContent = '✓ ' + rotulo + ' — copie e cole na conversa da Clint. Quando a pessoa pagar, o robô avisa e a tela já abre preenchida.';
+    var bc = $(X + '-copiar');
+    var cp = function () { (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(function () { bc.textContent = '✓ Copiado'; }).catch(function () { $(X + '-tx').select(); try { document.execCommand('copy'); bc.textContent = '✓ Copiado'; } catch (e) {} }); };
+    bc.textContent = '📋 Copiar mensagem'; bc.onclick = cp; cp();
+  }
+  function jsonp(payload, cb, tempo) {
+    var nm = 'guru' + Date.now() + Math.floor(Math.random() * 1000), sc = document.createElement('script'), feito = false;
+    var fim = function (r) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[nm] = function () {}; cb(r); };
+    window[nm] = fim; sc.onerror = function () { fim({ success: false, error: 'sem resposta do robô' }); };
+    setTimeout(function () { fim({ success: false, error: 'o robô demorou' }); }, tempo || 45000);
+    sc.src = GAS_URL + '?callback=' + nm + '&payload=' + encodeURIComponent(JSON.stringify(payload));
+    document.body.appendChild(sc);
+  }
+  function combinado(base, v) {
+    msgEl.textContent = 'Criando o link com ' + reais(v) + ' na Guru…'; op.style.display = 'none';
+    var chave = 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), tent = 0;
+    var pl = { action: 'guruLinkCriar', chave: chave, ofertaId: base.id, valor: v, nomeProduto: base.produto, contato: { nome: g(P + 'nome') || q.nome || '', email: g(P + 'email').toLowerCase(), cpf: g(P + 'cpf'), cel: cel() } };
+    try { fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ payload: JSON.stringify(pl) }) }).catch(function () {}); } catch (e) {}
+    (function olhar() {
+      tent++;
+      setTimeout(function () {
+        jsonp({ action: 'guruLinkPegar', chave: chave }, function (r) {
+          if (r && r.pronto && r.success && r.url) { pronto(montar(r.url, false), 'Link de ' + reais(r.valor) + ' (base: ' + r.oferta + ')'); return; }
+          if (r && r.pronto && !r.success) { msgEl.textContent = '⚠️ A Guru não criou o link: ' + (r.error || ''); return; }
+          if (tent < 10) olhar(); else msgEl.textContent = '⚠️ O link demorou — tente de novo';
+        }, 20000);
+      }, tent === 1 ? 2500 : 3000);
+    })();
+  }
+  function mostrar() {
+    var f = cfg.bloqueio ? famB(g(cfg.programa)) : fam(g(cfg.programa));
+    var lista = GURU_CHECKOUTS.map(function (c) { return { programa: c.programa, oferta: c.rotulo, url: c.url, valor: 0, bloqueio: !!c.bloqueio }; }).concat(_guruOfertasCache || [])
+      .filter(function (o) { return !!o.bloqueio === !!cfg.bloqueio && (cfg.bloqueio ? famB(o.programa) : fam(o.programa)) === f; });
+    if (!lista.length) { msgEl.textContent = '⚠️ Não achei ' + (cfg.bloqueio ? 'bloqueio/entrada' : 'oferta') + ' da Guru para ' + g(cfg.programa); return; }
     op.innerHTML = ''; op.style.display = 'flex';
-    lista.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.style.cssText = 'background:var(--card);color:var(--text);border:1px solid var(--border);font-size:.8rem'; b.textContent = c.rotulo; b.onclick = function () { op.style.display = 'none'; copiar(c); }; op.appendChild(b); });
-    $('guru-link-msg').textContent = 'Qual condição?';
+    lista.forEach(function (o) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'btn';
+      b.style.cssText = 'background:var(--card);color:var(--text);border:1px solid var(--border);font-size:.8rem;text-align:left';
+      b.innerHTML = '<b>' + esc(o.oferta) + '</b>' + (o.valor ? ' · ' + reais(o.valor) + (o.parcelas > 1 ? ' · até ' + o.parcelas + 'x' : ' · à vista') : '');
+      b.onclick = function () { pronto(montar(o.url, true), o.oferta + (o.valor ? ' · ' + reais(o.valor) : '')); };
+      op.appendChild(b);
+    });
+    var v = num(g(cfg.valor)), base = lista.filter(function (o) { return o.id; }).sort(function (a, b) { return (b.parcelas || 0) - (a.parcelas || 0); })[0];
+    if (v > 0 && base && !lista.some(function (o) { return Math.abs((o.valor || 0) - v) < 1; })) {
+      var bv = document.createElement('button'); bv.type = 'button'; bv.className = 'btn';
+      bv.style.cssText = 'font-size:.8rem;text-align:left';
+      bv.innerHTML = '💰 <b>Valor combinado: ' + reais(v) + '</b> — cria um link só para esse cliente';
+      bv.onclick = function () { combinado(base, v); };
+      op.appendChild(bv);
+    }
+    msgEl.textContent = cfg.bloqueio ? 'Qual bloqueio/entrada?' : 'Qual oferta?';
+  }
+  $(X + '-bt').onclick = function () {
+    $(X + '-pronto').style.display = 'none';
+    if (!fam(g(cfg.programa))) { msgEl.textContent = '⚠️ Escolha o programa primeiro'; return; }
+    if (_guruOfertasCache) { mostrar(); return; }
+    msgEl.textContent = 'Buscando as ofertas na Guru…';
+    jsonp({ action: 'guruOfertas' }, function (r) {
+      if (!r || !r.success) { msgEl.textContent = /GURU_USER_TOKEN/.test((r && r.error) || '') ? '⚠️ A Guru ainda não está ligada ao robô (falta a chave das ofertas)' : '⚠️ Não consegui ler as ofertas da Guru' + (r && r.error ? ' (' + String(r.error).slice(0, 80) + ')' : ''); if (GURU_CHECKOUTS.length) mostrar(); return; }
+      _guruOfertasCache = r.ofertas || []; mostrar();
+    });
   };
+}
+// só mostra os botões quando a Guru está ligada (o robô já leu as ofertas — fica guardado 6 h no robô)
+(function () {
+  if (typeof GAS_URL === 'undefined') return;
+  var nm = 'guruIni' + Date.now(), sc = document.createElement('script');
+  window[nm] = function (r) {
+    window[nm] = function () {}; try { sc.remove(); } catch (e) {}
+    if (!r || !r.success || !(r.ofertas || []).length) return;
+    _guruOfertasCache = r.ofertas;
+    Array.prototype.forEach.call(document.querySelectorAll('.guru-box'), function (b) { b.style.display = ''; });
+  };
+  sc.onerror = function () {};
+  sc.src = GAS_URL + '?callback=' + nm + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'guruOfertas' }));
+  document.body.appendChild(sc);
 })();
+guruBotaoPagamento({ id: 'guru-link', p: 'c-', valor: 'v-valor', programa: 'v-programa', vendedor: 'v-vendedor', titulo: 'Link de pagamento (Guru)', bloqueio: false });
+guruBotaoPagamento({ id: 'guru-bloq', p: 'b-', valor: 'b-bloqueio-valor', programa: 'b-programa', vendedor: 'b-vendedor', titulo: 'Link do bloqueio/entrada (Guru)', bloqueio: true });
 </script>
 </body>
 </html>
