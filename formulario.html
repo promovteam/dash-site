@@ -2166,6 +2166,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
       if (R.link && !manual) { estadoCliente('esperando'); agendar(); return; }
       estadoCliente(/nao achado/i.test((res && res.error) || '') ? 'nada' : 'erro', res && res.error); return;
     }
+    // 💳 pagou na Guru (robô v178): o link público do pedido vale como comprovante
+    if (res.guru && res.guru.link) { window.__guruPago = res.guru; try { document.dispatchEvent(new Event('guru-pago')); } catch (eG) {} }
     var msgs = [];
     (res.chats || []).forEach(function (c) { (c.mensagens || []).forEach(function (m) { msgs.push(m); }); });
     msgs.sort(function (a, b) { return new Date(a.quando) - new Date(b.quando); });
@@ -2323,14 +2325,64 @@ function precoTabela(p) {
   aviso.textContent = 'Anexe o comprovante de pagamento — sem ele a venda não é registrada.';
   if (box) box.appendChild(aviso);
   inp.addEventListener('change', function () { if (inp.files && inp.files[0]) { aviso.hidden = true; if (up) up.style.borderColor = ''; } });
+  // pagou na Guru: não precisa anexar — o robô põe o link do pedido como comprovante (30/09/2026)
+  var guruNota = document.createElement('div');
+  guruNota.hidden = true;
+  guruNota.style.cssText = 'margin-top:8px;padding:8px 12px;border-radius:10px;font-size:.8rem;line-height:1.45;color:#b8f5d8;background:var(--green-bg);border:1px solid rgba(0,230,167,.35)';
+  if (box) box.appendChild(guruNota);
+  document.addEventListener('guru-pago', function () {
+    var g = window.__guruPago || {};
+    guruNota.innerHTML = '💳 <b>Pago na Guru</b>' + (g.produto ? ' — ' + String(g.produto).replace(/</g, '&lt;') : '') + '. O link do pedido vira o comprovante: não precisa anexar. <a href="' + String(g.link || '#').replace(/"/g, '&quot;') + '" target="_blank" rel="noopener" style="color:#7ff0c4;font-weight:700">ver pedido ↗</a>';
+    guruNota.hidden = false; aviso.hidden = true; if (up) up.style.borderColor = '';
+  });
   var _sv = window.submitVenda;
   if (typeof _sv !== 'function') return;
   window.submitVenda = function () {
-    if (inp.files && inp.files[0]) return _sv.apply(this, arguments);
+    if ((inp.files && inp.files[0]) || (window.__guruPago && window.__guruPago.link)) return _sv.apply(this, arguments);
     var sec = inp.closest('[id^="v-step"]'), n = sec ? +sec.id.replace('v-step', '') : 0;
     if (n && typeof currentStep !== 'undefined' && currentStep !== n) { try { document.getElementById('v-step' + currentStep).style.display = 'none'; sec.style.display = 'block'; currentStep = n; updateProgress(); } catch (e) {} }
     aviso.hidden = false; if (up) up.style.borderColor = 'var(--red)';
     setTimeout(function () { (up || inp).scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 40);
+  };
+})();
+</script>
+<script>
+// 💳 LINK DE PAGAMENTO DA GURU (Bruno 30/09/2026: "será que dá até para puxar o link para pessoa pagar?")
+// Checkouts da Guru de cada programa. O link sai com nome, e-mail, CPF e celular do cliente já preenchidos
+// (parâmetros name, email, doc, phone, phone_local_code da Guru) e com src = closer e sck = celular do lead:
+// quando a pessoa paga, a Guru avisa o robô (v178) e ele sabe de quem é a venda.
+var GURU_CHECKOUTS = [
+  // { programa: 'Spark Anual', rotulo: 'Spark Anual — R$ 23.964', url: 'https://pay.ideiaspromov.com/...' },
+];
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var val = $('v-valor'); if (!val || !GURU_CHECKOUTS.length) return;
+  var fam = function (t) { t = _semAcento(t); var d = /cadeira|dupla/.test(t); return (/club/.test(t) ? 'club' : /legado/.test(t) ? 'legado' : /growth/.test(t) ? 'growth' : /spark/.test(t) ? (/semest/.test(t) ? 'semestral' : 'spark') : '') + (d ? '+2' : ''); };
+  var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function (p) { if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
+  var box = document.createElement('div');
+  box.className = 'f'; box.id = 'guru-link-box';
+  box.innerHTML = '<button type="button" class="btn" id="guru-link-bt" style="width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);">💳 Copiar link de pagamento (Guru)</button><div id="guru-link-op" style="display:none;margin-top:8px;gap:6px;flex-direction:column"></div><div class="colar-msg" id="guru-link-msg" style="margin-top:6px"></div>';
+  val.closest('.f').parentNode.insertBefore(box, val.closest('.f').nextSibling);
+  function copiar(ck) {
+    var g = function (id) { var el = $(id); return el ? String(el.value || '').trim() : ''; };
+    var cel = g('c-cel').replace(/\D/g, ''); if (cel.length >= 12 && cel.indexOf('55') === 0) cel = cel.slice(2);
+    var ps = [['name', g('c-nome') || q.nome || ''], ['email', g('c-email').toLowerCase()], ['doc', g('c-cpf').replace(/\D/g, '')], ['phone', cel], ['phone_local_code', cel ? '55' : ''],
+      ['src', g('v-vendedor')], ['sck', String(q.cel || cel || '').replace(/\D/g, '').slice(-8)]].filter(function (x) { return x[1]; });
+    var url = ck.url + (ck.url.indexOf('?') >= 0 ? '&' : '?') + ps.map(function (x) { return x[0] + '=' + encodeURIComponent(x[1]); }).join('&');
+    var nome = (g('c-nome') || q.nome || '').split(' ')[0];
+    var msg = 'Oi' + (nome ? ', ' + nome : '') + '! Aqui está o link para o pagamento do ' + (g('v-programa') || ck.programa) + ' 👇\n' + url + '\n\nSeus dados já vão preenchidos — é só conferir e pagar.';
+    var ok = function () { $('guru-link-msg').textContent = '✓ Link copiado (' + ck.rotulo + ') — cole na conversa da Clint. Quando a pessoa pagar, o robô avisa e a venda já abre preenchida.'; };
+    (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(ok).catch(function () { prompt('Copie a mensagem:', msg); ok(); });
+  }
+  $('guru-link-bt').onclick = function () {
+    var f = fam($('v-programa').value), op = $('guru-link-op');
+    if (!f) { $('guru-link-msg').textContent = '⚠️ Escolha o programa primeiro'; return; }
+    var lista = GURU_CHECKOUTS.filter(function (c) { return fam(c.programa) === f; });
+    if (!lista.length) { $('guru-link-msg').textContent = '⚠️ Ainda não tenho o link da Guru para ' + $('v-programa').value; return; }
+    if (lista.length === 1) { op.style.display = 'none'; copiar(lista[0]); return; }
+    op.innerHTML = ''; op.style.display = 'flex';
+    lista.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.style.cssText = 'background:var(--card);color:var(--text);border:1px solid var(--border);font-size:.8rem'; b.textContent = c.rotulo; b.onclick = function () { op.style.display = 'none'; copiar(c); }; op.appendChild(b); });
+    $('guru-link-msg').textContent = 'Qual condição?';
   };
 })();
 </script>
