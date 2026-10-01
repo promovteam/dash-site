@@ -1530,6 +1530,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
         <button class="chart-chip" data-p="tudo" onclick="mudarPeriodoLeads('tudo', this)">Tudo</button>
         <button class="chart-chip" id="ld-chip-datas" onclick="abrirDatasLeads()" title="Escolher um período de datas">📅 Datas…</button>
         <button class="chart-chip" id="ld-chip-gerar" onclick="abrirGerarLista()" title="Montar uma lista de leads para o discador ou para disparo, com filtros" style="border-color:rgba(246,163,80,.5);color:#f6a350;">📤 Gerar lista</button>
+        <button class="chart-chip" id="ld-chip-teste-ls" onclick="abrirTesteLeadScore()" title="Compara as faixas A/B/C/D do Lead Score novo pelo que aconteceu de verdade: agendou, compareceu, comprou">🧪 Lead Score funciona?</button>
         <button class="chart-chip" id="ld-chip-ajuda" onclick="abrirAjudaNotas()" title="O que significa cada nota de lead">?</button>
       </div>
       <div id="ld-datas" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(255,255,255,.05);padding:8px 12px;border-radius:12px;">
@@ -2658,7 +2659,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-09-30-1903';
+var VERSAO_DASH = '2026-09-30-2356';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4135,7 +4136,7 @@ function igResumo(per) {
         // 🏅 nota A ou B: os mais qualificados que interagiram
         var _cl = null;
         try { _cl = classeDoLead(l); } catch (eC) {}
-        if (_cl && (_cl.classe === 'A' || _cl.classe === 'B')) {
+        if (_cl && (_cl.classe === 'A' || _cl.classe === 'B') && !_cl.semDisp) {
           pessoa._nota = _cl.nota;
           r.quem.top.push(pessoa);
           var _st0 = ldSituacao(l);
@@ -8471,7 +8472,7 @@ function ldDoTexto(txt, doGuardado) {
       insta: col('instagram que vai receber', 'instagram'), email: col('e mail', 'email'),
       seg: col('quantos seguidores'), obj: col('principais objetivos'),
       renda: col('fonte de renda'), invest: col('disposto a investir'),
-      score: col('score'), data: col('data'), status: col('status da pesquisa'),
+      score: col('score'), data: col('data'), status: col('status da pesquisa'), faixaN: col('lead faixa'),
       dono: col('dono'), situacao: col('situacao'), quando: col('quando'), motivo: col('motivo'),
       origem: col('origem url') === col('origem') ? col('origem') : col('^origem') >= 0 ? col('^origem') : col('origem'),
       utmS: col('utm_source'), utmM: col('utm_medium'), utmC: col('utm_campaign'),
@@ -8496,6 +8497,7 @@ function ldDoTexto(txt, doGuardado) {
         email: cel(r, C.email), seg: cel(r, C.seg), obj: cel(r, C.obj).replace(/[\[\]"]/g, ''),
         renda: cel(r, C.renda), invest: invest,
         score: parseFloat(cel(r, C.score)) || 0,
+        faixaNova: (function(f){ return /^[ABCD]$/.test(f) ? f : ''; })(cel(r, C.faixaN).toUpperCase()),
         date: ldData(cel(r, C.data)), dataTxt: cel(r, C.data), aprox: false,
         status: cel(r, C.status),
         origem: (C.origemMan >= 0 && cel(r, C.origemMan).trim()) || cel(r, C.origem),
@@ -8696,9 +8698,6 @@ function montarFiltrosLeads() {
   if (segs.length > 1) {
     h += '<div class="filtro-inline"><span class="fi-label">👥 Seguidores:</span><div class="chart-chips" style="margin:0;">'
       + segs.slice(0, 7).map(function(o){ return chip('seg', o, o, LD_F.seg.indexOf(o) !== -1); }).join('')
-      + '</div>'
-      + '<span class="fi-label">⭐ Score mín.:</span><div class="chart-chips" style="margin:0;">'
-      + [10, 15, 20].map(function(n){ return chip('score', n, n + '+', LD_F.score === n); }).join('')
       + '</div>'
       + (ldContaF() ? '<span style="flex:1;"></span><button class="btn" style="padding:6px 14px;font-size:.68rem;" onclick="ldLimparF()">✕ Limpar ' + ldContaF() + ' filtro' + (ldContaF() === 1 ? '' : 's') + '</button>' : '')
       + '</div>';
@@ -10469,12 +10468,50 @@ var CLASSES_LEAD = {
   C: { cor: '#6ea8ff', rot: 'C', txt: 'qualificação média' },
   D: { cor: '#ff6b6b', rot: 'D', txt: 'pouco qualificado' }
 };
+// NOVO LEAD SCORE (Bruno 01/10/2026 — treinamento "Lead Score Promov · Setembro 2026"): o formulário novo grava o Score
+// (5 perguntas: atuação fora das redes 55, modelo do negócio 65, objetivo no digital 30, receita 25, investimento 25 —
+// até 200, pode ficar negativo) e a "Lead Faixa": A 120+, B 55–119, C 25–54, D 24 ou menos. Quando a faixa existe, ela
+// manda; a régua antiga (até 100) fica só para os leads de antes de 30/09/2026.
+var CLASSES_LEAD_NOVA = {
+  A: { cor: '#ffd166', rot: 'A', txt: 'prioridade alta — confirmar o gargalo' },
+  B: { cor: '#3ddc97', rot: 'B', txt: 'bom potencial — investigar o que falta' },
+  C: { cor: '#6ea8ff', rot: 'C', txt: 'menor maturidade — avaliar com critério' },
+  D: { cor: '#ff6b6b', rot: 'D', txt: 'baixa prioridade high ticket — nutrir' }
+};
+function _leadSemDisp(inv) { return /n[ãa]o tenho disponibilidade|sem disponibilidade|n[ãa]o receber/i.test(String(inv || '')); }
+function _classeDoLeadNova(l, inv) {
+  var k = l.faixaNova, itens = [];
+  if (l.obj) itens.push({ o: 'objetivo no digital', t: String(l.obj).slice(0, 60) });
+  if (inv) itens.push({ o: 'investimento', t: String(inv).replace(/\s*\(.*$/, '').slice(0, 60) });
+  return { classe: k, nota: Math.round(l.score || 0), max: 200, nova: true, provisoria: !/^\s*complet/i.test(String(l.status || '')),
+           semDisp: _leadSemDisp(inv), itens: itens, info: CLASSES_LEAD_NOVA[k] };
+}
+// "177/200 · provisória" (régua nova) ou "62/100" (régua antiga)
+// seguidores do lead: o que ele respondeu (régua antiga) ou, se não respondeu (formulário novo não pergunta), o que o robô
+// achou no Instagram (aba IG Perfis — Bruno 01/10/2026: "caso consiga puxar o número de seguidores dos leads")
+function _segTxt(l) {
+  if (!l) return '';
+  if (l.seg) return l.seg;
+  try { var u = String(_instaHandle(l.insta) || '').toLowerCase(), pf = (IGO.perfil || {})[u]; if (pf && pf.seg != null) return pf.seg.toLocaleString('pt-BR') + ' (Instagram)'; } catch (e) {}
+  return '';
+}
+// link na bio do Instagram do lead (aba IG Perfis, coluna Site) — Bruno 01/10/2026: "se tem link na bio"
+function _bioLinkHtml(l) {
+  try {
+    var u = String(_instaHandle(l && l.insta) || '').toLowerCase(), pf = (IGO.perfil || {})[u];
+    if (!pf) return '';
+    if (!pf.site) return pf.seg != null ? '<span class="hint" style="margin:0;">sem link na bio</span>' : '';
+    var href = String(pf.site).indexOf('http') === 0 ? pf.site : 'https://' + pf.site;
+    return '<a href="' + dspEsc(href) + '" target="_blank" rel="noopener" style="color:#6ea8ff;text-decoration:none;font-weight:700;">' + dspEsc(String(pf.site).replace(/^https?:\/\//, '').slice(0, 48)) + ' ↗</a>';
+  } catch (e) { return ''; }
+}
+function _notaTxt(c) { return c ? c.nota + '/' + (c.max || 100) + (c.provisoria ? ' · provisória' : '') : ''; }
 function classeDoLead(l) {
   if (!l) return null;
   var inv = String(l.invest || ''), ren = String(l.renda || ''), seg = String(l.seg || '');
-  var kc = inv + '|' + ren + '|' + seg;
+  var kc = inv + '|' + ren + '|' + seg + '|' + (l.faixaNova || '') + '|' + l.score + '|' + (l.status || '');
   if (l._clK === kc) return l._clV;          // ja calculada para estes mesmos campos
-  var rc = _classeDoLeadCalc(l, inv, ren, seg);
+  var rc = l.faixaNova ? _classeDoLeadNova(l, inv) : _classeDoLeadCalc(l, inv, ren, seg);
   l._clK = kc; l._clV = rc;
   return rc;
 }
@@ -10548,24 +10585,27 @@ function fechamentoHistorico(l) {
       if (!_st || !_st.re) return;
       var cc = classeDoLead(x);
       if (!cc) return;
-      m[cc.classe] = m[cc.classe] || { n: 0, vd: 0 };
-      m[cc.classe].n++;
-      if (_st.vd) m[cc.classe].vd++;
+      var kk = (cc.nova ? 'N' : '') + cc.classe;
+      m[kk] = m[kk] || { n: 0, vd: 0 };
+      m[kk].n++;
+      if (_st.vd) m[kk].vd++;
     });
     _fechPorClasse = {};
     Object.keys(m).forEach(function(k){ if (m[k].n >= 15) _fechPorClasse[k] = Math.round(m[k].vd / m[k].n * 100); });
     _fechQuando = Date.now();
   }
-  return _fechPorClasse[c.classe] || null;
+  return _fechPorClasse[(c.nova ? 'N' : '') + c.classe] || null;
 }
 function seloChance(l, mini) {
   var c = classeDoLead(l);
   if (!c) return '';
   var i = c.info;
-  var titulo = 'Qualificação ' + i.rot + ' (' + c.nota + '/100) — ' + i.txt
-    + (c.itens.length ? ' · ' + c.itens.map(function(x){ return x.o + ': ' + x.v + '/' + x.max; }).join(' · ') : '');
-  return ' <span class="ld-tag" style="background:' + i.cor + '26;color:' + i.cor + ';border:1px solid ' + i.cor + '55;font-weight:900;" title="' + titulo + '">'
-    + '🏅 ' + i.rot + (mini ? '' : ' · ' + c.nota + '/100') + '</span>';
+  var titulo = 'Qualificação ' + i.rot + ' (' + _notaTxt(c) + ') — ' + i.txt
+    + (c.semDisp ? ' · SEM DISPONIBILIDADE: nutrição, sem diagnóstico agora' : '')
+    + (c.itens.length ? ' · ' + c.itens.map(function(x){ return x.o + ': ' + (c.nova ? x.t : x.v + '/' + x.max); }).join(' · ') : '');
+  return ' <span class="ld-tag" style="background:' + i.cor + '26;color:' + i.cor + ';border:1px solid ' + i.cor + '55;font-weight:900;" title="' + dspEsc(titulo) + '">'
+    + '🏅 ' + i.rot + (c.provisoria ? '?' : '') + (mini ? '' : ' · ' + c.nota + '/' + (c.max || 100)) + '</span>'
+    + (c.semDisp ? ' <span class="ld-tag" style="background:rgba(255,107,107,.14);color:#ff6b6b;border:1px solid rgba(255,107,107,.4);font-weight:800;" title="Marcou &quot;Não tenho disponibilidade&quot;: sem diagnóstico agora — nutrição e retomada">⛔ sem verba</span>' : '');
 }
 // selo de quem voltou a preencher: quem insiste está interessado
 function seloVezes(l) {
@@ -10618,6 +10658,9 @@ function ldJuntarRepetidos(lista) {
       saida.push(l);
       return;
     }
+    // formulário novo (Lead Score, 30/09/2026) grava UMA LINHA A CADA RESPOSTA: as linhas da mesma sessão (até 2 h)
+    // são passos do mesmo preenchimento — vale a última e não conta como "preencheu de novo"
+    if (l.faixaNova && antes.faixaNova && antes.date && l.date && Math.abs(antes.date - l.date) < 2 * 3600000) return;
     // a lista vem do mais novo para o mais velho: o primeiro é o que vale
     antes.vezes = (antes.vezes || 1) + (l.vezes || 1);
     antes.outrasVezes = (antes.outrasVezes || []).concat([{ date: l.date, dataTxt: l.dataTxt, invest: l.invest,
@@ -12327,6 +12370,103 @@ function abrirGerarLista() {
   glConta();
 }
 // ===== ？O QUE É CADA NOTA DE LEAD (Bruno 01/09/2026) =====
+// 🧪 O LEAD SCORE FUNCIONA? (Bruno 01/10/2026: "arrume uma forma de testar se funciona o lead score mesmo, usando a
+// frente"). Só os leads da nota nova (desde 30/09/2026): por faixa A/B/C/D, quantos agendaram, compareceram, compraram,
+// estornaram e quanto faturou — completos e provisórios, com e sem verba, separados (como pede o treinamento: "acompanhar
+// comparecimento, venda e estorno por faixa" e "separar score completo de provisório"). O score funciona se a compra
+// por lead cair de A para D.
+var _tlsF = { form: 'todos', verba: 'todos' };
+function _tlsDados() {
+  try { _ldMontarIdx(); } catch (e) {}
+  var g = { A: [], B: [], C: [], D: [] }, total = 0, inicio = null, jaClientes = 0;
+  (LD.rows || []).forEach(function(l) {
+    if (!l.faixaNova) return;
+    var c = classeDoLead(l); if (!c || !g[c.classe]) return;
+    total++;
+    if (l.date && (!inicio || l.date < inicio)) inicio = l.date;
+    if (_tlsF.form === 'comp' && c.provisoria) return;
+    if (_tlsF.form === 'prov' && !c.provisoria) return;
+    if (_tlsF.verba === 'com' && c.semDisp) return;
+    if (_tlsF.verba === 'sem' && !c.semDisp) return;
+    var st = null; try { st = ldSituacao(l); } catch (e) {}
+    // só conta o que aconteceu DEPOIS do formulário (1 dia de folga); quem já tinha comprado antes é cliente, não teste
+    var desde = l.date ? l.date.getTime() - 86400000 : 0, todas = (st && st.linhas) || [];
+    if (todas.some(function(r) { return r.sn === 'vendido' && r.date && r.date.getTime() < desde; })) { jaClientes++; return; }
+    var depois = todas.filter(function(r) { return r.date && r.date.getTime() >= desde; }), fat = 0;
+    var REAL = ['vendido', 'nao vendido', 'bloqueio de oferta', 'entrada', 'estorno'];
+    depois.forEach(function(r) { if (r.sn === 'vendido' && r.valor > 0) fat += r.valor; });
+    g[c.classe].push({ l: l, c: c, ag: depois.length > 0, re: depois.some(function(r) { return REAL.indexOf(r.sn) !== -1; }),
+      vd: depois.some(function(r) { return r.sn === 'vendido'; }), est: depois.some(function(r) { return r.sn === 'estorno'; }), fat: fat });
+  });
+  return { g: g, total: total, inicio: inicio, jaClientes: jaClientes };
+}
+function _tlsPct(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }
+function abrirTesteLeadScore() {
+  var velho = document.getElementById('tls-modal'); if (velho) velho.remove();
+  var ov = document.createElement('div'); ov.className = 'modal-overlay open'; ov.id = 'tls-modal'; ov.style.zIndex = 330;
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  _tlsDesenhar();
+}
+function _tlsMudar(k, v) { _tlsF[k] = v; _tlsDesenhar(); }
+function _tlsDesenhar() {
+  var ov = document.getElementById('tls-modal'); if (!ov) return;
+  var D = _tlsDados(), g = D.g, K = ['A', 'B', 'C', 'D'];
+  var chip = function(k, v, rot) { return '<span class="chart-chip sm' + (_tlsF[k] === v ? ' on' : '') + '" style="cursor:pointer;" onclick="_tlsMudar(\'' + k + '\',\'' + v + '\')">' + rot + '</span>'; };
+  var soma = function(lst, campo) { return lst.reduce(function(s, x) { return s + (campo === 'fat' ? x.fat : (x[campo] ? 1 : 0)); }, 0); };
+  var res = K.map(function(k) { var L = g[k]; return { k: k, n: L.length, ag: soma(L, 'ag'), re: soma(L, 're'), vd: soma(L, 'vd'), est: soma(L, 'est'), fat: soma(L, 'fat'), L: L }; });
+  var tot = res.reduce(function(s, r) { return { n: s.n + r.n, ag: s.ag + r.ag, re: s.re + r.re, vd: s.vd + r.vd, est: s.est + r.est, fat: s.fat + r.fat }; }, { n: 0, ag: 0, re: 0, vd: 0, est: 0, fat: 0 });
+  // veredito: compra por lead tem que cair de A para D (só olha faixas com pelo menos 30 leads)
+  var taxa = res.filter(function(r) { return r.n >= 30; }).map(function(r) { return { k: r.k, t: r.vd / r.n }; });
+  var dias = D.inicio ? Math.max(1, Math.round((Date.now() - D.inicio.getTime()) / 86400000)) : 0, ver;
+  if (tot.vd < 10 || taxa.length < 2) ver = '<b style="color:#ffb454;">⏳ Ainda é cedo para concluir.</b> ' + tot.n + ' leads e ' + tot.vd + ' venda' + (tot.vd === 1 ? '' : 's') + ' em ' + dias + ' dia' + (dias === 1 ? '' : 's') + '. Dá para tirar conclusão quando cada faixa tiver <b>pelo menos 30 leads</b> e o time somar <b>10 vendas</b> desses leads (as reuniões levam 1 a 2 semanas para acontecer).';
+  else {
+    var emOrdem = taxa.every(function(x, i) { return i === 0 || x.t <= taxa[i - 1].t; });
+    ver = emOrdem ? '<b style="color:#3ddc97;">✅ O score está separando bem:</b> a compra por lead cai de ' + taxa[0].k + ' para ' + taxa[taxa.length - 1].k + '.'
+                  : '<b style="color:#ff6b6b;">⚠️ O score não está separando:</b> uma faixa de baixo compra mais que uma de cima (' + taxa.map(function(x) { return x.k + ' ' + Math.round(x.t * 100) + '%'; }).join(' · ') + '). Vale revisar os pesos com quem fez o score.';
+  }
+  var moeda = function(v) { return v ? 'R$ ' + Math.round(v).toLocaleString('pt-BR') : '—'; };
+  var th = function(t, tit) { return '<th style="padding:6px 8px;text-align:right;font-size:.62rem;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:800;" title="' + (tit || '') + '">' + t + '</th>'; };
+  var td = function(t, forte) { return '<td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;' + (forte ? 'font-weight:900;' : '') + '">' + t + '</td>'; };
+  var h = '<div class="modal" style="width:min(820px,96vw);padding:20px;max-height:92vh;overflow-y:auto;">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span style="font-size:1.3rem;">🧪</span><b style="flex:1;font-size:1.05rem;">O Lead Score funciona?</b>'
+    + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<div class="hint" style="margin-bottom:10px;">Leads da nota nova (desde ' + (D.inicio ? D.inicio.toLocaleDateString('pt-BR') : '30/09/2026') + ') e o que aconteceu com cada um na aba Vendas. Se o score funciona, <b>A compra mais que B, que compra mais que C e D</b>.</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">'
+    + '<span class="hint" style="margin:0;">Formulário:</span>' + chip('form', 'todos', 'Todos') + chip('form', 'comp', 'Completos') + chip('form', 'prov', 'Provisórios')
+    + '<span class="hint" style="margin:0 0 0 10px;">Verba:</span>' + chip('verba', 'todos', 'Todos') + chip('verba', 'com', 'Com disponibilidade') + chip('verba', 'sem', '⛔ Sem disponibilidade')
+    + '</div>'
+    + '<div class="dtl-card" style="font-size:.8rem;margin-bottom:10px;">' + ver
+    + (D.jaClientes ? '<div class="hint" style="margin-top:6px;">' + D.jaClientes + ' pessoa' + (D.jaClientes > 1 ? 's' : '') + ' que já tinha' + (D.jaClientes > 1 ? 'm' : '') + ' comprado antes de preencher ficou fora da conta (é cliente, não teste do score).</div>' : '') + '</div>'
+    + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.8rem;">'
+    + '<thead><tr><th style="text-align:left;padding:6px 8px;font-size:.62rem;color:var(--muted);">FAIXA</th>' + th('Leads') + th('Agendou', 'marcou reunião') + th('Compareceu', 'reunião aconteceu (vendido, não vendido, bloqueio, entrada ou estorno)')
+    + th('Comprou') + th('Compra / lead', 'de cada 100 leads da faixa, quantos compraram') + th('Fechamento', 'das reuniões que aconteceram, quantas viraram venda') + th('Estorno') + th('Faturado') + th('R$ / lead', 'faturado dividido pelos leads da faixa') + '</tr></thead><tbody>';
+  res.forEach(function(r) {
+    var i = CLASSES_LEAD_NOVA[r.k];
+    h += '<tr style="border-top:1px solid rgba(255,255,255,.07);">'
+      + '<td style="padding:7px 8px;"><span style="background:' + i.cor + '26;color:' + i.cor + ';border:1px solid ' + i.cor + '55;font-weight:900;border-radius:8px;padding:2px 8px;">' + r.k + '</span>'
+      + (r.n && r.n < 30 ? ' <span class="hint" title="poucos leads: o número ainda oscila">· poucos</span>' : '') + '</td>'
+      + td(r.n, true) + td(r.ag + ' <span class="hint">' + _tlsPct(r.ag, r.n) + '</span>') + td(r.re + ' <span class="hint">' + _tlsPct(r.re, r.ag) + '</span>')
+      + td(r.vd, true) + td(_tlsPct(r.vd, r.n), true) + td(_tlsPct(r.vd, r.re)) + td(r.est || '—') + td(moeda(r.fat)) + td(r.n ? moeda(r.fat / r.n) : '—') + '</tr>';
+  });
+  h += '<tr style="border-top:1px solid rgba(255,255,255,.18);"><td style="padding:7px 8px;font-weight:800;">Total</td>' + td(tot.n, true) + td(tot.ag) + td(tot.re) + td(tot.vd, true) + td(_tlsPct(tot.vd, tot.n), true) + td(_tlsPct(tot.vd, tot.re)) + td(tot.est || '—') + td(moeda(tot.fat)) + td(tot.n ? moeda(tot.fat / tot.n) : '—') + '</tr>'
+    + '</tbody></table></div>';
+  // quem é quem em cada faixa (para conferir na mão)
+  h += '<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">';
+  res.forEach(function(r) {
+    if (!r.n) return;
+    var L = r.L.slice().sort(function(a, b) { return (b.vd - a.vd) || (b.re - a.re) || (b.ag - a.ag) || (b.c.nota - a.c.nota); }).slice(0, 60);
+    h += '<details><summary style="cursor:pointer;font-size:.78rem;font-weight:700;">' + (r.n === 1 ? 'Ver o lead' : 'Ver os ' + r.n + ' leads') + ' da faixa ' + r.k + '</summary><div style="display:flex;flex-direction:column;gap:3px;margin:6px 0 4px 10px;font-size:.74rem;">'
+      + L.map(function(x) {
+          var s = x.vd ? '💰 comprou' + (x.fat ? ' ' + moeda(x.fat) : '') : x.re ? '✅ fez reunião' : x.ag ? '📅 agendou' : '— sem reunião';
+          var sgT = _segTxt(x.l);
+          return '<div><b>' + dspEsc(x.l.nome || 'Sem nome') + '</b> · ' + x.c.nota + ' pts' + (sgT ? ' · 👥 ' + dspEsc(String(sgT).replace(' (Instagram)', '')) : '') + (x.c.provisoria ? ' (provisória)' : '') + (x.c.semDisp ? ' · ⛔ sem verba' : '') + ' · ' + s + (x.est ? ' · ↩️ estorno' : '') + '</div>';
+        }).join('') + (r.n > 60 ? '<div class="hint">… e mais ' + (r.n - 60) + '</div>' : '') + '</div></details>';
+  });
+  h += '</div><div class="hint" style="margin-top:12px;">Como ler: <b>Compra / lead</b> é o número que diz se o score acerta. <b>Fechamento</b> mostra se o closer converte melhor as faixas altas. '
+    + 'Estorno alto numa faixa = a nota está deixando passar gente sem caixa. Conta pessoa, não linha: o formulário novo grava uma linha por resposta e o dash junta tudo na última.</div></div>';
+  ov.innerHTML = h;
+}
 function abrirAjudaNotas() {
   // taxa de fechamento real de cada nota, medida na própria base
   var taxas = {};
@@ -12334,8 +12474,9 @@ function abrirAjudaNotas() {
     var umComNota = (LD.rows || []).filter(function(l){ return classeDoLead(l); })[0];
     if (umComNota) { fechamentoHistorico(umComNota); taxas = _fechPorClasse || {}; }
   } catch (e) {}
-  var linha = function(k, faixa, oQue) {
-    var i = CLASSES_LEAD[k];
+  var linhaN = function(k, faixa, oQue) { return linha(k, faixa, oQue, CLASSES_LEAD_NOVA, 'N'); };
+  var linha = function(k, faixa, oQue, tab, pre) {
+    var i = (tab || CLASSES_LEAD)[k]; k = (pre || '') + k;
     var tx = taxas[k] != null ? '<span style="white-space:nowrap;color:' + i.cor + ';font-weight:800;">fecha ' + taxas[k] + '%</span>' : '';
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-radius:11px;background:' + i.cor + '14;border:1px solid ' + i.cor + '40;">'
       + '<span style="background:' + i.cor + '26;color:' + i.cor + ';border:1px solid ' + i.cor + '55;font-weight:900;border-radius:8px;padding:3px 9px;font-size:.8rem;">' + i.rot + '</span>'
@@ -12349,25 +12490,29 @@ function abrirAjudaNotas() {
   ov.innerHTML = '<div class="modal" style="width:min(500px,94vw);padding:20px;max-height:90vh;overflow-y:auto;">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🏅</span><b style="flex:1;">O que é cada nota de lead</b>'
     + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
-    + '<div class="hint" style="margin-bottom:12px;">Quando o lead termina a pesquisa do diagnóstico, o dash dá uma nota de 0 a 100 pelo que ele respondeu. A nota mede o PERFIL da pessoa — não é promessa de venda.</div>'
+    + '<div class="hint" style="margin-bottom:12px;"><b>Novo Lead Score</b> (desde 30/09/2026): 5 perguntas, até 200 pontos (pode ficar negativo). A pontuação organiza a fila; o diagnóstico confirma a oportunidade.</div>'
     + '<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px;">'
-    + linha('A', '75 ou mais', 'Tem verba boa, tem produto ou negócio rodando e audiência. É o lead para chamar primeiro.')
-    + linha('B', '58 a 74', 'Perfil forte, mas falta um dos pontos (verba, produto ou audiência).')
-    + linha('C', '40 a 57', 'Perfil mediano — vale chamar quando as listas A e B acabarem.')
-    + linha('D', 'abaixo de 40', 'Pouca verba, sem produto ou sem audiência. Chance baixa.')
+    + linhaN('A', '120 ou mais', 'Prioridade alta — confirmar o gargalo.')
+    + linhaN('B', '55 a 119', 'Bom potencial — investigar o que falta.')
+    + linhaN('C', '25 a 54', 'Menor maturidade — avaliar com critério.')
+    + linhaN('D', '24 ou menos', 'Baixa prioridade high ticket — nutrir para outra etapa.')
     + '</div>'
-    + '<div class="hint" style="margin-bottom:8px;"><b>Como a nota é montada</b> (soma até 100):</div>'
-    + '<div style="display:flex;flex-direction:column;gap:5px;font-size:.76rem;margin-bottom:14px;">'
-    + '<div>💰 <b>Quanto pode investir</b> — vale até <b>45</b> (é o que mais pesa)</div>'
-    + '<div>📦 <b>Tem produto ou negócio rodando</b> — vale até <b>35</b></div>'
-    + '<div>👥 <b>Tamanho da audiência</b> — vale até <b>20</b> (o corte que importa é passar de mil seguidores)</div>'
+    + '<div class="hint" style="margin-bottom:8px;"><b>Como os 200 pontos se distribuem</b>:</div>'
+    + '<div style="display:flex;flex-direction:column;gap:5px;font-size:.76rem;margin-bottom:10px;">'
+    + '<div>🏢 <b>Modelo do negócio/projeto</b> — até <b>65</b> (mentoria/consultoria 65 · produto digital/livro 58 · físico 52 · ainda não tenho nada −30)</div>'
+    + '<div>🎤 <b>Atuação fora das redes</b> — até <b>55</b> (experiência e valorizado 55 · clientes e crescendo 42 · ganho pouco 24 · começando 5)</div>'
+    + '<div>🎯 <b>Objetivo no digital</b> — até <b>30</b> (multiplicar receitas 30 · clientes qualificados 26 · autoridade 18 · seguidores 8)</div>'
+    + '<div>💵 <b>Receita mensal fora das redes</b> — até <b>25</b> (acima de 15 mil 25 · 5 a 15 mil 18 · até 5 mil 10 · sem renda −30)</div>'
+    + '<div>💰 <b>Disponibilidade de investimento</b> — até <b>25</b> (2 a 4 mil/mês 25 · 500 a 1 mil 15 · sem disponibilidade −25)</div>'
     + '</div>'
+    + '<div class="hint" style="margin-bottom:6px;">⛔ <b>Sem disponibilidade</b> = sem diagnóstico agora (nutrição), mesmo com nota A ou B. <b>?</b> ao lado da letra = formulário incompleto: a nota é <b>provisória</b> — resposta ausente não é "não tenho".</div>'
+    + '<div class="hint" style="margin-bottom:14px;opacity:.8;">Leads de antes de 30/09/2026 continuam com a nota antiga (0 a 100: investimento 45 + produto 35 + audiência 20; A 75+, B 58+, C 40+).</div>'
     + '<div class="hint" style="margin-bottom:8px;"><b>Outros nomes que usamos</b>:</div>'
     + '<div style="display:flex;flex-direction:column;gap:5px;font-size:.76rem;margin-bottom:14px;">'
     + '<div>⭐ <b>MQL</b> — declarou alguma verba na pesquisa (R$500 ou mais)</div>'
     + '<div>🔥 <b>Perfil HT</b> — declarou de R$2 mil a R$4 mil: é para chamar primeiro, no WhatsApp</div>'
     + '</div>'
-    + '<div class="hint">🟠 Quem <b>começou a pesquisa e não terminou</b> fica <b>sem nota</b> — não dá para medir o perfil. Esses aparecem no aviso laranja "para levar para a Clint" e podem entrar na lista do 📤 Gerar lista marcando a opção de incluir quem não terminou.</div>'
+    + '<div class="hint">🟠 (régua antiga) Quem <b>começou a pesquisa e não terminou</b> fica <b>sem nota</b> — não dá para medir o perfil. Esses aparecem no aviso laranja "para levar para a Clint" e podem entrar na lista do 📤 Gerar lista marcando a opção de incluir quem não terminou.</div>'
     + '<div class="hint" style="margin-top:8px;">A porcentagem "fecha X%" ao lado de cada nota é medida na nossa própria base: de todos os leads daquela nota que fizeram reunião, quantos compraram.</div>'
     + '</div>';
   document.body.appendChild(ov);
@@ -12870,10 +13015,10 @@ function ldTextoFicha(l) {
   if (l.tel) L.push('WhatsApp: ' + _telBonito(l.tel) + (ldWa(l) ? ' - ' + ldWa(l) : ''));
   if (l.insta) L.push('Instagram: @' + String(l.insta).replace(/^@/, '') + ' - https://instagram.com/' + String(l.insta).replace(/^@/, ''));
   if (l.email) L.push('E-mail: ' + l.email);
-  if (c) L.push('Nota: ' + c.info.rot + ' (' + c.nota + '/100) - ' + c.info.txt);
+  if (c) L.push('Nota: ' + c.info.rot + ' (' + _notaTxt(c) + ') - ' + c.info.txt + (c.semDisp ? ' - SEM DISPONIBILIDADE (nutrição, sem diagnóstico agora)' : ''));
   if (l.faixa === 'alta') L.push('Perfil HT - chamar primeiro');
   if (l.invest) L.push('Pode investir: ' + l.invest);
-  if (l.seg) L.push('Seguidores: ' + l.seg);
+  if (_segTxt(l)) L.push('Seguidores: ' + _segTxt(l));
   if (l.renda) L.push('Renda hoje: ' + l.renda);
   if (l.obj) L.push('Objetivos: ' + l.obj);
   var org = String(l.origemMan || '').trim() || l.origem || '';
@@ -12906,7 +13051,7 @@ function ldRow(l, quente) {
   var det = [
     ldDataTxt(l),
     l.invest ? l.invest.replace(/\s*\(.*$/, '') : '',
-    l.seg ? l.seg + ' seguidores' : '',
+    _segTxt(l) ? _segTxt(l) + ' seguidores' : '',
     l.score ? 'Score ' + l.score : '',
     l.origem
   ].filter(Boolean).join(' · ');
@@ -13012,6 +13157,12 @@ function abrirFichaLead(i) {
   var _FXs = { alta:['🔥 Prioridade máxima','#f6a350'], media:['🟡 Prioridade menor','#6ea8ff'], nda:['⚪ Sem disponibilidade','#8b8fa3'], sem:['⚪ Não respondeu','#8b8fa3'] };
   // quem veio só do comentário do Instagram não tem faixa: sem isto a ficha quebrava
   var FX = _FXs[l.faixa] || _FXs.sem;
+  // Lead Score novo: o topo da ficha segue a faixa A/B/C/D (a verba sozinha não diz a prioridade)
+  try {
+    var _cN = classeDoLead(l);
+    if (_cN && _cN.nova) FX = _cN.semDisp ? ['⛔ Sem disponibilidade — nutrição, sem diagnóstico agora', '#ff6b6b']
+      : [{ A: '🔥 Prioridade alta', B: '🟢 Bom potencial', C: '🔵 Menor maturidade', D: '⚪ Baixa prioridade — nutrir' }[_cN.classe] + ' · nota ' + _cN.classe + (_cN.provisoria ? ' (provisória)' : ''), _cN.info.cor];
+  } catch (eFx) {}
   var campos = [
     ['📅', 'Chegou em', ldDataTxt(l) + (l.aprox ? ' — a planilha não trouxe a data; estimada pela posição na lista' : '')],
     ['⏱', 'Tempo até o contato', (function(){ var t = tcInfoDe(l); if (!t) return '';
@@ -13037,10 +13188,15 @@ function abrirFichaLead(i) {
         var c = classeDoLead(l);
         if (!c) return '';
         var h = '<b style="color:' + c.info.cor + ';font-size:1.35rem;">' + c.info.rot + '</b>'
-          + '<span style="color:' + c.info.cor + ';font-weight:800;font-size:.9rem;margin-left:6px;">' + c.nota + '/100</span>'
+          + '<span style="color:' + c.info.cor + ';font-weight:800;font-size:.9rem;margin-left:6px;">' + c.nota + '/' + (c.max || 100) + '</span>'
           + '<div style="color:' + c.info.cor + ';font-weight:700;font-size:.76rem;margin-top:1px;">' + c.info.txt + '</div>'
+          + (c.nova ? '<div class="hint" style="margin-top:2px;">Lead Score novo (5 perguntas, até 200)' + (c.provisoria ? ' · <b style="color:#ffb454;">provisória</b>: não terminou o formulário — completar o contexto na conversa' : '') + '</div>' : '')
+          + (c.semDisp ? '<div style="margin-top:4px;color:#ff6b6b;font-weight:800;font-size:.74rem;">⛔ Marcou "Não tenho disponibilidade": sem diagnóstico agora — nutrição e retomada</div>' : '')
           + '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px;">';
-        c.itens.forEach(function(x) {
+        if (c.nova) c.itens.forEach(function(x) {
+          h += '<div class="hint" style="text-align:right;font-size:.66rem;"><b>' + x.o + ':</b> ' + dspEsc(x.t) + '</div>';
+        });
+        else c.itens.forEach(function(x) {
           var pct = Math.round(x.v / x.max * 100);
           h += '<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;margin-top:2px;">'
             + '<span class="hint" style="min-width:78px;text-align:right;">' + x.o + '</span>'
@@ -13063,7 +13219,8 @@ function abrirFichaLead(i) {
         + '" target="_blank" style="color:#b98aff;text-decoration:none;font-weight:800;" title="abrir o perfil no Instagram">@'
         + String(l.insta).replace(/^@/, '') + ' ↗</a>' : '', 'html'],
     ['✉️', 'E-mail', l.email],
-    ['👥', 'Seguidores', l.seg],
+    ['👥', 'Seguidores', _segTxt(l)],
+    ['🔗', 'Link na bio', _bioLinkHtml(l), 'html'],
     ['💰', 'Quanto pode investir', l.invest],
     ['💼', 'Fonte de renda hoje', l.renda],
     ['🎯', 'Objetivos', l.obj],
@@ -14683,7 +14840,7 @@ function mostrarFormularioDoLead(r) {
     +   seloChance(l)
     + '</div>'
     + linha('📅', 'Preencheu em', (l.dataTxt || '').slice(0, 16))
-    + linha('👥', 'Seguidores', l.seg)
+    + linha('👥', 'Seguidores', _segTxt(l))
     + linha('💰', 'Quanto pode investir', l.invest)
     + linha('💼', 'Fonte de renda hoje', l.renda)
     + linha('🎯', 'Objetivos', l.obj)
@@ -16771,12 +16928,12 @@ function gvQuemDesenhar() {
     + '<button class="btn" onclick="gvFichaCompleta()" title="A ficha inteira abre por cima — o vídeo continua">📋 Ficha completa</button>'
     + '</div>';
   if (l) {
-    var nota = ''; try { var c = classeDoLead(l); if (c) nota = '<span class="gq-nota" style="color:' + c.info.cor + ';">' + c.info.rot + '</span> <span style="color:' + c.info.cor + ';font-weight:800;">' + c.nota + '/100</span> <span class="gq-mini">' + e(c.info.txt || '') + '</span>'; } catch (eN) {}
+    var nota = ''; try { var c = classeDoLead(l); if (c) nota = '<span class="gq-nota" style="color:' + c.info.cor + ';">' + c.info.rot + '</span> <span style="color:' + c.info.cor + ';font-weight:800;">' + _notaTxt(c) + '</span> <span class="gq-mini">' + e(c.info.txt || '') + '</span>'; } catch (eN) {}
     var chegou = ''; try { chegou = ldDataTxt(l); } catch (eD) {}
     var origem = ''; try { origem = ldOrigemRotulo(l); } catch (eO) { origem = l.origem || ''; }
     var outroNome = l.nome && v2norm(l.nome).split(' ')[0] !== v2norm(p.nome || '').split(' ')[0];
     h += '<div class="gq-sec"><h5>🧑 Quem é (formulário)</h5>'
-      + linha('Nota', nota, true) + linha('Seguidores', l.seg) + linha('Pode investir', l.invest) + linha('Renda hoje', l.renda)
+      + linha('Nota', nota, true) + linha('Seguidores', _segTxt(l)) + linha('Pode investir', l.invest) + linha('Renda hoje', l.renda)
       + linha('Objetivos', l.obj) + linha('Chegou em', chegou) + linha('Origem', origem) + linha('Anúncio', l.anuncio)
       + (a.como && a.como !== 'telefone' ? '<div class="gq-aviso">achado na base pelo ' + e(a.como) + '</div>' : '')
       + (outroNome ? '<div class="gq-aviso">⚠️ na base de leads este contato está como <b>' + e(l.nome) + '</b></div>' : '')
@@ -20014,7 +20171,7 @@ function agMostrarOrigem(l) {
     + linha('anúncio', l.anuncio)
     + linha('campanha', l.campanha)
     + linha('investe', l.invest)
-    + linha('seguidores', l.seg)
+    + linha('seguidores', _segTxt(l))
     + linha('objetivo', l.obj)
     + linha('chegou em', (l.dataTxt || '').slice(0, 16))
     + linha('atendendo', l.dono)
@@ -21771,7 +21928,7 @@ function plPxListaLeads(titulo, leads) {
       + '<b class="click" style="cursor:pointer;color:#6ea8ff;" onclick="this.closest(\'.modal-overlay\').remove();abrirLead(' + (l.i !== undefined ? l.i : -1) + ')">' + (l.nome || 'Sem nome').replace(/</g, '&lt;') + '</b>'
       + (l._chegou ? '<span class="hint" style="margin:0;">chegou ' + new Date(l._chegou).toLocaleDateString('pt-BR') + '</span>' : (l.date ? '<span class="hint" style="margin:0;">formulário ' + l.date.toLocaleDateString('pt-BR') + '</span>' : ''))
       + (l.invest ? '<span class="ld-tag">' + String(l.invest).replace(/</g, '&lt;').slice(0, 28) + '</span>' : '')
-      + (l.seg ? '<span class="hint" style="margin:0;">' + String(l.seg).slice(0, 12) + ' seg.</span>' : '')
+      + (_segTxt(l) ? '<span class="hint" style="margin:0;">' + String(_segTxt(l)).replace(' (Instagram)', '').slice(0, 12) + ' seg.</span>' : '')
       + (ci && ci.etapa ? '<span class="px-tag">' + String(ci.etapa).replace(/</g, '&lt;').slice(0, 26) + '</span>' : '')
       + (l.origem ? '<span class="hint" style="margin:0;">' + String(l.origem).replace(/</g, '&lt;').slice(0, 26) + '</span>' : '')
       + '</div>';
