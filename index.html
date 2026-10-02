@@ -2665,7 +2665,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-1948';
+var VERSAO_DASH = '2026-10-02-2000';
 var _versaoNova = null;
 
 // =====================================================================
@@ -28221,6 +28221,9 @@ cmMostrarMenu();
 .cm-dados-links button:hover, .cm-dados-reu button:hover { background:rgba(110,168,255,.22); }
 .cm-dados-reus { display:flex; flex-direction:column; gap:4px; }
 .cm-dados-reu { display:grid; grid-template-columns:78px 96px 1fr auto auto; gap:8px; align-items:center; font-size:.76rem; padding:6px 8px; border-radius:9px; background:rgba(255,255,255,.025); }
+.cm-pagador { margin:-2px 0 2px 60px; font-size:.72rem; color:#ffd166; font-weight:700; }
+.cm-dados-nota { color:#9aa3b2; font-size:.72rem; margin-top:2px; }
+@media (max-width:640px) { .cm-pagador { margin-left:8px; } }
 .cm-dados-conta { margin:0; padding-left:16px; display:flex; flex-direction:column; gap:4px; font-size:.76rem; line-height:1.45; }
 @media (max-width:640px) { .cm-dados-reu { grid-template-columns:1fr auto; } .cm-dados-reu > span:nth-child(3) { grid-column:1 / -1; } }
 .cm-obs > div { margin-top:6px; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.03); line-height:1.45; }
@@ -28298,8 +28301,8 @@ function _cmDetCloser(p, todos, bt) {
   // resumo do que está na tela
   var sr = 0, sc = 0, porForma = {}, porOrig = {};
   V.forEach(function(l){ sr += l.r; sc += l.c; var fo = l.t === 'extra' ? 'Extra' : (l.f || '—').replace(/ \(.*\)$/, ''); porForma[fo] = (porForma[fo] || 0) + l.c; var o = l.o === 'Workshop' ? 'Workshop' : (l.t === 'extra' ? 'Extra' : 'Outras origens'); porOrig[o] = (porOrig[o] || 0) + l.c; });
-  var grupos = {}, ordem = [];
-  V.forEach(function(l){ var k = (todos ? l.aba + '|' : '') + (l.t === 'extra' ? 'extra|' + l.ln : _cmChaveCliente(l.n)); if (!grupos[k]) { grupos[k] = []; ordem.push(k); } grupos[k].push(l); });
+  var grupos = {}, ordem = [], raiz = _cmMesmaPessoa(V);
+  V.forEach(function(l){ var k = (todos ? l.aba + '|' : '') + (l.t === 'extra' ? 'extra|' + l.ln : raiz(_cmChaveCliente(l.n))); if (!grupos[k]) { grupos[k] = []; ordem.push(k); } grupos[k].push(l); });
   var h = '<div class="cm-filtros">' + bt('tudo', 'Tudo', L.length) + bt('venda', 'Vendas', cont.venda) + bt('parcela', 'Parcelas (Lia/Guru)', cont.parcela) + bt('extra', 'Extras', cont.extra) + bt('workshop', '🎓 Workshop', L.filter(function(l){ return l.o === 'Workshop'; }).length) + bt('fora', 'Não contou', F.length)
     + (!todos ? '<button class="cm-extra-bt" onclick="cmExtraAbrir()">+ Lançar extra</button>' : '') + '</div>'
     + '<div id="cm-extra-form"></div>';
@@ -28337,6 +28340,7 @@ function _cmDetCloser(p, todos, bt) {
         + '<span class="cm-pag-n hint">' + (l.pc && !soRegistro ? (l.pc * 100).toFixed(2).replace('.', ',') + '%' : '') + '</span>'
         + '<span class="cm-pag-n"><b>' + (soRegistro ? '' : cmR(l.c)) + '</b></span>'
         + '<button class="cm-lapis" title="Editar este pagamento" aria-label="Editar" onclick="cmEditarAbrir(\'' + id + '\')">✏️</button></div>'
+        + _cmPagador(l)
         + '<div class="cm-edita" id="' + id + '" style="display:none;" data-aba="' + dspEsc(l.aba || CMD.aba) + '" data-k="' + dspEsc(l.k || '') + '" data-ln="' + (l.ln || '') + '" data-n="' + dspEsc(l.n || '') + '">'
         + '<label>Conta na comissão do mês?<select data-c="entra"><option' + (l.e !== 'Não' ? ' selected' : '') + '>Sim</option><option' + (l.e === 'Não' ? ' selected' : '') + '>Não</option></select></label>'
         + '<label>Ajuste (R$, use − para descontar)<input data-c="ajuste" inputmode="decimal" value="' + (l.aj === '' || l.aj == null ? '' : String(l.aj).replace('.', ',')) + '"></label>'
@@ -28393,11 +28397,18 @@ function cmDadosAbrir(el, ci) {
   var cel = function(rot, val) {
     val = String(val == null ? '' : val).trim(); if (!val) return '';
     rot = String(rot || '').replace(/^\d+\.\s*/, '');   // "4. RG do mentorado" → "RG do mentorado"
-    return '<div><small>' + dspEsc(rot) + '</small><b>' + (/^https?:\/\/\S+$/i.test(val) ? _cmLink(val, 'abrir ↗') : dspEsc(val.length > 220 ? val.slice(0, 220) + '…' : val)) + '</b></div>';
+    var links = val.match(/https?:\/\/[^\s,]+/gi);
+    if (links && !val.replace(/https?:\/\/[^\s,]+/gi, '').replace(/[\s,;]+/g, '')) return '<div><small>' + dspEsc(rot) + '</small><b>' + links.map(function(u, i){ return _cmLink(u, links.length > 1 ? 'abrir ' + (i + 1) + ' ↗' : 'abrir ↗'); }).join(' · ') + '</b></div>';   // só links
+    return '<div><small>' + dspEsc(rot) + '</small><b>' + dspEsc(val.length > 220 ? val.slice(0, 220) + '…' : val) + '</b></div>';
   };
   var h = '';
   // como foi a conta
-  var contas = c.ls.map(function(l){ var t = _cmConta(l, c.nLeg); return t ? '<li><span class="hint">' + dspEsc(l.pg || l.fe || '') + '</span> ' + t + '</li>' : ''; }).filter(Boolean);
+  var TIPOS = { venda: 'Venda', lia: 'Boleto Lia', guru: 'Guru' };
+  var contas = c.ls.map(function(l){
+    var t = _cmConta(l, c.nLeg), nota = String(l.uf || l.u || '').trim();
+    if (!t && !nota) return '';
+    return '<li><span class="hint">' + dspEsc(l.pg || l.fe || '') + ' · ' + (TIPOS[l.t] || '') + '</span> ' + (t || cmR(l.c)) + (nota ? '<div class="cm-dados-nota">' + dspEsc(nota) + '</div>' : '') + '</li>';
+  }).filter(Boolean);
   if (contas.length) h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🧮 Como foi a conta</div><ul class="cm-dados-conta">' + contas.join('') + '</ul></div>';
   // formulário de pagamento
   if (!pags.length) h += '<div class="cm-dados-sec"><div class="cm-dados-tit">💳 Formulário de pagamento</div><div class="hint">Não achei o formulário desta pessoa na aba Pagamentos.</div></div>';
@@ -28431,6 +28442,26 @@ function cmDadosAbrir(el, ci) {
   var ws = ''; try { ws = tel ? wsFichaHtml(tel, reus[0] ? reus[0].date : null) : ''; } catch (e) {}
   if (ws) h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🎓 Workshop</div>' + ws + '</div>';
   box.innerHTML = h;
+}
+// "una os pagamentos de um mesmo lead quando possível" (Bruno 02/10/2026): nomes diferentes que no formulário de pagamento
+// têm o mesmo CPF ou celular viram um cartão só (ex.: a pessoa preencheu o nome de um jeito num formulário e de outro no outro)
+function _cmMesmaPessoa(V) {
+  var pai = {}, ach = function(k){ while (pai[k] && pai[k] !== k) k = pai[k]; return k; }, une = function(a, b){ a = ach(a); b = ach(b); if (a !== b) pai[b] = a; };
+  var nomes = {}; V.forEach(function(l){ if (l.t !== 'extra') { var k = _cmChaveCliente(l.n); if (k) { nomes[k] = 1; pai[k] = pai[k] || k; } } });
+  var porId = {};
+  (PAG.rows || []).forEach(function(p){
+    var k = _cmChaveCliente(p.nome); if (!nomes[k]) return;
+    var cpf = String(p.cpf || '').replace(/\D/g, ''), t8 = ldTel8(p.celular || '');
+    [cpf.length >= 11 ? 'c' + cpf : '', t8 ? 't' + t8 : ''].forEach(function(id){ if (!id) return; if (porId[id]) une(porId[id], k); else porId[id] = k; });
+  });
+  return function(k){ return k ? ach(k) : k; };
+}
+// quem pagou, quando não foi a pessoa da venda (o robô anota "pago por … — ligado à venda de … pelo …")
+function _cmPagador(l) {
+  var m = String(l.uf || l.u || '').match(/pago por ([^·]+?)(?:\s*·|$)/);
+  if (!m) return '';
+  var t = m[1].trim().replace(/^([^—]+)/, function(n){ return n === n.toUpperCase() ? n.toLowerCase().replace(/(^|\s)\S/g, function(x){ return x.toUpperCase(); }) : n; });   // MARCUS THULIO → Marcus Thulio
+  return '<div class="cm-pagador">👤 pago por ' + dspEsc(t) + '</div>';
 }
 // as fichas abrem por cima da janela de comissões (ela fica em z-index 9000) e voltam ao normal ao fechar
 function cmAbrirFichaPag(i) {
