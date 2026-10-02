@@ -2665,7 +2665,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-1446';
+var VERSAO_DASH = '2026-10-02-1450';
 var _versaoNova = null;
 
 // =====================================================================
@@ -19533,6 +19533,7 @@ function _fichaPelaUrl() {
   }
   // #aba=agenda (ou placar, leads, contratos…): abre direto naquela tela (botão "📅 agenda" da extensão)
   var mA = hx.match(/[#&?]aba=([a-z0-9-]+)/);
+
   if (mA) { var vaiA = function() { var it = document.querySelector('.nav-item[data-s="' + mA[1] + '"]'); if (it) it.click(); }; setTimeout(vaiA, 350); setTimeout(vaiA, 1800); }
 }
 try { _fichaPelaUrl(); } catch (e) {}
@@ -27620,6 +27621,30 @@ function _wsRefLead(l) {
   } catch (e) {}
   return null;
 }
+// origens do lead em ordem de data (Bruno 02/10/2026: "em cada lead que veio do workshop mostre sua origem; se for mais de uma
+// origem mostre as duas, priorizando a primeira"): reuniões da aba Vendas + formulário de diagnóstico + entrada no workshop
+var _wsOrig = { idx: null, ref: null };
+function _wsOrigIdx() {
+  var ref = (V2.rows || []).length + '|' + (LD.rows || []).length;
+  if (_wsOrig.idx && _wsOrig.ref === ref) return _wsOrig.idx;
+  var m = {}, poe = function(t8, d, o) { if (!t8 || !o) return; (m[t8] = m[t8] || []).push({ d: d instanceof Date ? d.getTime() : 0, o: String(o).trim() }); };
+  (V2.rows || []).forEach(function(r){ poe(ldTel8(r.telefone), r.date, r.origem); });
+  (LD.rows || []).forEach(function(l){ poe(l.tel8, l.date, l.origem); });
+  _wsOrig.idx = m; _wsOrig.ref = ref; return m;
+}
+function wsOrigens(tel) {
+  var t8 = ldTel8(tel); if (!t8) return [];
+  var x = WSL.porTel[t8], lista = (_wsOrigIdx()[t8] || []).slice();
+  if (x) { var ds = [x.ing, x.apl, x.dg].filter(function(d){ return d instanceof Date; }).map(function(d){ return d.getTime(); });
+    if (ds.length) lista.push({ d: Math.min.apply(null, ds), o: 'Workshop ' + _wsMes(x), ws: true }); }
+  lista.sort(function(a, b){ return (a.d || 9e15) - (b.d || 9e15); });
+  var vistos = {}, out = [];
+  lista.forEach(function(it){ var k = /workshop/i.test(it.o) ? 'workshop' : v2norm(it.o); if (!k || vistos[k]) return; vistos[k] = 1; out.push(it); });
+  return out;
+}
+function _wsOrigTxt(os, comData) {
+  return os.map(function(it, i){ var t = dspEsc(it.o) + (comData && it.d ? ' <span class="hint">(' + new Date(it.d).toLocaleDateString('pt-BR').slice(0, 5) + ')</span>' : ''); return i === 0 ? '<b>' + t + '</b>' : t; }).join(' → ');
+}
 function _wsLeadDoWorkshop(x) { return !!(x && (x.apl || x.ing || x.pqF || x.dg || x.crm)); }
 // selo 🎓 (mini = linha de lista)
 function seloWorkshop(tel, ref, mini) {
@@ -27629,6 +27654,8 @@ function seloWorkshop(tel, ref, mini) {
   var tit = (x.ws || 'Workshop') + (x.ing ? ' · ingresso pago ' + _wsDm(x.ing) : '') + (x.apl ? ' · aplicou ' + _wsDm(x.apl) : '')
     + (dias.length ? ' · participou ' + dias.join(', ') : '') + (x.sdr ? ' · SDR do workshop: ' + x.sdr : '');
   var h = ' <span class="ld-tag" style="background:rgba(176,132,255,.16);color:#b084ff;border:1px solid rgba(176,132,255,.45);font-weight:800;" title="' + dspEsc(tit) + '">🎓 Workshop ' + _wsMes(x) + '</span>';
+  var os = wsOrigens(tel);
+  if (os.length > 1) h += ' <span class="ld-tag" style="background:rgba(255,255,255,.06);color:#d6dbe6;font-weight:600;" title="Origens em ordem: ' + dspEsc(os.map(function(it){ return it.o; }).join(' → ')) + ' (a primeira vale como origem principal)">🧭 ' + _wsOrigTxt(os, false) + '</span>';
   if (x.apl) h += ' <span class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;" title="Fez a aplicação no app do workshop em ' + _wsDm(x.apl) + (x.aplSt ? ' (' + dspEsc(x.aplSt) + ')' : '') + '">📝 aplicou ' + _wsDm(x.apl) + '</span>';
   if (dias.length) h += ' <span class="ld-tag" style="background:rgba(110,168,255,.14);color:#6ea8ff;" title="Presença no workshop">✅ ' + dias.join('·') + '</span>';
   if (j && (x.apl || !mini || j.fase === 'dentro')) {
@@ -27642,6 +27669,8 @@ function seloWorkshop(tel, ref, mini) {
 function wsFichaHtml(tel, ref) {
   var x = wsDoTel(tel); if (!_wsLeadDoWorkshop(x)) return '';
   var L = [];
+  var os = wsOrigens(tel);
+  if (os.length) L.push('🧭 ' + (os.length > 1 ? 'Origens (a 1ª é a principal)' : 'Origem') + ': ' + _wsOrigTxt(os, true));
   L.push('<b>' + dspEsc(x.ws || 'Workshop') + '</b>' + (x.d1 instanceof Date ? ' <span class="hint">(' + _wsDm(x.d1) + ' a ' + _wsDm(new Date(x.d1.getTime() + 2 * 864e5)) + ')</span>' : ''));
   if (x.ing) L.push('🎟️ Ingresso pago em ' + _wsDm(x.ing));
   if (x.apl) L.push('📝 Aplicou em ' + _wsDm(x.apl) + (x.aplSt ? ' · ' + dspEsc(x.aplSt) : '') + (x.compra ? ' · ' + dspEsc(x.compra.replace(/_/g, ' ')) : ''));
@@ -27658,7 +27687,14 @@ function wsFichaHtml(tel, ref) {
 // =====================================================================
 // ⭐ QUALIFICADOS SEM REUNIÃO
 // =====================================================================
-var QF = { fonte: 'todos', sit: 'todas', dias: 30 };
+var QF = { fonte: 'todos', sit: 'todas', dias: 30, dono: 'todos' };
+// link direto (Bruno 02/10/2026: "me manda o link sem dono"): #aba=qualif&dono=sem&fonte=workshop&dias=90
+(function(){ try {
+  var hx = String(location.hash || '') + ' ' + String(location.search || '');
+  if (/[#&?]dono=sem/.test(hx)) QF.dono = 'sem';
+  var mFo = hx.match(/[#&?]fonte=(workshop|formulario)/); if (mFo) QF.fonte = mFo[1];
+  var mDi = hx.match(/[#&?]dias=(\d+)/); if (mDi) QF.dias = +mDi[1];
+} catch (e) {} })();
 function qfFiltro(k, v) { QF[k] = v; renderQualif(); }
 function _qfSituacao(t8, l) {
   try { _ldMontarIdx(); } catch (e) {}
@@ -27696,16 +27732,20 @@ function renderQualif() {
     else if (/^[AB]$/.test(x.pqF) && x.pqN !== '' && (!desde || (x.ing instanceof Date && x.ing.getTime() >= desde) || (x.apl instanceof Date && x.apl.getTime() >= desde)))
       poe(t8, x.nome, x.tel, x.ig, 'pesquisa do workshop ' + x.pqF, x.apl || x.ing, { ws: x });
   });
-  var lista = [], cont = { todos: 0, sem: 0, agendada: 0, noshow: 0, outro: 0 };
+  var lista = [], cont = { todos: 0, sem: 0, agendada: 0, noshow: 0, outro: 0, semDono: 0 };
   Object.keys(P).forEach(function(t8) {
     var p = P[t8]; if (!p.ws) p.ws = WSL.porTel[t8] || null;
     var s = _qfSituacao(t8, p.lead); if (!s) return;
     p.sit = s;
+    var dn = ''; try { dn = p.lead ? (ldDonoDe(p.lead) || '') : ''; } catch (e) {}
+    if (!dn && p.ws && p.ws.sdr) dn = p.ws.sdr + ' (workshop)';
+    p.dono = dn;
     var temWs = p.motivos.some(function(m){ return /workshop/.test(m); }), temForm = p.motivos.some(function(m){ return /formul/.test(m); });
     if (QF.fonte === 'workshop' && !temWs) return;
     if (QF.fonte === 'formulario' && !temForm) return;
-    cont.todos++; cont[s.tipo] = (cont[s.tipo] || 0) + 1;
-    if (QF.sit !== 'todas' && QF.sit !== s.tipo) return;
+    if (QF.sit !== 'todas' && QF.sit !== s.tipo) { cont.todos++; cont[s.tipo] = (cont[s.tipo] || 0) + 1; if (!p.dono) cont.semDono++; return; }
+    cont.todos++; cont[s.tipo] = (cont[s.tipo] || 0) + 1; if (!p.dono) cont.semDono++;
+    if (QF.dono === 'sem' && p.dono) return;
     lista.push(p);
   });
   lista.sort(function(a, b){ return b.quando - a.quando; });
@@ -27719,13 +27759,13 @@ function renderQualif() {
     + (WSL.carregado ? ' Workshop atualizado ' + (WSL.quando ? new Date(WSL.quando).toLocaleDateString('pt-BR') + ' às ' + new Date(WSL.quando).toTimeString().slice(0, 5) : '') + ' (' + WSL.n + ' pessoas).' : WSL.erro ? ' <b style="color:#f6a350;">Workshop: ' + dspEsc(WSL.erro) + '.</b>' : ' Buscando o workshop…') + '</div>'
     + '<div>' + chip('fonte', 'todos', 'Todos') + chip('fonte', 'workshop', '🎓 Workshop') + chip('fonte', 'formulario', '📋 Formulário') + '</div>'
     + '<div>' + chip('sit', 'todas', 'Todas', cont.todos) + chip('sit', 'sem', 'Sem reunião', cont.sem) + chip('sit', 'agendada', 'Agendada', cont.agendada) + chip('sit', 'noshow', 'No-show', cont.noshow) + '</div>'
+    + '<div>' + chip('dono', 'todos', '👤 Todos os donos') + chip('dono', 'sem', '👤 Sem dono', cont.semDono) + '</div>'
     + '<div>' + chip('dias', 7, '7 dias') + chip('dias', 30, '30 dias') + chip('dias', 90, '90 dias') + chip('dias', 0, 'Tudo') + '</div>'
     + '</div>';
   if (!lista.length) { el.innerHTML = h + '<div class="hint" style="padding:24px;text-align:center;">Ninguém nesse filtro. 🎉</div>'; return; }
   lista.slice(0, 300).forEach(function(p) {
     var pos = -1; if (p.lead) { pos = _ldReg.indexOf(p.lead); if (pos === -1) { _ldReg.push(p.lead); pos = _ldReg.length - 1; } }
-    var dono = ''; try { dono = p.lead ? (ldDonoDe(p.lead) || '') : ''; } catch (e) {}
-    if (!dono && p.ws && p.ws.sdr) dono = p.ws.sdr + ' (workshop)';
+    var dono = p.dono || '';
     var wa = p.tel ? 'https://wa.me/' + String(p.tel).replace(/\D/g, '').replace(/^(?!55)/, '55') : '';
     var ig = p.ig ? String(p.ig).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '') : '';
     h += '<div class="ld-row"' + (pos >= 0 ? ' style="cursor:pointer;" onclick="abrirFichaLead(' + pos + ')" title="Clique para ver todos os dados deste lead"' : '') + '>'
