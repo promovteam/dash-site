@@ -2665,7 +2665,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2026';
+var VERSAO_DASH = '2026-10-02-2056';
 var _versaoNova = null;
 
 // =====================================================================
@@ -5494,10 +5494,8 @@ function renderV2() {
             return '<s style="left:' + lx + '%;background:' + mt.cor + ';"></s><em style="left:' + lx + '%;color:' + mt.cor + ';">' + mt.k + ' ' + Math.round(mt.v / 1000) + 'k</em>';
           }).join('')
         : '';
-      // SDR: o card inteiro vira botão que abre o funil + cálculo de pagamento
-      var clickSdr = tipo === 'sdr'
-        ? ' style="cursor:pointer;" title="Clique para ver o funil e o pagamento" onclick="abrirFunilSdr(\'' + p.nome.replace(/'/g, "\\'") + '\')"'
-        : '';
+      // SDR: o card não abre mais nada ao clicar (Bruno 02/10/2026: "tire a parte clicável do ranking do SDR")
+      var clickSdr = '';
       hh += '<div class="rk-card' + (i < 3 ? ' top' + (i + 1) : '') + '"' + clickSdr + '>'
         + '<span class="rk-faixa ' + (faixas[i] || 'resto') + '"></span>'
         + '<div class="rk-top">'
@@ -28100,7 +28098,8 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
   var fx = (faixas || []).slice().sort(function(a, b){ return a[0] - b[0]; }), conta = p.realizadas + (wkConta ? p.workshop : 0);
   var atual = null, prox = null, letra = tipo === 'sdr' ? ['P', 'M', 'G', 'GG', 'GG+'] : ['1', '2', '3', '4', '5'];
   fx.forEach(function(t, k){ if (conta >= t[0]) atual = { t: t, i: k }; else if (!prox) prox = t; });
-  var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Variável', p.variavel, '#3ddc97']].filter(function(x){ return x[1] > 0; });
+  var bon = +p.bonus || 0;   // bônus da aba Extras (meta do time, plantão à noite…) — já está dentro do Variável na planilha
+  var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Variável', p.variavel - bon, '#3ddc97'], ['Bônus', bon, '#ffd166']].filter(function(x){ return x[1] > 0; });
   var topo = Math.max(conta, (prox ? prox[0] : (fx.length ? fx[fx.length - 1][0] : conta)) * 1.12) || 1;
   var R = p.reunioes || null, marc = R ? R.length : 0, apar = R ? R.filter(function(r){ return r.re && r.conta; }).length : 0, vds = R ? R.filter(function(r){ return r.vd && r.conta; }).length : 0;
   return '<div class="cm-card cm-clica cm-entra" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'' + tipo + '\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as reuniões do mês">'
@@ -28208,6 +28207,9 @@ function renderComissoes() {
   if (!CM.carregando && Date.now() - (CM.ultimaBusca || 0) > 5 * 60000) setTimeout(function(){ cmCarregar(); }, 50);
 }
 cmMostrarMenu();
+// ⚡ (Bruno 02/10/2026: "coloque algo para abrir mais rápido as informações"): com o dash aberto, as comissões já carregam por
+// trás (do que ficou guardado no aparelho e do robô) — ao clicar na aba está tudo pronto
+setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.dados) cmCarregar(); } catch (e) {} }, 6000);
 </script>
 
 <style>
@@ -28292,6 +28294,9 @@ cmMostrarMenu();
 .cm-motivo { margin-top:8px; font-size:.78rem; color:#ffb4b4; }
 
 /* ✨ visual novo dos cartões (02/10/2026) */
+.cm-bonus { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin:0 0 12px; padding:10px 12px; border-radius:12px; background:rgba(255,209,102,.07); border:1px solid rgba(255,209,102,.25); font-size:.78rem; }
+.cm-bonus b { color:#ffd166; margin-right:4px; } .cm-bonus span { padding:3px 10px; border-radius:999px; background:rgba(255,255,255,.05); } .cm-bonus em { font-style:normal; font-weight:900; color:#ffd166; }
+
 .cm-topo-barra { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; } .cm-topo-barra .cm-meses { margin-bottom:0; }
 .cm-sync { display:inline-flex; align-items:center; gap:7px; font-size:.74rem; font-weight:800; color:#6ea8ff; padding:5px 11px; border-radius:999px; background:rgba(110,168,255,.1); border:1px solid rgba(110,168,255,.28); }
 .cm-sync i { width:10px; height:10px; border-radius:50%; border:2px solid currentColor; border-right-color:transparent; animation:cmGira .8s linear infinite; }
@@ -28644,6 +28649,7 @@ function _cmDetPre(p, g, todos, bt) {
     + bt('workshop', '🎓 Workshop', R.filter(function(r){ return r.o === 'Workshop'; }).length) + bt('nao', 'Não realizadas', R.filter(function(r){ return !r.re; }).length) + bt('tirada', 'Tiradas pelo financeiro', R.filter(function(r){ return !r.conta; }).length) + '</div>';
   var V = R.filter(function(r){ return CMD.filtro === 'tudo' || (CMD.filtro === 'realizada' ? r.re && ok(r) : CMD.filtro === 'venda' ? r.vd && ok(r) : CMD.filtro === 'workshop' ? r.o === 'Workshop' : CMD.filtro === 'tirada' ? !r.conta : !r.re); });
   // lembrete do Bruno (02/10/2026): "SDR só recebe por reuniões que o lead apareceu" — "SS também"
+  if ((p.extras || []).length) h += '<div class="cm-bonus"><b>⭐ Bônus do mês</b>' + p.extras.map(function(x){ return '<span>' + dspEsc(x.d) + ' <em>' + cmR(x.v, false) + '</em></span>'; }).join('') + '</div>';
   var nAp = R.filter(function(r){ return r.re && ok(r); }).length, nNao = R.filter(function(r){ return !r.re; }).length, nVd = R.filter(function(r){ return r.vd && ok(r); }).length, nWs = R.filter(function(r){ return r.re && ok(r) && r.o === 'Workshop'; }).length;
   h += '<div class="cm-pv-resumo"><div class="ok"><b>' + nAp + '</b><small>✅ apareceram — pagam</small></div><div class="nao"><b>' + nNao + '</b><small>🚫 não apareceram — não pagam</small></div>'
     + '<div class="vd"><b>' + nVd + '</b><small>💰 viraram venda</small></div><div class="ws"><b>' + nWs + '</b><small>🎓 de workshop (R$ 10 cada)</small></div></div>'
