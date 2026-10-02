@@ -2665,7 +2665,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-1926';
+var VERSAO_DASH = '2026-10-02-1948';
 var _versaoNova = null;
 
 // =====================================================================
@@ -28207,7 +28207,23 @@ cmMostrarMenu();
 .cm-edita-bts { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .cm-obs { margin-top:8px; font-size:.76rem; color:#c9cfdb; }
 .cm-obs summary { cursor:pointer; color:#b084ff; font-weight:800; font-size:.74rem; }
-.cm-obs div { margin-top:6px; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.03); line-height:1.45; }
+.cm-dados-box summary { color:#6ea8ff; }
+.cm-dados-box > .cm-dados { background:transparent; padding:0; display:flex; flex-direction:column; gap:10px; }
+.cm-dados-sec { padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); }
+.cm-dados-tit { font-size:.7rem; font-weight:900; letter-spacing:.04em; word-spacing:.25em; text-transform:uppercase; color:#c9cfdb; margin-bottom:8px; }
+.cm-dados-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:8px 14px; }
+.cm-dados-grade small { display:block; color:#9aa3b2; font-size:.64rem; font-weight:700; }
+.cm-dados-grade b { display:block; font-size:.78rem; font-weight:700; color:#eef0f4; overflow-wrap:anywhere; }
+.cm-dados-obs { margin-top:8px; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.03); white-space:pre-wrap; line-height:1.45; }
+.cm-dados-links { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin-top:10px; font-size:.74rem; font-weight:800; }
+.cm-dados-links a { color:#6ea8ff; text-decoration:none; }
+.cm-dados-links button, .cm-dados-reu button { background:rgba(110,168,255,.12); color:#6ea8ff; border:1px solid rgba(110,168,255,.35); border-radius:8px; padding:4px 10px; font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; }
+.cm-dados-links button:hover, .cm-dados-reu button:hover { background:rgba(110,168,255,.22); }
+.cm-dados-reus { display:flex; flex-direction:column; gap:4px; }
+.cm-dados-reu { display:grid; grid-template-columns:78px 96px 1fr auto auto; gap:8px; align-items:center; font-size:.76rem; padding:6px 8px; border-radius:9px; background:rgba(255,255,255,.025); }
+.cm-dados-conta { margin:0; padding-left:16px; display:flex; flex-direction:column; gap:4px; font-size:.76rem; line-height:1.45; }
+@media (max-width:640px) { .cm-dados-reu { grid-template-columns:1fr auto; } .cm-dados-reu > span:nth-child(3) { grid-column:1 / -1; } }
+.cm-obs > div { margin-top:6px; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.03); line-height:1.45; }
 .cm-motivo { margin-top:8px; font-size:.78rem; color:#ffb4b4; }
 .cm-conta { border-radius:999px; padding:4px 10px; font-size:.72rem; font-weight:800; cursor:pointer; border:1px solid; }
 .cm-conta.sim { background:rgba(61,220,151,.12); color:#3ddc97; border-color:rgba(61,220,151,.4); }
@@ -28296,6 +28312,10 @@ function _cmDetCloser(p, todos, bt) {
     + '<div class="cm-quebras"><div><small>Comissão por forma de pagamento</small>' + _cmQuebra(porForma, sc) + '</div><div><small>Comissão por origem</small>' + _cmQuebra(porOrig, sc) + '</div></div>';
   if (!V.length) return h + '<div class="hint" style="padding:16px;">Nada nesse filtro.</div>';
   var TIPO = { venda: ['Venda', '#3ddc97'], lia: ['Boleto Lia', '#6ea8ff'], guru: ['Guru', '#b084ff'], extra: ['Extra', '#ffd166'] };
+  // escada do Legado: quantas linhas de Legado contam no mês de cada pessoa (mesma conta da planilha: Tipo Legado, conta Sim, valor > 0, mês da venda = mês)
+  var nLeg = {};
+  L.forEach(function(l){ if (l.tp === 'Legado' && l.e !== 'Não' && l.v > 0 && (!l.x || l.x === CM.dados.mes)) { var a = l.aba || CMD.aba; nLeg[a] = (nLeg[a] || 0) + 1; } });
+  window._cmCards = [];
   h += '<div class="cm-cards">';
   ordem.forEach(function(k) {
     var ls = grupos[k], venda = ls.filter(function(l){ return l.t === 'venda'; })[0], prim = venda || ls[0];
@@ -28303,7 +28323,8 @@ function _cmDetCloser(p, todos, bt) {
     var sub = prim.t === 'extra' ? 'Extra lançado no mês' : [dspEsc((venda || prim).p || ''), venda && venda.v ? 'venda ' + cmR(venda.v, false) : '', venda && venda.fe ? 'fechou ' + dspEsc(venda.fe) : ''].filter(Boolean).join(' · ');
     h += '<div class="cm-cli"><div class="cm-cli-topo">'
       + '<div class="cm-cli-nome"><b>' + dspEsc(prim.n) + '</b>' + (todos ? ' <span class="cm-quem">' + dspEsc(prim.q || '') + '</span>' : '') + '<small>' + sub + '</small>'
-      + '<div class="cm-cli-tags">' + (prim.t !== 'extra' ? _cmTagOrigem(prim) : '') + '</div></div>'
+      + '<div class="cm-cli-tags">' + (prim.t !== 'extra' ? _cmTagOrigem(prim) : '')
+      + (prim.t !== 'extra' && (prim.tp === 'Legado' || /legado|club/i.test(prim.p || '')) ? ' <span class="cm-tag" style="background:rgba(185,138,255,.14);color:#b98aff;" title="Legado Club e Legado Digital entram juntos na escada do Legado">🏛️ Legado · escada</span>' : '') + '</div></div>'
       + '<div class="cm-cli-valor"><small>comissão</small><b>' + cmR(com) + '</b><small>de ' + cmR(rec, false) + ' recebido</small></div></div>'
       + '<div class="cm-pags">';
     ls.forEach(function(l) {
@@ -28324,10 +28345,104 @@ function _cmDetCloser(p, todos, bt) {
         + '<div class="cm-edita-bts"><button class="btn" onclick="cmEditarSalvar(\'' + id + '\', \'closers\')">Salvar</button><button class="btn" style="background:transparent;" onclick="cmEditarAbrir(\'' + id + '\')">Cancelar</button><span class="hint" data-msg></span></div></div>';
     });
     var ob = ls.map(function(l){ return l.u; }).filter(Boolean);
+    if (prim.t !== 'extra') {
+      var ci = window._cmCards.push({ n: prim.n, ls: ls, nLeg: nLeg[prim.aba || CMD.aba] || 0 }) - 1;
+      h += '<details class="cm-obs cm-dados-box" ontoggle="if(this.open)cmDadosAbrir(this,' + ci + ')"><summary>ver dados do pagamento e do lead</summary><div class="cm-dados"></div></details>';
+    }
     if (ob.length) h += '<details class="cm-obs"><summary>ver observação</summary><div>' + ob.map(dspEsc).join('<br>') + '</div></details>';
     h += '</div></div>';
   });
   return h + '</div>';
+}
+// 📄 DADOS DENTRO DO CARTÃO (Bruno 02/10/2026: "que eu consiga ver os dados de pagamento", "os dados do lead na planilha e etc"):
+// o formulário de venda (aba Pagamentos), as linhas da pessoa na aba Vendas, o lead do formulário de entrada e o workshop —
+// tudo do que o dash já carregou. Monta só quando abre. E "como foi a conta" de cada pagamento (Bruno: "legado club entra como
+// legado na mesma lógica" — Legado Club e Legado Digital contam juntos na escada do Legado).
+function _cmNomeChave(n) { return String(n || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20); }   // igual ao _comChave do robô
+function _cmYmd(d) { return d instanceof Date ? d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) : ''; }
+function _cmPct(x) { return (x * 100).toFixed(2).replace('.', ',') + '%'; }
+function _cmConta(l, nLeg) {
+  if (l.t === 'extra' || !l.pb) return '';
+  var s = l.tp === 'Legado'
+    ? 'Legado (Club e Digital contam juntos): ' + nLeg + ' venda' + (nLeg === 1 ? '' : 's') + ' de Legado no mês → escada ' + _cmPct(l.pb)
+    : 'Programa · ' + (l.f || 'pagamento') + ' → ' + _cmPct(l.pb);
+  if (Math.abs(l.pc - l.pb) > 0.00001) {
+    var ws = l.o === 'Workshop' && l.wd != null && l.wd >= 0 && l.wd <= 15;
+    s += ws ? ' · workshop (dia ' + l.wd + '): fica ' + Math.round(l.pc / l.pb * 100) + '% → <b>' + _cmPct(l.pc) + '</b>' : ' → <b>' + _cmPct(l.pc) + '</b>';
+  }
+  return s + ' · ' + cmR(l.r) + ' × ' + _cmPct(l.pc) + (l.aj ? ' + ajuste ' + cmR(l.aj) : '') + ' = <b>' + cmR(l.c) + '</b>';
+}
+function _cmLink(u, rot) { u = String(u || '').trim(); return /^https?:\/\//i.test(u) ? '<a href="' + dspEsc(u) + '" target="_blank" rel="noopener">' + rot + '</a>' : ''; }
+function cmDadosAbrir(el, ci) {
+  var c = (window._cmCards || [])[ci], box = el.querySelector('.cm-dados');
+  if (!c || !box || el.dataset.ok) return;
+  if (!PAG.carregado) { box.innerHTML = '<span class="hint">Carregando os formulários…</span>'; setTimeout(function(){ if (el.open) cmDadosAbrir(el, ci); }, 900); return; }
+  el.dataset.ok = '1';
+  var kc = _cmChaveCliente(c.n), ks = {}, pags = [];
+  c.ls.forEach(function(l){ if (/^\d{8}\|/.test(l.k || '')) ks[l.k] = 1; });
+  (PAG.rows || []).forEach(function(p, i){
+    var exato = !!ks[_cmYmd(p.date) + '|' + _cmNomeChave(p.nome)];
+    if (exato || (kc && _cmChaveCliente(p.nome) === kc)) pags.push({ p: p, i: i, exato: exato });
+  });
+  pags.sort(function(a, b){ return (b.exato - a.exato) || ((b.p.date || 0) - (a.p.date || 0)); });
+  var t8s = {}; pags.forEach(function(x){ var t = ldTel8(x.p.celular); if (t) t8s[t] = 1; });
+  var reus = (V2.rows || []).filter(function(r){ var t = ldTel8(r.telefone); return (t && t8s[t]) || (kc && _cmChaveCliente(r.nome) === kc); })
+    .sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
+  var tel = (pags[0] && pags[0].p.celular) || (reus[0] && reus[0].telefone) || '';
+  var lead = null; try { var ac = acharLeadDeTodoJeito(reus[0] || { nome: c.n, telefone: tel }, pags[0] ? pags[0].p : null); lead = ac ? ac.lead : null; } catch (e) {}
+  var cel = function(rot, val) {
+    val = String(val == null ? '' : val).trim(); if (!val) return '';
+    rot = String(rot || '').replace(/^\d+\.\s*/, '');   // "4. RG do mentorado" → "RG do mentorado"
+    return '<div><small>' + dspEsc(rot) + '</small><b>' + (/^https?:\/\/\S+$/i.test(val) ? _cmLink(val, 'abrir ↗') : dspEsc(val.length > 220 ? val.slice(0, 220) + '…' : val)) + '</b></div>';
+  };
+  var h = '';
+  // como foi a conta
+  var contas = c.ls.map(function(l){ var t = _cmConta(l, c.nLeg); return t ? '<li><span class="hint">' + dspEsc(l.pg || l.fe || '') + '</span> ' + t + '</li>' : ''; }).filter(Boolean);
+  if (contas.length) h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🧮 Como foi a conta</div><ul class="cm-dados-conta">' + contas.join('') + '</ul></div>';
+  // formulário de pagamento
+  if (!pags.length) h += '<div class="cm-dados-sec"><div class="cm-dados-tit">💳 Formulário de pagamento</div><div class="hint">Não achei o formulário desta pessoa na aba Pagamentos.</div></div>';
+  pags.slice(0, 4).forEach(function(x, j){
+    var p = x.p, ex = '';
+    Object.keys(p.extras || {}).forEach(function(k){ ex += cel(k, p.extras[k]); });
+    h += '<div class="cm-dados-sec"><div class="cm-dados-tit">💳 Formulário de pagamento' + (pags.length > 1 ? ' ' + (j + 1) + ' de ' + pags.length : '') + (p.date ? ' · ' + p.date.toLocaleDateString('pt-BR') : '') + '</div>'
+      + '<div class="cm-dados-grade">' + cel('Programa', p.programa) + cel('Valor total', p.valor > 0 ? v2moeda(p.valor) : '') + cel('Forma de pagamento', p.forma) + cel('Teve entrada?', p.entrada)
+      + cel('Vendedor', p.vendedor) + cel('CPF', p.cpf) + cel('Celular', p.celular) + cel('E-mail', p.email) + cel('Instagram', p.insta) + cel('Contrato', p.stC) + cel('Lançado no Omie', p.omie) + ex + '</div>'
+      + (p.obs ? '<div class="cm-dados-obs">' + dspEsc(p.obs) + '</div>' : '')
+      + '<div class="cm-dados-links">' + _cmLink(p.contrato, '📄 abrir contrato') + _cmLink(p.clint, '💬 conversa na Clint')
+      + '<button type="button" onclick="cmAbrirFichaPag(' + x.i + ')">abrir ficha do pagamento</button></div></div>';
+  });
+  // linhas na aba Vendas
+  if (reus.length) {
+    h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🗂️ Na planilha de vendas · ' + reus.length + (reus.length === 1 ? ' linha' : ' linhas') + '</div><div class="cm-dados-reus">'
+      + reus.slice(0, 8).map(function(r){
+        var iR = v2reg(r);
+        return '<div class="cm-dados-reu"><span>' + (r.date ? r.date.toLocaleDateString('pt-BR') : '—') + '</span><b>' + dspEsc(r.status || '—') + '</b>'
+          + '<span>' + dspEsc([r.produto, r.closer ? 'closer ' + r.closer : '', r.sdr ? 'SDR ' + r.sdr : '', r.origem].filter(Boolean).join(' · ')) + '</span>'
+          + '<span class="cm-pag-n">' + (r.valor ? cmR(r.valor, false) : '') + '</span>'
+          + '<button type="button" onclick="cmAbrirLead(' + iR + ')">ficha</button></div>';
+      }).join('') + '</div></div>';
+  } else h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🗂️ Na planilha de vendas</div><div class="hint">Nenhuma linha com este nome ou telefone (venda sem reunião ou nome diferente).</div></div>';
+  // lead (formulário de entrada) e workshop
+  if (lead) {
+    h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🧲 Lead (formulário de entrada)</div><div class="cm-dados-grade">'
+      + cel('Chegou em', lead.dataTxt || (lead.date ? lead.date.toLocaleDateString('pt-BR') : '')) + cel('Origem', lead.origem) + cel('Campanha', lead.campanha) + cel('Investimento declarado', lead.invest)
+      + cel('Renda', lead.renda) + cel('Segmento', lead.seg) + cel('Objetivo', lead.obj) + cel('Nota', lead.score ? String(lead.score) : '') + '</div></div>';
+  }
+  var ws = ''; try { ws = tel ? wsFichaHtml(tel, reus[0] ? reus[0].date : null) : ''; } catch (e) {}
+  if (ws) h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🎓 Workshop</div>' + ws + '</div>';
+  box.innerHTML = h;
+}
+// as fichas abrem por cima da janela de comissões (ela fica em z-index 9000) e voltam ao normal ao fechar
+function cmAbrirFichaPag(i) {
+  abrirFichaPagDireto(i);
+  var ovs = document.querySelectorAll('.modal-overlay.open'); if (ovs.length) ovs[ovs.length - 1].style.zIndex = 9500;
+}
+function cmAbrirLead(i) {
+  abrirLead(i);
+  var m = document.getElementById('modal-lead'); if (!m) return;
+  m.style.zIndex = 9500;
+  var ob = new MutationObserver(function(){ if (!m.classList.contains('open')) { m.style.zIndex = ''; ob.disconnect(); } });
+  ob.observe(m, { attributes: true, attributeFilter: ['class'] });
 }
 function _cmQuebra(m, tot) {
   var ks = Object.keys(m).filter(function(k){ return Math.abs(m[k]) > 0.004; }).sort(function(a, b){ return m[b] - m[a]; }), cores = ['#3ddc97', '#6ea8ff', '#b084ff', '#ffd166', '#f6a350', '#9aa3b2'];
