@@ -2669,7 +2669,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2224';
+var VERSAO_DASH = '2026-10-02-2321';
 var _versaoNova = null;
 
 // =====================================================================
@@ -27612,7 +27612,7 @@ window.__gvizWS = function(resp) {
       d1: ix(/^1. dia$/), d2: ix(/^2. dia$/), ing: ix(/^ingresso/), apl: ix(/^aplicou/), aplSt: ix(/^aplicacao \(status/), compra: ix(/^compra/),
       pqF: ix(/^pesquisa: faixa/), pqN: ix(/^pesquisa: nota/), dg: ix(/^diagnostico em/), crm: ix(/^crm/), sdr: ix(/^sdr/), closer: ix(/^closer/),
       p1: ix(/^presenca d1/), p2: ix(/^presenca d2/), p3: ix(/^presenca d3/), grupo: ix(/^grupo/), atu: ix(/^atualizado/) };
-    var porTel = {}, n = 0, atu = 0;
+    var porTel = {}, aplNome = {}, n = 0, atu = 0;
     resp.table.rows.forEach(function(r) {
       var g = function(k) { return C[k] >= 0 ? _wsCel(r.c[C[k]]) : ''; };
       var t8 = String(g('t8') || '').replace(/\D/g, '').slice(-8); if (t8.length < 8) return;
@@ -27622,8 +27622,9 @@ window.__gvizWS = function(resp) {
         p1: /sim/i.test(g('p1')), p2: /sim/i.test(g('p2')), p3: /sim/i.test(g('p3')), grupo: /sim/i.test(g('grupo')) };
       var a = g('atu'); if (a instanceof Date && a.getTime() > atu) atu = a.getTime();
       porTel[t8] = x; n++;
+      if (x.apl instanceof Date) _wsNomeChaves(x.nome).forEach(function(k){ if (!aplNome[k]) aplNome[k] = x.apl; });
     });
-    WSL.porTel = porTel; WSL.n = n; WSL.quando = atu; WSL.carregado = true; WSL.erro = '';
+    WSL.porTel = porTel; WSL.aplNome = aplNome; WSL.n = n; WSL.quando = atu; WSL.carregado = true; WSL.erro = '';
     try { if (typeof LD !== 'undefined' && LD.carregado && telaVisivel('s-leads')) renderLeads(); } catch (eL) {}
     try { if (telaVisivel('s-qualif')) renderQualif(); } catch (eQ) {}
   } catch (e) { WSL.erro = e.message; }
@@ -27637,6 +27638,22 @@ function carregarWS() {
   s.src = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/gviz/tq?tqx=out:json;responseHandler:__gvizWS&sheet=' + encodeURIComponent('Workshop (Lovable)') + '&headers=1&_t=' + Date.now();
   document.body.appendChild(s);
   setTimeout(function(){ WSL.buscando = false; }, 60000);
+}
+// v224 (Bruno 02/10/2026: "a regra do 50% vale para quem aplicou, esse é o caso?"): mesma conta do robô — aplicou pelo
+// telefone ou pelo nome (1º + último nome, ou 1º + 2º; o app às vezes traz o nome mais curto)
+function _wsNomeChaves(n) {
+  var t = String(n || '').replace(/\([^)]*\)/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/)
+    .filter(function(x){ return x && !/^(pr|pra|pastor|pastora|dr|dra|ap|apostolo|apostola|bispo|bispa|miss|missionaria|missionario|prof|profa|de|da|do|dos|das|e)$/.test(x); });
+  if (t.length < 2) return [];
+  var k = [t[0] + ' ' + t[t.length - 1]]; if (t.length > 2) k.push(t[0] + ' ' + t[1]);
+  return k;
+}
+function wsAplicou(x, nome) {
+  if (!x) return null;
+  if (x.apl instanceof Date) return { d: x.apl, porNome: false };
+  var A = WSL.aplNome || {}, ks = _wsNomeChaves(x.nome).concat(_wsNomeChaves(nome));
+  for (var i = 0; i < ks.length; i++) if (A[ks[i]]) return { d: A[ks[i]], porNome: true };
+  return null;
 }
 function wsDoTel(tel) { var t = ldTel8(tel); return t && WSL.porTel[t] ? WSL.porTel[t] : null; }
 function _wsDm(d) { return d instanceof Date ? ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) : ''; }
@@ -27699,10 +27716,12 @@ function seloWorkshop(tel, ref, mini) {
   var h = ' <span class="ld-tag" style="background:rgba(176,132,255,.16);color:#b084ff;border:1px solid rgba(176,132,255,.45);font-weight:800;" title="' + dspEsc(tit) + '">🎓 Workshop ' + _wsMes(x) + '</span>';
   var os = wsOrigens(tel);
   if (os.length > 1) h += ' <span class="ld-tag" style="background:rgba(255,255,255,.06);color:#d6dbe6;font-weight:600;" title="Origens em ordem: ' + dspEsc(os.map(function(it){ return it.o; }).join(' → ')) + ' (a primeira vale como origem principal)">🧭 ' + _wsOrigTxt(os, false) + '</span>';
-  if (x.apl) h += ' <span class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;" title="Fez a aplicação no app do workshop em ' + _wsDm(x.apl) + (x.aplSt ? ' (' + dspEsc(x.aplSt) + ')' : '') + '">📝 aplicou ' + _wsDm(x.apl) + '</span>';
+  var ap = wsAplicou(x);
+  if (ap) h += ' <span class="ld-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;" title="Fez a aplicação no app do workshop em ' + _wsDm(ap.d) + (ap.porNome ? ' (achada pelo nome, com outro telefone)' : x.aplSt ? ' (' + dspEsc(x.aplSt) + ')' : '') + '">📝 aplicou ' + _wsDm(ap.d) + (ap.porNome ? ' · pelo nome' : '') + '</span>';
   if (dias.length) h += ' <span class="ld-tag" style="background:rgba(110,168,255,.14);color:#6ea8ff;" title="Presença no workshop">✅ ' + dias.join('·') + '</span>';
-  if (j && (x.apl || !mini || j.fase === 'dentro')) {
-    if (j.fase === 'dentro') h += ' <span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;font-weight:800;" title="Venda do workshop paga 50% da comissão do 2º dia (' + _wsDm(x.d2) + ') até ' + _wsDm(j.fim) + '">⏳ 50% até ' + _wsDm(j.fim) + ' · dia ' + j.dias + '/' + WS_JANELA_DIAS + '</span>';
+  if (j && (ap || !mini || j.fase === 'dentro')) {
+    if (j.fase === 'dentro' && !ap) h += ' <span class="ld-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;" title="Não fez a aplicação do workshop: os 50% por 15 dias só valem para quem aplicou. Se comprar, comissão normal.">sem aplicação · comissão normal</span>';
+    else if (j.fase === 'dentro') h += ' <span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;font-weight:800;" title="Venda do workshop paga 50% da comissão do 2º dia (' + _wsDm(x.d2) + ') até ' + _wsDm(j.fim) + '">⏳ 50% até ' + _wsDm(j.fim) + ' · dia ' + j.dias + '/' + WS_JANELA_DIAS + '</span>';
     else if (j.fase === 'depois') h += ' <span class="ld-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;" title="Passou dos 15 dias depois do 2º dia (' + _wsDm(x.d2) + '): comissão normal">depois do workshop · comissão normal</span>';
     else h += ' <span class="ld-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;" title="O 2º dia do workshop é ' + _wsDm(x.d2) + '">antes do workshop (' + _wsDm(x.d2) + ')</span>';
   }
@@ -27716,13 +27735,16 @@ function wsFichaHtml(tel, ref) {
   if (os.length) L.push('🧭 ' + (os.length > 1 ? 'Origens (a 1ª é a principal)' : 'Origem') + ': ' + _wsOrigTxt(os, true));
   L.push('<b>' + dspEsc(x.ws || 'Workshop') + '</b>' + (x.d1 instanceof Date ? ' <span class="hint">(' + _wsDm(x.d1) + ' a ' + _wsDm(new Date(x.d1.getTime() + 2 * 864e5)) + ')</span>' : ''));
   if (x.ing) L.push('🎟️ Ingresso pago em ' + _wsDm(x.ing));
-  if (x.apl) L.push('📝 Aplicou em ' + _wsDm(x.apl) + (x.aplSt ? ' · ' + dspEsc(x.aplSt) : '') + (x.compra ? ' · ' + dspEsc(x.compra.replace(/_/g, ' ')) : ''));
+  var ap = wsAplicou(x);
+  if (ap) L.push('📝 Aplicou em ' + _wsDm(ap.d) + (ap.porNome ? ' <span class="hint">(achada pelo nome, com outro telefone)</span>' : (x.aplSt ? ' · ' + dspEsc(x.aplSt) : '') + (x.compra ? ' · ' + dspEsc(x.compra.replace(/_/g, ' ')) : '')));
+  else L.push('<span style="color:#9aa3b2;">📝 Não fez a aplicação do workshop</span>');
   var dias = [x.p1 ? 'D1' : '', x.p2 ? 'D2' : '', x.p3 ? 'D3' : ''].filter(Boolean);
   L.push(dias.length ? '✅ Participou: ' + dias.join(', ') : '<span class="hint">Presença: o app ainda não manda (só julho tem)</span>');
   if (x.pqF || x.pqN !== '') L.push('🏅 Pesquisa do workshop: ' + (x.pqF || '—') + (x.pqN !== '' ? ' (' + x.pqN + ')' : ''));
   if (x.crm || x.sdr || x.closer) L.push('📋 No app: ' + [x.crm, x.sdr ? 'SDR ' + x.sdr : '', x.closer ? 'closer ' + x.closer : ''].filter(Boolean).map(dspEsc).join(' · '));
   var j = wsJanela(x, ref);
-  if (j) L.push(j.fase === 'dentro' ? '<b style="color:#f6a350;">⏳ Janela dos 50%: do 2º dia (' + _wsDm(x.d2) + ') até ' + _wsDm(j.fim) + ' — hoje é o dia ' + j.dias + ' de ' + WS_JANELA_DIAS + '</b>'
+  if (j) L.push(j.fase === 'dentro' && !ap ? '<span style="color:#9aa3b2;">Sem aplicação: os 50% por 15 dias não valem — se comprar, comissão normal</span>'
+    : j.fase === 'dentro' ? '<b style="color:#f6a350;">⏳ Janela dos 50%: do 2º dia (' + _wsDm(x.d2) + ') até ' + _wsDm(j.fim) + ' — hoje é o dia ' + j.dias + ' de ' + WS_JANELA_DIAS + '</b>'
     : j.fase === 'depois' ? '<span style="color:#9aa3b2;">Passou dos 15 dias do 2º dia (' + _wsDm(x.d2) + '): comissão normal</span>'
     : '<span class="hint">O 2º dia do workshop é ' + _wsDm(x.d2) + '</span>');
   return L.join('<br>');
