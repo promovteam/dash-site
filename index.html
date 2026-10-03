@@ -2675,7 +2675,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-0614';
+var VERSAO_DASH = '2026-10-03-0623';
 var _versaoNova = null;
 
 // =====================================================================
@@ -9099,6 +9099,32 @@ function metaTipoCampanha(c) {
   if (/(^|[^a-z])ild([^a-z]|$)|imersao|goiania|(^|[^a-z])df([^a-z]|$)/.test(u)) return 'imersao';
   return 'diagnostico';
 }
+// retorno "correto" (Bruno 03/10/2026: "pode mudar" / "quero tudo correto"): o dinheiro do diagnóstico se paga com as vendas
+// dos leads de anúncio; o do workshop, com as vendas do workshop. A imersão (ILD) fica de fora: as vendas dela não passam pelo dash.
+function metaRetorno(gt, fatAnuncio, fatWorkshop) {
+  var inv = (gt.diagnostico || 0) + (gt.workshop || 0);
+  return { geral: inv ? ((fatAnuncio || 0) + (fatWorkshop || 0)) / inv : 0, diag: gt.diagnostico ? (fatAnuncio || 0) / gt.diagnostico : 0, ws: gt.workshop ? (fatWorkshop || 0) / gt.workshop : 0 };
+}
+// 03/10/2026 (Bruno: "quero tudo correto"): o mesmo anúncio roda em mais de um conjunto/campanha (57 de 184 nomes em setembro) —
+// antes o cartão ficava só com a ÚLTIMA linha (ex.: ads_wld_leticia_02 mostrava R$ 5.120 de R$ 11.335). Agora soma todas;
+// id, campanha e foto ficam os da linha que mais gastou.
+function metaPorAnuncio() {
+  var D = META.dados; if (!D || !D.anuncios) return {};
+  if (D._porAn) return D._porAn;
+  var m = {};
+  D.anuncios.forEach(function(a) {
+    var k = _chaveAnuncio(a.anuncio), g = +a.gasto || 0, x = m[k];
+    if (!x) { x = m[k] = Object.assign({}, a, { gasto: g, _linhas: 1, _maior: g, _porTipo: {} }); }
+    else {
+      x._linhas++; x.gasto += g;
+      ['impressoes', 'cliques', 'leadsMeta'].forEach(function(c) { if (a[c] != null) x[c] = (+x[c] || 0) + (+a[c] || 0); });
+      if (g > x._maior) { x._maior = g; if (a.adId) x.adId = a.adId; if (a.campanha) x.campanha = a.campanha; if (a.conjunto) x.conjunto = a.conjunto; if (a.foto) x.foto = a.foto; }
+    }
+    var tp = metaTipoCampanha(a.campanha); x._porTipo[tp] = (x._porTipo[tp] || 0) + g;
+  });
+  try { Object.defineProperty(D, '_porAn', { value: m, enumerable: false, configurable: true, writable: true }); } catch (e) { D._porAn = m; }
+  return m;
+}
 function metaGastoPorTipo(anuncios) {
   var g = { diagnostico: 0, workshop: 0, imersao: 0 };
   (anuncios || []).forEach(function(a) { g[metaTipoCampanha(a.campanha)] += +a.gasto || 0; });
@@ -9107,6 +9133,13 @@ function metaGastoPorTipo(anuncios) {
 // quadro do investimento: gasto do Facebook × leads × reuniões × vendas
 function blocoMetaAds(listaAn, per) {
   if (telaVisivel('s-anuncios')) carregarMetaAds(per);
+  // 03/10/2026 (Bruno: "quero tudo correto"): o quadro mostrava o investimento do último período buscado (ex.: setembro, vindo do
+  // Relatório) ao lado dos leads de outro período — agora busca o mesmo período dos leads e só mostra quando os dois batem
+  if (META.dados && META.dados._chave !== metaChaveDe(per)) {
+    if (META._falhou && Date.now() - (META._falhou[metaChaveDe(per)] || 0) < 120000) return '<div class="hint" style="margin-top:10px;color:#f6a350;">💸 O Facebook não devolveu o investimento deste período agora — tento de novo em 2 minutos.</div>';
+    carregarMetaAds(per);
+    return '<div class="hint" style="margin-top:10px;">⏳ Buscando no Facebook o investimento deste período…</div>';
+  }
   if (META.buscando && !META.dados) return '<div class="hint" style="margin-top:10px;">⏳ Buscando o investimento no Facebook…</div>';
   if (!META.dados) {
     return '<div class="hint" style="margin-top:10px;color:#f6a350;">💸 Investimento do Facebook ainda não conectado'
@@ -9115,27 +9148,32 @@ function blocoMetaAds(listaAn, per) {
   }
   var porAn = {};
   listaAn.forEach(function(o){ porAn[_chaveAnuncio(o.nome)] = o.d; });
-  var linhas = [], gasto = 0, leads = 0, reun = 0, vend = 0, porTipo = {};
-  META.dados.anuncios.forEach(function(a) {
-    var d = porAn[_chaveAnuncio(a.anuncio)] || { n: 0, ag: 0, vd: 0 };
+  var linhas = [], gasto = 0, leads = 0, reun = 0, vend = 0, porTipo = {}, MP = metaPorAnuncio();
+  Object.keys(MP).forEach(function(k) {
+    var a = MP[k], d = porAn[k] || { n: 0, ag: 0, vd: 0 };
     gasto += a.gasto; leads += d.n; reun += d.ag; vend += d.vd;
     linhas.push({ nome: a.anuncio, gasto: a.gasto, n: d.n, ag: d.ag, vd: d.vd });
-    var tp = metaTipoCampanha(a.campanha), T = porTipo[tp] || (porTipo[tp] = { gasto: 0, n: 0, ag: 0, vd: 0 });
-    T.gasto += +a.gasto || 0; T.n += d.n; T.ag += d.ag; T.vd += d.vd;
+    // o gasto vai para o tipo de cada campanha; os leads, para o tipo onde o anúncio mais gastou
+    var tps = Object.keys(a._porTipo || {}), tPrin = tps.sort(function(p, q) { return a._porTipo[q] - a._porTipo[p]; })[0] || metaTipoCampanha(a.campanha);
+    tps.forEach(function(tp) { var T = porTipo[tp] || (porTipo[tp] = { gasto: 0, n: 0, ag: 0, vd: 0 }); T.gasto += a._porTipo[tp]; });
+    var T2 = porTipo[tPrin] || (porTipo[tPrin] = { gasto: 0, n: 0, ag: 0, vd: 0 }); T2.n += d.n; T2.ag += d.ag; T2.vd += d.vd;
   });
   linhas.sort(function(x, y){ return y.gasto - x.gasto; });
   function rs(v){ return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
+  // 03/10/2026 (Bruno: "quero tudo correto"): os leads, reuniões e vendas daqui vêm dos anúncios de diagnóstico — o custo de cada
+  // um usa só o investimento do diagnóstico (antes dividia o total, com o do workshop junto)
+  var TD = porTipo.diagnostico || { gasto: 0, n: 0, ag: 0, vd: 0 };
   var h = '<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.09);">'
     + '<b style="font-size:.72rem;color:#3ddc97;text-transform:uppercase;letter-spacing:.5px;">💸 Investimento no Facebook · ' + META.dados.desde.split('-').reverse().join('/') + ' a ' + META.dados.ate.split('-').reverse().join('/') + '</b>'
     + '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:9px;">'
     + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(255,107,107,.09);border:1px solid rgba(255,107,107,.28);">'
     +   '<b style="font-size:1.1rem;color:#ff6b6b;display:block;">' + rs(gasto) + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">INVESTIDO</span></div>'
     + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(110,168,255,.09);border:1px solid rgba(110,168,255,.28);">'
-    +   '<b style="font-size:1.1rem;color:#6ea8ff;display:block;">' + (leads ? rs(gasto / leads) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR LEAD</span></div>'
+    +   '<b style="font-size:1.1rem;color:#6ea8ff;display:block;">' + (TD.n ? rs(TD.gasto / TD.n) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR LEAD · DIAGNÓSTICO</span></div>'
     + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.28);">'
-    +   '<b style="font-size:1.1rem;color:#ffd166;display:block;">' + (reun ? rs(gasto / reun) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR REUNIÃO</span></div>'
+    +   '<b style="font-size:1.1rem;color:#ffd166;display:block;">' + (TD.ag ? rs(TD.gasto / TD.ag) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR REUNIÃO · DIAGNÓSTICO</span></div>'
     + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(61,220,151,.09);border:1px solid rgba(61,220,151,.28);">'
-    +   '<b style="font-size:1.1rem;color:#3ddc97;display:block;">' + (vend ? rs(gasto / vend) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR VENDA</span></div>'
+    +   '<b style="font-size:1.1rem;color:#3ddc97;display:block;">' + (TD.vd ? rs(TD.gasto / TD.vd) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR VENDA · DIAGNÓSTICO</span></div>'
     + '</div>';
   // por tipo de campanha (os leads do workshop entram pelo app do workshop, não pelo formulário: lá o custo por lead fica em branco)
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' + META_TIPOS.filter(function(t) { return porTipo[t[0]] && porTipo[t[0]].gasto > 0; }).map(function(t) {
@@ -10050,7 +10088,7 @@ function renderAnuncios() {
   // gasto/imagem do Facebook, se conectado — só pede ao robô com a aba Criativos na tela
   if (telaVisivel('s-anuncios')) carregarMetaAds(per);
   var metaPor = {};
-  if (META.dados) META.dados.anuncios.forEach(function(m){ metaPor[_chaveAnuncio(m.anuncio)] = m; });
+  if (META.dados) metaPor = metaPorAnuncio();   // 03/10/2026: soma o gasto do anúncio em todos os conjuntos
 
   // as postagens que a equipe cadastrou entram na lista junto com os anúncios,
   // mesmo as que ainda não trouxeram lead (Bruno 19/08/2026)
@@ -10859,7 +10897,7 @@ function abrirCriativo(nome, jaTocar, manterPer) {
   var d = _anDados[nome];
   if (!d) {
     // veio da ficha de um lead, sem ter aberto a aba Anúncios: monta na hora
-    var m = (META.dados || { anuncios: [] }).anuncios.filter(function(x){ return _chaveAnuncio(x.anuncio) === _chaveAnuncio(nome); })[0] || {};
+    var m = Object.assign({}, metaPorAnuncio()[_chaveAnuncio(nome)] || {});
     var cri = criativoDe(nome, m.adId);
     if (cri) m = { gasto: m.gasto, adId: m.adId, foto: cri.foto, link: cri.link, post: cri.post, video: cri.video };
     if (!m.foto && !m.link && !m.post && String(nome).indexOf('POST:') !== 0) return;
@@ -11444,6 +11482,13 @@ function sbJaNaClint() {
 
 // ===== 💸 META ADS: gasto por anúncio (vem do robô, que fala com o Facebook) =====
 var META = { dados: null, buscando: false, erro: '' };
+// chave do período (a mesma conta do carregarMetaAds): "aaaa-mm-dd_aaaa-mm-dd"
+function metaChaveDe(per) {
+  var ini = per && per.ini ? new Date(per.ini) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  var fim = per && per.fim ? new Date(per.fim - 1) : new Date();
+  var fmt = function(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); };
+  return fmt(ini) + '_' + fmt(fim);
+}
 function carregarMetaAds(per) {
   // 03/10/2026 (varredura): com outro período sendo buscado (ex.: Criativos no mês e Relatório no mês anterior), o pedido
   // era descartado e o Relatório ficava sem o investimento — agora fica na fila e é buscado em seguida
@@ -14632,7 +14677,7 @@ function _renderLeadsCorpo(agora) {
       };
       h += tabela('Anúncio (o criativo que a pessoa viu)', listaAn, '#b98aff');
       h += tabela('Campanha', listaCp, '#6ea8ff');
-      h += blocoMetaAds(listaAn, per);
+      h += blocoMetaAds(ordena(porAnuncio), per);   // 03/10/2026: todos os anúncios do período (antes só os 15 primeiros entravam na conta)
       if (listaOv.length) {
         h += '<div style="margin-top:10px;"><b style="font-size:.7rem;color:#3ddc97;text-transform:uppercase;letter-spacing:.5px;">Origem lançada na planilha de vendas (quando diferente)</b>'
           + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">'
@@ -26311,7 +26356,7 @@ function rlCriativos(p) {
   try { an = anColetar(per, 'todos').an || {}; } catch (e) { an = {}; }
   var metaOk = !!(META.dados && META.dados._chave === rlChaveMeta(p)), metaPor = {}, gasto = 0;
   var tipoIg = {}; try { (IGO.posts || []).forEach(function(q) { var c = _igCodigoDash(q.link); if (c) tipoIg[c] = String(q.tipo || ''); }); } catch (eT) {}
-  if (metaOk) (META.dados.anuncios || []).forEach(function(m) { metaPor[_chaveAnuncio(m.anuncio)] = m; gasto += +m.gasto || 0; });
+  if (metaOk) { metaPor = metaPorAnuncio(); (META.dados.anuncios || []).forEach(function(m) { gasto += +m.gasto || 0; }); }
   var gastoTipo = metaOk ? metaGastoPorTipo(META.dados.anuncios) : null;
   var lista = Object.keys(an).filter(function(k) { return !anEhOrigem(k); }).map(function(k) {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {}, ehPost = String(k).indexOf('POST:') === 0, cri = null, foto = '', video = '';
@@ -26446,6 +26491,8 @@ function rlRender() {
   RL._antRot = p.ant.rot;
   try { A = rlCalc(p); B = rlCalc(p.ant); X = rlCruzar(); } catch (e) { box.innerHTML = '<div class="rl-vazio">Não consegui montar o relatório: ' + rlE(e.message) + '</div>'; return; }
   C = rlCriativos(p);
+  // vendas do workshop no período (o investimento do workshop se paga com elas) — usado nos cartões, no resumo e na leitura
+  try { C.wsVd = (A.t.l.vd || []).filter(function(r) { return /workshop/i.test(r.origem || ''); }); C.wsFat = C.wsVd.reduce(function(s2, r) { return s2 + (r.valor || 0); }, 0); } catch (eWs) { C.wsVd = []; C.wsFat = 0; }
   RL._p = p; RL._C = C;
   // o que ainda falta chegar (investimento, imagens dos anúncios, gravações, disparos): pede e redesenha quando vier
   try { if (!C.metaOk) carregarMetaAds({ ini: p.ini, fim: p.fim, label: p.rot }); } catch (e) {}
@@ -26577,13 +26624,21 @@ function rlKpis(p, A, B, C) {
     // 03/10/2026 (Bruno): o mesmo investimento separado por tipo de campanha — os cartões de antes continuam iguais
     if (C.gastoTipo) {
       var GT = C.gastoTipo, wsVd = A.t.l.vd.filter(function(r) { return /workshop/i.test(r.origem || ''); });
-      var wsFat = wsVd.reduce(function(s2, r) { return s2 + (r.valor || 0); }, 0);
-      if (GT.diagnostico) lz.push(k('Anúncios · Diagnóstico', GT.diagnostico, 'moeda', null, '#6ea8ff', null, (C.leadsPagos ? rlMoeda(GT.diagnostico / C.leadsPagos) + ' por lead de anúncio · ' : '') + (C.fatPago ? 'retorno ' + (C.fatPago / GT.diagnostico).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x · ' : '') + Math.round(GT.diagnostico / C.gasto * 100) + '% do investimento (inclui distribuição/engajamento)', false, rlL('Leads de anúncio', A.pagoL, 'lead')));
-      if (GT.workshop) lz.push(k('Anúncios · Workshop', GT.workshop, 'moeda', null, '#b084ff', null, wsVd.length + ' vendas do workshop' + (wsVd.length ? ' · ' + rlMoeda(GT.workshop / wsVd.length) + ' por venda · retorno ' + (wsFat / GT.workshop).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x' : '') + ' · ' + Math.round(GT.workshop / C.gasto * 100) + '% do investimento', false, rlL('Vendas do workshop', wsVd)));
-      if (GT.imersao) lz.push(k('Anúncios · Imersão (ILD)', GT.imersao, 'moeda', null, '#f6a350', null, Math.round(GT.imersao / C.gasto * 100) + '% do investimento', false, null));
+      var wsFat = wsVd.reduce(function(s2, r) { return s2 + (r.valor || 0); }, 0), RT = metaRetorno(GT, C.fatPago, wsFat), x1 = function(v) { return v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x'; };
+      if (GT.diagnostico) lz.push(k('Anúncios · Diagnóstico', GT.diagnostico, 'moeda', null, '#6ea8ff', null, Math.round(GT.diagnostico / C.gasto * 100) + '% do investimento · inclui distribuição/engajamento · ' + C.vendasPagas + ' vendas de anúncio · retorno ' + x1(RT.diag), false, rlL('Leads de anúncio', A.pagoL, 'lead')));
+      if (GT.workshop) lz.push(k('Anúncios · Workshop', GT.workshop, 'moeda', null, '#b084ff', null, wsVd.length + ' vendas do workshop' + (wsVd.length ? ' · ' + rlMoeda(GT.workshop / wsVd.length) + ' por venda · retorno ' + x1(RT.ws) : '') + ' · ' + Math.round(GT.workshop / C.gasto * 100) + '% do investimento', false, rlL('Vendas do workshop', wsVd)));
+      if (GT.imersao) lz.push(k('Anúncios · Imersão (ILD)', GT.imersao, 'moeda', null, '#f6a350', null, Math.round(GT.imersao / C.gasto * 100) + '% do investimento · as vendas da imersão não passam pelo dash', false, null));
     }
-    lz.push(k('Custo por lead', C.leadsPagos ? C.gasto / C.leadsPagos : 0, 'moeda', null, '#6ea8ff', null, C.leadsPagos + ' leads de anúncio', true, rlL('Leads de anúncio', A.pagoL, 'lead')));
-    lz.push(k('Retorno dos anúncios', C.gasto ? C.fatPago / C.gasto : 0, 'dec', null, '#3ddc97', null, 'cada R$ 1 investido virou R$ ' + (C.gasto ? (C.fatPago / C.gasto).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0') + ' em vendas', false, rlL('Vendas de tráfego pago', pagas)));
+    // 03/10/2026 (Bruno: "pode mudar"): custo por lead só com o investimento do diagnóstico (os leads da planilha vêm dele) e
+    // retorno = vendas de anúncio + vendas do workshop ÷ investimento do diagnóstico + workshop (antes: tudo ÷ tudo)
+    if (C.gastoTipo) {
+      var _invD = C.gastoTipo.diagnostico || 0;
+      lz.push(k('Custo por lead', C.leadsPagos ? _invD / C.leadsPagos : 0, 'moeda', null, '#6ea8ff', null, C.leadsPagos + ' leads de anúncio · só o investimento do diagnóstico', true, rlL('Leads de anúncio', A.pagoL, 'lead')));
+      lz.push(k('Retorno dos anúncios', RT.geral, 'dec', null, '#3ddc97', null, 'cada R$ 1 virou R$ ' + RT.geral.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' em vendas · diagnóstico ' + x1(RT.diag) + ' · workshop ' + x1(RT.ws) + (C.gastoTipo.imersao ? ' · imersão fora (sem vendas no dash)' : ''), false, rlL('Vendas de tráfego pago e do workshop', pagas.concat(wsVd))));
+    } else {
+      lz.push(k('Custo por lead', C.leadsPagos ? C.gasto / C.leadsPagos : 0, 'moeda', null, '#6ea8ff', null, C.leadsPagos + ' leads de anúncio', true, rlL('Leads de anúncio', A.pagoL, 'lead')));
+      lz.push(k('Retorno dos anúncios', C.gasto ? C.fatPago / C.gasto : 0, 'dec', null, '#3ddc97', null, 'cada R$ 1 investido virou R$ ' + (C.gasto ? (C.fatPago / C.gasto).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0') + ' em vendas', false, rlL('Vendas de tráfego pago', pagas)));
+    }
   }
   h += grupo('🙋 Leads' + (lz.length > 2 ? ' e anúncios' : ''), lz);
   h += '</div>';
@@ -26792,7 +26847,9 @@ function rlSecCriativos(p, C) {
       + '<div class="rl-cris">' + g[1].slice(0, 8).map(rlCriCard).join('') + '</div>';
   });
   var sub = 'Os anúncios que mais venderam (e, depois, os que mais trouxeram reuniões e leads). Clique para ver o criativo e o vídeo.'
-    + (C.metaOk && C.gasto ? ' Investimento no período: <b>' + rlMoeda(C.gasto) + '</b> · ' + C.vendasPagas + ' vendas de anúncio · ' + rlMil(C.fatPago) + '.' : (META.buscando ? ' Buscando o investimento no Facebook…' : ''));
+    + (C.metaOk && C.gasto ? ' Investimento no período: <b>' + rlMoeda(C.gasto) + '</b>'
+        + (C.gastoTipo ? ' (diagnóstico ' + rlMoeda(C.gastoTipo.diagnostico) + ' · workshop ' + rlMoeda(C.gastoTipo.workshop) + (C.gastoTipo.imersao ? ' · imersão ' + rlMoeda(C.gastoTipo.imersao) : '') + ')' : '')
+        + ' · ' + C.vendasPagas + ' vendas de anúncio · ' + rlMil(C.fatPago) + (C.wsVd && C.wsVd.length ? ' · ' + C.wsVd.length + ' vendas do workshop · ' + rlMil(C.wsFat) : '') + '.' : (META.buscando ? ' Buscando o investimento no Facebook…' : ''));
   return rlSec('criativos', 'Criativos', 'Os criativos campeões', sub, h);
 }
 function rlProdutos(A) {
@@ -26866,7 +26923,12 @@ function rlLeitura(p, A, B, C) {
   var os = A.origens.filter(function(o) { return o.re >= 3 && o.vd <= o.re; }).map(function(o) { return { o: o, cv: o.vd / o.re }; }).sort(function(a, b) { return b.cv - a.cv; });
   if (os.length) bom.push(['🧲', '<b>' + rlE(os[0].o.nome) + '</b> é a origem que mais fecha: ' + rlPct(os[0].cv) + ' das reuniões realizadas.', rlL(os[0].o.nome + ' · reuniões (vendas primeiro)', rlOrdemStatus(os[0].o.rows))]);
   if (os.length > 1 && os[os.length - 1].cv < 0.1) ruim.push(['🧲', '<b>' + rlE(os[os.length - 1].o.nome) + '</b> fecha só ' + rlPct(os[os.length - 1].cv) + ' das reuniões realizadas.', rlL(os[os.length - 1].o.nome + ' · reuniões', rlOrdemStatus(os[os.length - 1].o.rows))]);
-  if (C.metaOk && C.gasto) { var roas = C.fatPago / C.gasto; (roas >= 3 ? bom : ruim).push(['💸', 'Anúncios: <b>' + rlMoeda(C.gasto) + ' investidos</b> viraram ' + rlMil(C.fatPago) + ' em vendas (' + roas.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x).']); }
+  if (C.metaOk && C.gasto) {
+    if (C.gastoTipo) {   // 03/10/2026: diagnóstico + workshop (cada um com as suas vendas); imersão fora — sem vendas no dash
+      var RTl = metaRetorno(C.gastoTipo, C.fatPago, C.wsFat || 0), invl = (C.gastoTipo.diagnostico || 0) + (C.gastoTipo.workshop || 0), xx = function(v) { return v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x'; };
+      (RTl.geral >= 3 ? bom : ruim).push(['💸', 'Anúncios: <b>' + rlMoeda(invl) + ' investidos</b> em diagnóstico e workshop viraram ' + rlMil((C.fatPago || 0) + (C.wsFat || 0)) + ' em vendas (' + xx(RTl.geral) + ' · diagnóstico ' + xx(RTl.diag) + ' · workshop ' + xx(RTl.ws) + ').']);
+    } else { var roas = C.fatPago / C.gasto; (roas >= 3 ? bom : ruim).push(['💸', 'Anúncios: <b>' + rlMoeda(C.gasto) + ' investidos</b> viraram ' + rlMil(C.fatPago) + ' em vendas (' + roas.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x).']); }
+  }
   var p0 = A.produtos[0]; if (p0) bom.push(['📦', '<b>' + rlE(p0.nome) + '</b> puxou o resultado: ' + rlMil(p0.fat) + ' (' + (A.fat ? Math.round(p0.fat / A.fat * 100) : 0) + '% do vendido).', rlL('Quem comprou ' + p0.nome, p0.rows)]);
   var h = '<div class="rl-lei"><div><h4 style="color:var(--rl-g);">O que foi bem</h4><ul>' + (bom.map(li).join('') || '<li><span>—</span></li>') + '</ul></div>'
     + '<div><h4 style="color:var(--rl-r);">Pontos de atenção</h4><ul>' + (ruim.map(li).join('') || '<li><span>Nada fora do normal no período.</span></li>') + '</ul></div></div>';
