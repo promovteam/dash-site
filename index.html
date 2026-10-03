@@ -2923,7 +2923,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-1150';
+var VERSAO_DASH = '2026-10-03-1156';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4013,6 +4013,7 @@ function filtrarUltimas(txt, mais) {
   }
   var base = v2fRows(V2.rows || []).filter(function(r){ return r.date; }).sort(function(a, b){ return b.date - a.date; });
   var achou = base.filter(function(r){ return _buscaBate([r.nome, r.closer, r.sdr, r.status, r.produto, r.telefone, r.leadId, r.origem, r.insta].filter(Boolean).join(' '), q, r.nome); });
+  achou = achou.map(function(r, i){ return { r: r, k: _buscaRank(r.nome, q), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; });
   var qE = q.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   var uh = '<div class="ult-achou" style="font-size:.74rem;font-weight:700;color:var(--text2);margin:0 0 10px;">🔎 '
     + (achou.length ? '<b style="color:var(--accent);">' + achou.length + '</b> ' + (achou.length === 1 ? 'reunião encontrada' : 'reuniões encontradas') + ' com "' + qE + '"'
@@ -6072,7 +6073,8 @@ var _ORG_BLOCO = 80;
 function _orgListaMostrar(filtro, ate) {
   var rows = window._orgListaRows || [];
   var f = v2norm(filtro || '');
-  var vis = f ? rows.filter(function(r){ return _buscaBate([r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' '), filtro, r.nome); }) : rows;
+  var vis = f ? rows.filter(function(r){ return _buscaBate([r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' '), filtro, r.nome); })
+    .map(function(r, i){ return { r: r, k: _buscaRank(r.nome, filtro), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; }) : rows;
   var fim = Math.min(vis.length, (ate || 0) + _ORG_BLOCO);
   var box = document.getElementById('ma-lista');
   if (!box) return;
@@ -6134,13 +6136,29 @@ function abrirPizzaProduto(nomeProd) {
 // Agora: cada palavra digitada tem que bater com o COMEÇO de uma palavra (nome, closer, SDR, produto, L-000…), em
 // qualquer ordem ("souza maria" acha "Maria de Souza"); com UMA letra só, vale o começo do nome ("a" = Ana, Araújo…);
 // número com 4+ dígitos procura no telefone/L-000 em qualquer parte, com ou sem espaço, parênteses ou traço.
+// 03/10/2026 (Bruno, print com "a": "por que não puxa o a"): com UMA letra vale só a inicial do PRIMEIRO nome
+// (Ozilene de Araújo não entra no "a"); "Pr.", "Dra."… na frente não contam. Com mais letras, quem tem o primeiro
+// nome começando pelo que foi digitado vem primeiro (_buscaRank).
+var _BUSCA_TITULO = /^(pr|pra|pastor|pastora|pastores|dr|dra|prof|profa|ap|apostolo|apostola|bispo|bispa|missionario|missionaria|ev|evangelista|irma|irmao|sr|sra)\s+/;
+function _buscaNome1(nome) {
+  var n = v2norm(nome || '').replace(/[^a-z0-9]+/g, ' ').trim();
+  for (var i = 0; i < 2 && _BUSCA_TITULO.test(n); i++) n = n.replace(_BUSCA_TITULO, '');
+  return n;
+}
 function _buscaBate(texto, q, nome) {
   var qn = v2norm(q || '').replace(/[^a-z0-9]+/g, ' ').trim(); if (!qn) return true;
   var qd = String(q || '').replace(/\D/g, '');
   if (qd.length >= 4 && qd.length >= qn.replace(/\s/g, '').length - 1 && String(texto || '').replace(/[\s()+\-.]/g, '').indexOf(qd) !== -1) return true;
-  var base = (qn.length === 1 && nome) ? nome : texto;
-  var t = ' ' + v2norm(base || '').replace(/[^a-z0-9]+/g, ' ') + ' ';
+  if (qn.length === 1 && nome) return _buscaNome1(nome).charAt(0) === qn;
+  var t = ' ' + v2norm(texto || '').replace(/[^a-z0-9]+/g, ' ') + ' ';
   return qn.split(' ').every(function(p){ return t.indexOf(' ' + p) !== -1; });
+}
+// 0 = o primeiro nome começa com o que foi digitado · 1 = alguma palavra do nome começa · 2 = achou em outro campo
+function _buscaRank(nome, q) {
+  var qn = v2norm(q || '').replace(/[^a-z0-9]+/g, ' ').trim(); if (!qn) return 0;
+  var n = _buscaNome1(nome), p = qn.split(' ')[0];
+  if (n.indexOf(qn) === 0 || n.indexOf(p) === 0) return 0;
+  return (' ' + n).indexOf(' ' + p) !== -1 ? 1 : 2;
 }
 function filtrarListaModal(txt, listaId) {
   var vis = 0, box = document.getElementById(listaId); if (!box) return;
@@ -15614,6 +15632,7 @@ function montarPesquisa(forcar) {
   var LIMITE_PESQ = 300;
   var buscando = !!String(_fp.txt || '').trim(), filtrando = buscando || _fp.st !== 'todos' || _fp.prod !== 'todos' || _fp.mes !== 'todos';
   var achadas = todas.filter(_pesqPassa);
+  if (buscando) achadas = achadas.map(function(r, i){ return { r: r, k: _buscaRank(r.nome, _fp.txt), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; });
   var cortou = achadas.length > LIMITE_PESQ;
   var rows = cortou ? achadas.slice(0, LIMITE_PESQ) : achadas;
   // desenha só a visão que está aparecendo — a outra fica para quando alguém trocar
@@ -26935,7 +26954,9 @@ function _rlListaMostrar(filtro, ate) {
     if (L.tipo === 'grav') return [r.t, (GRAV.closers || {})[r.k] || r.k].join(' ');
     return [r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' ');
   };
-  var vis = f ? L.rows.filter(function(r) { return _buscaBate(txt(r), filtro, L.tipo === 'grav' ? gravPartes(r.t).nome : r.nome); }) : L.rows;
+  var nmDe = function(r) { return L.tipo === 'grav' ? gravPartes(r.t).nome : r.nome; };
+  var vis = f ? L.rows.filter(function(r) { return _buscaBate(txt(r), filtro, nmDe(r)); })
+    .map(function(r, i){ return { r: r, k: _buscaRank(nmDe(r), filtro), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; }) : L.rows;
   var box = document.getElementById('ma-lista'); if (!box) return;
   var ini = ate || 0, fim = Math.min(vis.length, ini + 80), h = '';
   if (!ini) box.innerHTML = ''; else { var b0 = document.getElementById('ma-mais'); if (b0) b0.remove(); }
