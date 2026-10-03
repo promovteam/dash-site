@@ -2853,7 +2853,25 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-1258';
+var VERSAO_DASH = '2026-10-03-1338';
+// ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
+// aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
+// a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
+// Uma tentativa por versão (se o site ainda não tiver a página nova, não fica recarregando; o aviso "Atualizar agora" cuida).
+(function() {
+  var hn = location.hostname, t0 = Date.now();
+  if (!hn || hn === 'localhost' || hn === '127.0.0.1' || /[?&]v=/.test(location.search)) return;
+  fetch('versao.txt?t=' + t0, { cache: 'no-store' }).then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) {
+    var v = String(t || '').trim().split(/\s/)[0];
+    if (!v || v === VERSAO_DASH) return;
+    var ja = ''; try { ja = sessionStorage.getItem('v2TentouVersao') || ''; } catch (e) {}
+    if (ja === v) return;
+    if (!document.getElementById('boot-splash') && Date.now() - t0 > 6000) return;   // já está usando: fica para o aviso
+    try { sessionStorage.setItem('v2TentouVersao', v); } catch (e) {}
+    var m = document.getElementById('boot-msg'); if (m) m.textContent = 'atualizando para a versão nova…';
+    location.replace(location.pathname + '?v=' + encodeURIComponent(v) + location.hash);
+  }).catch(function() {});
+})();
 var _versaoNova = null;
 
 // =====================================================================
