@@ -2663,7 +2663,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2120';
+var VERSAO_DASH = '2026-10-02-2127';
 var _versaoNova = null;
 
 // =====================================================================
@@ -28320,6 +28320,8 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-motivo { margin-top:8px; font-size:.78rem; color:#ffb4b4; }
 
 /* ✨ visual novo dos cartões (02/10/2026) */
+.cm-tab tr.cm-reu-linha { cursor:pointer; transition:background .15s; } .cm-tab tr.cm-reu-linha:hover { background:rgba(110,168,255,.07); } .cm-tab tr.cm-reu-linha:hover td:nth-child(2) b { color:#6ea8ff; text-decoration:underline; }
+
 .cm-tag.cm-reu, .cm-tag.cm-vinc { border:1px solid rgba(110,168,255,.35); background:rgba(110,168,255,.12); color:#6ea8ff; cursor:pointer; font:inherit; font-size:.68rem; font-weight:800; }
 .cm-tag.cm-reu:hover, .cm-tag.cm-vinc:hover { background:rgba(110,168,255,.22); }
 .cm-tag.cm-vinc { border-style:dashed; }
@@ -28789,7 +28791,16 @@ function _cmReuQuebra(r, gk, aba) {
     if (r.cat === 'Spark') pts.push('Spark ' + cmR(tabSdr ? V.sdrSpark : V.spark, false));
     else if (r.cat === 'Growth') pts.push('Growth ' + cmR(tabSdr ? V.sdrGrowth : V.growth, false));
   }
-  return (tabSdr ? 'fora do Social Selling: valor do SDR no mesmo nível · ' : '') + pts.join(' + ');
+  return (tabSdr ? 'pelo SDR · ' : '') + pts.join(' + ');   // origem fora do Social Selling: valor do SDR no nível equivalente
+}
+// abre a ficha da reunião do SDR/Social Selling (Bruno 02/10/2026: "ainda não está clicável"): a chave da linha é
+// r|telefone (8 últimos) ou r|nome|aaaammdd — acha a reunião na aba Vendas pelo telefone/nome e pela data
+function cmAbrirReuPre(k) {
+  var p = String(k || '').replace(/#\d+$/, '').split('|'), id = p[1] || '', ymd = String(p[2] || '').slice(0, 8), tel = /^\d{8}$/.test(id);
+  var cand = (V2.rows || []).filter(function(r){ return tel ? ldTel8(r.telefone) === id : v2norm(r.nome || '').replace(/[^a-z]/g, '').slice(0, 14) === id; });
+  if (!cand.length) { avisoRapido('Não achei essa reunião na aba Vendas'); return; }
+  var r = cand.filter(function(x){ return x.date && _cmYmd(x.date) === ymd; })[0] || cand.sort(function(a, b){ return (b.date || 0) - (a.date || 0); })[0];
+  cmAbrirLead(v2reg(r));
 }
 function _cmDetPre(p, g, todos, bt) {
   var R = p.reunioes || [], ok = function(r){ return r.conta; };
@@ -28808,9 +28819,9 @@ function _cmDetPre(p, g, todos, bt) {
         var tags = (r.re ? '<span class="cm-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;">✅ apareceu · paga</span> ' : '<span class="cm-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;">🚫 não apareceu · não paga</span> ')
           + (r.vd ? '<span class="cm-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;">venda</span> ' : '')
           + (r.o === 'Workshop' && r.re ? '<span class="cm-tag" style="background:rgba(176,132,255,.16);color:#b084ff;">R$ 10</span> ' : '');
-        return '<tr class="' + (!r.conta ? 'tirada' : r.re ? 'apareceu' : 'naoapareceu') + '" data-busca="' + dspEsc(v2norm(r.n + ' ' + (r.cl || '') + ' ' + (r.q || ''))) + '"><td>' + dspEsc(r.d) + '</td>' + (todos ? '<td>' + dspEsc(r.q || '') + '</td>' : '') + '<td><b>' + dspEsc(r.n) + '</b>' + (r.u ? '<div class="cm-sub">' + dspEsc(r.u) + '</div>' : '') + '</td><td>' + dspEsc(r.o || '—') + '</td><td>' + dspEsc(r.s || '—') + '</td><td>' + dspEsc(r.cat || r.p || '—') + '</td><td>' + dspEsc(r.cl || '—') + '</td><td>' + tags + '</td>'
+        return '<tr class="cm-reu-linha ' + (!r.conta ? 'tirada' : r.re ? 'apareceu' : 'naoapareceu') + '" title="Clique para abrir a ficha da reunião" onclick="cmAbrirReuPre(\'' + dspEsc(r.k || '') + '\')" data-busca="' + dspEsc(v2norm(r.n + ' ' + (r.cl || '') + ' ' + (r.q || ''))) + '"><td>' + dspEsc(r.d) + '</td>' + (todos ? '<td>' + dspEsc(r.q || '') + '</td>' : '') + '<td><b>' + dspEsc(r.n) + '</b>' + (r.u ? '<div class="cm-sub">' + dspEsc(r.u) + '</div>' : '') + '</td><td>' + dspEsc(r.o || '—') + '</td><td>' + dspEsc(r.s || '—') + '</td><td>' + dspEsc(r.cat || r.p || '—') + '</td><td>' + dspEsc(r.cl || '—') + '</td><td>' + tags + '</td>'
           + '<td class="cm-reu-v"><b' + (r.v ? '' : ' style="color:#9aa3b2;"') + '>' + (r.v != null ? cmR(r.v, false) : '—') + '</b><small>' + dspEsc(_cmReuQuebra(r, gk, r.aba || CMD.aba)) + '</small></td>'
-          + '<td style="white-space:nowrap;"><button class="cm-conta ' + (r.conta ? 'sim' : 'nao') + '" title="' + (r.conta ? 'Conta para o SDR — clique para tirar' : 'Não conta — clique para voltar a contar') + '" onclick="cmPreConta(this,\'' + gk + '\',\'' + dspEsc(r.aba || CMD.aba) + '\',\'' + dspEsc(r.k || '') + '\',' + (r.ln || 0) + ',\'' + dspEsc(r.n).replace(/'/g, '') + '\',' + (r.conta ? 'false' : 'true') + ')">' + (r.conta ? '✓ conta' : '✕ não conta') + '</button></td></tr>';
+          + '<td style="white-space:nowrap;"><button class="cm-conta ' + (r.conta ? 'sim' : 'nao') + '" title="' + (r.conta ? 'Conta para o SDR — clique para tirar' : 'Não conta — clique para voltar a contar') + '" onclick="event.stopPropagation();cmPreConta(this,\'' + gk + '\',\'' + dspEsc(r.aba || CMD.aba) + '\',\'' + dspEsc(r.k || '') + '\',' + (r.ln || 0) + ',\'' + dspEsc(r.n).replace(/'/g, '') + '\',' + (r.conta ? 'false' : 'true') + ')">' + (r.conta ? '✓ conta' : '✕ não conta') + '</button></td></tr>';
       }).join('')
     + '</tbody></table></div>';
   return h;
