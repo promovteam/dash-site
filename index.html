@@ -2663,7 +2663,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2148';
+var VERSAO_DASH = '2026-10-02-2156';
 var _versaoNova = null;
 
 // =====================================================================
@@ -28137,11 +28137,21 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
   // faixa (todas aparecem) e embaixo vem a escada: cada faixa com reuniões e R$, a atual destacada e quanto falta para as próximas
   var topo = Math.max(conta, (fx.length ? fx[fx.length - 1][0] : conta) * 1.08) || 1;
   var rAt = atual ? atual.t[1] : 0;
+  // Social Selling (Bruno 02/10/2026: "no da Sarah tenha a observação do que falamos quando não for social selling"): reunião de
+  // outra origem paga o valor do SDR um nível abaixo do dela (1º e 2º = P, 3º = M, 4º = G, 5º = GG)
+  var fxSdr = tipo === 'ss' ? ((((CM.dados || {}).grupos || []).filter(function(x){ return x.k === 'sdr'; })[0] || {}).faixas || []).slice().sort(function(a, b){ return a[0] - b[0]; }) : [];
+  var LS = ['P', 'M', 'G', 'GG'], sdrDe = function(k){ if (!fxSdr.length) return null; var j = Math.min(Math.max(k, 1), fxSdr.length) - 1; return { l: LS[j] || '', v: fxSdr[j][1] }; };   // k = índice 0-based do nível dela
   var escada = '<div class="cm-escada">' + fx.map(function(t, k) {
-    var ok = conta >= t[0], aqui = atual && atual.i === k, falta = t[0] - conta;
+    var ok = conta >= t[0], aqui = atual && atual.i === k, falta = t[0] - conta, sd = sdrDe(k);
     var sub = aqui ? 'você está aqui' : ok ? '✓ passou' : 'faltam <b>' + falta + '</b>' + (rAt && t[1] > rAt ? ' · +' + cmR(t[1] - rAt, false) + ' em cada' : '');
-    return '<div class="cm-degrau' + (aqui ? ' atual' : ok ? ' ok' : '') + (prox && prox === t ? ' prox' : '') + '"><b>' + letra[k] + '</b><span>' + t[0] + '+ reuniões</span><em>' + cmR(t[1], false) + '</em><small>' + sub + '</small></div>';
+    return '<div class="cm-degrau' + (aqui ? ' atual' : ok ? ' ok' : '') + (prox && prox === t ? ' prox' : '') + '"><b>' + letra[k] + '</b><span>' + t[0] + '+ reuniões</span><em>' + cmR(t[1], false) + '</em>'
+      + (sd ? '<span class="cm-degrau-sdr">outras origens: ' + cmR(sd.v, false) + ' (' + sd.l + ')</span>' : '') + '<small>' + sub + '</small></div>';
   }).join('') + '</div>';
+  if (tipo === 'ss' && fxSdr.length) {
+    var sdA = atual ? sdrDe(atual.i) : null;
+    escada += '<div class="cm-obs-ss">💡 Reunião de <b>Social Selling' + (_cmV223() ? ' ou indicação' : '') + '</b> paga pela tabela dela' + (atual ? ' (hoje ' + cmR(atual.t[1], false) + ')' : '') + '. '
+      + '<b>Outras origens</b> (anúncio, orgânico…) pagam o valor do <b>SDR um nível abaixo</b> do dela' + (sdA ? ': hoje <b>' + sdA.l + ' · ' + cmR(sdA.v, false) + '</b> por reunião e por venda' : '') + '. A faixa sai do total de reuniões do mês.</div>';
+  }
   var R = p.reunioes || null, marc = R ? R.length : 0, apar = R ? R.filter(function(r){ return r.re && r.conta; }).length : 0, vds = R ? R.filter(function(r){ return r.vd && r.conta; }).length : 0;
   return '<div class="cm-card cm-clica cm-entra" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'' + tipo + '\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as reuniões do mês">'
     + _cmBotaoAtu()
@@ -28337,6 +28347,9 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-motivo { margin-top:8px; font-size:.78rem; color:#ffb4b4; }
 
 /* ✨ visual novo dos cartões (02/10/2026) */
+.cm-degrau-sdr { font-size:.62rem; color:#b084ff; font-weight:700; }
+.cm-obs-ss { margin-top:8px; padding:8px 10px; border-radius:10px; background:rgba(176,132,255,.08); border:1px solid rgba(176,132,255,.25); font-size:.72rem; color:#c9cfdb; line-height:1.45; } .cm-obs-ss b { color:#eef0f4; }
+
 .cm-card > .cm-card-atu, .cm-card-atu { position:absolute; top:10px; right:10px; z-index:2; align-self:auto; width:auto; display:inline-flex; align-items:center; gap:5px; height:28px; min-width:28px; padding:0 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05); color:#c9cfdb; font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; opacity:.55; transition:opacity .2s, background .2s; }
 .cm-card:hover .cm-card-atu, .cm-card-atu:focus-visible, .cm-det-topo .cm-card-atu { opacity:1; } .cm-card-atu:hover { background:rgba(110,168,255,.18); color:#fff; }
 .cm-card-atu i { font-style:normal; display:inline-block; font-size:.9rem; } .cm-card-atu.girando i { animation:cmGira .9s linear infinite; } .cm-card-atu:disabled { cursor:wait; }
