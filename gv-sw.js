@@ -8,12 +8,34 @@ var PEDACO = 4 * 1024 * 1024;          // 4 MB por chamada ao robô (~20-30 s de
 var GUARDA = 14;                        // pedaços guardados na memória (~56 MB), para voltar sem pedir de novo
 var MEM = new Map(), ORDEM = [];
 
+// ⚡ 02/10/2026 (Bruno: "melhore o desempenho do site em todos os formatos com abertura recorde"): este ajudante também guarda
+// a PÁGINA do dash no aparelho. Ao abrir, a página sai da cópia guardada na hora e a versão do site é buscada por trás (fica para
+// a próxima abertura). "Atualizar agora" abre com ?v=… — aí vem sempre da internet. Só a página do dash; o resto passa direto.
+var CASCA = 'dash-pagina-v1';
 self.addEventListener('install', function () { self.skipWaiting(); });
-self.addEventListener('activate', function (ev) { ev.waitUntil(self.clients.claim()); });
+self.addEventListener('activate', function (ev) {
+  ev.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return /^dash-pagina-/.test(k) && k !== CASCA; }).map(function (k) { return caches.delete(k); })); })
+    .then(function () { return self.clients.claim(); }));
+});
+function ehODash(u) {
+  var base = new URL('./', self.registration.scope).pathname;
+  return u.pathname === base || u.pathname === base + 'index.html' || /\/dash[^\/]*\.html$/.test(u.pathname);
+}
+function pagina(ev, u) {
+  var chave = u.origin + u.pathname.replace(/index\.html$/, '');
+  var daRede = fetch(u.href, { cache: 'no-store', credentials: 'same-origin' }).then(function (r) {
+    if (r && r.ok && /text\/html/.test(r.headers.get('content-type') || '')) { var c = r.clone(); caches.open(CASCA).then(function (cc) { return cc.put(chave, c); }).catch(function () {}); }
+    return r;
+  });
+  ev.waitUntil(daRede.catch(function () {}));
+  if (u.searchParams.has('v')) return daRede.catch(function () { return caches.match(chave); });   // "Atualizar agora": sempre a nova
+  return caches.open(CASCA).then(function (cc) { return cc.match(chave); }).then(function (r) { return r || daRede; }).catch(function () { return daRede; });
+}
 self.addEventListener('fetch', function (ev) {
   var u;
   try { u = new URL(ev.request.url); } catch (e) { return; }
   if (u.origin !== self.location.origin) return;
+  if (ev.request.method === 'GET' && ev.request.mode === 'navigate' && ehODash(u)) { ev.respondWith(pagina(ev, u)); return; }
   var m = u.pathname.match(/\/gv-video\/([A-Za-z0-9_-]{10,})$/);
   if (!m) return;
   ev.respondWith(servir(m[1], u.searchParams.get('robo') || '', ev.request.headers.get('range') || ''));
