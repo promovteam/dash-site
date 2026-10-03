@@ -2853,7 +2853,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-1353';
+var VERSAO_DASH = '2026-10-03-1550';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21186,6 +21186,7 @@ var ACESSOS = [
   { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
+  { nome: 'Suellen',       financeiro: true },   // Financeiro (03/10/2026): só a aba Comissões; a senha é conferida no robô — não fica no código
   { nome: 'Juliane Promov', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
@@ -21240,8 +21241,9 @@ function montarLogin() {
     var b = document.createElement('button');
     b.className = 'btn';
     b.style.cssText = 'padding:13px;font-size:.85rem;width:100%;';
-    b.textContent = (a.soOlha ? '👁 ' : a.adm ? '🛡 ' : a.executivo ? '🤝 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : a.executivo ? ' — Executiva (CS)' : '');
+    b.textContent = (a.soOlha ? '👁 ' : a.adm ? '🛡 ' : a.executivo ? '🤝 ' : a.financeiro ? '💼 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : a.executivo ? ' — Executiva (CS)' : a.financeiro ? ' — Financeiro' : '');
     b.onclick = function() {
+      if (a.financeiro) { _loginFinMostrar(ov, a, false); return; }
       window._lgEscolhido = a.nome;
       ov.querySelector('#lg-quem').textContent = a.nome;
       caixa.style.display = 'none';
@@ -21258,7 +21260,49 @@ function loginVoltar() {
   ov.querySelector('#lg-nomes').style.display = 'flex';
   ov.querySelector('#lg-senha').value = '';
 }
+// 💼 entrada do financeiro (Suellen): a senha é a das comissões, conferida no robô (v226); na 1ª vez, o código que o Bruno gera
+function _loginFinMostrar(ov, a, codigo) {
+  window._lgEscolhido = a.nome; window._lgFin = true; window._lgFinCod = !!codigo;
+  var caixa = ov.querySelector('#lg-nomes'), pin = ov.querySelector('#lg-pin');
+  caixa.style.display = 'none'; pin.style.display = 'flex';
+  var est = 'font-size:1rem;text-align:center;width:240px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;';
+  pin.innerHTML = '<b style="color:#f6a350;">💼 ' + a.nome + ' — Financeiro</b>'
+    + (codigo ? '<button class="btn" id="lg-fpedir" style="padding:10px 18px;" onclick="_loginFinPedir()">📲 Receber código no WhatsApp</button><input id="lg-fcod" type="text" inputmode="numeric" maxlength="7" placeholder="código (6 números)" autocomplete="one-time-code" style="' + est + '">' : '')
+    + '<input id="lg-fsenha" type="password" placeholder="' + (codigo ? 'crie a sua senha (6+ caracteres)' : 'sua senha') + '" autocomplete="' + (codigo ? 'new-password' : 'current-password') + '" style="' + est + '">'
+    + (codigo ? '<input id="lg-fsenha2" type="password" placeholder="repita a senha" autocomplete="new-password" style="' + est + '">' : '')
+    + '<button class="btn primary" style="padding:10px 26px;" onclick="_loginFinEntrar()">' + (codigo ? 'Criar senha e entrar' : 'Entrar') + '</button>'
+    + '<span id="lg-fmsg" class="hint"></span>'
+    + '<span class="hint" style="cursor:pointer;" onclick="_loginFinMostrar(document.getElementById(\'tela-login\'),{nome:\'' + a.nome + '\'},' + !codigo + ')">' + (codigo ? '← já tenho senha' : 'Primeira vez ou esqueceu a senha? Receber código no WhatsApp') + '</span>'
+    + '<span class="hint" style="cursor:pointer;" onclick="location.reload()">← escolher outro nome</span>';
+  setTimeout(function(){ var i = document.getElementById(codigo ? 'lg-fcod' : 'lg-fsenha'); if (i) i.focus(); }, 50);
+}
+function _loginFinPedir() {
+  var b = document.getElementById('lg-fpedir'), m = document.getElementById('lg-fmsg'); if (b) { b.disabled = true; b.textContent = 'Mandando…'; }
+  gasPedir({ action: 'comissoesPessoaCodigo', login: window._lgEscolhido }, function(d) {
+    if (b) { b.disabled = false; b.textContent = '📲 Receber outro código'; }
+    m.textContent = d && d.success ? '📲 Mandamos o código no seu WhatsApp' + (d.final ? ' (final ' + d.final + ')' : '') + '. Vale 10 minutos.' : '❌ ' + ((d && d.error) || 'o robô não respondeu');
+  }, 40000);
+}
+function _loginFinEntrar() {
+  var cod = window._lgFinCod, m = document.getElementById('lg-fmsg'), senha = (document.getElementById('lg-fsenha') || {}).value || '';
+  var pl = { action: cod ? 'comissoesPessoaCriar' : 'comissoesPessoaEntrar', login: window._lgEscolhido, senha: senha };
+  if (cod) {
+    pl.codigo = ((document.getElementById('lg-fcod') || {}).value || '').replace(/\D/g, '');
+    if (pl.codigo.length !== 6) { m.textContent = 'O código tem 6 números.'; return; }
+    if (senha.length < 6) { m.textContent = 'A senha precisa ter pelo menos 6 caracteres.'; return; }
+    if (senha !== ((document.getElementById('lg-fsenha2') || {}).value || '')) { m.textContent = 'As duas senhas não são iguais.'; return; }
+  } else if (!senha) return;
+  m.textContent = 'Conferindo…';
+  gasPedir(pl, function(d) {
+    if (!d || !d.success || !d.token || d.papel !== 'financeiro') { m.textContent = '❌ ' + ((d && d.error) || (d && d.success ? 'esse acesso não é do financeiro' : 'o robô não respondeu')); return; }
+    try { localStorage.setItem('v2Login', window._lgEscolhido); localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
+    var ov = document.getElementById('tela-login'); if (ov) ov.remove();
+    try { mostrarAcessoAtual(); } catch (eAc) {}
+    try { cmMostrarMenu(); _cmPapelNav(); } catch (eF) {}
+  }, 40000);
+}
 function loginConferir() {
+  if (window._lgFin) { _loginFinEntrar(); return; }
   var senha = (document.getElementById('lg-senha') || {}).value || '';
   var quem = null;
   ACESSOS.forEach(function(a){ if (a.nome === window._lgEscolhido && a.pin === senha) quem = a; });
@@ -28978,7 +29022,7 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
     + _cmBotaoAtu()
     + (lider ? '<div class="cm-coroa">👑 líder do mês</div>' : '')
     + '<div class="cm-pessoa">' + _cmAvatar(p.nome, cor, 52, p.total > 0 ? CM_MEDALHA[pos - 1] : '')
-    + '<div class="cm-nome"><b>' + dspEsc(p.nome) + '</b><small>' + pos + 'º lugar' + (p._ant ? ' ' + _cmDelta(p._ant, p.total) : '') + '</small></div>'
+    + '<div class="cm-nome"><b>' + dspEsc(p.nome) + '</b><small>' + (pos ? pos + 'º lugar' : 'seu mês') + (p._ant ? ' ' + _cmDelta(p._ant, p.total) : '') + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(p.total) + '</b><small>a receber</small></div></div>'
     + _cmCompo(compo)
     + '<div class="cm-stats cm-stats4">' + [['Recebido', cmMil(p.recebido)], ['% médio', (pm * 100).toFixed(2).replace('.', ',') + '%'], ['Vendas', p.vendas || 0], ['Parcelas', p.parcelas || 0]]
@@ -29000,7 +29044,7 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
       + partes.map(function(q){ return '<div class="cm-parte" title="Recebido ' + cmR(q.recebido) + (q.pct ? ' · ' + (q.pct * 100).toFixed(2).replace('.', ',') + '% médio' : '') + '"><span>' + dspEsc(q.nome) + '</span>' + _cmTrilho(Math.abs(q.comissao) / mx, cor) + '<b>' + cmR(q.comissao, false) + '</b></div>'; }).join('')
       + '</div></div>';
   }
-  return h + '<div class="cm-ver">Ver as vendas do mês →</div></div>';
+  return h + _cmRevCard({ k: 'closers' }, p) + '<div class="cm-ver">Ver as vendas do mês →</div></div>';
 }
 function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
   var fx = (faixas || []).slice().sort(function(a, b){ return a[0] - b[0]; }), conta = p.realizadas + (wkConta ? p.workshop : 0);
@@ -29041,7 +29085,7 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
     + escada + '</div>'
     + (R ? _cmFunil(marc, apar, vds, cor) : '')
     + '<div class="cm-stats">' + [['Lead apareceu', p.realizadas], ['Workshop', p.workshop], ['Vendas', p.vendas], ['Spark', p.spark], ['Growth', p.growth]].map(function(s){ return '<div class="cm-stat"><b>' + s[1] + '</b><small>' + s[0] + '</small></div>'; }).join('') + '</div>'
-    + '<div class="cm-ver">Ver as reuniões do mês →</div></div>';
+    + _cmRevCard({ k: tipo }, p) + '<div class="cm-ver">Ver as reuniões do mês →</div></div>';
 }
 function _cmRosca(grupos, total) {
   var R = 46, C = 2 * Math.PI * R, ini = 0, h = '<div class="cm-rosca" title="Divisão da folha"><svg viewBox="0 0 118 118"><circle cx="59" cy="59" r="' + R + '" stroke="rgba(255,255,255,.07)"></circle>';
@@ -29055,7 +29099,8 @@ function _cmRosca(grupos, total) {
 }
 function renderComissoes() {
   var el = document.getElementById('cm-corpo'); if (!el) return;
-  if (!_cmPode()) { el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Esta tela é só do Bruno.</div>'; return; }
+  if (!_cmPode()) { el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Esta tela não está liberada para o seu acesso.</div>'; return; }
+  if (!_cmTok() && _cmPapelLogin() !== 'admin') { _cmEntradaPessoa(el); return; }   // v226: cada pessoa entra com a senha dela
   if (!_cmTok()) {
     // senha das comissões (Bruno 02/10/2026: "coloque uma senha") — criada aqui na 1ª vez; o robô guarda só a impressão digital
     if (CM.temSenha == null) {
@@ -29081,6 +29126,8 @@ function renderComissoes() {
       : '<div class="cm-esq" style="height:210px;margin-bottom:20px;"></div><div class="cm-grade"><div class="cm-esq" style="height:300px;"></div><div class="cm-esq" style="height:300px;"></div><div class="cm-esq" style="height:300px;"></div></div><div class="hint" style="text-align:center;margin-top:14px;">Lendo as 3 planilhas de comissão…</div>';
     return;
   }
+  document.documentElement.classList.toggle('cm-so-ler', CM.dados.papel === 'dono');   // v226: o dono só olha (o robô também recusa)
+  if (CM.dados.papel === 'dono') { _cmRenderDono(el, CM.dados); return; }
   var d = CM.dados, todas = [];
   d.grupos.forEach(function(g){ g.pessoas.forEach(function(p){ todas.push({ g: g, p: p }); }); });
   todas.forEach(function(x, i){ x.cor = _cmPessoaCor(i); });
@@ -29095,7 +29142,7 @@ function renderComissoes() {
   var NM = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   var seletor = (d.meses && d.meses.length > 1) ? '<div class="cm-meses" role="tablist" aria-label="Mês">' + d.meses.map(function(m){ return '<button role="tab" aria-selected="' + (m === d.mes) + '" class="' + (m === d.mes ? 'on' : '') + '" onclick="cmMes(\'' + m + '\')">' + NM[+m.slice(5, 7) - 1] + '/' + m.slice(2, 4) + '</button>'; }).join('') + '</div>' : '';
   var selo = CM.carregando ? '<span class="cm-sync"><i></i>atualizando…</span>' : CM.aviso ? '<span class="cm-sync aviso">' + dspEsc(CM.aviso) + '</span>' : '';
-  var h = '<div class="cm-topo-barra">' + seletor + selo + '</div>' + '<div class="panel cm-hero cm-entra"><div class="cm-topo"><div><div class="cm-olho">Folha de comissões</div><div class="cm-mes">' + dspEsc((d.mesTxt || d.mes).replace(/^\w/, function(c){ return c.toUpperCase(); })) + '</div>' + status
+  var h = '<div class="cm-topo-barra">' + seletor + selo + '</div>' + _cmAvisosHtml() + _cmContListaHtml() + '<div class="panel cm-hero cm-entra"><div class="cm-topo"><div><div class="cm-olho">Folha de comissões</div><div class="cm-mes">' + dspEsc((d.mesTxt || d.mes).replace(/^\w/, function(c){ return c.toUpperCase(); })) + '</div>' + status
     + '<div class="cm-resumo"><b>' + nVendas + '</b> vendas pagando comissão · <b>' + nReu + '</b> reuniões em que o lead apareceu (SDRs e Social Selling)</div></div>'
     + '<div class="cm-lado">' + _cmRosca(d.grupos, d.totalFolha) + '<div class="cm-total"><small>Total a pagar</small><b>' + _cmNum(d.totalFolha) + '</b><small>fixo + comissão + prêmio</small></div></div></div>'
     + '<div class="cm-folha">' + todas.map(function(x){ return '<i style="background:' + x.cor + ';" data-w="' + (x.p.total / (d.totalFolha || 1) * 100).toFixed(2) + '%" title="' + dspEsc(x.p.nome) + ': ' + cmR(x.p.total) + '"></i>'; }).join('') + '</div>'
@@ -29121,6 +29168,7 @@ function renderComissoes() {
       + Object.keys(hist).sort().map(function(k){ return '<tr><td>' + dspEsc(k) + '</td>' + ms.map(function(m){ return '<td>' + (hist[k][m] ? cmR(hist[k][m], false) : '—') + '</td>'; }).join('') + '</tr>'; }).join('')
       + '<tr><td><b>Total</b></td>' + ms.map(function(m){ var s = 0; Object.keys(hist).forEach(function(k){ s += hist[k][m] || 0; }); return '<td><b>' + cmR(s, false) + '</b></td>'; }).join('') + '</tr></tbody></table></div></div>';
   }
+  h += _cmAcessosHtml();
   h += '<div class="cm-pe">' + d.grupos.map(function(g){ return '<a class="btn" style="background:transparent;" href="' + g.url + '" target="_blank" rel="noopener">📄 Planilha ' + dspEsc(g.nome) + '</a>'; }).join('')
     + '<button class="btn" onclick="cmCarregar(true)"' + (CM.carregando ? ' disabled' : '') + '>' + (CM.carregando ? '⏳ Atualizando…' : '↻ Atualizar') + '</button><span class="hint">números de ' + new Date(d.gerado).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span></div>';
   el.innerHTML = h;
@@ -29424,6 +29472,7 @@ function cmDetRender() {
     + (!todos ? ' · ' + [['fixo', p.fixo], [g.k === 'closers' ? 'comissão' : 'variável', g.k === 'closers' ? p.comissao : p.variavel], ['prêmio', p.premio]].filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') : '') + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(p.total) + '</b><small>a receber</small></div>'
     + _cmBotaoAtu('Atualizar') + '<button class="cm-det-x" onclick="cmFechar()" aria-label="Fechar">✕</button></div>';
+  h += _cmValidaBarra(g, p, todos);   // v226: quanto falta revisar · validar o mês (financeiro) · contestar (dono)
   if ((g.k === 'closers' && !p.linhas) || (g.k !== 'closers' && !p.reunioes)) {
     f.innerHTML = h + '<div class="hint" style="padding:18px;">A lista do mês chega com o robô novo. Depois de instalar, clique em ↻ Atualizar.</div></div>'; return;
   }
@@ -29504,6 +29553,7 @@ function _cmDetCloser(p, todos, bt) {
         + '<span class="cm-pag-n">' + (soRegistro ? '' : cmR(l.r)) + '</span>'
         + '<span class="cm-pag-n hint">' + (l.pc && !soRegistro ? (l.pc * 100).toFixed(2).replace('.', ',') + '%' : '') + '</span>'
         + '<span class="cm-pag-n"><b>' + (soRegistro ? '' : cmR(l.c)) + '</b></span>'
+        + (CM.dados && CM.dados.papel && !soRegistro ? _cmRevChip('closers', l.aba || CMD.aba, l, l.c) : '')
         + '<button class="cm-lapis" title="Editar este pagamento" aria-label="Editar" onclick="cmEditarAbrir(\'' + id + '\')">✏️</button></div>'
         + _cmPagador(l)
         + '<div class="cm-edita" id="' + id + '" style="display:none;" data-aba="' + dspEsc(l.aba || CMD.aba) + '" data-k="' + dspEsc(l.k || '') + '" data-ln="' + (l.ln || '') + '" data-n="' + dspEsc(l.n || '') + '">'
@@ -29866,6 +29916,7 @@ function _cmDetPre(p, g, todos, bt) {
           + (r.vd ? '<span class="cm-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;">venda</span> ' : '')
           + (r.o === 'Workshop' && r.re ? '<span class="cm-tag" style="background:rgba(176,132,255,.16);color:#b084ff;">R$ 10</span> ' : '')
           + _cmGravSelo(r)
+          + (CM.dados && CM.dados.papel ? ' ' + _cmRevChip(gk, r.aba || CMD.aba, r, r.v) + ' ' : '')
           + (function(){ var rv = _cmReuDaChave(r.k); return _cmClintBotao(rv ? _cmClintUrl(rv.telefone, rv.nome, rv.obs) : '', 'r', r.k || ''); })();
         return '<tr class="cm-reu-linha ' + (!r.conta ? 'tirada' : r.re ? 'apareceu' : 'naoapareceu') + '" title="Clique para abrir a ficha da reunião" onclick="cmAbrirReuPre(\'' + dspEsc(r.k || '') + '\')" data-busca="' + dspEsc(v2norm(r.n + ' ' + (r.cl || '') + ' ' + (r.q || ''))) + '"><td>' + dspEsc(r.d) + '</td>' + (todos ? '<td>' + dspEsc(r.q || '') + '</td>' : '') + '<td><b>' + dspEsc(r.n) + '</b>' + (r.u ? '<div class="cm-sub">' + dspEsc(r.u) + '</div>' : '') + '</td><td>' + dspEsc(r.o || '—') + '</td><td>' + dspEsc(r.s || '—') + '</td><td>' + dspEsc(r.cat || r.p || '—') + '</td><td>' + dspEsc(r.cl || '—') + '</td><td>' + tags + '</td>'
           + '<td class="cm-reu-v"><b' + (r.v ? '' : ' style="color:#9aa3b2;"') + '>' + (r.v != null ? cmR(r.v, false) : '—') + '</b><small>' + dspEsc(_cmReuQuebra(r, gk, r.aba || CMD.aba)) + '</small></td>'
@@ -29882,7 +29933,7 @@ function _cmRecarregarDetalhe() { CMD.reabrir = true; cmCarregar(true); }
 function cmEditarSalvar(id, grupo) {
   var el = document.getElementById(id); if (!el) return;
   var msg = el.querySelector('[data-msg]'), tok = _cmTok(), campos = Array.prototype.slice.call(el.querySelectorAll('[data-c]'));
-  var base = { action: 'comissoesEditar', token: tok, grupo: grupo, aba: el.getAttribute('data-aba'), chave: el.getAttribute('data-k'), ln: el.getAttribute('data-ln'), nome: el.getAttribute('data-n'), quem: _cmQuem() };
+  var base = { action: 'comissoesEditar', token: tok, mes: (CM.dados || {}).mes || '', grupo: grupo, aba: el.getAttribute('data-aba'), chave: el.getAttribute('data-k'), ln: el.getAttribute('data-ln'), nome: el.getAttribute('data-n'), quem: _cmQuem() };
   var mud = campos.filter(function(c){ return c.value !== c.defaultValue && !(c.tagName === 'SELECT' && c.querySelector('option[selected]') && c.value === c.querySelector('option[selected]').value); });
   if (!mud.length) { msg.textContent = 'Nada mudou.'; return; }
   msg.textContent = 'Salvando…';
@@ -29895,7 +29946,7 @@ function cmEditarSalvar(id, grupo) {
 }
 function cmPreConta(btn, gk, aba, k, ln, nome, conta) {
   btn.disabled = true; btn.textContent = '…';
-  _cmPedir({ action: 'comissoesEditar', token: _cmTok(), grupo: gk === 'ss' ? 'ss' : 'sdr', aba: aba, chave: k, ln: ln, nome: nome, campo: 'conta', valor: conta ? 'Sim' : 'Não', quem: _cmQuem() }).then(function(d){
+  _cmPedir({ action: 'comissoesEditar', token: _cmTok(), mes: (CM.dados || {}).mes || '', grupo: gk === 'ss' ? 'ss' : 'sdr', aba: aba, chave: k, ln: ln, nome: nome, campo: 'conta', valor: conta ? 'Sim' : 'Não', quem: _cmQuem() }).then(function(d){
     if (d && d.success) _cmRecarregarDetalhe(); else { btn.disabled = false; btn.textContent = '❌ ' + ((d && d.error) || 'erro'); }
   });
 }
@@ -29916,6 +29967,632 @@ function cmExtraSalvar() {
   });
 }
 </script>
+<!-- 👥 COMISSÕES POR PESSOA (robô v226) — Bruno 03/10/2026: cada closer/SDR/Social Selling vê SÓ o próprio card (o corte é feito
+     no robô); só o admin (Bruno) e o financeiro (Suellen) editam, revisam e validam; contestação com prints (uma por pessoa por mês,
+     até o dia 5 do mês seguinte) que chega para os dois; o financeiro responde no dash; selo "🤖 automático · ainda não revisado"
+     até o financeiro revisar; validar o mês manda aviso para a pessoa. Avisos só aqui dentro da aba Comissões. -->
+<style>
+html.cm-so-ler .cm-lapis, html.cm-so-ler .cm-edita, html.cm-so-ler .cm-extra-bt, html.cm-so-ler #cm-extra-form, html.cm-so-ler .cm-todas, html.cm-so-ler .cm-pe a { display:none !important; }
+html.cm-so-ler .cm-conta { pointer-events:none; }
+html.papel-fin .nav-item[data-s]:not([data-s="comissoes"]), html.papel-fin #tb, html.papel-fin #btn-someu, html.papel-fin .bt-ext { display:none !important; }
+.cmp-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:.64rem; font-weight:800; white-space:nowrap; border:1px solid transparent; font-family:inherit; line-height:1.5; }
+.cmp-chip.auto { background:rgba(255,209,102,.12); color:#ffd166; border-color:rgba(255,209,102,.3); }
+.cmp-chip.ok { background:rgba(61,220,151,.12); color:#3ddc97; border-color:rgba(61,220,151,.3); }
+.cmp-chip.mudou { background:rgba(255,107,107,.12); color:#ff8a8a; border-color:rgba(255,107,107,.35); }
+.cmp-chip.mao { background:rgba(110,168,255,.12); color:#8fbaff; border-color:rgba(110,168,255,.3); }
+button.cmp-chip { cursor:pointer; } button.cmp-chip:hover { filter:brightness(1.2); } button.cmp-chip:focus-visible { outline:2px solid #fff; outline-offset:1px; }
+.cmp-barra { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 0 14px; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); font-size:.8rem; }
+.cmp-barra b { font-weight:800; } .cmp-barra .btn { padding:8px 14px; font-size:.78rem; margin-left:auto; }
+.cmp-card-rev { margin:10px 0 0; display:flex; flex-wrap:wrap; gap:6px; }
+.cmp-secao { margin:0 0 18px; }
+.cmp-secao > .cm-h { margin-top:0; }
+.cmp-avisos { display:flex; flex-direction:column; gap:8px; }
+.cmp-aviso { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07); font-size:.82rem; line-height:1.45; }
+.cmp-aviso.novo { background:rgba(246,163,80,.08); border-color:rgba(246,163,80,.35); }
+.cmp-aviso small { display:block; color:var(--text2); font-size:.7rem; margin-top:2px; }
+.cmp-aviso .btn { margin-left:auto; padding:6px 12px; font-size:.72rem; flex:none; }
+.cmp-conts { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:10px; }
+.cmp-cont { text-align:left; padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:inherit; font:inherit; cursor:pointer; display:flex; flex-direction:column; gap:6px; }
+.cmp-cont:hover { border-color:rgba(255,255,255,.2); } .cmp-cont:focus-visible { outline:2px solid #f6a350; outline-offset:2px; }
+.cmp-cont b { font-size:.9rem; } .cmp-cont small { color:var(--text2); font-size:.72rem; }
+.cmp-sit { align-self:flex-start; padding:2px 9px; border-radius:999px; font-size:.66rem; font-weight:800; }
+.cmp-sit.aberta { background:rgba(246,163,80,.16); color:#f6a350; } .cmp-sit.analise { background:rgba(110,168,255,.16); color:#8fbaff; } .cmp-sit.resp { background:rgba(61,220,151,.14); color:#3ddc97; }
+.cmp-form label { display:flex; flex-direction:column; gap:5px; font-size:.74rem; font-weight:700; color:var(--text2); }
+.cmp-form input[type=text], .cmp-form input[type=password], .cmp-form input[inputmode], .cmp-form textarea, .cmp-form select { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); color:#fff; border-radius:10px; padding:9px 11px; font:inherit; font-size:.84rem; }
+.cmp-form textarea { min-height:64px; resize:vertical; }
+.cmp-itens { display:flex; flex-direction:column; gap:8px; max-height:44vh; overflow:auto; padding-right:4px; }
+.cmp-item { border-radius:12px; border:1px solid rgba(255,255,255,.09); background:rgba(255,255,255,.03); }
+.cmp-item > label.cmp-ck { flex-direction:row; align-items:center; gap:10px; padding:10px 12px; cursor:pointer; color:#fff; font-weight:600; font-size:.82rem; }
+.cmp-item > label.cmp-ck small { color:var(--text2); font-weight:600; }
+.cmp-item .cmp-mais { display:none; padding:0 12px 12px; gap:8px; flex-direction:column; }
+.cmp-item.on { border-color:rgba(246,163,80,.5); background:rgba(246,163,80,.06); } .cmp-item.on .cmp-mais { display:flex; }
+.cmp-arqs { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.cmp-arq { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:8px; background:rgba(255,255,255,.07); font-size:.72rem; }
+.cmp-arq button { background:none; border:0; color:#ff8a8a; cursor:pointer; font:inherit; }
+.cmp-anexar { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:10px; border:1px dashed rgba(255,255,255,.25); color:#fff; font-size:.74rem; font-weight:700; cursor:pointer; }
+.cmp-anexar input { display:none; }
+.cmp-msgs { display:flex; flex-direction:column; gap:10px; margin:10px 0; }
+.cmp-msg { padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); font-size:.82rem; line-height:1.5; white-space:pre-wrap; }
+.cmp-msg.gestao { background:rgba(61,220,151,.06); border-color:rgba(61,220,151,.22); }
+.cmp-msg .cmp-quem { font-size:.7rem; color:var(--text2); font-weight:700; margin-bottom:4px; white-space:normal; }
+.cmp-anx { display:inline-flex; align-items:center; gap:6px; margin:6px 6px 0 0; padding:5px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.05); color:#fff; font:inherit; font-size:.72rem; cursor:pointer; }
+.cmp-dec { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08); font-size:.8rem; }
+.cmp-dec small { color:var(--text2); display:block; }
+.cmp-dec select, .cmp-dec input { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); color:#fff; border-radius:8px; padding:6px 8px; font:inherit; font-size:.76rem; }
+.cmp-dec input { width:92px; }
+.cmp-luz { position:fixed; inset:0; z-index:100002; background:rgba(5,7,10,.9); display:flex; align-items:center; justify-content:center; padding:20px; cursor:zoom-out; }
+.cmp-luz img { max-width:96vw; max-height:92vh; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+.cmp-codigo { font:900 2rem/1 'Inter', system-ui, sans-serif; letter-spacing:6px; padding:14px 18px; border-radius:14px; background:rgba(246,163,80,.12); border:1px solid rgba(246,163,80,.4); color:#ffd166; text-align:center; margin:10px 0; }
+.cmp-acessos { width:100%; border-collapse:collapse; font-size:.8rem; }
+.cmp-acessos th, .cmp-acessos td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.07); text-align:left; vertical-align:middle; }
+.cmp-acessos th { font-size:.68rem; color:var(--text2); text-transform:uppercase; letter-spacing:.6px; }
+.cmp-acessos .btn { padding:6px 10px; font-size:.72rem; }
+@media (max-width:640px) { .cmp-dec { grid-template-columns:1fr; } .cmp-barra .btn { margin-left:0; width:100%; } }
+</style>
+<script>
+// ---------- quem é quem (o robô confere de verdade; aqui é só para desenhar a tela certa) ----------
+function _cmPapelLogin() {
+  var login = null; try { login = localStorage.getItem('v2Login'); } catch (e) {}
+  if (login === 'Bruno Pardim' || (!login && typeof _dashNaInternet === 'function' && !_dashNaInternet())) return 'admin';
+  var a = (typeof ACESSOS !== 'undefined' ? ACESSOS : []).filter(function(x){ return x.nome === login; })[0];
+  if (!a) return '';
+  if (a.financeiro) return 'financeiro';
+  if (a.adm || a.soOlha || a.executivo || a.contratos) return '';
+  return 'dono';
+}
+function _cmPode() { return !!_cmPapelLogin(); }
+function _cmPapel() { return (CM.dados && CM.dados.papel) || (_cmPapelLogin() === 'admin' ? 'admin' : ''); }
+function _cmGest() { var p = _cmPapel(); return p === 'admin' || p === 'financeiro'; }
+function _cmLoginNome() { try { return localStorage.getItem('v2Login') || ''; } catch (e) { return ''; } }
+function _cmPost(payload) {
+  return fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), redirect: 'follow' })
+    .then(function(r) { return r.json(); }).catch(function() { return { success: false, error: 'sem conexão com o robô' }; });
+}
+function _cmGet(payload, ms) { return new Promise(function(res) { gasPedir(payload, function(d) { res(d || { success: false, error: 'o robô não respondeu' }); }, ms || 40000); }); }
+function _cmData(ms) { return ms ? new Date(ms).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''; }
+function _cmMesNome(m) { var N = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']; return /^\d{4}-\d{2}$/.test(m || '') ? N[+m.slice(5, 7) - 1] + ' de ' + m.slice(0, 4) : (m || ''); }
+
+// ---------- entrada de cada pessoa (dono e financeiro) ----------
+CM.pessoaModo = '';   // '' = senha · 'codigo' = 1ª vez (código do Bruno)
+function _cmEntradaPessoa(el) {
+  var cod = CM.pessoaModo === 'codigo';
+  el.innerHTML = '<div class="panel cm-entrar cm-entra cmp-form"><div class="cm-cadeado">🔐</div>'
+    + '<div style="font-weight:900;font-size:1.15rem;margin:8px 0 4px;">' + (cod ? 'Primeiro acesso às suas comissões' : 'Suas comissões') + '</div>'
+    + '<div class="hint" style="margin-bottom:18px;max-width:360px;">' + (cod ? 'Toque em “Receber código no WhatsApp”: o código chega no seu WhatsApp. Digite o código e crie a sua senha (pelo menos 6 caracteres). Só você vai saber a senha.' : 'Aqui aparecem só as suas comissões. Digite a sua senha das comissões.') + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;align-items:stretch;width:min(280px,100%);margin:0 auto;">'
+    + (cod ? '<button class="btn" id="cmp-pedir" onclick="cmPessoaPedirCodigo()">📲 Receber código no WhatsApp</button><input id="cmp-cod" type="text" inputmode="numeric" maxlength="7" placeholder="código (6 números)" aria-label="Código" autocomplete="one-time-code">' : '')
+    + '<input id="cmp-senha" type="password" autocomplete="' + (cod ? 'new-password' : 'current-password') + '" placeholder="' + (cod ? 'crie a sua senha' : 'sua senha') + '" aria-label="Senha" onkeydown="if(event.key===\'Enter\')' + (cod ? 'document.getElementById(\'cmp-senha2\').focus()' : 'cmPessoaEntrar()') + '">'
+    + (cod ? '<input id="cmp-senha2" type="password" autocomplete="new-password" placeholder="repita a senha" aria-label="Repita a senha" onkeydown="if(event.key===\'Enter\')cmPessoaCriar()">' : '')
+    + '<button class="btn primary" onclick="' + (cod ? 'cmPessoaCriar()' : 'cmPessoaEntrar()') + '">' + (cod ? 'Criar senha e entrar' : 'Entrar') + '</button>'
+    + '<button class="btn" style="background:transparent;" onclick="CM.pessoaModo=\'' + (cod ? '' : 'codigo') + '\';CM.msg=\'\';renderComissoes();">' + (cod ? '← Já tenho senha' : 'Primeira vez ou esqueceu a senha? Receber código no WhatsApp') + '</button></div>'
+    + (CM.msg ? '<div class="hint" style="margin-top:14px;">' + dspEsc(CM.msg) + '</div>' : '') + '</div>';
+  setTimeout(function(){ var i = document.getElementById(cod ? 'cmp-cod' : 'cmp-senha'); if (i) i.focus(); }, 60);
+}
+function _cmPessoaToken(d) {
+  if (d && d.success && d.token) {
+    try { localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
+    CM.msg = ''; CM.pessoaModo = ''; CM.dados = null; cmCarregar(true); return true;
+  }
+  if (d && (d.semConta || d.semSenha)) CM.pessoaModo = 'codigo';
+  CM.msg = '❌ ' + ((d && d.error) || 'o robô não respondeu') + '.'; renderComissoes(); return false;
+}
+function cmPessoaPedirCodigo() {
+  var b = document.getElementById('cmp-pedir'); if (b) { b.disabled = true; b.textContent = 'Mandando…'; }
+  _cmGet({ action: 'comissoesPessoaCodigo', login: _cmLoginNome() }).then(function(d) {
+    CM.pessoaModo = 'codigo';
+    CM.msg = d && d.success ? '📲 Mandamos o código no seu WhatsApp' + (d.final ? ' (final ' + d.final + ')' : '') + '. Vale 10 minutos.' : '❌ ' + ((d && d.error) || 'o robô não respondeu') + '.';
+    renderComissoes();
+  });
+}
+function cmPessoaEntrar() {
+  var s = (document.getElementById('cmp-senha') || {}).value || ''; if (!s) return;
+  CM.msg = 'Conferindo…'; renderComissoes();
+  _cmGet({ action: 'comissoesPessoaEntrar', login: _cmLoginNome(), senha: s }).then(_cmPessoaToken);
+}
+function cmPessoaCriar() {
+  var c = ((document.getElementById('cmp-cod') || {}).value || '').replace(/\D/g, ''), a = (document.getElementById('cmp-senha') || {}).value || '', b = (document.getElementById('cmp-senha2') || {}).value || '';
+  if (c.length !== 6) { CM.msg = 'O código tem 6 números.'; renderComissoes(); return; }
+  if (a.length < 6) { CM.msg = 'A senha precisa ter pelo menos 6 caracteres.'; renderComissoes(); return; }
+  if (a !== b) { CM.msg = 'As duas senhas não são iguais.'; renderComissoes(); return; }
+  CM.msg = 'Guardando…'; renderComissoes();
+  _cmGet({ action: 'comissoesPessoaCriar', codigo: c, senha: a, login: _cmLoginNome() }).then(_cmPessoaToken);
+}
+
+// ---------- revisão do financeiro ----------
+function _cmRevChave(grupo, aba, l) { return grupo + '|' + aba + '|' + (l.k || ('ln' + l.ln)); }
+function _cmRevEstado(grupo, aba, l, valor) {
+  var d = CM.dados || {}, r = (d.rev || {})[_cmRevChave(grupo, aba, l)];
+  if (l.t === 'extra') return { e: 'mao', r: r };
+  if (!r) return { e: 'auto' };
+  var v = Array.isArray(r.v) ? r.v[0] : r.v;
+  return { e: (v == null || Math.abs((+v || 0) - (+valor || 0)) < 0.005) ? 'ok' : 'mudou', r: r };
+}
+function _cmRevChip(grupo, aba, l, valor) {
+  var st = _cmRevEstado(grupo, aba, l, valor), g = _cmGest(), ch = _cmRevChave(grupo, aba, l);
+  var txt = st.e === 'ok' ? '✅ revisado' : st.e === 'mudou' ? '⚠️ mudou depois da revisão' : st.e === 'mao' ? '✋ lançado à mão' : '🤖 automático · não revisado';
+  var tit = st.r ? 'Revisado por ' + st.r.q + ' em ' + _cmData(st.r.em) : st.e === 'mao' ? 'Lançado pelo admin ou financeiro' : 'Puxado automaticamente das planilhas — o financeiro ainda não revisou';
+  if (g && st.e !== 'mao') return '<button type="button" class="cmp-chip ' + st.e + '" title="' + dspEsc(tit) + (st.e === 'ok' ? ' · clique para desfazer' : ' · clique para marcar como revisado') + '" onclick="event.stopPropagation();cmRevisar(\'' + dspEsc(ch) + '\',' + (+valor || 0) + ',' + (st.e === 'ok') + ',this)">' + txt + '</button>';
+  return '<span class="cmp-chip ' + st.e + '" title="' + dspEsc(tit) + '">' + txt + '</span>';
+}
+function cmRevisar(chave, valor, desfazer, bt) {
+  var d = CM.dados; if (!d) return;
+  if (bt) { bt.disabled = true; bt.textContent = '…'; }
+  _cmGet({ action: 'comissoesRevisar', token: _cmTok(), mes: d.mes, desfazer: !!desfazer, itens: JSON.stringify([{ chave: chave, v: [valor] }]) }).then(function(r) {
+    if (r && r.success) { d.rev = d.rev || {}; if (desfazer) delete d.rev[chave]; else d.rev[chave] = { v: [valor], q: _cmPapel() === 'financeiro' ? 'financeiro' : 'Bruno', em: Date.now() }; }
+    else alert('Não consegui marcar: ' + ((r && r.error) || 'o robô não respondeu'));
+    cmDetRender();
+  });
+}
+function _cmLinhasDaPessoa(g, p) {
+  if (g.k === 'closers') return (p.linhas || []).filter(function(l){ return l.t !== 'extra'; }).map(function(l){ return { l: l, v: l.c }; });
+  return (p.reunioes || []).map(function(r){ return { l: r, v: r.v }; });
+}
+function _cmRevResumo(g, p) {
+  var aba = p.aba, n = 0, ok = 0, mud = 0;
+  _cmLinhasDaPessoa(g, p).forEach(function(x){ n++; var e = _cmRevEstado(g.k, aba, x.l, x.v).e; if (e === 'ok') ok++; else if (e === 'mudou') mud++; });
+  return { n: n, ok: ok, mud: mud, falta: n - ok, val: ((CM.dados || {}).val || {})[g.k + '|' + aba] || null };
+}
+function _cmRevCard(g, p) {
+  if (!CM.dados || !CM.dados.papel) return '';
+  var r = _cmRevResumo(g, p), v = _cmApr(g, p), dono = _cmPapel() === 'dono';
+  var h = '<div class="cmp-card-rev">';
+  if (v.sit === 'Aprovada pelos dois') h += '<span class="cmp-chip ok">✍️ fechado pelos dois</span>';
+  else if (v.sit === 'Aprovada pelo prazo') h += '<span class="cmp-chip ok">✅ aprovado pelo prazo</span>';
+  else if (v.sit === 'Aguardando aprovação') h += '<span class="cmp-chip mao">📨 ' + (dono ? 'esperando a sua aprovação' : 'aguardando aprovação') + '</span>';
+  else if (v.sit === 'Contestada') h += '<span class="cmp-chip mudou">📝 contestada</span>';
+  if (!_cmAprFechado(v) && r.n) {
+    if (r.falta) h += '<span class="cmp-chip ' + (r.mud ? 'mudou' : 'auto') + '">' + (r.mud ? '⚠️ ' + r.mud + ' mudaram depois da revisão' : '🤖 ' + r.falta + ' de ' + r.n + ' ainda não revisadas') + '</span>';
+    else if (v.sit === 'Em revisão') h += '<span class="cmp-chip ok">✅ tudo revisado · falta enviar</span>';
+  }
+  return h === '<div class="cmp-card-rev">' ? '' : h + '</div>';
+}
+// situação da assinatura de um card: Em revisão → Aguardando aprovação (o financeiro enviou) → Aprovada pelos dois (fechado)
+// · Contestada (volta para o financeiro) · Aprovada pelo prazo (sem resposta até o dia 5)
+function _cmApr(g, p) { var v = ((CM.dados || {}).val || {})[g.k + '|' + p.aba]; return v && v.sit ? v : { sit: 'Em revisão' }; }
+function _cmAprFechado(v) { return /^Aprovada/.test(v.sit || ''); }
+function _cmValidaBarra(g, p, todos) {
+  if (todos || !CM.dados || !CM.dados.papel) return '';
+  var r = _cmRevResumo(g, p), v = _cmApr(g, p), gest = _cmGest(), dono = _cmPapel() === 'dono', nm = dspEsc(p.nome.split(' ')[0]), mesN = dspEsc(_cmMesNome(CM.dados.mes));
+  var arg = '\'' + g.k + '\',\'' + dspEsc(p.aba) + '\'', txt = '', bts = '';
+  var rev = r.n ? '🤖 <b>' + r.falta + ' de ' + r.n + '</b> linhas puxadas automaticamente ainda não revisadas pelo financeiro' + (r.mud ? ' (' + r.mud + ' mudaram depois da revisão)' : '') + '.' : '';
+  if (v.sit === 'Aprovada pelos dois') txt = '✍️ <b>Fechado pelos dois</b> — ' + (dono ? 'você aprovou' : nm + ' aprovou') + ' em ' + _cmData(v.pesEm) + ' e o financeiro em ' + _cmData(v.finEm) + '.';
+  else if (v.sit === 'Aprovada pelo prazo') txt = '✅ <b>Aprovado pelo prazo</b> — o financeiro enviou em ' + _cmData(v.finEm) + ' e não houve contestação até o dia 5.';
+  else if (v.sit === 'Aguardando aprovação') txt = dono ? '📨 <b>O financeiro revisou e enviou suas comissões de ' + mesN + '</b> em ' + _cmData(v.finEm) + '. Confira os números e aprove — ou conteste se algo estiver errado.'
+    : '📨 Enviado para ' + nm + ' em ' + _cmData(v.finEm) + ' — <b>aguardando a aprovação</b>.';
+  else if (v.sit === 'Contestada') txt = dono ? '📝 <b>Você contestou</b> — o financeiro está vendo. Depois do ajuste, chega de novo para você aprovar.' : '📝 <b>' + nm + ' contestou</b> — veja a contestação, ajuste e envie de novo para aprovação.';
+  else txt = rev ? rev + (dono ? ' Quando o financeiro terminar, chega aqui para você aprovar.' : '') : (dono ? 'O financeiro ainda vai revisar e enviar para você aprovar.' : 'Sem linhas neste mês.');
+  if (dono) {
+    if (v.sit === 'Aguardando aprovação') bts += '<button class="btn primary" onclick="cmAprovar(' + arg + ',this)">✍️ Aprovar</button>';
+    if (!_cmAprFechado(v) && CM.dados.podeContestar) bts += '<button class="btn" onclick="cmContNova(' + arg + ')">📝 ' + (v.sit === 'Contestada' ? 'Contestar mais' : 'Contestar') + '</button>';
+  } else if (gest) {
+    if (_cmAprFechado(v)) bts += '<button class="btn" onclick="cmReabrir(' + arg + ',this)">🔓 Reabrir</button>';
+    else if (r.n || v.sit !== 'Em revisão') bts += '<button class="btn primary" onclick="cmValidarMes(' + arg + ',this)">✅ ' + (v.sit === 'Aguardando aprovação' ? 'Enviar de novo' : 'Validar e enviar para ' + nm + ' aprovar') + '</button>';
+  }
+  return '<div class="cmp-barra"><span>' + txt + '</span>' + (bts ? '<span style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;">' + bts + '</span>' : '') + '</div>';
+}
+function cmAprovar(grupo, aba, bt) {
+  var d = CM.dados; if (!d) return;
+  if (!confirm('Aprovar as suas comissões de ' + _cmMesNome(d.mes) + '?\n\nDepois de aprovar, fica fechado (você e o financeiro assinaram) e não dá mais para contestar este mês.')) return;
+  if (bt) { bt.disabled = true; bt.textContent = 'Aprovando…'; }
+  _cmGet({ action: 'comissoesAprovar', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba }).then(function(r) {
+    if (!r || !r.success) { alert('Não consegui aprovar: ' + ((r && r.error) || 'o robô não respondeu')); if (bt) { bt.disabled = false; bt.textContent = '✍️ Aprovar'; } return; }
+    d.val = d.val || {}; d.val[grupo + '|' + aba] = Object.assign({}, d.val[grupo + '|' + aba] || {}, { sit: 'Aprovada pelos dois', pesEm: Date.now() });
+    CM.avisos = null; renderComissoes(); try { if (document.getElementById('cm-det-fundo')) cmDetRender(); } catch (e) {}
+  });
+}
+function cmReabrir(grupo, aba, bt) {
+  var d = CM.dados; if (!d) return;
+  var motivo = prompt('Reabrir para ajustar? A pessoa recebe o aviso e depois aprova de novo.\n\nMotivo (aparece para a pessoa):', '');
+  if (motivo === null) return;
+  if (bt) { bt.disabled = true; bt.textContent = 'Reabrindo…'; }
+  _cmGet({ action: 'comissoesReabrir', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba, motivo: motivo }).then(function(r) {
+    if (!r || !r.success) { alert('Não consegui reabrir: ' + ((r && r.error) || 'o robô não respondeu')); return; }
+    d.val = d.val || {}; d.val[grupo + '|' + aba] = { sit: 'Em revisão' };
+    renderComissoes(); try { if (document.getElementById('cm-det-fundo')) cmDetRender(); } catch (e) {}
+  });
+}
+function cmValidarMes(grupo, aba, bt) {
+  var d = CM.dados, g = (d.grupos || []).filter(function(x){ return x.k === grupo; })[0], p = g && g.pessoas.filter(function(x){ return x.aba === aba; })[0];
+  if (!p) return;
+  if (!confirm('Marcar todas as linhas de ' + p.nome + ' em ' + _cmMesNome(d.mes) + ' como revisadas e ENVIAR para ' + p.nome.split(' ')[0] + ' aprovar?\n\n' + p.nome.split(' ')[0] + ' recebe o aviso na aba Comissões e aprova (fecha pelos dois) ou contesta.')) return;
+  var itens = _cmLinhasDaPessoa(g, p).map(function(x){ return { chave: _cmRevChave(grupo, aba, x.l), v: [+x.v || 0] }; });
+  if (bt) { bt.disabled = true; bt.textContent = 'Validando…'; }
+  _cmPost({ action: 'comissoesValidarMes', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba, itens: itens }).then(function(r) {
+    if (!r || !r.success) {   // o POST não passou (rede): tenta pelo caminho de sempre
+      return _cmGet({ action: 'comissoesValidarMes', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba, itens: JSON.stringify(itens) });
+    }
+    return r;
+  }).then(function(r) {
+    if (r && r.success) { d.rev = d.rev || {}; itens.forEach(function(it){ d.rev[it.chave] = { v: it.v, q: 'financeiro', em: Date.now() }; }); d.val = d.val || {}; d.val[grupo + '|' + aba] = { sit: 'Aguardando aprovação', finEm: Date.now() }; }
+    else alert('Não consegui validar: ' + ((r && r.error) || 'o robô não respondeu'));
+    cmDetRender(); renderComissoes();
+  });
+}
+
+// ---------- avisos (só aqui dentro) ----------
+CM.avisos = null;
+function cmAvisosCarregar() {
+  if (!_cmTok() || CM.avisosBuscando) return;
+  CM.avisosBuscando = true;
+  _cmGet({ action: 'comissoesAvisos', token: _cmTok() }).then(function(r) {
+    CM.avisosBuscando = false;
+    if (r && r.success) { CM.avisos = r.avisos || []; var box = document.getElementById('cmp-avisos'); if (box) box.outerHTML = _cmAvisosHtml(); }
+  });
+}
+function _cmAvisosHtml() {
+  if (!CM.dados || !CM.dados.papel) return '';
+  var A = CM.avisos;
+  if (!A || Date.now() - (CM.avisosEm || 0) > 120000) { CM.avisosEm = Date.now(); setTimeout(cmAvisosCarregar, 30); }
+  if (!A) return '<div id="cmp-avisos"></div>';
+  if (!A.length) return '<div id="cmp-avisos"></div>';
+  var novos = A.filter(function(a){ return !a.lido; });
+  var h = '<div id="cmp-avisos" class="cmp-secao"><div class="cm-h">🔔 Avisos' + (novos.length ? ' <small>' + novos.length + ' novo' + (novos.length === 1 ? '' : 's') + '</small>' : '') + '</div><div class="cmp-avisos">'
+    + A.slice(0, novos.length ? Math.max(novos.length, 3) : 3).map(function(a) {
+      var abre = (a.tipo === 'contestacao' || a.tipo === 'resposta') && a.ref ? '<button class="btn" onclick="cmContAbrir(\'' + dspEsc(a.ref) + '\')">Abrir</button>' : '';
+      return '<div class="cmp-aviso' + (a.lido ? '' : ' novo') + '"><div>' + dspEsc(a.texto) + '<small>' + _cmData(a.quando) + '</small></div>' + abre + '</div>';
+    }).join('') + '</div></div>';
+  if (novos.length) setTimeout(function() {   // viu: marca como lido
+    _cmGet({ action: 'comissoesAvisosLidos', token: _cmTok(), ids: JSON.stringify(novos.map(function(a){ return a.id; })) }).then(function(){ novos.forEach(function(a){ a.lido = true; }); });
+  }, 2500);
+  return h;
+}
+
+// ---------- contestações ----------
+CM.conts = null;
+function cmContCarregar(forcar) {
+  if (!_cmTok() || (CM.contsBuscando && !forcar)) return;
+  CM.contsBuscando = true;
+  _cmGet({ action: 'comissoesContestacoes', token: _cmTok() }).then(function(r) {
+    CM.contsBuscando = false;
+    if (r && r.success) { CM.conts = r.lista || []; CM.contMeses = r.podeContestar || []; var box = document.getElementById('cmp-conts'); if (box) box.outerHTML = _cmContListaHtml(); }
+  });
+}
+function _cmSitClasse(s) { return /an[aá]lise/i.test(s) ? 'analise' : /respondida/i.test(s) ? 'resp' : 'aberta'; }
+function _cmContListaHtml() {
+  if (!CM.dados || !CM.dados.papel) return '';
+  var L = CM.conts, gest = _cmGest();
+  if (!L || Date.now() - (CM.contsEm || 0) > 120000) { CM.contsEm = Date.now(); setTimeout(function(){ cmContCarregar(); }, 40); }
+  if (!L) return '<div id="cmp-conts"></div>';
+  if (!L.length && gest) return '<div id="cmp-conts"></div>';
+  var abertas = L.filter(function(c){ return !/respondida/i.test(c.situacao); }).length;
+  var h = '<div id="cmp-conts" class="cmp-secao"><div class="cm-h">📝 ' + (gest ? 'Contestações' : 'Suas contestações') + (abertas ? ' <small>' + abertas + ' esperando resposta</small>' : '') + '</div>';
+  if (!L.length) h += '<div class="hint" style="padding:4px 2px 2px;">Nenhuma contestação. Se alguma venda ou reunião não entrou, ou entrou com valor diferente, use “📝 Contestar” (até o dia 5 do mês seguinte).</div>';
+  else h += '<div class="cmp-conts">' + L.map(function(c) {
+    var nAce = c.itens.filter(function(i){ return i.decisao === 'aceita' || i.decisao === 'parcial'; }).length;
+    return '<button type="button" class="cmp-cont" onclick="cmContAbrir(\'' + dspEsc(c.id) + '\')"><span class="cmp-sit ' + _cmSitClasse(c.situacao) + '">' + dspEsc(c.situacao) + '</span>'
+      + '<b>' + (gest ? dspEsc(c.nome) + ' · ' : '') + dspEsc(_cmMesNome(c.mes)) + '</b>'
+      + '<small>' + c.itens.length + (c.itens.length === 1 ? ' item' : ' itens') + (nAce ? ' · ' + nAce + ' aceito' + (nAce === 1 ? '' : 's') : '') + ' · atualizada ' + _cmData(c.atualizada) + '</small></button>';
+  }).join('') + '</div>';
+  return h + '</div>';
+}
+function _cmContFundo(html) {
+  var f = document.getElementById('cmp-fundo');
+  if (!f) {
+    f = document.createElement('div'); f.id = 'cmp-fundo'; f.className = 'cm-det-fundo';
+    f.addEventListener('click', function(e){ if (e.target === f) cmContFechar(); });
+    document.body.appendChild(f);
+    document.addEventListener('keydown', _cmContEsc);
+  }
+  f.innerHTML = '<div class="cm-det cmp-form" role="dialog" aria-modal="true">' + html + '</div>';
+  return f;
+}
+function _cmContEsc(e) { if (e.key === 'Escape') cmContFechar(); }
+function cmContFechar() { var f = document.getElementById('cmp-fundo'); if (f) f.remove(); document.removeEventListener('keydown', _cmContEsc); CM.contForm = null; }
+// mesmo nome (1ª palavra) — "Tony Londe" × "Tony", "SS Sarah" × "Sarah Promov"
+function _cmMesmoNome(a, b) {
+  var x = v2norm(String(a || '')).replace(/^(ss|sdr|closer)\s+/, '').split(/[^a-z0-9]+/)[0], y = v2norm(String(b || '')).replace(/^(ss|sdr|closer)\s+/, '').split(/[^a-z0-9]+/)[0];
+  return !!x && x === y;
+}
+// mesma pessoa mesmo com o nome escrito diferente ("Kezia Guerra" × "Kezia Guerra de Araujo", "Jane hora" × "JANE IRACI HORA OLIVEIRA")
+var _CMP_LIGA = { de: 1, da: 1, do: 1, dos: 1, das: 1, e: 1 };
+function _cmTokens(n) { return v2norm(String(n || '')).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function(w){ return w && !_CMP_LIGA[w]; }); }
+function _cmMesmaPessoaN(a, b) {
+  var A = _cmTokens(a), B = _cmTokens(b); if (!A.length || !B.length || A[0] !== B[0]) return false;
+  var dentro = function(X, Y) { return X.every(function(w){ return Y.indexOf(w) >= 0; }); };
+  if (dentro(A, B) || dentro(B, A)) return true;
+  return A.filter(function(w){ return B.indexOf(w) >= 0; }).length >= 2;
+}
+function _cmCandidatos(g, p, mes) {
+  var nomes = [], out = [], feitos = {};
+  (g.k === 'closers' ? (p.linhas || []) : (p.reunioes || [])).forEach(function(l){ if (l.n) nomes.push(l.n); });
+  (V2.rows || []).forEach(function(r) {
+    if (!r.date || !r.nome) return;
+    var m = r.date.getFullYear() + '-' + ('0' + (r.date.getMonth() + 1)).slice(-2); if (m !== mes) return;
+    var minha = g.k === 'closers' ? _cmMesmoNome(r.closer, p.nome) : _cmMesmoNome(r.sdr, p.nome);
+    if (!minha) return;
+    // closer: só venda que paga (vendido ou entrada — estorno e bloqueio não pagam comissão); SDR/SS: reunião em que o lead apareceu
+    var conta = g.k === 'closers' ? (r.sn === 'vendido' || r.sn === 'entrada') : (typeof isComp === 'function' ? isComp(r.sn) : true);
+    if (!conta || feitos[_cmChaveCliente(r.nome)]) return;
+    if (nomes.some(function(n){ return _cmMesmaPessoaN(n, r.nome); })) return;
+    feitos[_cmChaveCliente(r.nome)] = 1;
+    // Bruno 03/10/2026: "se algo tiver como vendido sem dados na planilha de vendas não dá para contestar — tem que enviar antes"
+    var semDados = false;
+    if (g.k === 'closers' && r.sn === 'vendido') { var pago = null; try { pago = ldPagamento({ tel: r.telefone, tel8: ldTel8(r.telefone) }); } catch (e) {} semDados = !pago && !(typeof pagVinculado === 'function' && pagVinculado(r)); }
+    out.push({ n: r.nome, d: r.date.toLocaleDateString('pt-BR').slice(0, 5), p: String(r.produto || ''), v: +r.valor || 0, st: r.status || '', semDados: semDados });
+  });
+  return out;
+}
+function cmContNova(gk, aba) {
+  var d = CM.dados; if (!d || d.papel !== 'dono') return;
+  var g = d.grupos.filter(function(x){ return !gk || x.k === gk; })[0] || d.grupos[0], p = g && (g.pessoas.filter(function(x){ return !aba || x.aba === aba; })[0] || g.pessoas[0]);
+  if (!p) { alert('Seu card deste mês ainda não apareceu — não dá para contestar este mês.'); return; }
+  if (!d.podeContestar) { alert('O prazo para contestar ' + _cmMesNome(d.mes) + ' acabou (vai até o dia 5 do mês seguinte).'); return; }
+  var cand = _cmCandidatos(g, p, d.mes);
+  var lanc = g.k === 'closers' ? (p.linhas || []).filter(function(l){ return l.t !== 'extra'; }).map(function(l){ return { k: l.k, ln: l.ln, n: l.n, d: l.pg || l.fe || '', p: l.p || '', v: l.c, rot: 'comissão ' + cmR(l.c) + (l.r ? ' de ' + cmR(l.r, false) + ' recebido' : '') }; })
+    : (p.reunioes || []).map(function(r){ return { k: r.k, ln: r.ln, n: r.n, d: r.d, p: r.p || '', v: r.v, rot: (r.re && r.conta ? 'paga ' + cmR(r.v || 0) : r.re ? 'tirada da conta' : 'lead não apareceu') }; });
+  CM.contForm = { g: g, p: p, cand: cand, lanc: lanc, outros: [], arqs: {} };
+  var bloco = function(tipo, lista, vazio) {
+    if (!lista.length) return '<div class="hint" style="padding:6px 2px;">' + vazio + '</div>';
+    return lista.map(function(x, i) {
+      var id = tipo + i;
+      if (x.semDados) return '<div class="cmp-item" id="cmpi-' + id + '" style="opacity:.75;"><label class="cmp-ck" style="cursor:default;"><input type="checkbox" disabled> <span><b>' + dspEsc(x.n) + '</b><br><small>' + dspEsc([x.d, x.p, x.st].filter(Boolean).join(' · ')) + '</small><br><small style="color:#ffd166;">⚠️ Está como Vendido mas sem os dados da venda — envie o formulário da venda antes de contestar.</small></span></label>'
+        + '<div style="padding:0 12px 12px;"><button class="btn" onclick="cmContFechar();try{renderVendidosSemForm(true)}catch(e){}">💰 Enviar os dados da venda</button></div></div>';
+      return '<div class="cmp-item" id="cmpi-' + id + '"><label class="cmp-ck"><input type="checkbox" onchange="this.closest(\'.cmp-item\').classList.toggle(\'on\',this.checked)"> <span><b>' + dspEsc(x.n) + '</b><br><small>' + dspEsc([x.d, x.p, x.rot || x.st].filter(Boolean).join(' · ')) + '</small></span></label>'
+        + '<div class="cmp-mais">' + (tipo === 'v' ? '<label>Valor que deveria ser (R$)<input inputmode="decimal" data-esp placeholder="ex.: 350,00"></label>' : '<label>Valor que você espera receber (R$, se souber)<input inputmode="decimal" data-esp placeholder="opcional"></label>')
+        + '<label>Explique<textarea data-txt placeholder="' + (tipo === 'v' ? 'Por que o valor está diferente?' : 'O que aconteceu com essa ' + (g.k === 'closers' ? 'venda' : 'reunião') + '?') + '"></textarea></label>'
+        + _cmAnexarHtml(id) + '</div></div>';
+    }).join('');
+  };
+  var o = g.k === 'closers' ? 'venda' : 'reunião', os = g.k === 'closers' ? 'vendas' : 'reuniões';
+  _cmContFundo('<div class="cm-det-topo"><div class="cm-nome"><b style="font-size:1.08rem;">📝 Contestar ' + dspEsc(_cmMesNome(d.mes)) + '</b><small>Marque o que está errado, explique e anexe os prints. Chega para o Bruno e para o financeiro.</small></div><button class="cm-det-x" onclick="cmContFechar()" aria-label="Fechar">✕</button></div>'
+    + '<div class="cm-h" style="margin-top:6px;">🚫 ' + (g.k === 'closers' ? 'Vendas' : 'Reuniões') + ' que não foram lançadas</div><div class="cmp-itens">' + bloco('n', cand, 'Não achei ' + os + ' suas na planilha de vendas que estejam faltando aqui. Se faltar alguma, use “+ Outra ' + o + '”.')
+    + '<div id="cmp-outros"></div><button class="btn" style="background:transparent;align-self:flex-start;" onclick="cmContOutro()">+ Outra ' + o + ' que não está na lista</button>'
+    + (g.k === 'closers' ? '<div class="hint" style="padding:2px 2px 0;">Venda que está como Vendido sem os dados na planilha não pode ser contestada: envie o formulário da venda antes.</div>' : '') + '</div>'
+    + '<div class="cm-h">💲 Lançadas com valor diferente</div><div class="cmp-itens">' + bloco('v', lanc, 'Nada lançado neste mês ainda.') + '</div>'
+    + '<label style="margin-top:12px;">Mensagem geral (opcional)<textarea id="cmp-geral" placeholder="Algo mais que o financeiro precisa saber?"></textarea></label>'
+    + '<div style="margin-top:8px;">' + _cmAnexarHtml('geral') + '</div>'
+    + '<div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap;"><button class="btn primary" id="cmp-enviar" onclick="cmContEnviar()">Enviar contestação</button><span class="hint" id="cmp-msg"></span></div>');
+}
+function cmContOutro() {
+  var F = CM.contForm; if (!F) return;
+  var i = F.outros.length; F.outros.push(1);
+  var box = document.getElementById('cmp-outros'); if (!box) return;
+  var div = document.createElement('div'); div.className = 'cmp-item on'; div.id = 'cmpi-o' + i;
+  div.innerHTML = '<div class="cmp-mais" style="display:flex;padding-top:12px;"><label>Cliente / lead<input type="text" data-nome placeholder="nome"></label><label>Data<input type="text" data-dia placeholder="dd/mm"></label>'
+    + '<label>Valor que você espera receber (R$, se souber)<input inputmode="decimal" data-esp placeholder="opcional"></label><label>Explique<textarea data-txt></textarea></label>' + _cmAnexarHtml('o' + i)
+    + '<button class="btn" style="background:transparent;align-self:flex-start;" onclick="this.closest(\'.cmp-item\').remove()">Tirar</button></div>';
+  box.appendChild(div);
+}
+function _cmAnexarHtml(id) {
+  return '<div class="cmp-arqs" id="cmpa-' + id + '"><label class="cmp-anexar">📎 Anexar print, foto ou PDF<input type="file" accept="image/*,application/pdf" multiple onchange="cmArqEscolher(\'' + id + '\',this)"></label></div>';
+}
+// imagem vira JPEG de até 1800 px (print de celular fica com ~200–400 KB); PDF vai como está (até 5 MB)
+function _cmArqPreparar(f) {
+  return new Promise(function(res) {
+    if (/^application\/pdf$/.test(f.type)) {
+      if (f.size > 5 * 1024 * 1024) { res({ erro: f.name + ': PDF grande demais (máximo 5 MB)' }); return; }
+      var rd = new FileReader(); rd.onload = function(){ res({ nome: f.name, mime: 'application/pdf', b64: String(rd.result).split(',')[1] }); }; rd.onerror = function(){ res({ erro: 'não consegui ler ' + f.name }); }; rd.readAsDataURL(f); return;
+    }
+    if (!/^image\//.test(f.type)) { res({ erro: f.name + ': só foto, print ou PDF' }); return; }
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function() {
+      var M = 1800, k = Math.min(1, M / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res({ nome: f.name.replace(/\.[a-z0-9]+$/i, '') + '.jpg', mime: 'image/jpeg', b64: c.toDataURL('image/jpeg', 0.85).split(',')[1] });
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); res({ erro: 'não consegui abrir ' + f.name }); };
+    img.src = url;
+  });
+}
+function cmArqEscolher(id, inp) {
+  var F = CM.contForm || CM.respForm; if (!F) return;
+  var lista = (F.arqs[id] = F.arqs[id] || []), box = document.getElementById('cmpa-' + id);
+  Array.prototype.forEach.call(inp.files || [], function(f) {
+    if (lista.length >= 6) return;
+    var it = { nome: f.name, pronto: null }; lista.push(it);
+    var chip = document.createElement('span'); chip.className = 'cmp-arq'; chip.textContent = '⏳ ' + f.name; box.appendChild(chip);
+    it.pronto = _cmArqPreparar(f).then(function(x) {
+      if (x.erro) { chip.textContent = '❌ ' + x.erro; lista.splice(lista.indexOf(it), 1); return null; }
+      it.dado = x; chip.innerHTML = (x.mime === 'application/pdf' ? '📄 ' : '🖼️ ') + dspEsc(x.nome) + ' <button type="button" aria-label="Tirar anexo">✕</button>';
+      chip.querySelector('button').onclick = function(){ lista.splice(lista.indexOf(it), 1); chip.remove(); };
+      return x;
+    });
+  });
+  inp.value = '';
+}
+// manda cada arquivo ao robô (um por vez) e devolve os ids
+function _cmArqsEnviar(lista, msgEl) {
+  var ids = [], i = 0;
+  function proximo() {
+    if (i >= lista.length) return Promise.resolve(ids);
+    var it = lista[i++];
+    return Promise.resolve(it.pronto).then(function(x) {
+      if (!x) return proximo();
+      if (msgEl) msgEl.textContent = 'Enviando anexo ' + i + ' de ' + lista.length + '…';
+      var id = 'ax' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      return _cmPost({ action: 'comissoesAnexoEnviar', token: _cmTok(), id: id, nome: x.nome, mime: x.mime, base64: x.b64 }).then(function(r) {
+        if (!r || !r.success) throw new Error((r && r.error) || 'não consegui enviar ' + x.nome);
+        ids.push(r.id); return proximo();
+      });
+    });
+  }
+  return proximo();
+}
+function cmContEnviar() {
+  var F = CM.contForm, d = CM.dados; if (!F || !d) return;
+  var bt = document.getElementById('cmp-enviar'), msg = document.getElementById('cmp-msg'), itens = [], faltaTxt = false;
+  var pegar = function(el) { return { esp: ((el.querySelector('[data-esp]') || {}).value || '').trim(), txt: ((el.querySelector('[data-txt]') || {}).value || '').trim() }; };
+  F.cand.forEach(function(x, i) { var el = document.getElementById('cmpi-n' + i); if (!el || !el.classList.contains('on') || x.semDados) return; var v = pegar(el); itens.push({ tipo: 'nao_lancada', ref: { n: x.n, d: x.d, p: x.p, v: '' }, esperado: v.esp, texto: v.txt, _arq: 'n' + i }); });
+  F.lanc.forEach(function(x, i) { var el = document.getElementById('cmpi-v' + i); if (!el || !el.classList.contains('on')) return; var v = pegar(el); if (!v.esp && !v.txt) faltaTxt = true; itens.push({ tipo: 'valor_diferente', ref: { k: x.k, ln: x.ln, n: x.n, d: x.d, p: x.p, v: x.v }, esperado: v.esp, texto: v.txt, _arq: 'v' + i }); });
+  F.outros.forEach(function(_, i) { var el = document.getElementById('cmpi-o' + i); if (!el) return; var n = ((el.querySelector('[data-nome]') || {}).value || '').trim(); if (!n) return; var v = pegar(el); itens.push({ tipo: 'nao_lancada', ref: { n: n, d: ((el.querySelector('[data-dia]') || {}).value || '').trim(), v: '' }, esperado: v.esp, texto: v.txt, _arq: 'o' + i }); });
+  if (!itens.length) { msg.textContent = 'Marque pelo menos uma venda ou reunião.'; return; }
+  if (faltaTxt) { msg.textContent = 'Nos itens com valor diferente, diga o valor certo ou explique.'; return; }
+  bt.disabled = true; msg.textContent = 'Preparando…';
+  var todas = [];
+  itens.forEach(function(it) { (F.arqs[it._arq] || []).forEach(function(a){ todas.push({ dono: it, a: a }); }); });
+  (F.arqs.geral || []).forEach(function(a){ todas.push({ dono: null, a: a }); });
+  var seq = Promise.resolve(), geral = [];
+  todas.forEach(function(t) {
+    seq = seq.then(function() { return _cmArqsEnviar([t.a], msg).then(function(ids) { if (t.dono) (t.dono.anexos = t.dono.anexos || []).push.apply(t.dono.anexos, ids); else geral.push.apply(geral, ids); }); });
+  });
+  seq.then(function() {
+    msg.textContent = 'Enviando a contestação…';
+    itens.forEach(function(it){ delete it._arq; });
+    return _cmPost({ action: 'comissoesContestar', token: _cmTok(), mes: d.mes, grupo: F.g.k, aba: F.p.aba, itens: itens, texto: ((document.getElementById('cmp-geral') || {}).value || '').trim(), anexos: geral });
+  }).then(function(r) {
+    if (!r || !r.success) throw new Error((r && r.error) || 'o robô não respondeu');
+    cmContFechar();
+    alert(r.juntou ? 'Pronto! Os itens entraram na sua contestação de ' + _cmMesNome(d.mes) + ' que ainda estava aberta.' : 'Contestação enviada! O Bruno e o financeiro já veem. A resposta aparece aqui na aba Comissões.');
+    CM.conts = null; renderComissoes();
+  }).catch(function(e) { bt.disabled = false; msg.textContent = '❌ ' + (e && e.message ? e.message : 'não consegui enviar') + '. Tente de novo.'; });
+}
+var CMP_DEC = { aceita: '✅ aceita', nao_procede: '❌ não procede', parcial: '🟡 aceita em parte' };
+function cmContAbrir(id) {
+  var abre = function(c) {
+    if (!c) { alert('Não achei essa contestação.'); return; }
+    var gest = _cmGest(), dono = _cmPapel() === 'dono';
+    CM.respForm = { id: c.id, arqs: {} };
+    var anx = function(lista) { return (lista || []).map(function(a){ return '<button type="button" class="cmp-anx" onclick="cmAnexoVer(\'' + dspEsc(a.id) + '\')">' + (/pdf/.test(a.tipo) ? '📄 ' : '🖼️ ') + dspEsc(a.nome) + '</button>'; }).join(''); };
+    var h = '<div class="cm-det-topo"><div class="cm-nome"><b style="font-size:1.05rem;">📝 Contestação de ' + dspEsc(c.nome) + ' · ' + dspEsc(_cmMesNome(c.mes)) + '</b><small><span class="cmp-sit ' + _cmSitClasse(c.situacao) + '">' + dspEsc(c.situacao) + '</span> · aberta ' + _cmData(c.criada) + ' · ' + dspEsc(c.id) + '</small></div><button class="cm-det-x" onclick="cmContFechar()" aria-label="Fechar">✕</button></div>';
+    h += '<div class="cm-h" style="margin-top:6px;">Itens</div><div class="cmp-itens" style="max-height:none;">' + c.itens.map(function(it) {
+      var tipo = it.tipo === 'valor_diferente' ? '💲 lançada com valor diferente' : '🚫 não foi lançada';
+      var info = [it.ref && it.ref.d, it.ref && it.ref.p, it.ref && it.ref.v !== '' && it.ref.v != null ? 'hoje ' + cmR(it.ref.v) : '', it.esperado !== '' && it.esperado != null ? 'espera ' + cmR(it.esperado) : ''].filter(Boolean).join(' · ');
+      var dec = it.decisao ? '<span class="cmp-chip ' + (it.decisao === 'nao_procede' ? 'mudou' : 'ok') + '">' + CMP_DEC[it.decisao] + (it.valorAceito !== '' && it.valorAceito != null ? ' · ' + cmR(it.valorAceito) : '') + '</span>' : '<span class="cmp-chip auto">aguardando</span>';
+      var ctl = gest ? '<select data-dec="' + it.id + '" aria-label="Decisão"><option value="">— decisão —</option>' + Object.keys(CMP_DEC).map(function(k){ return '<option value="' + k + '"' + (it.decisao === k ? ' selected' : '') + '>' + CMP_DEC[k] + '</option>'; }).join('') + '</select>'
+        + '<input inputmode="decimal" data-val="' + it.id + '" placeholder="R$ aceito" value="' + (it.valorAceito === '' || it.valorAceito == null ? '' : String(it.valorAceito).replace('.', ',')) + '" aria-label="Valor aceito">' : dec;
+      return '<div class="cmp-dec"><div><b>' + dspEsc(it.ref ? it.ref.n : '') + '</b><small>' + tipo + (info ? ' · ' + dspEsc(info) : '') + '</small>' + (it.texto ? '<div style="margin-top:4px;white-space:pre-wrap;">' + dspEsc(it.texto) + '</div>' : '') + anx(it.anexos) + (gest && it.decisao ? '<div style="margin-top:6px;">' + dec + '</div>' : '') + '</div>' + (gest ? ctl : '<div></div><div>' + dec + '</div>') + '</div>';
+    }).join('') + '</div>';
+    h += '<div class="cm-h">Conversa</div><div class="cmp-msgs">' + c.conversa.map(function(m) {
+      var g2 = m.papel !== 'dono';
+      return '<div class="cmp-msg' + (g2 ? ' gestao' : '') + '"><div class="cmp-quem">' + dspEsc(m.de || '') + (g2 ? ' · ' + (m.papel === 'financeiro' ? 'financeiro' : 'admin') : '') + ' · ' + _cmData(m.em) + '</div>'
+        + (m.t ? dspEsc(m.t) : (m.decisoes && m.decisoes.length ? '<span class="hint">decidiu ' + m.decisoes.length + (m.decisoes.length === 1 ? ' item' : ' itens') + '</span>' : '')) + anx(m.anexos) + '</div>';
+    }).join('') + '</div>';
+    h += '<label>' + (gest ? 'Resposta para ' + dspEsc(c.nome.split(' ')[0]) : 'Responder') + '<textarea id="cmp-resp" placeholder="' + (gest ? 'Explique a decisão…' : 'Escreva aqui…') + '"></textarea></label>'
+      + '<div style="margin-top:8px;">' + _cmAnexarHtml('resp') + '</div>'
+      + '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;">'
+      + (gest ? '<button class="btn primary" onclick="cmContResponder(\'' + dspEsc(c.id) + '\',\'respondida\',this)">Enviar resposta</button><button class="btn" onclick="cmContResponder(\'' + dspEsc(c.id) + '\',\'em_analise\',this)">Marcar “em análise”</button>'
+        + '<button class="btn" style="background:transparent;" onclick="cmContFechar();cmAbrir(\'' + dspEsc(c.grupo) + '\',\'' + dspEsc(c.aba) + '\')">Abrir as comissões de ' + dspEsc(c.nome.split(' ')[0]) + ' para ajustar</button>'
+        : '<button class="btn primary" onclick="cmContResponder(\'' + dspEsc(c.id) + '\',\'\',this)">Enviar</button>')
+      + '<span class="hint" id="cmp-msg"></span></div>';
+    _cmContFundo(h);
+  };
+  var c0 = (CM.conts || []).filter(function(c){ return c.id === id; })[0];
+  if (c0) { abre(c0); return; }
+  _cmGet({ action: 'comissoesContestacoes', token: _cmTok() }).then(function(r) { if (r && r.success) { CM.conts = r.lista || []; abre(CM.conts.filter(function(c){ return c.id === id; })[0]); } else alert('Não consegui abrir: ' + ((r && r.error) || 'o robô não respondeu')); });
+}
+function cmContResponder(id, situacao, bt) {
+  var F = CM.respForm, msg = document.getElementById('cmp-msg'), texto = ((document.getElementById('cmp-resp') || {}).value || '').trim(), decisoes = [];
+  if (_cmGest()) Array.prototype.forEach.call(document.querySelectorAll('#cmp-fundo [data-dec]'), function(s) {
+    var it = s.getAttribute('data-dec'), v = (document.querySelector('#cmp-fundo [data-val="' + it + '"]') || {}).value || '';
+    if (s.value) decisoes.push({ item: it, decisao: s.value, valor: v.trim() });
+  });
+  var arqs = (F && F.arqs.resp) || [];
+  if (!texto && !arqs.length && !decisoes.length && !situacao) { msg.textContent = 'Escreva a resposta ou anexe um arquivo.'; return; }
+  if (situacao === 'respondida' && _cmGest() && !texto) { msg.textContent = 'Escreva a resposta para a pessoa entender a decisão.'; return; }
+  bt.disabled = true; msg.textContent = 'Enviando…';
+  _cmArqsEnviar(arqs, msg).then(function(ids) {
+    return _cmPost({ action: 'comissoesContestacaoResponder', token: _cmTok(), id: id, texto: texto, anexos: ids, decisoes: decisoes, situacao: situacao });
+  }).then(function(r) {
+    if (!r || !r.success) throw new Error((r && r.error) || 'o robô não respondeu');
+    var L = CM.conts || []; for (var i = 0; i < L.length; i++) if (L[i].id === id) L[i] = r.contestacao;
+    cmContAbrir(id); var box = document.getElementById('cmp-conts'); if (box) box.outerHTML = _cmContListaHtml();
+  }).catch(function(e) { bt.disabled = false; msg.textContent = '❌ ' + (e && e.message ? e.message : 'não consegui enviar'); });
+}
+function cmAnexoVer(id) {
+  var janela = null;
+  _cmGet({ action: 'comissoesAnexoVer', token: _cmTok(), id: id }, 60000).then(function(r) {
+    if (!r || !r.success) { alert('Não consegui abrir o anexo: ' + ((r && r.error) || 'o robô não respondeu')); return; }
+    var bin = atob(r.b64), arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([arr], { type: r.tipo }));
+    if (/^image\//.test(r.tipo)) {
+      var l = document.createElement('div'); l.className = 'cmp-luz'; l.title = 'Clique para fechar'; l.innerHTML = '<img alt="' + dspEsc(r.nome) + '" src="' + url + '">';
+      l.onclick = function(){ l.remove(); URL.revokeObjectURL(url); }; document.body.appendChild(l);
+    } else {
+      var a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.download = r.nome; document.body.appendChild(a); a.click(); a.remove();
+    }
+  });
+}
+
+// ---------- só o Bruno: quem tem acesso ----------
+CM.acessos = null;
+function cmAcessosCarregar() {
+  if (_cmPapel() !== 'admin' || CM.acessosBuscando) return;
+  CM.acessosBuscando = true;
+  _cmGet({ action: 'comissoesContas', token: _cmTok() }).then(function(r) {
+    CM.acessosBuscando = false;
+    if (r && r.success) { CM.acessos = r; var box = document.getElementById('cmp-acessos'); if (box) box.outerHTML = _cmAcessosHtml(); }
+  });
+}
+function _cmAcessosHtml() {
+  if (_cmPapel() !== 'admin' || !CM.dados || !CM.dados.papel) return '';
+  var A = CM.acessos;
+  if (!A) { setTimeout(cmAcessosCarregar, 60); return '<div id="cmp-acessos"></div>'; }
+  var porChave = {}; (A.contas || []).forEach(function(c){ if (!c.teste) porChave[c.chave] = c; });
+  var sit = function(c) { return !c ? '<span class="hint">ainda não entrou</span>' : c.temSenha ? '<span class="cmp-chip ok">ativo · ' + c.aparelhos + ' aparelho' + (c.aparelhos === 1 ? '' : 's') + '</span>' : c.convite ? '<span class="cmp-chip auto">código pedido · ainda sem senha</span>' : '<span class="hint">ainda não entrou</span>'; };
+  return '<div id="cmp-acessos" class="cmp-secao"><div class="cm-h">🔑 Acessos às comissões</div><div class="panel" style="padding:8px 12px;overflow-x:auto;"><table class="cmp-acessos"><thead><tr><th>Pessoa</th><th>Grupo</th><th>WhatsApp</th><th>Situação</th><th></th></tr></thead><tbody>'
+    + (A.pessoas || []).filter(function(x){ return x.primeiro !== 'bruno'; }).map(function(x) {   // o Bruno entra como admin (vê tudo)
+      var c = porChave[x.chave], arg = '\'' + dspEsc(x.primeiro) + '\',\'' + dspEsc(x.nome) + '\',\'' + (x.financeiro ? 'financeiro' : 'dono') + '\'';
+      return '<tr><td><b>' + dspEsc(x.nome) + '</b></td><td>' + dspEsc((x.grupos || []).join(' + ')) + '</td><td>' + (x.zap ? '<span class="cmp-chip ok">cadastrado</span>' : '<span class="cmp-chip mudou">falta cadastrar</span>') + '</td><td>' + sit(c) + '</td><td style="white-space:nowrap;text-align:right;">'
+        + (c ? '<button class="btn" style="background:transparent;" onclick="cmTirarAcesso(\'' + dspEsc(x.chave) + '\',\'' + dspEsc(x.nome) + '\')">Tirar acesso</button> ' : '')
+        + '<button class="btn" style="background:transparent;" title="Use só se o WhatsApp não chegar" onclick="cmConvidar(' + arg + ',' + !!(c && c.temSenha) + ')">Código manual</button></td></tr>';
+    }).join('') + '</tbody></table><div class="hint" style="padding:8px 2px 4px;line-height:1.55;">Cada pessoa entra sozinha: abre <b>Comissões</b>, toca em “Primeira vez ou esqueceu a senha? Receber código no WhatsApp”, digita o código que chega no WhatsApp dela e cria a senha. O código manual é só reserva (se o WhatsApp não chegar).</div></div></div>';
+}
+function cmConvidar(primeiro, nome, papel, resetar) {
+  if (resetar && !confirm('Gerar um código manual para ' + nome + '? A senha atual dele(a) deixa de valer e os aparelhos saem.')) return;
+  _cmGet({ action: 'comissoesConvidar', token: _cmTok(), primeiro: primeiro, nome: nome, papel: papel, resetar: !!resetar }).then(function(r) {
+    if (!r || !r.success) { alert('Não consegui gerar: ' + ((r && r.error) || 'o robô não respondeu')); return; }
+    _cmContFundo('<div class="cm-det-topo"><div class="cm-nome"><b style="font-size:1.05rem;">🔑 Código manual de ' + dspEsc(r.nome) + '</b><small>vale até ' + _cmData(r.validoAte) + ' · só serve uma vez</small></div><button class="cm-det-x" onclick="cmContFechar()" aria-label="Fechar">✕</button></div>'
+      + '<div class="cmp-codigo">' + String(r.codigo).replace(/(\d{3})(\d{3})/, '$1 $2') + '</div>'
+      + '<div class="hint" style="line-height:1.6;">Passe este código para ' + dspEsc(r.nome.split(' ')[0]) + ' pessoalmente ou por mensagem direta. Na tela de entrada das comissões, ele(a) toca em “Primeira vez ou esqueceu a senha?”, digita o código (sem pedir pelo WhatsApp) e cria a senha.<br>Este código não fica guardado em lugar nenhum: se fechar esta janela, gere outro.</div>');
+    CM.acessos = null; var box = document.getElementById('cmp-acessos'); if (box) box.outerHTML = _cmAcessosHtml();
+  });
+}
+function cmTirarAcesso(conta, nome) {
+  if (!confirm('Tirar o acesso de ' + nome + ' às comissões? Os aparelhos dele(a) saem na hora. Dá para gerar outro código depois.')) return;
+  _cmGet({ action: 'comissoesContaRemover', token: _cmTok(), conta: conta }).then(function(r) {
+    if (!r || !r.success) { alert('Não consegui: ' + ((r && r.error) || 'o robô não respondeu')); return; }
+    CM.acessos = null; var box = document.getElementById('cmp-acessos'); if (box) box.outerHTML = _cmAcessosHtml();
+  });
+}
+
+// ---------- a tela do dono: só o card dele ----------
+function _cmRenderDono(el, d) {
+  var NM = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  var seletor = (d.meses && d.meses.length > 1) ? '<div class="cm-meses" role="tablist" aria-label="Mês">' + d.meses.map(function(m){ return '<button role="tab" aria-selected="' + (m === d.mes) + '" class="' + (m === d.mes ? 'on' : '') + '" onclick="cmMes(\'' + m + '\')">' + NM[+m.slice(5, 7) - 1] + '/' + m.slice(2, 4) + '</button>'; }).join('') + '</div>' : '';
+  var selo = CM.carregando ? '<span class="cm-sync"><i></i>atualizando…</span>' : CM.aviso ? '<span class="cm-sync aviso">' + dspEsc(CM.aviso) + '</span>' : '';
+  var h = '<div class="cm-topo-barra">' + seletor + selo + '</div>' + _cmAvisosHtml(), algum = false, i = 0;
+  var aberto = !d.fechado || d.fechado < d.mes;
+  (d.grupos || []).forEach(function(g) {
+    (g.pessoas || []).forEach(function(p) {
+      algum = true;
+      h += '<div class="cm-h">' + (g.k === 'closers' ? '🤝' : g.k === 'sdr' ? '📞' : '📱') + ' Suas comissões de ' + dspEsc(_cmMesNome(d.mes)) + (d.grupos.length > 1 ? ' · ' + dspEsc(g.nome) : '') + ' <small>' + (aberto ? 'mês em aberto' : 'mês fechado') + '</small></div>';
+      h += _cmValidaBarra(g, p, false);
+      h += '<div class="cm-grade">' + (g.k === 'closers' ? _cmCardCloser(p, '#3ddc97', d.premios || [], d.mes, i++, 0) : _cmCardPre(p, CM_GRUPO_COR[g.k] || '#6ea8ff', g.faixas, g.workshopContaFaixa, g.k, i++)) + '</div>';
+    });
+  });
+  if (!algum) h += '<div class="panel" style="padding:24px;text-align:center;"><div style="font-weight:800;margin-bottom:6px;">Seu card de ' + dspEsc(_cmMesNome(d.mes)) + ' ainda não apareceu.</div><div class="hint">Se você teve vendas ou reuniões neste mês, fale com o financeiro.</div></div>';
+  var hist = [];
+  (d.grupos || []).forEach(function(g){ (g.historico || []).forEach(function(x){ if (x.total) hist.push({ x: x, g: g }); }); });
+  if (hist.length) h += '<div class="cm-h">🗂️ Seus meses fechados</div><div class="panel cm-entra" style="padding:12px 14px;"><div class="cm-hist-wrap"><table class="cm-hist"><thead><tr><th>Mês</th>' + (d.grupos.length > 1 ? '<th>Grupo</th>' : '') + '<th>Fixo</th><th>Comissão</th><th>Prêmio</th><th>Total</th></tr></thead><tbody>'
+    + hist.map(function(o){ var x = o.x; return '<tr><td>' + dspEsc(_cmMesNome(x.mes)) + '</td>' + (d.grupos.length > 1 ? '<td>' + dspEsc(o.g.nome) + '</td>' : '') + '<td>' + cmR(x.fixo, false) + '</td><td>' + cmR(x.comissao, false) + '</td><td>' + cmR(x.premio, false) + '</td><td><b>' + cmR(x.total, false) + '</b></td></tr>'; }).join('') + '</tbody></table></div></div>';
+  h += _cmContListaHtml();
+  h += '<div class="cm-pe"><button class="btn" onclick="cmCarregar()"' + (CM.carregando ? ' disabled' : '') + '>' + (CM.carregando ? '⏳ Atualizando…' : '↻ Atualizar') + '</button>'
+    + '<button class="btn" style="background:transparent;" onclick="cmSairPessoa()">Sair das comissões</button><span class="hint">números de ' + new Date(d.gerado).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span></div>';
+  el.innerHTML = h;
+  if (CM.semAnim) { el.classList.add('cm-sem-anim'); Array.prototype.forEach.call(el.querySelectorAll('[data-w]'), function(b){ b.style.width = b.getAttribute('data-w'); }); }
+  else { el.classList.remove('cm-sem-anim'); cmAnimar(el); }
+  CM.semAnim = false;
+  if (!CM.carregando && Date.now() - (CM.ultimaBusca || 0) > 5 * 60000) setTimeout(function(){ cmCarregar(); }, 50);
+}
+function cmSairPessoa() {
+  var t = _cmTok();
+  try { localStorage.removeItem('comPainelTok'); localStorage.removeItem('comPainelCache'); } catch (e) {}
+  CM.dados = null; CM.conts = null; CM.avisos = null; CM.msg = ''; renderComissoes();
+  if (t) _cmGet({ action: 'comissoesSair', token: t });
+}
+
+// ---------- Suellen (financeiro): entra no dash com a senha das comissões (conferida no robô — sem senha no código) ----------
+function _cmPapelNav() {
+  var fin = _cmPapelLogin() === 'financeiro';
+  document.documentElement.classList.toggle('papel-fin', fin);
+  if (fin) { var it = document.querySelector('.nav-item[data-s="comissoes"]'); if (it && !it.classList.contains('active')) setTimeout(function(){ it.click(); }, 200); }
+}
+try { _cmPapelNav(); } catch (eFin) {}
+try { cmMostrarMenu(); } catch (eMn) {}   // a aba aparece para quem tem comissão (antes era só o Bruno)
+</script>
+
 
 </body>
 </html>
