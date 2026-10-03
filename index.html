@@ -1411,7 +1411,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
 <main class="main">
   <div class="topbar">
     <button class="toggle-btn" onclick="alternarMenu()">☰</button>
-    <h1 id="screen-title">Visão Geral<small>Dashboard Comercial — Julho 2026</small></h1>
+    <h1 id="screen-title">Visão Geral<small>Dashboard Comercial</small></h1>
     <div class="topbar-right">
       <button class="btn" id="btn-someu" onclick="soMeuAlternar()" title="Mostrar só o que é seu (reuniões, vendas, leads, pagamentos) ou tudo" style="display:none;">👤 Só o meu</button>
       <button class="btn" id="btn-filtros" onclick="abrirFiltros()">⚙ Filtros</button>
@@ -2582,8 +2582,10 @@ function desenharCalendario(){
   var dows = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
   var html = '';
   dows.forEach(function(d){ html += '<div class="cal-dow">' + d + '</div>'; });
-  // Julho/2026 começa numa quarta-feira (2 células vazias antes)
-  html += '<div class="cal-cell vazio"></div><div class="cal-cell vazio"></div>';
+  // 03/10/2026 (varredura): antes eram sempre 2 células vazias (julho/2026 começa numa quarta) — em outro mês os dias
+  // caíam embaixo do dia da semana errado. Agora conta quantos dias faltam da segunda-feira até o dia 1 do mês atual.
+  var _h = new Date(), _vazias = (new Date(_h.getFullYear(), _h.getMonth(), 1).getDay() + 6) % 7;
+  for (var _v = 0; _v < _vazias; _v++) html += '<div class="cal-cell vazio"></div>';
   for (var d = 1; d <= DIAS_MES; d++){
     var fds = !!FDS[d], passado = d <= HOJE, hoje = d === HOJE;
     var n = ag[d-1] || 0;
@@ -2637,7 +2639,9 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     var s = item.getAttribute('data-s');
     document.querySelectorAll('.screen').forEach(function(sc){ sc.classList.remove('active'); });
     document.getElementById('s-'+s).classList.add('active');
-    document.getElementById('screen-title').innerHTML = titulos[s] + '<small>Dashboard Comercial — Julho 2026</small>';
+    // 03/10/2026 (varredura): o subtítulo dizia "Julho 2026" em qualquer mês
+    var _hj = new Date(), _mn = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][_hj.getMonth()];
+    document.getElementById('screen-title').innerHTML = titulos[s] + '<small>Dashboard Comercial — ' + _mn + ' ' + _hj.getFullYear() + '</small>';
     // abriu a aba Leads = viu os novos; o aviso da tela inicial zera
     // (espera um pouco para o filtro "só os novos" ainda funcionar nesta visita)
     if (s === 'leads' && typeof marcarLeadsVistos === 'function') setTimeout(marcarLeadsVistos, 2500);
@@ -2671,7 +2675,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-0002';
+var VERSAO_DASH = '2026-10-03-0614';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4191,10 +4195,12 @@ function igVerEtapa(et) {
 }
 // o resumo de cada isca no período (uma conta só, usada nos chips e na tabela)
 function igResumoPorIsca(per) {
+  var _temMemo = typeof _anMemoChave === 'function', _mk = _temMemo ? _anMemoChave(per, 'isca') : '', _mm = _temMemo ? _anMemo[_mk] : null;
+  if (_temMemo && _anMemoOk(_mm)) return _mm.r;
   var out = {}, guarda = IG_ISCA;
   Object.keys(IGO.iscas || {}).forEach(function(k) { IG_ISCA = k; try { out[k] = igResumo(per); } catch (e) { out[k] = null; } });
   IG_ISCA = guarda;
-  return out;
+  return _temMemo ? _anMemoGuardar(_mk, out) : out;
 }
 function igPainelResumo(per) {
   var r = igResumo(per);
@@ -4399,6 +4405,18 @@ setTimeout(function(){ try { if (!/clint=1/.test(String(location.hash || '') + S
 // (tem a memória dela) e quando a memória passou de 2 h (gravações) / 6 h (criativos): não carrega o robô à toa.
 setTimeout(function(){ try { if (!/clint=1/.test(String(location.hash || '') + String(location.search || ''))) { gravAquecer(); setTimeout(criAquecer, 8000); } } catch (e) {} }, 25000);
 // abre a conversa com o servidor do vídeo/imagem antes do clique (economiza ~0,3 s na 1ª abertura)
+// 03/10/2026 (varredura no celular e tablet): o menu "⋯ Mais" do Placar abria 53–59 px para fora da tela, à esquerda.
+// Ao abrir, se o menu sair da tela, ele passa a se alinhar pelo outro lado do botão.
+document.addEventListener('toggle', function(e) {
+  var d = e.target;
+  if (!d || !d.matches || !d.matches('details.pl-mais') || !d.open) return;
+  var m = d.querySelector('.pl-mais-m'); if (!m) return;
+  m.style.left = ''; m.style.right = '';
+  var b = m.getBoundingClientRect();
+  if (b.left < 8) { m.style.right = 'auto'; m.style.left = '0'; }
+  b = m.getBoundingClientRect();
+  if (b.right > window.innerWidth - 8) { m.style.left = 'auto'; m.style.right = '0'; }
+}, true);
 var _preconectados = {};
 function preconectar(hosts) {
   (hosts || []).forEach(function(h) {
@@ -4645,7 +4663,9 @@ function _vendedorLogado() {
   var eu = localStorage.getItem('v2Login') || ldEu() || '';
   if (/bruno/i.test(eu)) return 'Bruno';
   if (/tony/i.test(eu)) return 'Tony';
-  return _primeiroNome(eu);
+  // 03/10/2026 (varredura): _primeiroNome foi redefinida mais abaixo (devolve em minúsculas: "wesllene") e o Google Forms
+  // não reconhecia o vendedor — _nomeCurto devolve "Wesllene"
+  return _nomeCurto(eu) || _primeiroNome(eu);
 }
 // O formulario de venda DE VERDADE e um Google Forms (gera o contrato pelo Form
 // Publisher). O formulario HTML antigo gravava numa planilha de teste — por isso
@@ -7166,7 +7186,7 @@ function _grupoAttr(nomes) {
 // dono e etapa do lead: primeiro a consulta individual (mais fresca), senão o painel geral
 // acha a pessoa na Clint pelo NOME (só quando o telefone falta) — exige que
 // exatamente UMA pessoa da Clint tenha esse nome, senão devolve nada (nome repete!)
-var _clintNomeIdx = null, _clintNomeIdxN = 0, _clintNomeCache = {};
+var _clintNomeIdx = null, _clintNomeIdxN = 0, _clintNomeCache = {}, _clintNomesOrd = [], _clintNomeIdxRef = null;
 // "Michelly" e "Michely" são a mesma pessoa: compara sem acento e sem letra dobrada
 function _nomeChave(n) { return v2norm(n).replace(/(.)\1+/g, '$1'); }
 // quantas letras separam duas palavras (trocar/tirar/pôr) — para achar nome escrito diferente
@@ -7234,10 +7254,10 @@ function clintPorNome(nome) {
   if (!CLINT_PAINEL || !CLINT_PAINEL.success || !nome) return null;
   var alvo = _nomeChave(nome);
   if (!alvo || alvo.length < 5) return null;   // nome curto demais casa com gente errada
-  if (_clintNomeCache[alvo] !== undefined) return _clintNomeCache[alvo];   // ja procuramos esse nome: nao varre de novo (a varredura travava a tela por segundos)
-  var ks = Object.keys(CLINT_PAINEL.mapa || {});
-  if (!_clintNomeIdx || _clintNomeIdxN !== ks.length) {
-    _clintNomeIdx = {}; _clintNomeCache = {};
+  // o índice é refeito quando chega um painel novo da Clint (antes listava os 12 mil telefones a cada nome procurado)
+  if (!_clintNomeIdx || _clintNomeIdxRef !== CLINT_PAINEL) {
+    var ks = Object.keys(CLINT_PAINEL.mapa || {});
+    _clintNomeIdx = {}; _clintNomeCache = {}; _clintNomeIdxRef = CLINT_PAINEL;
     ks.forEach(function(t8) {
       var r = CLINT_PAINEL.mapa[t8];
       var n = _nomeChave((r && r[3]) || '');
@@ -7245,12 +7265,17 @@ function clintPorNome(nome) {
       (_clintNomeIdx[n] = _clintNomeIdx[n] || []).push(t8);
     });
     _clintNomeIdxN = ks.length;
+    _clintNomesOrd = Object.keys(_clintNomeIdx).sort();
   }
+  if (_clintNomeCache[alvo] !== undefined) return _clintNomeCache[alvo];   // ja procuramos esse nome: nao procura de novo
   var achados = _clintNomeIdx[alvo] || [];
   if (achados.length !== 1) {
     // nome incompleto ("Michelly"): serve se só UMA pessoa da Clint começa assim
-    var cands = [];
-    for (var n2 in _clintNomeIdx) if (n2.indexOf(alvo) === 0) { cands.push(n2); if (cands.length > 1) break; }
+    // ⚡ 03/10/2026 (Bruno: "por que a aba de lead demora para abrir"): antes varria os ~12 mil nomes da Clint para cada lead
+    // sem telefone (1.463 leads → 5 s travado no 1º desenho). Agora procura na lista em ordem alfabética: mesmo resultado, na hora.
+    var cands = [], arr = _clintNomesOrd || [], lo = 0, hi = arr.length;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (arr[mid] < alvo) lo = mid + 1; else hi = mid; }
+    for (var q = lo; q < arr.length && arr[q].indexOf(alvo) === 0; q++) { cands.push(arr[q]); if (cands.length > 1) break; }
     if (cands.length === 1 && _clintNomeIdx[cands[0]].length === 1) achados = _clintNomeIdx[cands[0]];
     else { _clintNomeCache[alvo] = null; return null; }
   }
@@ -8561,7 +8586,15 @@ function ldMesmoDono(a, b) {
   return (x + ' ').indexOf(y + ' ') === 0 || (y + ' ').indexOf(x + ' ') === 0;
 }
 // lista de responsáveis que REALMENTE aparecem nos leads, do que mais tem para o que menos tem
+// ⚡ 03/10/2026: chamada 2× em cada desenho da aba Leads (filtros e seletor), cada uma varrendo os 20 mil leads — guarda dentro do mesmo desenho
+var _ldDonosMemo = { g: -1, r: null };
 function ldDonosExistentes() {
+  if (_ldMemo && _ldDonosMemo.g === _ldGen && _ldDonosMemo.r) return _ldDonosMemo.r.slice();
+  var r = ldDonosExistentes0();
+  if (_ldMemo) _ldDonosMemo = { g: _ldGen, r: r.slice() };
+  return r;
+}
+function ldDonosExistentes0() {
   var c = {};
   (LD.rows || []).forEach(function(l){ var d = ldDonoDe(l); if (d) c[d] = (c[d] || 0) + 1; });
   var nomes = Object.keys(c), junto = {};
@@ -8588,7 +8621,7 @@ function _ldSoWorkshop(per) {
       var x = WSL.porTel[t8], d = x.apl instanceof Date ? x.apl : x.ing instanceof Date ? x.ing : x.d2 instanceof Date ? x.d2 : null;
       if (!d || !x.nome) return null;
       return { nome: x.nome, tel: x.tel || t8, tel8: t8, insta: String(x.ig || '').replace(/^@+/, ''), email: '', origem: 'Workshop ' + _wsMes(x), fonte: 'workshop', utm: '', campanha: '',
-        faixa: 'sem', seg: '', renda: '', obj: '', invest: '', score: 0, date: d, dataTxt: d.toLocaleDateString('pt-BR'), i: 'ws', _ws: true, dono: x.sdr || '' };
+        faixa: leadFaixa(_wsInvTxt(x.inv)), seg: '', renda: '', obj: '', invest: _wsInvTxt(x.inv), score: 0, date: d, dataTxt: d.toLocaleDateString('pt-BR'), i: 'ws', _ws: true, dono: x.sdr || '' };
     }).filter(Boolean);
     _ldWs.ref = ref;
   }
@@ -9055,6 +9088,22 @@ function verAconteceu(qual) {
   var bq2 = document.getElementById('mb-busca'); if (bq2) { bq2.value = ''; bq2.style.display = 'none'; }
   document.getElementById('modal-b').classList.add('open');
 }
+// 03/10/2026 (Bruno: "sobre o valor do tráfego, consegue separar o que é diagnóstico do que é workshop?"): pelo nome da
+// campanha no Facebook — WLD/workshop = Workshop · ILD/Goiânia/DF = Imersão · DIAGNOSTICO e distribuição/engajamento
+// (e o resto) = Diagnóstico (Bruno 03/10/2026: "distribuição/engajamento é diagnóstico, que deve ser considerado")
+var META_TIPOS = [['diagnostico', '🩺 Diagnóstico', '#6ea8ff'], ['workshop', '🎓 Workshop', '#b084ff'], ['imersao', '🏟️ Imersão (ILD)', '#f6a350']];
+function metaTipoCampanha(c) {
+  var u = v2norm(c || '');
+  if (/wld|workshop/.test(u)) return 'workshop';
+  if (/diagnost/.test(u)) return 'diagnostico';
+  if (/(^|[^a-z])ild([^a-z]|$)|imersao|goiania|(^|[^a-z])df([^a-z]|$)/.test(u)) return 'imersao';
+  return 'diagnostico';
+}
+function metaGastoPorTipo(anuncios) {
+  var g = { diagnostico: 0, workshop: 0, imersao: 0 };
+  (anuncios || []).forEach(function(a) { g[metaTipoCampanha(a.campanha)] += +a.gasto || 0; });
+  return g;
+}
 // quadro do investimento: gasto do Facebook × leads × reuniões × vendas
 function blocoMetaAds(listaAn, per) {
   if (telaVisivel('s-anuncios')) carregarMetaAds(per);
@@ -9066,11 +9115,13 @@ function blocoMetaAds(listaAn, per) {
   }
   var porAn = {};
   listaAn.forEach(function(o){ porAn[_chaveAnuncio(o.nome)] = o.d; });
-  var linhas = [], gasto = 0, leads = 0, reun = 0, vend = 0;
+  var linhas = [], gasto = 0, leads = 0, reun = 0, vend = 0, porTipo = {};
   META.dados.anuncios.forEach(function(a) {
     var d = porAn[_chaveAnuncio(a.anuncio)] || { n: 0, ag: 0, vd: 0 };
     gasto += a.gasto; leads += d.n; reun += d.ag; vend += d.vd;
     linhas.push({ nome: a.anuncio, gasto: a.gasto, n: d.n, ag: d.ag, vd: d.vd });
+    var tp = metaTipoCampanha(a.campanha), T = porTipo[tp] || (porTipo[tp] = { gasto: 0, n: 0, ag: 0, vd: 0 });
+    T.gasto += +a.gasto || 0; T.n += d.n; T.ag += d.ag; T.vd += d.vd;
   });
   linhas.sort(function(x, y){ return y.gasto - x.gasto; });
   function rs(v){ return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
@@ -9086,6 +9137,14 @@ function blocoMetaAds(listaAn, per) {
     + '<div style="flex:1;min-width:120px;padding:11px;border-radius:13px;background:rgba(61,220,151,.09);border:1px solid rgba(61,220,151,.28);">'
     +   '<b style="font-size:1.1rem;color:#3ddc97;display:block;">' + (vend ? rs(gasto / vend) : '—') + '</b><span style="font-size:.62rem;color:var(--text-secondary);font-weight:700;">CUSTO POR VENDA</span></div>'
     + '</div>';
+  // por tipo de campanha (os leads do workshop entram pelo app do workshop, não pelo formulário: lá o custo por lead fica em branco)
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">' + META_TIPOS.filter(function(t) { return porTipo[t[0]] && porTipo[t[0]].gasto > 0; }).map(function(t) {
+      var T = porTipo[t[0]];
+      return '<div style="flex:1;min-width:150px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);">'
+        + '<span style="font-size:.66rem;font-weight:800;color:' + t[2] + ';">' + t[1] + '</span>'
+        + '<b style="display:block;font-size:1rem;margin-top:2px;">' + rs(T.gasto) + ' <small style="font-size:.66rem;color:var(--text-secondary);font-weight:700;">' + (gasto ? Math.round(T.gasto / gasto * 100) : 0) + '%</small></b>'
+        + '<span class="hint" style="font-size:.64rem;">' + [T.n ? T.n + ' leads · ' + rs(T.gasto / T.n) + '/lead' : '', T.vd ? T.vd + ' vendas · ' + rs(T.gasto / T.vd) + '/venda' : ''].filter(Boolean).join(' · ') + '</span></div>';
+    }).join('') + '</div>';
   h += '<div style="display:flex;flex-direction:column;gap:4px;margin-top:10px;max-height:260px;overflow-y:auto;">';
   linhas.slice(0, 20).forEach(function(x) {
     h += '<div style="display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:9px;background:rgba(255,255,255,.04);flex-wrap:wrap;">'
@@ -9369,7 +9428,21 @@ function anVendasPainel(per) {
   }
   return h + '</div>';
 }
+// ⚡ 03/10/2026 (Bruno: "melhore o desempenho"): as contas mais pesadas da aba Criativos ficam guardadas por 60 s —
+// clicar em ordenar, tipo, "só com venda" ou isca não refaz tudo (0,3 a 0,6 s cada clique). Planilha nova (Vendas, leads,
+// Instagram) é outro objeto: a conta é refeita na hora.
+var _anMemo = {};
+function _anMemoChave(per, extra) { return (per && per.ini) + '|' + (per && per.fim) + '|' + (extra || ''); }
+function _anMemoOk(m) { return !!(m && Date.now() - m.t < 60000 && m.v2 === V2.rows && m.ld === LD.rows && m.ig === IGO.posts && m.igi === IGO.iscas && m.ldn === (LD.rows || []).length); }
+function _anMemoGuardar(k, r) { _anMemo[k] = { t: Date.now(), v2: V2.rows, ld: LD.rows, ig: IGO.posts, igi: IGO.iscas, ldn: (LD.rows || []).length, r: r }; return r; }
 function anColetar(per, tipoFiltro) {
+  var _mk = _anMemoChave(per, 'col:' + tipoFiltro), _mm = _anMemo[_mk];
+  if (_anMemoOk(_mm)) return { an: Object.assign({}, _mm.r.an), fora: _mm.r.fora };
+  var _res = anColetar0(per, tipoFiltro);
+  _anMemoGuardar(_mk, { an: Object.assign({}, _res.an), fora: _res.fora });
+  return _res;
+}
+function anColetar0(per, tipoFiltro) {
   var an = {}, fora = {};
   try { PL_PAG_TEL = plPagPorTel(); } catch (e) {}
   var noPer = function(t){ return t != null && !((per.ini !== null && t < per.ini) || (per.fim !== null && t >= per.fim)); };
@@ -10052,6 +10125,16 @@ function renderAnuncios() {
     + [['','Tudo'],['mql','⭐ só com MQL'],['agend','📅 só com agendamento'],['reuniao','✅ só com reunião'],['venda','💰 só com venda']].map(function(o){
         return '<span class="chart-chip' + (AN_SO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_SO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '</span></div>';
+  // 03/10/2026 (Bruno: "sobre o valor do tráfego, consegue separar o que é diagnóstico do que é workshop?")
+  if (META.dados && (META.dados.anuncios || []).length) {
+    var _gt = metaGastoPorTipo(META.dados.anuncios), _gtot = _gt.diagnostico + _gt.workshop + _gt.imersao;
+    var _rs = function(v){ return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); };
+    if (_gtot > 0) h += '<div class="an-gasto-tipos" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.09);">'
+      + '<span style="font-size:.7rem;font-weight:800;">💸 Investimento ' + (META.dados.desde ? META.dados.desde.split('-').reverse().slice(0, 2).join('/') + ' a ' + String(META.dados.ate || '').split('-').reverse().slice(0, 2).join('/') : '') + ': ' + _rs(_gtot) + '</span>'
+      + META_TIPOS.filter(function(t){ return _gt[t[0]] > 0; }).map(function(t){
+          return '<span class="ld-tag" style="background:rgba(255,255,255,.06);color:' + t[2] + ';font-weight:800;" title="Campanhas do tipo ' + t[1].replace(/^\S+ /, '') + ' (pelo nome da campanha no Facebook)">' + t[1] + ' ' + _rs(_gt[t[0]]) + ' · ' + Math.round(_gt[t[0]] / _gtot * 100) + '%</span>'; }).join('')
+      + '</div>';
+  }
   if (!META.dados) {
     h += '<div class="hint" style="margin-top:9px;color:#f6a350;">💸 '
       + (META.buscando ? 'Buscando investimento e imagens no Facebook…' : 'Facebook ainda não conectado' + (META.erro ? ' (' + META.erro + ')' : '') + ' — falta a chave META_TOKEN no robô. Os números de leads/reuniões/vendas abaixo já funcionam.')
@@ -11362,12 +11445,15 @@ function sbJaNaClint() {
 // ===== 💸 META ADS: gasto por anúncio (vem do robô, que fala com o Facebook) =====
 var META = { dados: null, buscando: false, erro: '' };
 function carregarMetaAds(per) {
-  if (META.buscando) return;
+  // 03/10/2026 (varredura): com outro período sendo buscado (ex.: Criativos no mês e Relatório no mês anterior), o pedido
+  // era descartado e o Relatório ficava sem o investimento — agora fica na fila e é buscado em seguida
+  if (META.buscando) { META._fila = per || null; META._temFila = true; return; }
   var ini = per && per.ini ? new Date(per.ini) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   var fim = per && per.fim ? new Date(per.fim - 1) : new Date();
   function fmt(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
   var chave = fmt(ini) + '_' + fmt(fim);
   if (META.dados && META.dados._chave === chave) return;
+  if (META._falhou && Date.now() - (META._falhou[chave] || 0) < 120000) return;   // falhou há pouco: não insiste (evita pedir sem parar)
   // o gasto de cada anúncio também fica guardado no navegador por 3 horas:
   // a aba abre com os números na hora e só depois confere com o Facebook
   try {
@@ -11393,8 +11479,11 @@ function carregarMetaAds(per) {
       try { localStorage.setItem('v2MetaGasto_' + chave, JSON.stringify({ quando: Date.now(), dados: d })); } catch (e) {}
     }
     else if (!META.dados) { META.erro = (d && (d.detalhe || d.error)) || 'sem resposta'; META.dados = null; }
+    if (!(d && d.success)) { META._falhou = META._falhou || {}; META._falhou[chave] = Date.now(); }
     renderLeads();
     try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e) {}
+    try { if (telaVisivel('s-relatorio') && typeof rlRender === 'function') rlRender(); } catch (eRl) {}   // o Relatório também mostra o investimento
+    if (META._temFila) { var fila = META._fila; META._temFila = false; META._fila = null; setTimeout(function() { try { carregarMetaAds(fila); } catch (eF2) {} }, 50); }
   };
   window[nome] = fim2;
   sc.onerror = function(){ fim2(null); };
@@ -25955,6 +26044,8 @@ html.visitante .nav-item[data-s="relatorio"], html.visitante #s-relatorio { disp
 .rl-kg-t { font-size:.7rem; font-weight:900; letter-spacing:1.4px; text-transform:uppercase; color:var(--text2); margin-bottom:8px; }
 .rl-kg { display:grid; grid-template-columns:repeat(var(--n, 4), minmax(0,1fr)); gap:12px; }
 @media (max-width:1100px) { .rl-kg[style*="--n:5"] { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+/* 03/10/2026: com o investimento separado por tipo, o grupo de leads e anúncios chega a 8 cartões — 2 linhas de 4 */
+@media (min-width:901px) { .rl-kg[style*="--n:6"], .rl-kg[style*="--n:7"], .rl-kg[style*="--n:8"] { grid-template-columns:repeat(4, minmax(0,1fr)); } }
 @media (max-width:900px) { .rl-kg { grid-template-columns:repeat(2, minmax(0,1fr)); } }
 .rl-cmp { display:inline-flex; align-items:center; gap:6px; font-size:.7rem; font-weight:800; color:var(--muted); }
 .rl-cmp select { background:var(--panel, #151922); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:6px 8px; font:inherit; font-weight:800; cursor:pointer; }
@@ -26221,6 +26312,7 @@ function rlCriativos(p) {
   var metaOk = !!(META.dados && META.dados._chave === rlChaveMeta(p)), metaPor = {}, gasto = 0;
   var tipoIg = {}; try { (IGO.posts || []).forEach(function(q) { var c = _igCodigoDash(q.link); if (c) tipoIg[c] = String(q.tipo || ''); }); } catch (eT) {}
   if (metaOk) (META.dados.anuncios || []).forEach(function(m) { metaPor[_chaveAnuncio(m.anuncio)] = m; gasto += +m.gasto || 0; });
+  var gastoTipo = metaOk ? metaGastoPorTipo(META.dados.anuncios) : null;
   var lista = Object.keys(an).filter(function(k) { return !anEhOrigem(k); }).map(function(k) {
     var a = an[k], m = metaPor[_chaveAnuncio(k)] || {}, ehPost = String(k).indexOf('POST:') === 0, cri = null, foto = '', video = '';
     if (!ehPost) { try { cri = criativoDe(k, m.adId); } catch (e) {} foto = (cri && cri.foto) || m.foto || ''; video = (cri && cri.video) || ''; }
@@ -26237,7 +26329,7 @@ function rlCriativos(p) {
   var org = lista.filter(function(x) { return x.ehPost || x.tipo === 'organico'; }).sort(function(a, b) { return score(b) - score(a); });
   var vendasPagas = 0, fatPago = 0, leadsPagos = 0;
   pagos.forEach(function(x) { vendasPagas += x.vd; fatPago += x.fat; leadsPagos += x.n; });
-  return { pagos: pagos, org: org, metaOk: metaOk, gasto: gasto, vendasPagas: vendasPagas, fatPago: fatPago, leadsPagos: leadsPagos };
+  return { pagos: pagos, org: org, metaOk: metaOk, gasto: gasto, gastoTipo: gastoTipo, vendasPagas: vendasPagas, fatPago: fatPago, leadsPagos: leadsPagos };
 }
 // ---------- pedaços visuais ----------
 function rlDelta(a, b, menosEhMelhor, pp) {
@@ -26482,6 +26574,14 @@ function rlKpis(p, A, B, C) {
   if (C.metaOk && C.gasto) {
     var pagas = A.t.l.vd.filter(function(r) { return rlGrupo(r.origem) === 'Tráfego pago'; });
     lz.push(k('Investimento em anúncios', C.gasto, 'moeda', null, '#6ea8ff', null, 'Facebook / Instagram no período', false, rlL('Leads de anúncio', A.pagoL, 'lead')));
+    // 03/10/2026 (Bruno): o mesmo investimento separado por tipo de campanha — os cartões de antes continuam iguais
+    if (C.gastoTipo) {
+      var GT = C.gastoTipo, wsVd = A.t.l.vd.filter(function(r) { return /workshop/i.test(r.origem || ''); });
+      var wsFat = wsVd.reduce(function(s2, r) { return s2 + (r.valor || 0); }, 0);
+      if (GT.diagnostico) lz.push(k('Anúncios · Diagnóstico', GT.diagnostico, 'moeda', null, '#6ea8ff', null, (C.leadsPagos ? rlMoeda(GT.diagnostico / C.leadsPagos) + ' por lead de anúncio · ' : '') + (C.fatPago ? 'retorno ' + (C.fatPago / GT.diagnostico).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x · ' : '') + Math.round(GT.diagnostico / C.gasto * 100) + '% do investimento (inclui distribuição/engajamento)', false, rlL('Leads de anúncio', A.pagoL, 'lead')));
+      if (GT.workshop) lz.push(k('Anúncios · Workshop', GT.workshop, 'moeda', null, '#b084ff', null, wsVd.length + ' vendas do workshop' + (wsVd.length ? ' · ' + rlMoeda(GT.workshop / wsVd.length) + ' por venda · retorno ' + (wsFat / GT.workshop).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x' : '') + ' · ' + Math.round(GT.workshop / C.gasto * 100) + '% do investimento', false, rlL('Vendas do workshop', wsVd)));
+      if (GT.imersao) lz.push(k('Anúncios · Imersão (ILD)', GT.imersao, 'moeda', null, '#f6a350', null, Math.round(GT.imersao / C.gasto * 100) + '% do investimento', false, null));
+    }
     lz.push(k('Custo por lead', C.leadsPagos ? C.gasto / C.leadsPagos : 0, 'moeda', null, '#6ea8ff', null, C.leadsPagos + ' leads de anúncio', true, rlL('Leads de anúncio', A.pagoL, 'lead')));
     lz.push(k('Retorno dos anúncios', C.gasto ? C.fatPago / C.gasto : 0, 'dec', null, '#3ddc97', null, 'cada R$ 1 investido virou R$ ' + (C.gasto ? (C.fatPago / C.gasto).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0') + ' em vendas', false, rlL('Vendas de tráfego pago', pagas)));
   }
@@ -27746,7 +27846,8 @@ window.__gvizWS = function(resp) {
     var C = { t8: ix(/^tel8$/), tel: ix(/^telefone$/), nome: ix(/^nome$/), ig: ix(/^instagram$/), ws: ix(/^workshop$/), prog: ix(/^programa$/),
       d1: ix(/^1. dia$/), d2: ix(/^2. dia$/), ing: ix(/^ingresso/), apl: ix(/^aplicou/), aplSt: ix(/^aplicacao \(status/), compra: ix(/^compra/),
       pqF: ix(/^pesquisa: faixa/), pqN: ix(/^pesquisa: nota/), dg: ix(/^diagnostico em/), crm: ix(/^crm/), sdr: ix(/^sdr/), closer: ix(/^closer/),
-      p1: ix(/^presenca d1/), p2: ix(/^presenca d2/), p3: ix(/^presenca d3/), grupo: ix(/^grupo/), atu: ix(/^atualizado/) };
+      p1: ix(/^presenca d1/), p2: ix(/^presenca d2/), p3: ix(/^presenca d3/), grupo: ix(/^grupo/), atu: ix(/^atualizado/),
+      inv: ix(/^investimento/), rec: ix(/^receita/), pqEm: ix(/^pesquisa em/) };
     var porTel = {}, aplNome = {}, n = 0, atu = 0;
     resp.table.rows.forEach(function(r) {
       var g = function(k) { return C[k] >= 0 ? _wsCel(r.c[C[k]]) : ''; };
@@ -27754,7 +27855,8 @@ window.__gvizWS = function(resp) {
       var x = { t8: t8, tel: String(g('tel') || ''), nome: String(g('nome') || ''), ig: String(g('ig') || ''), ws: String(g('ws') || ''), prog: String(g('prog') || ''),
         d1: g('d1'), d2: g('d2'), ing: g('ing'), apl: g('apl'), aplSt: String(g('aplSt') || ''), compra: String(g('compra') || ''),
         pqF: String(g('pqF') || '').toUpperCase(), pqN: g('pqN'), dg: g('dg'), crm: String(g('crm') || ''), sdr: String(g('sdr') || ''), closer: String(g('closer') || ''),
-        p1: /sim/i.test(g('p1')), p2: /sim/i.test(g('p2')), p3: /sim/i.test(g('p3')), grupo: /sim/i.test(g('grupo')) };
+        p1: /sim/i.test(g('p1')), p2: /sim/i.test(g('p2')), p3: /sim/i.test(g('p3')), grupo: /sim/i.test(g('grupo')),
+        inv: String(g('inv') || ''), rec: String(g('rec') || ''), pqEm: g('pqEm') };
       var a = g('atu'); if (a instanceof Date && a.getTime() > atu) atu = a.getTime();
       porTel[t8] = x; n++;
       if (x.apl instanceof Date) _wsNomeChaves(x.nome).forEach(function(k){ if (!aplNome[k]) aplNome[k] = x.apl; });
@@ -27840,6 +27942,37 @@ function wsOrigens(tel) {
 function _wsOrigTxt(os, comData) {
   return os.map(function(it, i){ var t = dspEsc(it.o) + (comData && it.d ? ' <span class="hint">(' + new Date(it.d).toLocaleDateString('pt-BR').slice(0, 5) + ')</span>' : ''); return i === 0 ? '<b>' + t + '</b>' : t; }).join(' → ');
 }
+// 03/10/2026 (Bruno: "os leads que vieram do workshop puxem os dados dele mesmo quando não tiver formulário; caso tenha,
+// mostre os dois ou o caminho dele"): investimento da aplicação, receita do diagnóstico do app e o caminho em ordem de data
+function _wsInvTxt(v) {
+  var k = String(v || '').toLowerCase().trim(); if (!k) return '';
+  var M = { '500_1k_grupo': 'R$ 500 a R$ 1 mil (grupo)', '2k_3k_individual': 'R$ 2 mil a R$ 3 mil (individual)', '3k_4k_ultra': 'R$ 3 mil a R$ 4 mil (ultra)', 'sem_disponibilidade': 'Não tenho disponibilidade agora' };
+  return M[k] || k.replace(/_/g, ' ').replace(/(\d+)k/g, 'R$ $1 mil');
+}
+function _wsRecTxt(v) {
+  var k = String(v || '').toLowerCase().trim(); if (!k) return '';
+  if (k === 'nenhuma') return 'nenhuma ainda';
+  return k.replace(/(\d+)k/g, 'R$ $1 mil').replace(/-/g, ' a ').replace(/\+$/, ' ou mais') + ' por mês';
+}
+function wsCaminho(tel) {
+  var t8 = ldTel8(tel); if (!t8) return [];
+  var ev = [], x = WSL.porTel[t8], agora = Date.now();
+  var add = function(d, txt) { if (d instanceof Date && !isNaN(d.getTime())) ev.push({ d: d.getTime(), t: txt }); };
+  if (x) {
+    var oque = x.prog === 'ILD' ? 'da imersão' : 'do workshop';
+    add(x.ing, '🎟️ Comprou o ingresso ' + oque + (_wsMes(x) ? ' (' + _wsMes(x) + ')' : ''));
+    if (x.d1 instanceof Date) add(x.d1, '🎓 1º dia ' + oque + (x.d1.getTime() > agora ? ' (vai acontecer)' : x.p1 ? ' · participou' : ''));
+    if (x.d2 instanceof Date) add(x.d2, '🎓 2º dia ' + oque + (x.d2.getTime() > agora ? ' (vai acontecer)' : x.p2 ? ' · participou' : ''));
+    add(x.apl, '📝 Fez a aplicação' + (x.inv ? ' · investimento: ' + _wsInvTxt(x.inv) : '') + (x.compra ? ' · ' + String(x.compra).replace(/_/g, ' ') : ''));
+    add(x.pqEm, '🏅 Respondeu a pesquisa' + (x.pqF ? ' · nota ' + x.pqF : ''));
+    add(x.dg, '🩺 Fez o diagnóstico no app' + (x.rec ? ' · receita: ' + _wsRecTxt(x.rec) : ''));
+  }
+  (LD.rows || []).forEach(function(l) { if (l.tel8 === t8 && l.date) add(l.date, '🧾 Preencheu o formulário de diagnóstico' + (l.origem ? ' (' + l.origem + ')' : '') + (l.invest ? ' · ' + l.invest : '')); });
+  (V2.rows || []).forEach(function(r) { if (r.date && ldTel8(r.telefone) === t8) add(r.date, '📅 Reunião' + (r.closer ? ' com ' + r.closer : '') + ' · ' + (r.status || 'agendada')); });
+  ev.sort(function(a, b) { return a.d - b.d; });
+  var vistos = {};
+  return ev.filter(function(e) { var k = new Date(e.d).toDateString() + e.t; if (vistos[k]) return false; vistos[k] = 1; return true; });
+}
 function _wsLeadDoWorkshop(x) { return !!(x && (x.apl || x.ing || x.pqF || x.dg || x.crm)); }
 // selo 🎓 (mini = linha de lista)
 function seloWorkshop(tel, ref, mini) {
@@ -27875,8 +28008,15 @@ function wsFichaHtml(tel, ref) {
   else L.push('<span style="color:#9aa3b2;">📝 Não fez a aplicação do workshop</span>');
   var dias = [x.p1 ? 'D1' : '', x.p2 ? 'D2' : '', x.p3 ? 'D3' : ''].filter(Boolean);
   L.push(dias.length ? '✅ Participou: ' + dias.join(', ') : '<span class="hint">Presença: o app ainda não manda (só julho tem)</span>');
+  if (x.inv) L.push('💰 Investimento na aplicação: <b>' + dspEsc(_wsInvTxt(x.inv)) + '</b>');
+  if (x.rec || x.dg) L.push('🩺 Diagnóstico no app' + (x.dg instanceof Date ? ' em ' + _wsDm(x.dg) : '') + (x.rec ? ' · receita: <b>' + dspEsc(_wsRecTxt(x.rec)) + '</b>' : ''));
   if (x.pqF || x.pqN !== '') L.push('🏅 Pesquisa do workshop: ' + (x.pqF || '—') + (x.pqN !== '' ? ' (' + x.pqN + ')' : ''));
   if (x.crm || x.sdr || x.closer) L.push('📋 No app: ' + [x.crm, x.sdr ? 'SDR ' + x.sdr : '', x.closer ? 'closer ' + x.closer : ''].filter(Boolean).map(dspEsc).join(' · '));
+  try {
+    var cam = wsCaminho(tel);
+    if (cam.length > 1) L.push('<div style="margin-top:6px;"><b>🛤️ Caminho</b>' + cam.slice(-14).map(function(e) {
+      return '<div style="display:flex;gap:8px;margin-top:3px;font-size:.78em;"><span class="hint" style="min-width:38px;font-variant-numeric:tabular-nums;">' + _wsDm(new Date(e.d)) + '</span><span>' + dspEsc(e.t) + '</span></div>'; }).join('') + '</div>');
+  } catch (eCam) {}
   var j = wsJanela(x, ref);
   if (j) L.push(j.fase === 'dentro' && !ap ? '<span style="color:#9aa3b2;">Sem aplicação: os 50% por 15 dias não valem — se comprar, comissão normal</span>'
     : j.fase === 'dentro' ? '<b style="color:#f6a350;">⏳ Janela dos 50%: do 2º dia (' + _wsDm(x.d2) + ') até ' + _wsDm(j.fim) + ' — hoje é o dia ' + j.dias + ' de ' + WS_JANELA_DIAS + '</b>'
