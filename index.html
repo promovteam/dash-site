@@ -2663,7 +2663,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2156';
+var VERSAO_DASH = '2026-10-02-2210';
 var _versaoNova = null;
 
 // =====================================================================
@@ -27988,23 +27988,32 @@ function _cmGuardado(mk) { try { var c = JSON.parse(localStorage.getItem('comPai
 function _cmGuardar(mk, d) {
   try { var c = JSON.parse(localStorage.getItem('comPainelCache') || '{}'); delete c[mk]; c[mk] = d; var ks = Object.keys(c); while (ks.length > 4) delete c[ks.shift()]; localStorage.setItem('comPainelCache', JSON.stringify(c)); } catch (e) {}
 }
-function cmCarregar(forcar) {
+function cmCarregar(forcar, auto) {
   if (!_cmPode()) return;
   var tok = _cmTok(); if (!tok) { CM.etapa = 'pedir'; renderComissoes(); return; }
   if (CM.carregando) return;
   var mk = CM.mes || 'atual';
   if (!CM.dados || CM.dadosMes !== mk) { CM.dados = _cmGuardado(mk); CM.dadosMes = mk; }
-  CM.carregando = true; CM.erro = ''; CM.ultimaBusca = Date.now(); renderComissoes();
-  try { if (CM.dados && document.getElementById('cm-det-fundo')) cmDetRender(); } catch (eD) {}   // a janela aberta mostra "Atualizando…"
+  CM.carregando = true; CM.erro = ''; CM.ultimaBusca = Date.now(); if (!auto) renderComissoes();   // automática: busca quieta, sem redesenhar
+  try { if (!auto && CM.dados && document.getElementById('cm-det-fundo')) cmDetRender(); } catch (eD) {}   // a janela aberta mostra "Atualizando…" (só no ↻)
   gasPedir({ action: 'comissoesPainel', token: tok, mes: CM.mes || '', forcar: !!forcar }, function(d) {
     CM.carregando = false;
-    var tinha = !!CM.dados;
+    var tinha = !!CM.dados, geradoAntes = tinha ? CM.dados.gerado : 0;
     if (!d) { if (!tinha) CM.erro = 'O robô não respondeu. Tente de novo em instantes.'; else CM.aviso = 'Não consegui atualizar agora — mostrando o que estava guardado.'; }
     else if (d.precisaCodigo) { try { localStorage.removeItem('comPainelTok'); localStorage.removeItem('comPainelCache'); } catch (e) {} CM.etapa = 'pedir'; CM.dados = null; }
     else if (!d.success) { if (!tinha) CM.erro = d.error || 'erro ao ler as planilhas'; else CM.aviso = d.error || 'erro ao ler as planilhas'; }
     else { CM.dados = d; CM.dadosMes = mk; CM.etapa = ''; CM.aviso = ''; CM.semAnim = tinha; _cmGuardar(mk, d); }
-    renderComissoes();
-    if (CMD) { CMD.reabrir = false; if (CM.dados && document.getElementById('cm-det-fundo')) cmDetRender(); }   // janela aberta: troca pelos números novos
+    var _igual = auto && d && d.success && d.gerado === geradoAntes;   // nada mudou: não redesenha (sem piscar)
+    if (!_igual) renderComissoes(); else { CM.semAnim = false; var _sl = document.querySelector('#cm-corpo .cm-sync'); if (_sl) _sl.remove(); }
+    if (CMD) {
+      var _janela = CM.dados && document.getElementById('cm-det-fundo');
+      if (_janela && auto && !CMD.reabrir) {   // atualização automática: não fecha o que está aberto — avisa (só se mudou)
+        if (!(d && d.success && d.gerado !== geradoAntes)) { CMD.reabrir = false; return; }
+        var tp = document.querySelector('#cm-det-fundo .cm-det-topo'), av = document.getElementById('cm-det-novos');
+        if (tp && !av) { av = document.createElement('button'); av.id = 'cm-det-novos'; av.type = 'button'; av.className = 'cm-det-novos'; av.textContent = '🔄 números novos · ver'; av.onclick = function(){ cmDetRender(); }; tp.parentNode.insertBefore(av, tp.nextSibling); }
+      } else if (_janela) cmDetRender();   // janela aberta: troca pelos números novos
+      CMD.reabrir = false;
+    }
   }, 90000);
 }
 function cmPedirCodigo() {
@@ -28078,6 +28087,16 @@ function _cmDelta(ant, total) {
   var NM = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'], d = (total - ant.total) / ant.total, sobe = d >= 0;
   return '<span class="cm-delta ' + (sobe ? 'sobe' : 'desce') + '" title="' + NM[+ant.mes.slice(5, 7) - 1] + '/' + ant.mes.slice(2, 4) + ': ' + cmR(ant.total, false) + '">' + (sobe ? '▲' : '▼') + ' ' + Math.abs(Math.round(d * 100)) + '% vs ' + NM[+ant.mes.slice(5, 7) - 1] + '</span>';
 }
+// 📐 grade equilibrada (Bruno 02/10/2026: "ajuste os cards ao tamanho da tela"): quantos cabem na largura (mín. 330 px cada) e,
+// quando sobra um sozinho, divide por igual (4 cards = 2 + 2); um card só não estica além de 640 px
+function _cmAjustarGrade(el) {
+  Array.prototype.forEach.call((el || document).querySelectorAll('.cm-grade'), function(g) {
+    var n = g.children.length, W = g.clientWidth; if (!n || !W) return;
+    var cab = Math.max(1, Math.floor((W + 16) / (330 + 16))), linhas = Math.ceil(n / cab), cols = Math.ceil(n / linhas);
+    g.style.gridTemplateColumns = n === 1 ? 'minmax(0, 640px)' : 'repeat(' + cols + ', minmax(0, 1fr))';
+  });
+}
+window.addEventListener('resize', function(){ clearTimeout(window._cmGradeT); window._cmGradeT = setTimeout(function(){ try { var c = document.getElementById('cm-corpo'); if (c) _cmAjustarGrade(c); } catch (e) {} }, 150); });
 // luz que segue o mouse nos cartões (um ouvinte só)
 function _cmLuz(el) {
   if (el._cmLuz || _cmMenosMov()) return; el._cmLuz = true;
@@ -28141,11 +28160,11 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
   // outra origem paga o valor do SDR um nível abaixo do dela (1º e 2º = P, 3º = M, 4º = G, 5º = GG)
   var fxSdr = tipo === 'ss' ? ((((CM.dados || {}).grupos || []).filter(function(x){ return x.k === 'sdr'; })[0] || {}).faixas || []).slice().sort(function(a, b){ return a[0] - b[0]; }) : [];
   var LS = ['P', 'M', 'G', 'GG'], sdrDe = function(k){ if (!fxSdr.length) return null; var j = Math.min(Math.max(k, 1), fxSdr.length) - 1; return { l: LS[j] || '', v: fxSdr[j][1] }; };   // k = índice 0-based do nível dela
-  var escada = '<div class="cm-escada">' + fx.map(function(t, k) {
+  var escada = '<div class="cm-escada" style="--n:' + Math.max(fx.length, 1) + ';">' + fx.map(function(t, k) {
     var ok = conta >= t[0], aqui = atual && atual.i === k, falta = t[0] - conta, sd = sdrDe(k);
-    var sub = aqui ? 'você está aqui' : ok ? '✓ passou' : 'faltam <b>' + falta + '</b>' + (rAt && t[1] > rAt ? ' · +' + cmR(t[1] - rAt, false) + ' em cada' : '');
-    return '<div class="cm-degrau' + (aqui ? ' atual' : ok ? ' ok' : '') + (prox && prox === t ? ' prox' : '') + '"><b>' + letra[k] + '</b><span>' + t[0] + '+ reuniões</span><em>' + cmR(t[1], false) + '</em>'
-      + (sd ? '<span class="cm-degrau-sdr">outras origens: ' + cmR(sd.v, false) + ' (' + sd.l + ')</span>' : '') + '<small>' + sub + '</small></div>';
+    var sub = aqui ? 'você está aqui' : ok ? '✓ passou' : 'faltam <b>' + falta + '</b>' + (rAt && t[1] > rAt ? '<br>+' + cmR(t[1] - rAt, false) + ' cada' : '');
+    return '<div class="cm-degrau' + (aqui ? ' atual' : ok ? ' ok' : '') + (prox && prox === t ? ' prox' : '') + '" title="' + letra[k] + ': a partir de ' + t[0] + ' reuniões, ' + cmR(t[1], false) + ' por reunião e por venda' + (sd ? ' · outras origens: ' + cmR(sd.v, false) + ' (' + sd.l + ')' : '') + '"><b>' + letra[k] + '</b><span>' + t[0] + '+ reun.</span><em>' + cmR(t[1], false) + '</em>'
+      + (sd ? '<span class="cm-degrau-sdr">fora: ' + cmR(sd.v, false) + ' ' + sd.l + '</span>' : '') + '<small>' + sub + '</small></div>';
   }).join('') + '</div>';
   if (tipo === 'ss' && fxSdr.length) {
     var sdA = atual ? sdrDe(atual.i) : null;
@@ -28256,10 +28275,14 @@ function renderComissoes() {
   } else { el.classList.remove('cm-sem-anim'); cmAnimar(el); }
   CM.semAnim = false;
   _cmLuz(el);
+  _cmAjustarGrade(el);
   // voltou para a tela depois de um tempo: atualiza por trás (no máximo a cada 5 min)
   if (!CM.carregando && Date.now() - (CM.ultimaBusca || 0) > 5 * 60000) setTimeout(function(){ cmCarregar(); }, 50);
 }
 cmMostrarMenu();
+// 🔄 (Bruno 02/10/2026: "quando atualizar algo mude na hora na comissão"): com a tela de comissões aberta, busca de novo a cada
+// 2 min (o robô devolve o painel guardado na hora; ele refaz o painel assim que algo muda nas planilhas)
+setInterval(function(){ try { if (_cmTok() && CM.dados && !CM.carregando && telaVisivel('s-comissoes') && !document.hidden && Date.now() - (CM.ultimaBusca || 0) > 110000) cmCarregar(false, true); } catch (e) {} }, 30000);
 // ⚡ (Bruno 02/10/2026: "coloque algo para abrir mais rápido as informações"): com o dash aberto, as comissões já carregam por
 // trás (do que ficou guardado no aparelho e do robô) — ao clicar na aba está tudo pronto
 setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.dados) cmCarregar(); } catch (e) {} }, 6000);
@@ -28347,6 +28370,9 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-motivo { margin-top:8px; font-size:.78rem; color:#ffb4b4; }
 
 /* ✨ visual novo dos cartões (02/10/2026) */
+.cm-det-novos { display:block; width:100%; margin:0 0 10px; padding:8px; border-radius:10px; border:1px dashed rgba(110,168,255,.5); background:rgba(110,168,255,.1); color:#6ea8ff; font:inherit; font-size:.78rem; font-weight:800; cursor:pointer; }
+@media (max-width:640px) { .cm-funil-l { grid-template-columns:104px minmax(0,1fr) 24px !important; } .cm-funil-l em { display:none; } }
+
 .cm-degrau-sdr { font-size:.62rem; color:#b084ff; font-weight:700; }
 .cm-obs-ss { margin-top:8px; padding:8px 10px; border-radius:10px; background:rgba(176,132,255,.08); border:1px solid rgba(176,132,255,.25); font-size:.72rem; color:#c9cfdb; line-height:1.45; } .cm-obs-ss b { color:#eef0f4; }
 
@@ -28458,6 +28484,37 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
   .cm-edita { grid-template-columns:1fr; }
 }
 
+
+/* 📐 cards do tamanho da tela (Bruno 02/10/2026: "ajuste os cards ao tamanho da tela", "faça o mesmo para celular") */
+.cm-grade { grid-template-columns:repeat(auto-fit, minmax(min(100%, 330px), 1fr)); }
+.cm-escada { grid-template-columns:repeat(var(--n, 4), minmax(0, 1fr)) !important; gap:5px; }
+.cm-degrau { padding:6px 6px; min-width:0; font-size:.62rem; overflow-wrap:anywhere; }
+.cm-degrau b { font-size:.82rem; } .cm-degrau em { font-size:.74rem; } .cm-degrau-sdr { font-size:.58rem; }
+.cm-marcas span { font-size:.6rem; }
+@media (max-width:640px) {
+  .cm-card { padding:14px; } .cm-escada { gap:4px; } .cm-degrau { padding:5px 4px; font-size:.58rem; } .cm-degrau b { font-size:.76rem; } .cm-degrau em { font-size:.68rem; }
+  .cm-stats { grid-template-columns:repeat(5, minmax(0,1fr)) !important; gap:4px; } .cm-stat { padding:6px 2px; } .cm-stat b { font-size:.92rem; } .cm-stat small { font-size:.56rem; }
+  .cm-stats4 { grid-template-columns:repeat(4, minmax(0,1fr)) !important; }
+  .cm-valor b { font-size:1.2rem; } .cm-pessoa .cm-av { width:44px !important; height:44px !important; }
+  .cm-funil-l { grid-template-columns:86px minmax(0,1fr) 26px; }
+}
+/* 📱 filtros no celular, em todas as telas (Bruno 02/10/2026: "arrume os filtros de pesquisa e etc no celular e todos"):
+   as fileiras quebram em linhas (antes rolavam de lado e escondiam opções) e o topo fica só com ícones */
+@media (max-width:640px) {
+  .chart-chips, #an-chips, .gx-pills { flex-wrap:wrap !important; overflow:visible !important; row-gap:6px; }
+  .chart-chips > *, .gx-pills > * { flex:0 0 auto; }
+  .chart-chip, .chart-chip.sm { padding:6px 10px !important; font-size:.72rem !important; }
+  .gx-pill { padding:6px 10px !important; font-size:.72rem !important; }
+  .topbar { gap:8px; }
+  .topbar h1 { font-size:1rem !important; min-width:0; flex:1 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar h1 small { display:none; }
+  .topbar-right { gap:6px !important; flex:0 0 auto; }
+  #btn-someu, #btn-filtros { font-size:0 !important; width:38px; height:38px; padding:0 !important; display:inline-flex; align-items:center; justify-content:center; }
+  #btn-someu::before { content:'👤'; font-size:1rem; } #btn-filtros::before { content:'⚙'; font-size:1.05rem; }
+  .search-input, input[type="search"] { min-width:0; }
+  .filtro-inline .fi-label, .chart-chips .fi-label { flex-basis:100%; margin:4px 0 0 !important; }   /* "Mês:", "Veio de:"… começam a própria linha */
+  select.edit-in, .edit-in { max-width:100%; }
+}
 </style>
 <script>
 // clique no cartão → lista do mês da pessoa (Bruno 02/10/2026: "ao entrar conseguimos ver quais as vendas, suas origens e etc?")
