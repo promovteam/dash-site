@@ -2651,6 +2651,8 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
     if (s === 'anuncios' && typeof renderAnuncios === 'function') { setTimeout(function(){ try { renderAnuncios(); } catch (eRa) {} }, 30); setTimeout(function(){ try { aplicarCapasIG(); pedirCapasIG(); } catch (eCp) {} }, 1500); }
     if (s === 'contratos' && typeof renderContratos === 'function') renderContratos();
     if (s === 'disparos' && typeof renderDisparos === 'function') { try { renderDisparos(); } catch (eDsp) {} }
+    if (s === 'gravacoes' && typeof preconectar === 'function') preconectar(['https://drive.google.com', 'https://www.googleapis.com', 'https://lh3.googleusercontent.com']);
+    if (s === 'anuncios' && typeof preconectar === 'function') preconectar(['https://www.facebook.com', 'https://static.xx.fbcdn.net']);
     if (s === 'gravacoes' && typeof gravCarregar === 'function' && !GRAV.carregado && !GRAV.carregando) { try { gravCarregar(); } catch (eGv) {} }
     // a tela que precisa dos bloqueios os busca na hora (se ainda não vieram)
     if (typeof BLQ !== 'undefined' && !BLQ.carregado && !BLQ.buscando) { try { carregarBloqueios(); } catch (e) {} }
@@ -2669,7 +2671,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2321';
+var VERSAO_DASH = '2026-10-02-2355';
 var _versaoNova = null;
 
 // =====================================================================
@@ -4392,6 +4394,19 @@ function carregarPostsOrganicos(tentativa) {
 }
 // espera o resto do painel carregar (o endereço do robô é declarado mais abaixo no arquivo)
 setTimeout(function(){ try { if (!/clint=1/.test(String(location.hash || '') + String(location.search || ''))) carregarPostsOrganicos(); } catch (e) {} }, 12000);   // Criativos: fora da Clint, depois do essencial
+// ⚡ 02/10/2026 (Bruno: "melhore a abertura das gravações" / "dos criativos"): com o dash parado, renova no aparelho a lista
+// das gravações e as imagens dos criativos — ao clicar na aba, abre na hora. Só em aparelho que já usa a aba
+// (tem a memória dela) e quando a memória passou de 2 h (gravações) / 6 h (criativos): não carrega o robô à toa.
+setTimeout(function(){ try { if (!/clint=1/.test(String(location.hash || '') + String(location.search || ''))) { gravAquecer(); setTimeout(criAquecer, 8000); } } catch (e) {} }, 25000);
+// abre a conversa com o servidor do vídeo/imagem antes do clique (economiza ~0,3 s na 1ª abertura)
+var _preconectados = {};
+function preconectar(hosts) {
+  (hosts || []).forEach(function(h) {
+    if (_preconectados[h]) return; _preconectados[h] = 1;
+    try { var l = document.createElement('link'); l.rel = 'preconnect'; l.href = h; l.crossOrigin = 'anonymous'; document.head.appendChild(l);
+      var l2 = document.createElement('link'); l2.rel = 'preconnect'; l2.href = h; document.head.appendChild(l2); } catch (e) {}
+  });
+}
 setTimeout(function(){ try { carregarEtiquetas(); } catch (e) {} }, 9000);
 // os pedidos do Instagram chegam em segundo plano (a aba é grande) — quando
 // chegam, as listas de leads são redesenhadas com o selo 📷
@@ -10212,7 +10227,9 @@ var CRI_VALIDADE = 6 * 3600 * 1000;   // 6 horas, igual à memória do robô
 function criativosDaMemoria() {
   try {
     var g = JSON.parse(localStorage.getItem(CRI_CACHE_CHAVE) || 'null');
-    if (!g || !g.quando || Date.now() - g.quando > CRI_VALIDADE) return false;
+    // 02/10/2026 (Bruno: "melhore a abertura dos criativos"): até 3 dias (antes 6 h) — as imagens guardadas aparecem na hora
+    // e a lista nova do robô chega logo depois; foto que já venceu no Facebook cai no "sem foto" até a nova chegar
+    if (!g || !g.quando || Date.now() - g.quando > 3 * 86400000) return false;
     (g.itens || []).forEach(function(it) {
       if (it.id) META_CRI.porId[it.id] = it;
       if (it.nome) META_CRI.porNome[_chaveAnuncio(it.nome)] = it;
@@ -10234,6 +10251,24 @@ function guardarCriativos() {
       localStorage.setItem(CRI_CACHE_CHAVE, JSON.stringify({ quando: Date.now(), pagina: META_CRI.pagina, itens: itens }));
     } catch (e) { /* memória cheia: segue sem guardar */ }
   }, 3000);
+}
+// renova as imagens guardadas sem desenhar (o dash está em outra aba); lista "velha" no robô fica para quando abrir a aba
+function criAquecer() {
+  if (META_CRI.tentouTodos || META_CRI.esperandoTodos || typeof APPS_SCRIPT_URL === 'undefined') return;
+  var g = null; try { g = JSON.parse(localStorage.getItem(CRI_CACHE_CHAVE) || 'null'); } catch (e) {}
+  if (!g || !g.quando || Date.now() - g.quando < CRI_VALIDADE) return;
+  var nome = 'criAq_' + Math.random().toString(36).slice(2, 7), sc = document.createElement('script');
+  window[nome] = function(d) {
+    try { sc.remove(); delete window[nome]; } catch (e) {}
+    if (!d || !d.success || !d.itens || !d.itens.length || META_CRI.tentouTodos) return;
+    d.itens.forEach(function(it) { if (it.id) META_CRI.porId[it.id] = it; if (it.nome) META_CRI.porNome[_chaveAnuncio(it.nome)] = it; });
+    META_CRI.tentouCache = true;
+    if (!d.velho) { META_CRI.tentouTodos = true; META_CRI.todosOk = true; META_CRI.fim = true; }
+    guardarCriativos();
+  };
+  sc.onerror = function() { try { delete window[nome]; } catch (e) {} };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'metaCriativosTodos' }));
+  document.body.appendChild(sc);
 }
 var _criEmVoo = 0;
 // robô estava ocupado e as imagens não vieram: recomeça a busca
@@ -15957,7 +15992,8 @@ function gravPartes(titulo) {
 function gravDaMemoria(dias) {
   try {
     var g = JSON.parse(localStorage.getItem('v2Grav_' + dias) || 'null');
-    if (!g || !g.quando || Date.now() - g.quando > 12 * 3600 * 1000 || !g.itens || !g.itens.length) return false;
+    // 02/10/2026: até 7 dias (antes 12 h) — a lista guardada aparece na hora e o robô troca pela nova em seguida
+    if (!g || !g.quando || Date.now() - g.quando > 7 * 86400000 || !g.itens || !g.itens.length) return false;
     GRAV.itens = g.itens; GRAV.closers = g.closers || {}; GRAV.pastas = g.pastas || {}; GRAV.raiz = g.raiz || ''; GRAV.dias = dias;
     GRAV.carregado = true; GRAV.mostrar = 150; GRAV._v2n = (V2.rows || []).length;
     return true;
@@ -15973,7 +16009,7 @@ function gravCarregar(fresco) {
   var dias = +((document.getElementById('grav-dias') || {}).value || 60);
   var res = document.getElementById('grav-resumo');
   var tinha = !fresco && gravDaMemoria(dias);
-  if (tinha) { gravDesenhar(); if (res) res.textContent += ' · atualizando…'; }
+  if (tinha) { gravDesenhar(); if (res) res.textContent += ' · atualizando…'; gvTextosAdiantar(); }
   else {
     if (res) res.textContent = '⏳ buscando as gravações' + (dias > 120 ? ' (o histórico todo leva alguns segundos)' : '') + '…';
     var glSk = document.getElementById('grav-lista');
@@ -15991,20 +16027,86 @@ function gravCarregar(fresco) {
       var dr = document.getElementById('grav-drive');
       if (dr) { dr.style.display = GRAV.raiz ? '' : 'none'; if (GRAV.raiz) dr.href = GRAV.raiz; }
       gravDesenhar();
+      gvTextosAdiantar();
     })
     .catch(function() { GRAV.carregando = false; if (tinha) { gravDesenhar(); return; } if (res) res.textContent = '⚠️ não consegui falar com o robô — tente ↻ Atualizar'; });
 }
+// renova a lista guardada sem desenhar (o dash está em outra aba)
+function gravAquecer() {
+  if (GRAV.carregado || GRAV.carregando || typeof APPS_SCRIPT_URL === 'undefined') return;
+  var dias = +((document.getElementById('grav-dias') || {}).value || 60), g = null;
+  try { g = JSON.parse(localStorage.getItem('v2Grav_' + dias) || 'null'); } catch (e) {}
+  if (!g || !g.quando || Date.now() - g.quando < 2 * 3600000) return;
+  fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'gravacoesLista', dias: dias })), { redirect: 'follow' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d && d.success && d.itens && d.itens.length && !GRAV.carregado) gravGuardar(dias, d); })
+    .catch(function() {});
+}
+// ⚡ (Bruno 02/10/2026: "melhore a abertura das gravações"): o resumo e a conversa do Gemini não mudam depois da reunião —
+// ficam guardados no aparelho (IndexedDB) e reabrir é na hora; um pedido por reunião de cada vez (hover, clique e o
+// adiantamento das mais novas esperam o mesmo pedido em vez de pedir de novo ao robô, que leva 4 a 6 s)
+var _GVT_DB = null;
+function _gvtDb(cb) {
+  if (_GVT_DB) return cb(_GVT_DB);
+  var feito = false, fim = function(db) { if (feito) return; feito = true; cb(db); };
+  try {
+    var rq = indexedDB.open('promovTextos', 1);
+    rq.onupgradeneeded = function() { try { rq.result.createObjectStore('gv'); } catch (e) {} };
+    rq.onsuccess = function() { _GVT_DB = rq.result; _GVT_DB.onversionchange = function() { try { _GVT_DB.close(); } catch (e) {} _GVT_DB = null; }; fim(_GVT_DB); };
+    rq.onerror = function() { fim(null); };
+    rq.onblocked = function() { fim(null); };
+    setTimeout(function() { fim(null); }, 1500);
+  } catch (e) { fim(null); }
+}
+function _gvtLer(chave, cb) {
+  _gvtDb(function(db) {
+    if (!db) return cb(null);
+    try { var g = db.transaction('gv', 'readonly').objectStore('gv').get(chave); g.onsuccess = function() { cb(g.result || null); }; g.onerror = function() { cb(null); }; } catch (e) { cb(null); }
+  });
+}
+function _gvtGuardar(chave, v) { _gvtDb(function(db) { if (!db) return; try { db.transaction('gv', 'readwrite').objectStore('gv').put(v, chave); } catch (e) {} }); }
+// reunião de menos de 3 h: o Gemini ainda pode estar escrevendo — fica só na memória da aba
+function _gvtPodeGuardar(dataReuniao) { var t = dataReuniao ? Date.parse(String(dataReuniao).slice(0, 16)) : 0; return !t || Date.now() - t > 3 * 3600000; }
+GRAV._esperando = {};
+function gvTextoBuscar(doc, cb, dataReuniao) {
+  cb = cb || function() {};
+  if (!doc) return cb(null);
+  if (GRAV.textos[doc]) return cb(GRAV.textos[doc]);
+  if (GRAV._esperando[doc]) { GRAV._esperando[doc].push(cb); return; }
+  GRAV._esperando[doc] = [cb];
+  var entregar = function(d) {
+    var l = GRAV._esperando[doc] || []; delete GRAV._esperando[doc];
+    if (d && d.success && d.observacoes !== undefined) GRAV.textos[doc] = d;
+    l.forEach(function(f) { try { f(d); } catch (e) {} });
+  };
+  _gvtLer('t:' + doc, function(g) {
+    if (g && g.d) return entregar(g.d);
+    fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'gravacaoTexto', doc: doc })), { redirect: 'follow' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.success && d.observacoes !== undefined && _gvtPodeGuardar(dataReuniao)) _gvtGuardar('t:' + doc, { quando: Date.now(), d: d });
+        entregar(d);
+      })
+      .catch(function() { entregar(null); });
+  });
+}
+// as reuniões mais novas da lista já ficam prontas (uma a cada 2,5 s, só com a aba Gravações na tela)
+function gvTextosAdiantar() {
+  clearTimeout(GRAV._tAdiantar);
+  var fila = (GRAV.vis || []).slice(0, 10).filter(function(x) { var d = (x.doc || [])[0]; return d && !GRAV.textos[d] && !GRAV._esperando[d]; });
+  var passo = function() {
+    if (!fila.length || !telaVisivel('s-gravacoes') || document.hidden) return;
+    var x = fila.shift(), d = (x.doc || [])[0];
+    if (GRAV.textos[d] || GRAV._esperando[d]) return passo();
+    gvTextoBuscar(d, function() { GRAV._tAdiantar = setTimeout(passo, 2500); }, x.d);
+  };
+  GRAV._tAdiantar = setTimeout(passo, 1500);
+}
 // passou o mouse no card: já pede o texto do Gemini, para a sala abrir com a conversa pronta
-GRAV._pre = {};
 function gravPre(iV) {
   try { gvPreVideo(iV); } catch (ePv) {}
   var x = (GRAV.vis || [])[iV], doc = x && (x.doc || [])[0];
-  if (!doc || GRAV.textos[doc] || GRAV._pre[doc]) return;
-  GRAV._pre[doc] = true;
-  fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'gravacaoTexto', doc: doc })), { redirect: 'follow' })
-    .then(function(r) { return r.json(); })
-    .then(function(d) { if (d && d.success && (d.observacoes !== undefined)) GRAV.textos[doc] = d; else delete GRAV._pre[doc]; })
-    .catch(function() { delete GRAV._pre[doc]; });
+  if (doc) gvTextoBuscar(doc, null, x.d);
 }
 function gravCloser(k) { GRAV.closer = k; GRAV.mostrar = 150; gravDesenhar(); }
 // se a planilha de vendas carregou (ou cresceu) depois da lista, as origens são recalculadas
@@ -16223,6 +16325,13 @@ function gravAvatar(nome) {
   if (f) return '<i class="gx-av tem-foto" style="background-image:url(' + f + ');"></i>';
   return '<i class="gx-av" style="background:linear-gradient(135deg,' + v2grad(nome) + ');">' + gravEsc(v2ini(nome)) + '</i>';
 }
+// v225 (Bruno 02/10/2026: "considere nas reuniões a data da gravação"): a data mostrada é a de quando gravou; se o evento
+// da agenda foi remarcado para outro dia, aparece o dia da agenda ao lado
+function gravAgendaTag(x) {
+  if (!x || !x.da) return '';
+  var dm = x.da.slice(8, 10) + '/' + x.da.slice(5, 7);
+  return '<span class="gx-ag" title="Gravada em ' + gravEsc(x.d.slice(8, 10) + '/' + x.d.slice(5, 7)) + '. Na agenda o evento está em ' + dm + ' (remarcado no mesmo evento) — vale a data da gravação.">📅 agenda ' + dm + '</span>';
+}
 function gravCard(x, iV, prat) {
   var p = gravPartes(x.t), st = GRAV_ST[gravStatus(x)] || GRAV_ST.agendada;
   var vid = (x.rec || [])[0], doc = (x.doc || [])[0];
@@ -16247,7 +16356,7 @@ function gravCard(x, iV, prat) {
     +   '<div class="gx-quem">' + gravAvatar(closer) + '<span>' + gravEsc(closer) + '</span>' + (org ? '<span class="gx-org">🧲 ' + gravEsc(org) + '</span>' : '') + '</div>'
     +   (function() { var pr = gravProduto(x); if (!pr) return ''; var vd = gravStatus(x) === 'vendido';
           return '<div class="gx-prod' + (vd ? ' vd' : '') + '" title="' + (vd ? 'Comprou: ' : 'Produto da reunião: ') + gravEsc(pr) + '">' + (vd ? '💰 comprou ' : '📦 ') + gravEsc(pr) + '</div>'; })()
-    +   (meta ? '<small>' + gravEsc(meta) + '</small>' : '')
+    +   (meta || x.da ? '<small>' + gravEsc(meta) + (meta && x.da ? ' · ' : '') + gravAgendaTag(x) + '</small>' : '')
     +   (prat ? '' : '<div class="gx-acts">'
     +     (doc ? '<button class="gx-a" onclick="event.stopPropagation();gravAbrir(' + iV + ',\'transcricao\')" title="Abrir direto na conversa">💬 Conversa</button>' : '')
     +     (doc ? '<button class="gx-a rx" onclick="event.stopPropagation();gravAbrir(' + iV + ',\'ficha\')" title="Ficha do cliente montada pela IA a partir da reunião">🧠 ' + (x.rx ? 'Ficha da IA' : 'Gerar ficha') + '</button>' : '')
@@ -16601,7 +16710,7 @@ function gravAbrir(i, foco) {
   var naJan = !!vid && !cel && !dentro && (gvJanelaAberta() || (gvSempreJanela() && !toque));   // computador: o vídeo vai para a janela do Drive
   var dt = x.d ? new Date(x.d.slice(0, 10) + 'T12:00:00') : null, semana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   var meta = [p.tipo, p.lid, dt ? semana[dt.getDay()] + ' ' + x.d.slice(8, 10) + '/' + x.d.slice(5, 7) + ' · ' + x.d.slice(11, 16) : '',
-              gravDur(x.dur) ? '⏱ ' + gravDur(x.dur) : '', 'Closer ' + (GRAV.closers[x.k] || x.k), p.sdr ? 'SDR ' + p.sdr : '', gravOrigem(x) ? '🧲 ' + gravOrigem(x) : ''].filter(Boolean).join(' · ');
+              x.da ? '📅 na agenda ' + x.da.slice(8, 10) + '/' + x.da.slice(5, 7) : '', gravDur(x.dur) ? '⏱ ' + gravDur(x.dur) : '', 'Closer ' + (GRAV.closers[x.k] || x.k), p.sdr ? 'SDR ' + p.sdr : '', gravOrigem(x) ? '🧲 ' + gravOrigem(x) : ''].filter(Boolean).join(' · ');
   var outros = (x.rec || []).slice(1).map(function(r, j) { return '<a class="btn" href="https://drive.google.com/file/d/' + encodeURIComponent(r) + '/view" target="_blank" rel="noopener">▶ Parte ' + (j + 2) + '</a>'; }).join('');
   var total = (GRAV.vis || []).length, vistaJa = !!gravVistas()[gravChave(x)];
   var cine = false; try { cine = localStorage.getItem('v2GvCinema') === '1'; } catch (eC) {}
@@ -16679,7 +16788,7 @@ function gravAbrir(i, foco) {
     gvTocarEm(+alvo.getAttribute('data-s') || 0, alvo.classList.contains('gv-msg') ? alvo : null);
   });
   if (!doc) return;
-  gvRaioX(doc, true);   // se já foi gerado antes, aparece na hora (sem gastar IA)
+  if (x.rx) gvRaioX(doc, true);   // se já foi gerado antes, aparece (sem gastar IA); sem ficha na lista, nem pergunta ao robô
   var pronto = function(d) {
     if (!document.getElementById('gv') || GRAV._aberto.x !== x) return;
     if (!d || !d.success) {
@@ -16696,13 +16805,7 @@ function gravAbrir(i, foco) {
     GRAV.textos[doc] = d;
     gvDesenharTexto(d, p);
   };
-  if (GRAV.textos[doc]) { pronto(GRAV.textos[doc]); return; }
-  if (GRAV._pre[doc]) {   // o hover já pediu: só espera chegar
-    var esp = 0, tm = setInterval(function() { if (GRAV.textos[doc]) { clearInterval(tm); pronto(GRAV.textos[doc]); } else if (!GRAV._pre[doc] || ++esp > 300) { clearInterval(tm); if (!GRAV.textos[doc]) pronto(null); } }, 200);
-    return;
-  }
-  fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'gravacaoTexto', doc: doc })), { redirect: 'follow' })
-    .then(function(r) { return r.json(); }).then(pronto).catch(function() { pronto(null); });
+  gvTextoBuscar(doc, pronto, x.d);
 }
 function gvDesenharTexto(d, p) {
   var o = gvParseObs(d.observacoes), tr = gvParseTrans(d.transcricao, p);
@@ -16772,12 +16875,20 @@ GRAV.raiox = GRAV.raiox || {};
 function gvRaioX(doc, soGuardado) {
   var box = document.getElementById('gv-rx'); if (!box) return;
   if (GRAV.raiox[doc]) { gvRaioXDesenhar(GRAV.raiox[doc]); return; }
+  if (soGuardado && !(GRAV._rxDisco = GRAV._rxDisco || {})[doc]) {   // 1º olha no aparelho
+    GRAV._rxDisco[doc] = 1;
+    _gvtLer('rx:' + doc, function(g) {
+      if (g && g.d && g.d.dados) { GRAV.raiox[doc] = g.d; if (document.getElementById('gv-rx')) gvRaioXDesenhar(g.d); return; }
+      gvRaioX(doc, true);
+    });
+    return;
+  }
   if (!soGuardado) box.innerHTML = '<h4>🧠 Raio-X do cliente<small>a IA está lendo a transcrição…</small></h4><div class="gv-sk" style="width:85%"></div><div class="gv-sk"></div><div class="gv-sk" style="width:70%"></div><div class="gv-sk" style="width:50%"></div>';
   fetch(APPS_SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(soGuardado ? { action: 'gravacaoRaioX', doc: doc, soGuardado: true } : { action: 'gravacaoRaioX', doc: doc })), { redirect: 'follow' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!document.getElementById('gv-rx')) return;
-      if (d && d.success && d.dados) { GRAV.raiox[doc] = d; gvRaioXDesenhar(d); try { GRAV.itens.forEach(function(it) { if ((it.doc || [])[0] === doc) it.rx = 1; }); } catch (eM) {} return; }
+      if (d && d.success && d.dados) { GRAV.raiox[doc] = d; _gvtGuardar('rx:' + doc, { quando: Date.now(), d: d }); gvRaioXDesenhar(d); try { GRAV.itens.forEach(function(it) { if ((it.doc || [])[0] === doc) it.rx = 1; }); } catch (eM) {} return; }
       if (soGuardado) return;   // não tinha guardado: fica o botão
       var msg = d && d.error === 'sem_chave' ? 'A chave da IA não está configurada no robô (GEMINI_API_KEY, em Propriedades do script).' : 'Não consegui gerar agora' + (d && d.error ? ': ' + d.error : '') + '.';
       box.innerHTML = '<h4>🧠 Raio-X do cliente</h4><div class="rx-acoes"><button class="btn primary" onclick="gvRaioX(\'' + gravEsc(doc) + '\')">Tentar de novo</button><span class="hint" style="color:#ff8f8f;">' + gravEsc(msg) + '</span></div>';
@@ -17125,7 +17236,8 @@ function gvPlayerLigar(pl, x, vid) {
   });
   pl._ligado = true;
   clearTimeout(pl._tDemora);
-  pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok') && !pl._falhou) gvPlayerFalhou(pl, 'demora'); }, 10000);
+  // 02/10/2026: 5 s sem começar → player do Google (antes 10 s; vídeo que funciona começa em 1 a 3 s)
+  pl._tDemora = setTimeout(function () { if (!pl.classList.contains('ok') && !pl._falhou) gvPlayerFalhou(pl, 'demora'); }, 5000);
   try { gvCtlLigar(pl); } catch (eC) {}   // barra, velocidade (padrão 1,5x) e a fala de agora
   if (pl.readyState >= 2) pronto();   // veio já carregado (baixou enquanto o mouse estava em cima do cartão)
   try { var p = pl.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
@@ -17149,6 +17261,8 @@ function gvPreVideo(iV) {
     if (!g) { g = document.createElement('div'); g.id = 'gv-pre'; g.setAttribute('aria-hidden', 'true'); document.body.appendChild(g); }
     var v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v._vid = vid;
     v.src = gvPlayerSrc(vid); g.appendChild(v); GRAV._preV = v;
+    // o vídeo adiantado falhou: descobre o motivo agora (sem esperar o clique); limite do Google → o clique já vai para o player do Google
+    v.addEventListener('error', function() { gvSondar(vid, x.vs).then(function(res) { if (res.tipo === 'cota') { gvDriveMarcar(vid); if (GRAV._preV === v) gvPreVideoSoltar(); } }); }, { once: true });
   }, 500);
 }
 function gvPreVideoSoltar() {
@@ -17245,20 +17359,12 @@ function gvPlayerFalhou(pl, motivo) {
     var dono = (GRAV.closers && GRAV.closers[x.k]) || x.k || 'quem gravou';
     caixa('🔒 Esta gravação está no Drive de ' + dono, 'Para abrir aqui dentro, ' + gravEsc(String(dono).split(' ')[0]) + ' precisa compartilhar a pasta <b>Meet Recordings</b> do Drive dele(a) como <b>Qualquer pessoa com o link</b> (Leitor). Uma vez só — as próximas já entram liberadas.', txtGoogle);
   };
-  fetch(gvPlayerSrc(vid), { headers: { Range: 'bytes=0-1' } })
-    .then(function(r) {
-      if (r.ok) return { tipo: 'outro', txt: 'respondeu normal (' + r.status + ')' };
-      return r.text().then(function(t) {
-        t = String(t || ''); var jm = '';
-        try { jm = JSON.parse(t).error.message; } catch (eJ) { jm = t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 120); }
-        if (/automated queries|unusual traffic|Sorry\.\.\./i.test(t)) return { tipo: 'outro', txt: 'bloqueio por tráfego automático nesta internet (' + r.status + ')' };
-        if (/quota|limit/i.test(jm)) return { tipo: 'cota', txt: r.status + ' — ' + jm };
-        if (r.status === 404) return { tipo: 'nao-publico', txt: '404 — ' + jm };
-        if (r.status === 403 && x.vs === 'acesso') return { tipo: 'acesso', txt: '403 — ' + jm };
-        return { tipo: 'outro', txt: r.status + ' — ' + jm };
-      });
-    }, function(eF) { return { tipo: x.vs === 'acesso' ? 'acesso' : 'outro', txt: 'sem resposta legível (' + ((eF && eF.message) || 'rede') + ')' }; })
-    .then(function(res) {
+  // ⚡ 02/10/2026: espera o motivo no máximo 0,7 s — depois disso já vai para o player do Google (antes esperava 1 a 6 s);
+  // se o motivo chegar depois e for o limite do Google, o aparelho lembra e a próxima abertura já vai direto
+  var decidiu = false;
+  var decidir = function(res) {
+      if (decidiu) return; decidiu = true;
+      if (res.tipo === 'ok') res = { tipo: 'outro', txt: res.txt };
       if (document.getElementById('gv-player') !== pl || GRAV._modoDrive) return;
       if (res.tipo === 'nao-publico' && GV_CHAVE && !pl._tentouLiberar) {
         // (27/09/2026: "esse tempo tem como melhorar?") gravação nova ainda fechada: o robô libera AGORA, sem esperar a hora cheia
@@ -17271,9 +17377,37 @@ function gvPlayerFalhou(pl, motivo) {
         return;
       }
       if (res.tipo === 'nao-publico' || res.tipo === 'acesso') { mostrarDono(res.txt); return; }
-      if (res.tipo === 'cota') gvDriveMarcar(vid);
       gvModoDrive(res.tipo === 'cota' ? 'cota' : 'erro', vid, res.txt);
-    }).catch(function() { gvModoDrive('erro', vid); });
+  };
+  gvSondar(vid, x.vs)
+    .then(function(res) { if (res.tipo === 'cota') gvDriveMarcar(vid); decidir(res); })
+    .catch(function() { decidir({ tipo: 'outro', txt: '' }); });
+  setTimeout(function() { decidir({ tipo: x.vs === 'acesso' ? 'acesso' : 'outro', txt: '' }); }, 700);
+}
+// ⚡ 02/10/2026 (Bruno: "melhore a abertura das gravações"): o limite de download do Google ("download quota exceeded") só
+// aparece no pedido do vídeo INTEIRO — o teste antigo pedia 2 bytes, recebia 206 e o dash ainda esperava o player falhar
+// (1 a 6 s a mais). Agora o teste pede o vídeo inteiro e corta assim que chega a resposta — só quando o vídeo falha
+// (não gasta pedido no Google quando tudo abre normal).
+GRAV._sondas = {};
+function gvSondar(vid, vs) {
+  var sd = GRAV._sondas[vid];
+  if (sd && Date.now() - sd.t < 5 * 60000) return sd.p;
+  var ctl = null; try { ctl = new AbortController(); } catch (eA) {}
+  var p = fetch(gvPlayerSrc(vid), ctl ? { headers: { Range: 'bytes=0-' }, signal: ctl.signal } : { headers: { Range: 'bytes=0-' } })
+    .then(function(r) {
+      if (r.ok) { try { if (ctl) ctl.abort(); else r.body.cancel(); } catch (eC) {} return { tipo: 'ok', txt: 'respondeu normal (' + r.status + ')' }; }
+      return r.text().then(function(t) {
+        t = String(t || ''); var jm = '';
+        try { jm = JSON.parse(t).error.message; } catch (eJ) { jm = t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 120); }
+        if (/automated queries|unusual traffic|Sorry\.\.\./i.test(t)) return { tipo: 'outro', txt: 'bloqueio por tráfego automático nesta internet (' + r.status + ')' };
+        if (/quota|limit/i.test(jm)) return { tipo: 'cota', txt: r.status + ' — ' + jm };
+        if (r.status === 404) return { tipo: 'nao-publico', txt: '404 — ' + jm };
+        if (r.status === 403 && vs === 'acesso') return { tipo: 'acesso', txt: '403 — ' + jm };
+        return { tipo: 'outro', txt: r.status + ' — ' + jm };
+      });
+    }, function(eF) { return { tipo: vs === 'acesso' ? 'acesso' : 'outro', txt: 'sem resposta legível (' + ((eF && eF.message) || 'rede') + ')' }; });
+  GRAV._sondas[vid] = { t: Date.now(), p: p };
+  return p;
 }
 function gvPlayerRecarregar() {
   var pl = document.getElementById('gv-player'); if (!pl) return;
@@ -23613,6 +23747,7 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .gx-card .grav-info > b { font-size:.87rem; }
 .grav-card.vista .grav-info > b { color:var(--text2); }
 .gx-st { display:none; }
+.gx-ag { color:#f6c177; font-weight:700; }
 .gx-quem { display:flex; align-items:center; gap:6px; font-size:.7rem; color:var(--text2); font-weight:700; min-width:0; }
 .gx-quem .gx-av { width:18px; height:18px; font-size:.44rem; }
 .gx-quem span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
