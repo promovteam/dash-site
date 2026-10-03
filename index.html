@@ -114,6 +114,28 @@ body {
 .glass.click:hover { transform:translateY(-4px); border-color:rgba(255,255,255,.22); }
 .glass::before { content:''; position:absolute; top:-40%; right:-25%; width:70%; height:120%; background:radial-gradient(closest-side, var(--halo,rgba(246,163,80,.15)), transparent); pointer-events:none; }
 .g-label { font-size:.66rem; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:var(--text2); margin-bottom:8px; }
+/* "?" dos cartões do funil (Bruno 03/10/2026): explica o que cada número conta */
+.kp-q { display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px; margin-left:7px; padding:0; vertical-align:1px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.3); background:rgba(255,255,255,.06); color:var(--text2); font-family:inherit; font-size:.62rem; font-weight:800; letter-spacing:0; line-height:1; cursor:help; transition:background .15s ease, color .15s ease, border-color .15s ease; }
+.kp-q:hover, .kp-q:focus-visible, .kp-info-on .kp-q { background:var(--tint, var(--accent)); border-color:var(--tint, var(--accent)); color:#14110c; outline:none; }
+.kp-pop { display:none; position:absolute; left:10px; top:44px; width:250px; min-width:calc(100% - 20px); max-width:calc(100vw - 32px); z-index:4; padding:11px 13px; border-radius:12px;
+  background:rgba(16,18,24,.98); border:1px solid rgba(255,255,255,.16); box-shadow:0 14px 34px rgba(0,0,0,.55);
+  font-size:.74rem; font-weight:600; line-height:1.5; color:var(--text); text-transform:none; letter-spacing:0; cursor:default; }
+.kpis > .glass:nth-last-child(-n+2) .kp-pop { left:auto; right:10px; }
+/* "🔜 futuras" no canto do cartão Marcadas; em cartão estreito (celular, tela pequena) desce para baixo do número para não cobrir o "?" */
+.kpis > .glass:has(.kp-canto) { container-type:inline-size; }
+.kp-canto { position:absolute; top:12px; right:14px; font-size:.62rem; color:var(--text-secondary); font-weight:700; cursor:pointer; }
+@container (max-width: 250px) { .kp-canto { position:static; display:inline-block; margin:2px 0 6px; font-size:.72rem; } }
+/* aberto: a explicação pode passar da borda do cartão (o brilho do canto continua só dentro) */
+.glass.kp-info-on { overflow:visible; z-index:6; }
+.glass.kp-info-on::before { clip-path:inset(33.4% 35.8% 0 0); }
+.kp-pop b { color:var(--tint, var(--accent)); font-weight:800; }
+.kp-info-on .kp-pop { display:block; }
+@media (hover:hover) and (pointer:fine) {
+  .glass:has(.kp-q:hover) .kp-pop, .glass:has(.kp-pop:hover) .kp-pop { display:block; }
+  .glass:has(.kp-q:hover), .glass:has(.kp-pop:hover) { overflow:visible; z-index:6; }
+  .glass:has(.kp-q:hover)::before, .glass:has(.kp-pop:hover)::before { clip-path:inset(33.4% 35.8% 0 0); }
+}
 .g-value { font-size:1.85rem; font-weight:900; letter-spacing:-.7px; }
 .g-value.money { background:linear-gradient(90deg,#fff 30%, var(--tint,#f6a350) 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
 .g-sub { font-size:.73rem; color:var(--muted); font-weight:600; margin-top:6px; }
@@ -2675,7 +2697,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-0706';
+var VERSAO_DASH = '2026-10-03-1101';
 var _versaoNova = null;
 
 // =====================================================================
@@ -5275,7 +5297,8 @@ function v2row(r) {
   // 26/09/2026 (Bruno: "link deve ser da Clint, não do WhatsApp"): o botão abre a conversa na Clint — se o endereço
   // ainda não é conhecido, o robô procura a pessoa (abrirAtendimentoClintPor) e abre a conversa ou o contato
   var acts = igBt + ((r.telefone || r.nome) ? '<a class="ld-wa cr-clint" href="' + (lkC || 'https://app.clint.digital/chat') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint" aria-label="Abrir na Clint">🟣 Clint</a>' : '');
-  return '<div class="cliente-row cr2" onclick="event.stopPropagation();abrirLead(' + i + ');">'
+  var q = [r.nome, r.telefone, rx.insta, r.closer, r.sdr, r.origem, r.produto, r.status, r.leadId].filter(Boolean).join(' ').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  return '<div class="cliente-row cr2" data-q="' + q + '" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
     + '<div class="lead-info"><b class="nome-link" onclick="event.stopPropagation();_fichaAtual=' + i + ';abrirMenu(event);" title="' + String(r.nome || '').replace(/"/g, '&quot;') + '">' + (r.nome || 'Sem nome') + '</b>'
     +   '<span class="cr-meta" title="' + detT.replace(/"/g, '&quot;') + '">' + det + '</span>'
@@ -5399,10 +5422,12 @@ function renderV2() {
     vals.forEach(function(v){ s += '<i style="height:' + Math.max(Math.round(v / mx * 100), 8) + '%"></i>'; });
     return s + '</div>';
   }
-  function mini(lbl, val, tint, halo, tipo, fn, sub, canto) {
+  // 03/10/2026 (Bruno: "coloca o ? com o que é"): o "?" ao lado do nome explica o que o número conta (passar o mouse ou tocar)
+  function mini(lbl, val, tint, halo, tipo, fn, sub, canto, info) {
     return '<div class="glass click" style="--halo:' + halo + ';--tint:' + tint + ';position:relative;" onclick="abrirB(\'' + tipo + '\')">'
-      + (canto ? '<span style="position:absolute;top:12px;right:14px;font-size:.62rem;color:var(--text-secondary);font-weight:700;cursor:pointer;" onclick="event.stopPropagation();abrirB(\'futuras\');">' + canto + '</span>' : '')
-      + '<div class="g-label">' + lbl + '</div><div class="g-value">' + val + '</div>'
+      + '<div class="g-label">' + lbl + (info ? '<button type="button" class="kp-q" aria-label="O que é ' + String(lbl).replace(/"/g, '&quot;') + '" onclick="kpInfo(event, this)" onmouseenter="kpAjustar(this)" onfocus="kpAjustar(this)">?</button>' : '') + '</div><div class="g-value">' + val + '</div>'
+      + (canto ? '<span class="kp-canto" onclick="event.stopPropagation();abrirB(\'futuras\');">' + canto + '</span>' : '')
+      + (info ? '<div class="kp-pop" role="note" onclick="event.stopPropagation();">' + info + '</div>' : '')
       + (sub ? '<div class="hint" style="margin:2px 0 6px;">' + sub + '</div>' : '')
       + spark(fn, tint) + '</div>';
   }
@@ -5417,12 +5442,18 @@ function renderV2() {
   function pconv(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; }
   h += '<div class="kpis">';
   // 03/10/2026 (Bruno: "a pessoa não achar que realizada é que a reunião aconteceu"): nomes que dizem o que cada número conta
+  // 03/10/2026 (Bruno: "deixa assim, só muda a segunda" / "ou realizada mesmo"): o 2º cartão volta a ser Realizadas (com "inclui faltas")
   var fFalt = mesRows.filter(function(r){ return r.sn === 'no show'; }).length;
-  h += mini(_sm('Marcadas', 'Suas marcadas'), fAg, '#f6a350', 'rgba(246,163,80,.14)', 'agendadas', function(){ return true; }, '', '🔜 ' + fFut + ' futuras');
-  h += mini(_sm('Data já passou', 'Suas: data já passou'), fReal, '#ffd166', 'rgba(255,209,102,.14)', 'realizadas', isReal, '↳ ' + pconv(fReal, fAg) + ' das marcadas · inclui faltas');
-  h += mini(_sm('Lead apareceu', 'Lead apareceu (suas)'), fComp, '#6ea8ff', 'rgba(110,168,255,.14)', 'compareceram', isComp, '↳ ' + pconv(fComp, fReal) + ' das que já passaram' + (fFalt ? ' · ' + fFalt + (fFalt === 1 ? ' faltou' : ' faltaram') : ''));
-  h += mini(_sm('Disse sim na reunião', 'Disse sim (suas)'), fFech, '#b98aff', 'rgba(185,138,255,.14)', 'fechamento', isFechouReuniao, '↳ ' + pconv(fFech, fComp) + ' de quem apareceu');
-  h += mini(_sm('Pagou tudo', 'Pagou tudo (suas)'), fPag, '#3ddc97', 'rgba(61,220,151,.14)', 'pagaram', function(sn){ return sn === 'vendido'; }, '↳ 100% pago · ' + pconv(fPag, fFech) + ' de quem disse sim');
+  h += mini(_sm('Marcadas', 'Suas marcadas'), fAg, '#f6a350', 'rgba(246,163,80,.14)', 'agendadas', function(){ return true; }, '', '🔜 ' + fFut + ' futuras',
+    'Todas as reuniões <b>marcadas</b> para o mês, inclusive as que ainda vão acontecer (🔜 futuras).');
+  h += mini(_sm('Realizadas', 'Suas realizadas'), fReal, '#ffd166', 'rgba(255,209,102,.14)', 'realizadas', isReal, '↳ ' + pconv(fReal, fAg) + ' das marcadas · inclui faltas', '',
+    'Reuniões cujo dia já chegou e que já têm o <b>resultado lançado</b>. Conta também quem <b>faltou</b> (no-show): realizada não quer dizer que o lead apareceu.');
+  h += mini(_sm('Lead apareceu', 'Lead apareceu (suas)'), fComp, '#6ea8ff', 'rgba(110,168,255,.14)', 'compareceram', isComp, '↳ ' + pconv(fComp, fReal) + ' das realizadas' + (fFalt ? ' · ' + fFalt + (fFalt === 1 ? ' faltou' : ' faltaram') : ''), '',
+    'O lead <b>entrou na reunião</b>: vendido, não vendido, entrada, bloqueio ou estorno. Quem faltou (no-show) não entra.');
+  h += mini(_sm('Disse sim na reunião', 'Disse sim (suas)'), fFech, '#b98aff', 'rgba(185,138,255,.14)', 'fechamento', isFechouReuniao, '↳ ' + pconv(fFech, fComp) + ' de quem apareceu', '',
+    'O lead <b>fechou na reunião</b>: vendido, entrada ou bloqueio. Quem estornou depois continua contando aqui.');
+  h += mini(_sm('Pagou tudo', 'Pagou tudo (suas)'), fPag, '#3ddc97', 'rgba(61,220,151,.14)', 'pagaram', function(sn){ return sn === 'vendido'; }, '↳ 100% pago · ' + pconv(fPag, fFech) + ' de quem disse sim', '',
+    'Só quem já <b>pagou 100%</b> (status Vendido). Entrada e bloqueio ficam fora até pagar tudo.');
   h += '</div>';
 
   // === METAS ===
@@ -5760,7 +5791,7 @@ var _ORG_BLOCO = 80;
 function _orgListaMostrar(filtro, ate) {
   var rows = window._orgListaRows || [];
   var f = v2norm(filtro || '');
-  var vis = f ? rows.filter(function(r){ return v2norm([r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' ')).indexOf(f) !== -1; }) : rows;
+  var vis = f ? rows.filter(function(r){ return _buscaBate([r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' '), filtro); }) : rows;
   var fim = Math.min(vis.length, (ate || 0) + _ORG_BLOCO);
   var box = document.getElementById('ma-lista');
   if (!box) return;
@@ -5817,11 +5848,44 @@ function abrirPizzaProduto(nomeProd) {
 }
 
 // busca dentro das janelas de lista (cards do funil e cards grandes)
+// 03/10/2026 (Bruno: "ainda está com problema de busca dentro dos cards"): a busca das listas acha também pelo telefone
+// (com ou sem DDD, espaço, parênteses ou traço), pelo @, closer, SDR e origem, e aceita as palavras fora de ordem
+// ("souza maria" acha "Maria de Souza")
+function _buscaBate(texto, q) {
+  var qn = v2norm(q || '').trim(); if (!qn) return true;
+  var t = v2norm(texto || '');
+  if (qn.split(/\s+/).every(function(p){ return t.indexOf(p) !== -1; })) return true;
+  var qd = String(q || '').replace(/\D/g, '');
+  return qd.length >= 4 && String(texto || '').replace(/[\s()+\-.]/g, '').indexOf(qd) !== -1;
+}
+// a explicação abre para o lado que cabe na tela (no celular, o cartão da direita abre para a esquerda)
+function kpAjustar(btn) {
+  var c = btn.closest('.glass'), p = c && c.querySelector('.kp-pop'); if (!p) return;
+  var r = c.getBoundingClientRect(), w = Math.max(Math.min(250, window.innerWidth - 32), r.width - 20);
+  var cabe = r.left + 10 + w <= window.innerWidth - 8;
+  p.style.left = cabe ? '10px' : 'auto'; p.style.right = cabe ? 'auto' : '10px';
+}
+function kpInfo(ev, el) {
+  ev.stopPropagation(); kpAjustar(el);
+  var c = el.closest('.glass'), on = c && !c.classList.contains('kp-info-on');
+  document.querySelectorAll('.kp-info-on').forEach(function(x){ x.classList.remove('kp-info-on'); });
+  if (on) c.classList.add('kp-info-on');
+}
+document.addEventListener('click', function(e) {
+  if (e.target.closest && e.target.closest('.kp-q, .kp-pop')) return;
+  document.querySelectorAll('.kp-info-on').forEach(function(x){ x.classList.remove('kp-info-on'); });
+}, true);
 function filtrarListaModal(txt, listaId) {
-  var t = v2norm(txt || '');
-  document.querySelectorAll('#' + listaId + ' .cliente-row').forEach(function(el) {
-    el.style.display = (!t || v2norm(el.textContent).indexOf(t) !== -1) ? '' : 'none';
+  var vis = 0, box = document.getElementById(listaId); if (!box) return;
+  box.querySelectorAll('.cliente-row').forEach(function(el) {
+    var ok = _buscaBate((el.getAttribute('data-q') || '') + ' ' + el.textContent, txt);
+    el.style.display = ok ? '' : 'none'; if (ok) vis++;
   });
+  var av = box.querySelector(':scope > .busca-nada');
+  if (!vis && String(txt || '').trim() && box.querySelector('.cliente-row')) {
+    if (!av) { av = document.createElement('div'); av.className = 'busca-nada'; av.style.cssText = 'color:var(--muted);font-size:.8rem;text-align:center;padding:16px;'; box.appendChild(av); }
+    av.textContent = 'Ninguém nesta lista com "' + String(txt).trim() + '".';
+  } else if (av) av.remove();
 }
 
 function abrirB(tipo) {
@@ -5830,7 +5894,7 @@ function abrirB(tipo) {
     agendadas: { t:'Marcadas', ico:'📅', f:function(){ return true; } },
     futuras: { t:'Reuniões futuras marcadas', ico:'🔜', f:function(r){ return isFut(r.sn); } },
     compareceram: { t:'Lead apareceu', ico:'🤝', f:function(r){ return isComp(r.sn); } },
-    realizadas: { t:'Data já passou (inclui faltas)', ico:'✅', f:function(r){ return isReal(r.sn); } },
+    realizadas: { t:'Realizadas (inclui faltas)', ico:'✅', f:function(r){ return isReal(r.sn); } },
     fechamento: { t:'Disse sim na reunião', ico:'🏆', f:function(r){ return isFechouReuniao(r.sn); } },
     pagaram: { t:'Pagou tudo (100% pago)', ico:'💰', f:function(r){ return r.sn === 'vendido'; } },
     vendidos: { t:'Vendidos', ico:'💰', f:function(r){ return r.sn === 'vendido'; } },
@@ -26584,7 +26648,7 @@ function _rlListaMostrar(filtro, ate) {
     if (L.tipo === 'grav') return [r.t, (GRAV.closers || {})[r.k] || r.k].join(' ');
     return [r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' ');
   };
-  var vis = f ? L.rows.filter(function(r) { return v2norm(txt(r)).indexOf(f) !== -1; }) : L.rows;
+  var vis = f ? L.rows.filter(function(r) { return _buscaBate(txt(r), filtro); }) : L.rows;
   var box = document.getElementById('ma-lista'); if (!box) return;
   var ini = ate || 0, fim = Math.min(vis.length, ini + 80), h = '';
   if (!ini) box.innerHTML = ''; else { var b0 = document.getElementById('ma-mais'); if (b0) b0.remove(); }
@@ -29112,7 +29176,7 @@ function cmDetRender() {
 // procurar cliente na janela (sem redesenhar: só esconde os cartões que não batem)
 function cmBuscar(q) {
   CMD.busca = q || ''; var t = v2norm(CMD.busca).trim(), n = 0;
-  Array.prototype.forEach.call(document.querySelectorAll('#cm-det-fundo [data-busca]'), function(c){ var ok = !t || c.getAttribute('data-busca').indexOf(t) !== -1; c.style.display = ok ? '' : 'none'; if (ok) n++; });
+  Array.prototype.forEach.call(document.querySelectorAll('#cm-det-fundo [data-busca]'), function(c){ var ok = !t || _buscaBate(c.getAttribute('data-busca'), CMD.busca); c.style.display = ok ? '' : 'none'; if (ok) n++; });
   var m = document.getElementById('cm-busca-n'); if (m) m.textContent = t ? n + ' encontrado' + (n === 1 ? '' : 's') : '';
 }
 function cmOrdem(o) { CMD.ordem = o; cmDetRender(); }
