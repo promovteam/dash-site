@@ -2697,7 +2697,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-1101';
+var VERSAO_DASH = '2026-10-03-1121';
 var _versaoNova = null;
 
 // =====================================================================
@@ -3730,17 +3730,30 @@ function _ultCard(r) {
       })()
     + v2pill(r) + '</div>';
 }
-function filtrarUltimas(txt) {
-  var t = v2norm(txt || '');
-  var lista = t
-    ? _ultTodas.filter(function(r){
-        return v2norm((r.nome || '') + ' ' + (r.closer || '') + ' ' + (r.status || '') + ' ' + (r.produto || '') + ' ' + (r.telefone || '') + ' ' + (r.leadId || '')).indexOf(t) !== -1;
-      }).slice(0, 20)
-    : _ultTodas.slice(0, 6);
-  var uh = '';
-  lista.forEach(function(r){ uh += _ultCard(r); });
-  var box = document.getElementById('v2-ultimas');
-  if (box) box.innerHTML = uh || '<div style="color:var(--muted);font-size:.8rem;">Nenhuma reunião encontrada.</div>';
+// 03/10/2026 (Bruno, print com "a" na busca: "por que não busca?"): com uma letra quase todo nome bate e a lista parecia igual.
+// Agora a busca diz quantas achou, procura em TODAS as reuniões (também as futuras e as sem resultado), aceita telefone com
+// ou sem formatação, @, SDR e origem, palavras fora de ordem (_buscaBate), e tem "Mostrar mais".
+var _ultMax = 20;
+function filtrarUltimas(txt, mais) {
+  var q = String(txt || '').trim();
+  _ultMax = mais ? _ultMax + 20 : 20;
+  var box = document.getElementById('v2-ultimas'); if (!box) return;
+  if (!q) {
+    var uh0 = ''; _ultTodas.slice(0, 6).forEach(function(r){ uh0 += _ultCard(r); });
+    box.innerHTML = uh0 || '<div style="color:var(--muted);font-size:.8rem;">Nenhuma reunião ainda.</div>';
+    return;
+  }
+  var base = v2fRows(V2.rows || []).filter(function(r){ return r.date; }).sort(function(a, b){ return b.date - a.date; });
+  var achou = base.filter(function(r){ return _buscaBate([r.nome, r.closer, r.sdr, r.status, r.produto, r.telefone, r.leadId, r.origem, r.insta].filter(Boolean).join(' '), q); });
+  var qE = q.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  var uh = '<div class="ult-achou" style="font-size:.74rem;font-weight:700;color:var(--text2);margin:0 0 10px;">🔎 '
+    + (achou.length ? '<b style="color:var(--accent);">' + achou.length + '</b> ' + (achou.length === 1 ? 'reunião encontrada' : 'reuniões encontradas') + ' com "' + qE + '"'
+      + (achou.length > _ultMax ? ' · mostrando ' + _ultMax : '')
+      : 'Nenhuma reunião com "' + qE + '". Confira o nome ou o número' + (base.length < (V2.rows || []).length ? ' — os filtros de cima também valem aqui' : '') + '.')
+    + '</div>';
+  achou.slice(0, _ultMax).forEach(function(r){ uh += _ultCard(r); });
+  if (achou.length > _ultMax) uh += '<button class="btn" style="width:100%;margin-top:4px;padding:10px;" onclick="filtrarUltimas(' + JSON.stringify(q).replace(/"/g, '&quot;') + ', true)">Mostrar mais ' + Math.min(20, achou.length - _ultMax) + ' (faltam ' + (achou.length - _ultMax) + ')</button>';
+  box.innerHTML = uh;
 }
 // ===== 📣 O ANÚNCIO DE CADA LEAD, EM TODA TELA (pedido do Bruno 19/08/2026) =====
 // Uma peça só, usada na lista de leads, na ficha, nas reuniões e na busca.
@@ -5620,7 +5633,7 @@ function renderV2() {
     + '<div id="chart-legenda-box"></div>'
     + '<div class="chart-wrap" id="chart-wrap"></div></div>';
   h += '<div class="panel v2-ultimas-painel" style="grid-row:span 2;"><h3>Resultado das últimas reuniões</h3>'
-    + '<input class="search-input" style="margin:10px 0;" placeholder="🔍  Buscar por nome, closer, status ou produto..." oninput="filtrarUltimas(this.value)">'
+    + '<input class="search-input" style="margin:10px 0;" placeholder="🔍  Buscar por nome, telefone, closer, status ou produto..." oninput="clearTimeout(window._ultBt);var v=this.value;window._ultBt=setTimeout(function(){filtrarUltimas(v);},180);">'
     + '<div id="v2-ultimas"></div></div>';
   // 🍕 pizza: VENDIDOS por produto — clicável, alinhada com as últimas reuniões
   h += (function() {
