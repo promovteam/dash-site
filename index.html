@@ -2663,7 +2663,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2127';
+var VERSAO_DASH = '2026-10-02-2148';
 var _versaoNova = null;
 
 // =====================================================================
@@ -27995,6 +27995,7 @@ function cmCarregar(forcar) {
   var mk = CM.mes || 'atual';
   if (!CM.dados || CM.dadosMes !== mk) { CM.dados = _cmGuardado(mk); CM.dadosMes = mk; }
   CM.carregando = true; CM.erro = ''; CM.ultimaBusca = Date.now(); renderComissoes();
+  try { if (CM.dados && document.getElementById('cm-det-fundo')) cmDetRender(); } catch (eD) {}   // a janela aberta mostra "Atualizando…"
   gasPedir({ action: 'comissoesPainel', token: tok, mes: CM.mes || '', forcar: !!forcar }, function(d) {
     CM.carregando = false;
     var tinha = !!CM.dados;
@@ -28090,10 +28091,16 @@ function _cmFunil(marc, re, vd, cor) {
     + linha('Viraram venda', vd, marc ? vd / marc : 0, '#3ddc97')
     + (marc - re > 0 ? '<div class="cm-dica">🚫 ' + (marc - re) + ' não apareceram ou ainda vão acontecer — <b style="color:#9aa3b2;">não pagam</b></div>' : '') + '</div>';
 }
+// ↻ em cada card e na janela (Bruno 02/10/2026: "esse atualizar deve estar em cada card") — lê as planilhas de novo (todas)
+function _cmBotaoAtu(rot) {
+  return '<button type="button" class="cm-card-atu' + (CM.carregando ? ' girando' : '') + '" onclick="event.stopPropagation();cmCarregar(true)"' + (CM.carregando ? ' disabled' : '')
+    + ' title="Atualizar os números (lê as planilhas de novo)" aria-label="Atualizar"><i>↻</i>' + (rot ? ' ' + (CM.carregando ? 'Atualizando…' : rot) : '') + '</button>';
+}
 function _cmCardCloser(p, cor, premios, mes, i, pos) {
   var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', p.comissao, '#3ddc97'], ['Prêmio', p.premio, '#ffd166']].filter(function(x){ return x[1] > 0; });
   var lider = pos === 1 && p.total > 0, pm = p.recebido ? p.comissao / p.recebido : 0;
   var h = '<div class="cm-card cm-clica cm-entra' + (lider ? ' cm-lider' : '') + '" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'closers\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as vendas do mês">'
+    + _cmBotaoAtu()
     + (lider ? '<div class="cm-coroa">👑 líder do mês</div>' : '')
     + '<div class="cm-pessoa">' + _cmAvatar(p.nome, cor, 52, p.total > 0 ? CM_MEDALHA[pos - 1] : '')
     + '<div class="cm-nome"><b>' + dspEsc(p.nome) + '</b><small>' + pos + 'º lugar' + (p._ant ? ' ' + _cmDelta(p._ant, p.total) : '') + '</small></div>'
@@ -28126,9 +28133,18 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
   fx.forEach(function(t, k){ if (conta >= t[0]) atual = { t: t, i: k }; else if (!prox) prox = t; });
   var bon = +p.bonus || 0;   // bônus da aba Extras (meta do time, plantão à noite…) — já está dentro do Variável na planilha
   var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Variável', p.variavel - bon, '#3ddc97'], ['Bônus', bon, '#ffd166']].filter(function(x){ return x[1] > 0; });
-  var topo = Math.max(conta, (prox ? prox[0] : (fx.length ? fx[fx.length - 1][0] : conta)) * 1.12) || 1;
+  // Bruno 02/10/2026 ("no SDR em outubro mostre todas as faixas e quantos faltam para a próxima"): a barra vai até a última
+  // faixa (todas aparecem) e embaixo vem a escada: cada faixa com reuniões e R$, a atual destacada e quanto falta para as próximas
+  var topo = Math.max(conta, (fx.length ? fx[fx.length - 1][0] : conta) * 1.08) || 1;
+  var rAt = atual ? atual.t[1] : 0;
+  var escada = '<div class="cm-escada">' + fx.map(function(t, k) {
+    var ok = conta >= t[0], aqui = atual && atual.i === k, falta = t[0] - conta;
+    var sub = aqui ? 'você está aqui' : ok ? '✓ passou' : 'faltam <b>' + falta + '</b>' + (rAt && t[1] > rAt ? ' · +' + cmR(t[1] - rAt, false) + ' em cada' : '');
+    return '<div class="cm-degrau' + (aqui ? ' atual' : ok ? ' ok' : '') + (prox && prox === t ? ' prox' : '') + '"><b>' + letra[k] + '</b><span>' + t[0] + '+ reuniões</span><em>' + cmR(t[1], false) + '</em><small>' + sub + '</small></div>';
+  }).join('') + '</div>';
   var R = p.reunioes || null, marc = R ? R.length : 0, apar = R ? R.filter(function(r){ return r.re && r.conta; }).length : 0, vds = R ? R.filter(function(r){ return r.vd && r.conta; }).length : 0;
   return '<div class="cm-card cm-clica cm-entra" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'' + tipo + '\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as reuniões do mês">'
+    + _cmBotaoAtu()
     + '<div class="cm-pessoa">' + _cmAvatar(p.nome, cor, 52, '')
     + '<div class="cm-nome"><b>' + dspEsc(p.nome) + '</b><small>' + (atual ? 'faixa ' + letra[atual.i] + ' · ' + cmR(atual.t[1], false) + ' por reunião e por venda' : 'sem faixa') + (p._ant ? ' ' + _cmDelta(p._ant, p.total) : '') + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(p.total) + '</b><small>a receber</small></div></div>'
@@ -28136,7 +28152,8 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
     + '<div class="cm-bloco"><div class="cm-bloco-t"><span>📈 ' + conta + ' reuniões contam para a faixa' + (wkConta && p.workshop ? ' <span class="hint">(' + p.realizadas + ' + ' + p.workshop + ' do workshop)</span>' : '') + '</span><span>'
     + (prox ? 'faltam ' + (prox[0] - conta) + ' para ' + cmR(prox[1], false) : '🎉 faixa mais alta') + '</span></div>'
     + _cmTrilho(conta / topo, cor, fx.map(function(t){ return t[0] / topo; }), true)
-    + '<div class="cm-marcas">' + fx.map(function(t, k){ return '<span class="' + (conta >= t[0] ? 'ok' : '') + '" style="left:' + _cmPct(t[0] / topo) + '">' + letra[k] + ' ' + t[0] + '</span>'; }).join('') + '</div></div>'
+    + '<div class="cm-marcas">' + fx.map(function(t, k){ return '<span class="' + (conta >= t[0] ? 'ok' : '') + '" style="left:' + _cmPct(t[0] / topo) + '">' + letra[k] + ' ' + t[0] + '</span>'; }).join('') + '</div>'
+    + escada + '</div>'
     + (R ? _cmFunil(marc, apar, vds, cor) : '')
     + '<div class="cm-stats">' + [['Realizadas', p.realizadas], ['Workshop', p.workshop], ['Vendas', p.vendas], ['Spark', p.spark], ['Growth', p.growth]].map(function(s){ return '<div class="cm-stat"><b>' + s[1] + '</b><small>' + s[0] + '</small></div>'; }).join('') + '</div>'
     + '<div class="cm-ver">Ver as reuniões do mês →</div></div>';
@@ -28320,6 +28337,21 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-motivo { margin-top:8px; font-size:.78rem; color:#ffb4b4; }
 
 /* ✨ visual novo dos cartões (02/10/2026) */
+.cm-card > .cm-card-atu, .cm-card-atu { position:absolute; top:10px; right:10px; z-index:2; align-self:auto; width:auto; display:inline-flex; align-items:center; gap:5px; height:28px; min-width:28px; padding:0 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05); color:#c9cfdb; font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; opacity:.55; transition:opacity .2s, background .2s; }
+.cm-card:hover .cm-card-atu, .cm-card-atu:focus-visible, .cm-det-topo .cm-card-atu { opacity:1; } .cm-card-atu:hover { background:rgba(110,168,255,.18); color:#fff; }
+.cm-card-atu i { font-style:normal; display:inline-block; font-size:.9rem; } .cm-card-atu.girando i { animation:cmGira .9s linear infinite; } .cm-card-atu:disabled { cursor:wait; }
+.cm-det-topo .cm-card-atu { position:static; height:36px; padding:0 12px; flex:0 0 auto; }
+.cm-card .cm-pessoa { padding-right:26px; }
+
+.cm-escada { display:grid; grid-template-columns:repeat(auto-fit, minmax(74px, 1fr)); gap:6px; margin-top:10px; }
+.cm-degrau { display:flex; flex-direction:column; gap:1px; padding:7px 8px; border-radius:10px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07); font-size:.68rem; color:#9aa3b2; line-height:1.25; }
+.cm-degrau b { font-size:.9rem; color:#c9cfdb; } .cm-degrau em { font-style:normal; font-weight:900; color:#c9cfdb; font-variant-numeric:tabular-nums; } .cm-degrau small b { font-size:inherit; color:#ffd166; }
+.cm-degrau.ok { opacity:.55; } .cm-degrau.ok small { color:#3ddc97; }
+.cm-degrau.atual { background:color-mix(in srgb, var(--cm-cor, #3ddc97) 16%, transparent); border-color:color-mix(in srgb, var(--cm-cor, #3ddc97) 60%, transparent); color:#eef0f4; } .cm-degrau.atual b, .cm-degrau.atual em { color:#fff; } .cm-degrau.atual small { color:var(--cm-cor, #3ddc97); font-weight:800; }
+.cm-degrau.prox { border-style:dashed; border-color:rgba(255,209,102,.5); }
+
+.cm-grav-resumo { display:flex; flex-wrap:wrap; gap:6px; margin:-4px 0 12px; } .cm-grav-resumo .cm-tag { font-size:.72rem; padding:4px 10px; }
+
 .cm-tab tr.cm-reu-linha { cursor:pointer; transition:background .15s; } .cm-tab tr.cm-reu-linha:hover { background:rgba(110,168,255,.07); } .cm-tab tr.cm-reu-linha:hover td:nth-child(2) b { color:#6ea8ff; text-decoration:underline; }
 
 .cm-tag.cm-reu, .cm-tag.cm-vinc { border:1px solid rgba(110,168,255,.35); background:rgba(110,168,255,.12); color:#6ea8ff; cursor:pointer; font:inherit; font-size:.68rem; font-weight:800; }
@@ -28328,6 +28360,7 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-tag.cm-grav-ok { background:rgba(61,220,151,.14); color:#3ddc97; text-decoration:none; border:1px solid rgba(61,220,151,.35); }
 .cm-tag.cm-grav-ok:hover { background:rgba(61,220,151,.24); }
 .cm-tag.cm-grav-nao { background:rgba(246,163,80,.14); color:#f6a350; border:1px solid rgba(246,163,80,.35); }
+.cm-clint-bt { cursor:pointer; font:inherit; font-size:.68rem; font-weight:800; } .cm-clint-bt:hover { background:rgba(246,163,80,.24); } .cm-clint-bt:disabled { cursor:wait; opacity:.8; }
 
 .cm-reu-v { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; } .cm-reu-v b { display:block; font-size:.86rem; color:#3ddc97; } .cm-reu-v small { display:block; font-size:.64rem; color:#9aa3b2; white-space:normal; max-width:190px; margin-left:auto; line-height:1.3; }
 
@@ -28462,7 +28495,7 @@ function cmDetRender() {
     + '<div class="cm-nome"><b style="font-size:1.08rem;">' + dspEsc(p.nome) + '</b><small>' + dspEsc((d.mesTxt || d.mes)) + ' · ' + dspEsc(g.nome)
     + (!todos ? ' · ' + [['fixo', p.fixo], [g.k === 'closers' ? 'comissão' : 'variável', g.k === 'closers' ? p.comissao : p.variavel], ['prêmio', p.premio]].filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') : '') + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(p.total) + '</b><small>a receber</small></div>'
-    + '<button class="cm-det-x" onclick="cmFechar()" aria-label="Fechar">✕</button></div>';
+    + _cmBotaoAtu('Atualizar') + '<button class="cm-det-x" onclick="cmFechar()" aria-label="Fechar">✕</button></div>';
   if ((g.k === 'closers' && !p.linhas) || (g.k !== 'closers' && !p.reunioes)) {
     f.innerHTML = h + '<div class="hint" style="padding:18px;">A lista do mês chega com o robô novo. Depois de instalar, clique em ↻ Atualizar.</div></div>'; return;
   }
@@ -28704,7 +28737,7 @@ function _cmSeloReuniao(ls, ci) {
   if (!GRAV.carregado) return h + ' <span class="cm-tag" style="background:rgba(255,255,255,.05);color:#9aa3b2;">⏳ gravação…</span>';
   var g = _cmGravDe(r, x.t8s);
   if (g) return h + ' <a class="cm-tag cm-grav-ok" href="https://drive.google.com/file/d/' + encodeURIComponent(g.rec[0]) + '/view" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Abrir a gravação da reunião">🎥 com gravação' + (g.dur ? ' · ' + gravDur(g.dur) : '') + '</a>';
-  return h + ' <span class="cm-tag cm-grav-nao" title="Não achei a gravação desta reunião (lista dos últimos ' + (GRAV.dias || 60) + ' dias)">⚠️ sem gravação</span>';
+  return h + ' ' + _cmBotaoClint(iR);
 }
 // 🔗 escolher a reunião da venda: grava ##PAGVINC:telefone do formulário## na observação da reunião (o mesmo vínculo de
 // "Vendido sem os dados" — o robô também usa)
@@ -28785,7 +28818,7 @@ function _cmReuQuebra(r, gk, aba) {
   if (!r.conta) return 'tirada pelo financeiro';
   if (!r.re) return 'não apareceu';
   if (r.o === 'Workshop') return 'workshop: só ' + cmR(V.wk || 10, false);
-  var tabSdr = gk === 'ss' && !/social/i.test(r.o || ''), rate = tabSdr ? P.faixaSdr : P.faixa, pts = ['realização ' + cmR(rate, false)];
+  var tabSdr = gk === 'ss' && !(_cmV223() ? /social|indica/i : /social/i).test(r.o || ''), rate = tabSdr ? P.faixaSdr : P.faixa, pts = ['realização ' + cmR(rate, false)];
   if (r.vd) {
     pts.push('venda ' + cmR(rate, false));
     if (r.cat === 'Spark') pts.push('Spark ' + cmR(tabSdr ? V.sdrSpark : V.spark, false));
@@ -28795,15 +28828,61 @@ function _cmReuQuebra(r, gk, aba) {
 }
 // abre a ficha da reunião do SDR/Social Selling (Bruno 02/10/2026: "ainda não está clicável"): a chave da linha é
 // r|telefone (8 últimos) ou r|nome|aaaammdd — acha a reunião na aba Vendas pelo telefone/nome e pela data
-function cmAbrirReuPre(k) {
+function _cmReuDaChave(k) {
   var p = String(k || '').replace(/#\d+$/, '').split('|'), id = p[1] || '', ymd = String(p[2] || '').slice(0, 8), tel = /^\d{8}$/.test(id);
+  if (!id) return null;
   var cand = (V2.rows || []).filter(function(r){ return tel ? ldTel8(r.telefone) === id : v2norm(r.nome || '').replace(/[^a-z]/g, '').slice(0, 14) === id; });
-  if (!cand.length) { avisoRapido('Não achei essa reunião na aba Vendas'); return; }
-  var r = cand.filter(function(x){ return x.date && _cmYmd(x.date) === ymd; })[0] || cand.sort(function(a, b){ return (b.date || 0) - (a.date || 0); })[0];
+  if (!cand.length) return null;
+  return cand.filter(function(x){ return x.date && _cmYmd(x.date) === ymd; })[0] || cand.sort(function(a, b){ return (b.date || 0) - (a.date || 0); })[0];
+}
+function cmAbrirReuPre(k) {
+  var r = _cmReuDaChave(k);
+  if (!r) { avisoRapido('Não achei essa reunião na aba Vendas'); return; }
   cmAbrirLead(v2reg(r));
+}
+// 🎥 gravação da reunião do SDR/SS (Bruno 02/10/2026: "o rolê de gravação deve estar no SDR também — a gravação, na maior parte,
+// comprova que a reunião aconteceu"): realizada sem gravação = aviso; no-show COM gravação = conferir (pode ter acontecido)
+function _cmGravSelo(r) {
+  if (!GRAV.carregado) return '<span class="cm-tag" style="background:rgba(255,255,255,.05);color:#9aa3b2;">⏳ gravação…</span>';
+  var rv = _cmReuDaChave(r.k), g = rv ? _cmGravDe(rv, {}) : null;
+  r._grav = g ? 1 : 0;
+  if (g) {
+    var lk = 'href="https://drive.google.com/file/d/' + encodeURIComponent(g.rec[0]) + '/view" target="_blank" rel="noopener" onclick="event.stopPropagation();"';
+    return r.re ? '<a class="cm-tag cm-grav-ok" ' + lk + ' title="Abrir a gravação">🎥 ' + (g.dur ? gravDur(g.dur) : 'gravação') + '</a>'
+      : '<a class="cm-tag cm-grav-nao" ' + lk + ' title="Está como não realizada, mas tem gravação — confira se a reunião aconteceu (poucos minutos = sala vazia)">🔎 tem gravação' + (g.dur ? ' (' + gravDur(g.dur) + ')' : '') + ' · conferir</a>';
+  }
+  return r.re ? (rv ? _cmBotaoClint(v2reg(rv)) : '<span class="cm-tag cm-grav-nao">⚠️ sem gravação</span>') : '';
+}
+// 💬 sem gravação: a conversa na Clint no dia da reunião também comprova (Bruno 02/10/2026) — busca só quando clica
+var _cmClint = {};
+function _cmV223() { return ((CM.dados || {}).v || 0) >= 223; }   // robô v223 no ar (indicação = Social Selling, conversa na Clint)
+function _cmBotaoClint(iR) {
+  if (!_cmV223()) return '<span class="cm-tag cm-grav-nao">⚠️ sem gravação</span>';
+  var r = _v2reg[iR], ck = r ? ldTel8(r.telefone) + '|' + (r.date ? _cmYmd(r.date) : '') : '';
+  if (ck && _cmClint[ck]) return _cmClint[ck];
+  return '<button type="button" class="cm-tag cm-grav-nao cm-clint-bt" onclick="event.stopPropagation();cmConferirClint(this,' + iR + ')" title="Não achei a gravação. Clique para procurar conversa na Clint no dia da reunião">⚠️ sem gravação · 💬 conferir na Clint</button>';
+}
+function cmConferirClint(btn, iR) {
+  var r = _v2reg[iR]; if (!r) return;
+  var dia = r.date ? r.date.getFullYear() + '-' + ('0' + (r.date.getMonth() + 1)).slice(-2) + '-' + ('0' + r.date.getDate()).slice(-2) : '', ck = ldTel8(r.telefone) + '|' + (r.date ? _cmYmd(r.date) : '');
+  btn.disabled = true; btn.textContent = '⏳ procurando na Clint…';
+  gasPedir({ action: 'clintConversasDaPessoa', telefone: r.telefone || '', nome: r.nome || '', dia: dia }, function(d) {
+    var h;
+    if (!d || !d.success) h = '<span class="cm-tag cm-grav-nao">⚠️ sem gravação · a Clint não respondeu</span>';
+    else {
+      var cs = d.conversas || [], dDia = cs.filter(function(c){ return c.noDia > 0; }), tot = cs.reduce(function(t, c){ return t + c.mensagens; }, 0);
+      if (dDia.length) {
+        var n = dDia.reduce(function(t, c){ return t + c.noDia; }, 0), nl = dDia.reduce(function(t, c){ return t + c.doLeadNoDia; }, 0);
+        h = '<span class="cm-tag cm-grav-ok" title="' + dspEsc(dDia.map(function(c){ return (c.canal || c.tipo || 'canal') + ': ' + c.noDia + ' mensagens no dia (' + c.doLeadNoDia + ' do lead)'; }).join(' · ')) + '">💬 ' + n + ' mensagens no dia' + (nl ? ' (' + nl + ' do lead)' : '') + ' · comprova</span>';
+      } else h = '<span class="cm-tag cm-grav-nao" title="' + (tot ? tot + ' mensagens na Clint, mas nenhuma no dia da reunião' : 'nenhuma conversa achada na Clint') + '">⚠️ sem gravação · ' + (tot ? 'conversa na Clint, mas nada no dia' : 'sem conversa na Clint') + '</span>';
+    }
+    _cmClint[ck] = h;
+    var w = document.createElement('span'); w.innerHTML = h; btn.replaceWith(w.firstChild);
+  }, 90000);
 }
 function _cmDetPre(p, g, todos, bt) {
   var R = p.reunioes || [], ok = function(r){ return r.conta; };
+  _cmGravPedir();
   var h = '<div class="cm-filtros">' + bt('tudo', 'Todas', R.length) + bt('realizada', 'Realizadas', R.filter(function(r){ return r.re && ok(r); }).length) + bt('venda', 'Viraram venda', R.filter(function(r){ return r.vd && ok(r); }).length)
     + bt('workshop', '🎓 Workshop', R.filter(function(r){ return r.o === 'Workshop'; }).length) + bt('nao', 'Não realizadas', R.filter(function(r){ return !r.re; }).length) + bt('tirada', 'Tiradas pelo financeiro', R.filter(function(r){ return !r.conta; }).length) + '</div>';
   var V = R.filter(function(r){ return CMD.filtro === 'tudo' || (CMD.filtro === 'realizada' ? r.re && ok(r) : CMD.filtro === 'venda' ? r.vd && ok(r) : CMD.filtro === 'workshop' ? r.o === 'Workshop' : CMD.filtro === 'tirada' ? !r.conta : !r.re); });
@@ -28812,13 +28891,20 @@ function _cmDetPre(p, g, todos, bt) {
   var nAp = R.filter(function(r){ return r.re && ok(r); }).length, nNao = R.filter(function(r){ return !r.re; }).length, nVd = R.filter(function(r){ return r.vd && ok(r); }).length, nWs = R.filter(function(r){ return r.re && ok(r) && r.o === 'Workshop'; }).length;
   h += '<div class="cm-pv-resumo"><div class="ok"><b>' + nAp + '</b><small>✅ apareceram — pagam</small></div><div class="nao"><b>' + nNao + '</b><small>🚫 não apareceram — não pagam</small></div>'
     + '<div class="vd"><b>' + nVd + '</b><small>💰 viraram venda</small></div><div class="ws"><b>' + nWs + '</b><small>🎓 de workshop (R$ 10 cada)</small></div></div>'
+    + (GRAV.carregado ? (function(){
+        var cg = 0, sg = 0, ns = 0;
+        R.forEach(function(r){ var rv = _cmReuDaChave(r.k), gv = rv ? _cmGravDe(rv, {}) : null; if (r.re && ok(r)) { if (gv) cg++; else sg++; } else if (!r.re && gv) ns++; });
+        return '<div class="cm-grav-resumo"><span class="cm-tag cm-grav-ok">🎥 ' + cg + ' realizadas com gravação</span><span class="cm-tag cm-grav-nao">⚠️ ' + sg + ' realizadas sem gravação</span>'
+          + (ns ? '<span class="cm-tag cm-grav-nao">🔎 ' + ns + ' marcadas como não realizadas, mas com gravação — conferir</span>' : '') + '</div>';
+      })() : '')
     + '<div class="cm-busca"><input type="search" placeholder="🔎 Procurar lead" aria-label="Procurar lead" value="' + dspEsc(CMD.busca || '') + '" oninput="cmBuscar(this.value)"><span class="hint" id="cm-busca-n"></span></div>';
   h += '<div class="cm-tab-wrap"><table class="cm-tab"><thead><tr><th>Data</th>' + (todos ? '<th>Quem</th>' : '') + '<th>Lead</th><th>Origem</th><th>Status</th><th>Produto</th><th>Closer</th><th>Situação</th><th style="text-align:right;">R$</th><th>Conta?</th></tr></thead><tbody>'
     + V.map(function(r){
         var id = 'cmr-' + (r.k || 'l' + r.ln).replace(/[^a-z0-9]/gi, '') + (r.aba || ''), gk = r.gk || CMD.gk;
         var tags = (r.re ? '<span class="cm-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;">✅ apareceu · paga</span> ' : '<span class="cm-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;">🚫 não apareceu · não paga</span> ')
           + (r.vd ? '<span class="cm-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;">venda</span> ' : '')
-          + (r.o === 'Workshop' && r.re ? '<span class="cm-tag" style="background:rgba(176,132,255,.16);color:#b084ff;">R$ 10</span> ' : '');
+          + (r.o === 'Workshop' && r.re ? '<span class="cm-tag" style="background:rgba(176,132,255,.16);color:#b084ff;">R$ 10</span> ' : '')
+          + _cmGravSelo(r);
         return '<tr class="cm-reu-linha ' + (!r.conta ? 'tirada' : r.re ? 'apareceu' : 'naoapareceu') + '" title="Clique para abrir a ficha da reunião" onclick="cmAbrirReuPre(\'' + dspEsc(r.k || '') + '\')" data-busca="' + dspEsc(v2norm(r.n + ' ' + (r.cl || '') + ' ' + (r.q || ''))) + '"><td>' + dspEsc(r.d) + '</td>' + (todos ? '<td>' + dspEsc(r.q || '') + '</td>' : '') + '<td><b>' + dspEsc(r.n) + '</b>' + (r.u ? '<div class="cm-sub">' + dspEsc(r.u) + '</div>' : '') + '</td><td>' + dspEsc(r.o || '—') + '</td><td>' + dspEsc(r.s || '—') + '</td><td>' + dspEsc(r.cat || r.p || '—') + '</td><td>' + dspEsc(r.cl || '—') + '</td><td>' + tags + '</td>'
           + '<td class="cm-reu-v"><b' + (r.v ? '' : ' style="color:#9aa3b2;"') + '>' + (r.v != null ? cmR(r.v, false) : '—') + '</b><small>' + dspEsc(_cmReuQuebra(r, gk, r.aba || CMD.aba)) + '</small></td>'
           + '<td style="white-space:nowrap;"><button class="cm-conta ' + (r.conta ? 'sim' : 'nao') + '" title="' + (r.conta ? 'Conta para o SDR — clique para tirar' : 'Não conta — clique para voltar a contar') + '" onclick="event.stopPropagation();cmPreConta(this,\'' + gk + '\',\'' + dspEsc(r.aba || CMD.aba) + '\',\'' + dspEsc(r.k || '') + '\',' + (r.ln || 0) + ',\'' + dspEsc(r.n).replace(/'/g, '') + '\',' + (r.conta ? 'false' : 'true') + ')">' + (r.conta ? '✓ conta' : '✕ não conta') + '</button></td></tr>';
