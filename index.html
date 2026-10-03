@@ -1392,7 +1392,6 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
   <div class="nav-item" data-s="agenda"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 17.5h.01M12 17.5h.01"/></svg></span><span class="nav-label">Agenda</span></div>
   <div class="nav-item" data-s="gravacoes"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5l6-3.5v10l-6-3.5z"/></svg></span><span class="nav-label">Gravações</span></div>
   <div class="nav-item" data-s="leads"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2.4-7.2A2.5 2.5 0 0 1 7.8 4h8.4a2.5 2.5 0 0 1 2.4 1.8L21 13v5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18v-5z"/><path d="M3 13h5l1.5 3h5l1.5-3h5"/></svg></span><span class="nav-label">Leads</span></div>
-  <div class="nav-item" data-s="qualif"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></span><span class="nav-label">Qualificados</span></div>
   <div class="nav-item" data-s="anuncios"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 15.5l-4.5-4.5L7 20.5"/></svg></span><span class="nav-label">Criativos</span></div>
   <div class="nav-item" data-s="disparos"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 2.5L10.8 13.2"/><path d="M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9 19-6.8z"/></svg></span><span class="nav-label">Disparos</span></div>
   <div class="nav-item" data-s="pagamentos"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg></span><span class="nav-label">Pagamentos</span></div>
@@ -1440,7 +1439,6 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
   <!-- ============ 🏁 PLACAR DO DIA (ranking SDR x closer — Bruno 02/09/2026) ============ -->
   <section class="screen" id="s-placar"><div id="placar-corpo"><div class="hint" style="padding:30px;text-align:center;"><span class="mv-brilho-txt">Carregando o placar…</span></div></div></section>
   <section class="screen" id="s-comissoes"><div id="cm-corpo"><div class="hint" style="padding:30px;text-align:center;">Abra para ver as comissões.</div></div></section>
-  <section class="screen" id="s-qualif"><div id="qf-corpo"><div class="hint" style="padding:30px;text-align:center;"><span class="mv-brilho-txt">Carregando os qualificados…</span></div></div></section>
   <section class="screen" id="s-relatorio"><div id="rl-corpo"><div class="rl-vazio">O relatório monta quando você abre esta aba.</div></div></section>
   <section class="screen" id="s-agenda">
     <div class="panel" style="margin-bottom:16px;padding:28px;">
@@ -2665,7 +2663,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2056';
+var VERSAO_DASH = '2026-10-02-2120';
 var _versaoNova = null;
 
 // =====================================================================
@@ -8050,6 +8048,7 @@ function montarSeletorEu() {
 }
 // grava na planilha e já mostra na tela (a planilha só é relida a cada 3 min)
 function ldSalvarAtendimento(l, campos) {
+  if (l && l._ws) { alert('Esta pessoa veio só do app do workshop: ela não tem linha na planilha de leads. Use a Clint para marcar dono e etapa.'); return; }
   if (campos.dono !== undefined) l.dono = campos.dono;
   if (campos.situacao !== undefined) l.situacao = campos.situacao;
   if (campos.motivo !== undefined) l.motivo = campos.motivo;
@@ -8549,6 +8548,26 @@ function ldDonosExistentes() {
 }
 // ===== FILTROS DA ABA LEADS =====
 // grupos são LISTAS: dá para marcar mais de uma opção (vazio = todos)
+// 🎓 (Bruno 02/10/2026: "esta aba de qualificados não quero; podemos ter junto aos leads os clientes que são do workshop"):
+// gente do app do workshop que NÃO está na planilha de leads entra na lista só com o filtro 🎓 Workshop, com o selo do
+// workshop. Não mexe nos números da tela sem o filtro. Não grava nada na planilha de leads (não têm linha lá).
+var _ldWs = { ref: '', rows: [] };
+function _ldSoWorkshop(per) {
+  if (!WSL.carregado) { try { carregarWS(); } catch (e) {} return []; }
+  var ref = WSL.quando + '|' + WSL.n + '|' + (LD.rows || []).length;
+  if (_ldWs.ref !== ref) {
+    var tem = {}; (LD.rows || []).forEach(function(l){ if (l.tel8) tem[l.tel8] = 1; });
+    _ldWs.rows = Object.keys(WSL.porTel).filter(function(t8){ return !tem[t8]; }).map(function(t8) {
+      var x = WSL.porTel[t8], d = x.apl instanceof Date ? x.apl : x.ing instanceof Date ? x.ing : x.d2 instanceof Date ? x.d2 : null;
+      if (!d || !x.nome) return null;
+      return { nome: x.nome, tel: x.tel || t8, tel8: t8, insta: String(x.ig || '').replace(/^@+/, ''), email: '', origem: 'Workshop ' + _wsMes(x), fonte: 'workshop', utm: '', campanha: '',
+        faixa: 'sem', seg: '', renda: '', obj: '', invest: '', score: 0, date: d, dataTxt: d.toLocaleDateString('pt-BR'), i: 'ws', _ws: true, dono: x.sdr || '' };
+    }).filter(Boolean);
+    _ldWs.ref = ref;
+  }
+  if (!per) return _ldWs.rows;
+  return _ldWs.rows.filter(function(l){ var t = l.date.getTime(); return (!per.ini || t >= per.ini) && (!per.fim || t < per.fim); });
+}
 function ldFiltrar(rows) {
   var f = LD_F;
   var visto = f.novos ? ldVisto() : 0;
@@ -8576,6 +8595,7 @@ function ldFiltrar(rows) {
     // 📷 comentou pedindo diagnóstico no Instagram · 🆕 formulário novo (Lovable)
     if (f.veio === 'ig') { var _p = null; try { _p = igPedidoDoLead(l); } catch (e) {} if (!_p) return false; }
     else if (f.veio === 'form') { if (!/^diagnostico-/i.test(String(l.origem || ''))) return false; }
+    else if (f.veio === 'ws') { if (!l._ws) { var _w = null; try { _w = wsDoTel(l.tel8 || l.tel); } catch (e) {} if (!_w || !_wsLeadDoWorkshop(_w)) return false; } }
     if (f.faixa.length && f.faixa.indexOf(l.faixa) === -1) return false;
     // filtro pela nota de qualificação A/B/C/D (Bruno 19/08/2026)
     if (f.classe.length) {
@@ -8662,6 +8682,7 @@ function montarFiltrosLeads() {
     + '<span class="fi-label">📍 Veio de:</span><div class="chart-chips" style="margin:0;">'
     + '<button class="chart-chip' + (LD_F.veio === 'ig' ? ' on' : '') + '" onclick="ldFiltroVeio(\'ig\')" title="comentou pedindo diagnóstico num post do Instagram">📷 Comentou no post</button>'
     + '<button class="chart-chip' + (LD_F.veio === 'form' ? ' on' : '') + '" onclick="ldFiltroVeio(\'form\')" title="veio pelo formulário novo (diagnostico-v2 / v3 / org)">🆕 Formulário novo</button>'
+    + '<button class="chart-chip' + (LD_F.veio === 'ws' ? ' on' : '') + '" onclick="ldFiltroVeio(\'ws\')" title="todos do workshop: quem também preencheu o formulário e quem só está no app do workshop">🎓 Workshop' + (WSL.carregado ? ' (' + WSL.n + ')' : '') + '</button>'
     + '</div>'
     + '<span class="fi-label">💰 Investimento:</span><div class="chart-chips" style="margin:0;">'
     + '<button class="chart-chip' + ((LD_F.faixa.indexOf('alta') !== -1 && LD_F.faixa.indexOf('media') !== -1) ? ' on' : '')
@@ -13961,7 +13982,9 @@ function _renderLeadsCorpo(agora) {
   var per = ldPeriodo();
   // quem digita um nome/telefone quer ACHAR a pessoa: procura na base inteira, nao so no
   // periodo marcado (Iane, que preencheu em fevereiro, nao aparecia com "Hoje" — 02/09/2026)
-  var rows = ldFiltrar(LD_BUSCA ? (LD.rows || []) : per.rows);
+  var _base = LD_BUSCA ? (LD.rows || []) : per.rows;
+  if (LD_F.veio === 'ws') _base = _base.concat(_ldSoWorkshop(LD_BUSCA ? null : per));   // 🎓 quem só está no app do workshop
+  var rows = ldFiltrar(_base);
   var _buscaParecida = '';
   if (LD_BUSCA) {
     var t = v2norm(LD_BUSCA);
@@ -19533,6 +19556,8 @@ function _fichaPelaUrl() {
   // #aba=agenda (ou placar, leads, contratos…): abre direto naquela tela (botão "📅 agenda" da extensão)
   var mA = hx.match(/[#&?]aba=([a-z0-9-]+)/);
 
+  // a aba Qualificados saiu (Bruno 02/10/2026): o link antigo #aba=qualif abre os Leads com o filtro 🎓 Workshop
+  if (mA && mA[1] === 'qualif') { mA[1] = 'leads'; try { LD_F.veio = 'ws'; } catch (eQ) {} }
   if (mA) { var vaiA = function() { var it = document.querySelector('.nav-item[data-s="' + mA[1] + '"]'); if (it) it.click(); }; setTimeout(vaiA, 350); setTimeout(vaiA, 1800); }
 }
 try { _fichaPelaUrl(); } catch (e) {}
@@ -20654,6 +20679,7 @@ function mostrarAcessoAtual() {
 mostrarAcessoAtual();
 // ✏️🗑 corrigir o nome / excluir o lead — só admin, Bruno ou o DONO do lead (Bruno 08/09/2026)
 function ldPodeEditarLead(l) {
+  if (l && l._ws) return false;   // 🎓 só do app do workshop: não tem linha na planilha de leads
   if (ehAdm()) return true;
   var login = localStorage.getItem('v2Login') || '';
   if (!login || login === 'Visitante') return false;
@@ -28294,6 +28320,15 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-motivo { margin-top:8px; font-size:.78rem; color:#ffb4b4; }
 
 /* ✨ visual novo dos cartões (02/10/2026) */
+.cm-tag.cm-reu, .cm-tag.cm-vinc { border:1px solid rgba(110,168,255,.35); background:rgba(110,168,255,.12); color:#6ea8ff; cursor:pointer; font:inherit; font-size:.68rem; font-weight:800; }
+.cm-tag.cm-reu:hover, .cm-tag.cm-vinc:hover { background:rgba(110,168,255,.22); }
+.cm-tag.cm-vinc { border-style:dashed; }
+.cm-tag.cm-grav-ok { background:rgba(61,220,151,.14); color:#3ddc97; text-decoration:none; border:1px solid rgba(61,220,151,.35); }
+.cm-tag.cm-grav-ok:hover { background:rgba(61,220,151,.24); }
+.cm-tag.cm-grav-nao { background:rgba(246,163,80,.14); color:#f6a350; border:1px solid rgba(246,163,80,.35); }
+
+.cm-reu-v { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; } .cm-reu-v b { display:block; font-size:.86rem; color:#3ddc97; } .cm-reu-v small { display:block; font-size:.64rem; color:#9aa3b2; white-space:normal; max-width:190px; margin-left:auto; line-height:1.3; }
+
 .cm-bonus { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin:0 0 12px; padding:10px 12px; border-radius:12px; background:rgba(255,209,102,.07); border:1px solid rgba(255,209,102,.25); font-size:.78rem; }
 .cm-bonus b { color:#ffd166; margin-right:4px; } .cm-bonus span { padding:3px 10px; border-radius:999px; background:rgba(255,255,255,.05); } .cm-bonus em { font-style:normal; font-weight:900; color:#ffd166; }
 
@@ -28430,6 +28465,7 @@ function cmDetRender() {
     f.innerHTML = h + '<div class="hint" style="padding:18px;">A lista do mês chega com o robô novo. Depois de instalar, clique em ↻ Atualizar.</div></div>'; return;
   }
   CMD.primeira = !jaAberta;
+  if (g.k === 'closers') _cmGravPedir();
   h += g.k === 'closers' ? _cmDetCloser(p, todos, bt) : _cmDetPre(p, g, todos, bt);
   f.innerHTML = h + '</div>';
   if (!jaAberta) cmAnimar(f); else Array.prototype.forEach.call(f.querySelectorAll('[data-w]'), function(b){ b.style.width = b.getAttribute('data-w'); });
@@ -28466,12 +28502,16 @@ function _cmDetCloser(p, todos, bt) {
     + '<div class="cm-quebras"><div><small>Comissão por forma de pagamento</small>' + _cmQuebra(porForma, sc) + '</div><div><small>Comissão por origem</small>' + _cmQuebra(porOrig, sc) + '</div></div>';
   if (!V.length) return h + '<div class="hint" style="padding:16px;">Nada nesse filtro.</div>';
   var TIPO = { venda: ['🤝 Venda', '#3ddc97'], lia: ['🧾 Boleto Lia', '#6ea8ff'], guru: ['🔁 Guru', '#b084ff'], extra: ['⭐ Extra', '#ffd166'] };
-  // ordem dos clientes: maior comissão (padrão), pagamento mais recente ou nome
-  var o = CMD.ordem || 'com', somaC = function(k){ return grupos[k].reduce(function(s, l){ return s + l.c; }, 0); };
-  var dataN = function(k){ return Math.max.apply(null, grupos[k].map(function(l){ var m = String(l.pg || l.fe || '').match(/(\d{2})\/(\d{2})/); return m ? +m[2] * 100 + +m[1] : 0; })); };
-  ordem.sort(o === 'nome' ? function(a, b){ return String(grupos[a][0].n).localeCompare(String(grupos[b][0].n)); } : o === 'data' ? function(a, b){ return dataN(b) - dataN(a); } : function(a, b){ return somaC(b) - somaC(a); });
+  // ordem dos clientes (Bruno 02/10/2026: "a organização dentro do dash é pela data, não pelo maior valor"): por data, do começo do
+  // mês para o fim (como na planilha) — padrão; ou mais recente primeiro, maior comissão, nome
+  var o = CMD.ordem || 'data', somaC = function(k){ return grupos[k].reduce(function(s, l){ return s + l.c; }, 0); };
+  var dataN = function(k, maior){ var ds = grupos[k].map(function(l){ var m = String(l.pg || l.fe || '').match(/(\d{2})\/(\d{2})/); return m ? +m[2] * 100 + +m[1] : (maior ? 0 : 9999); }); return maior ? Math.max.apply(null, ds) : Math.min.apply(null, ds); };
+  ordem.sort(o === 'nome' ? function(a, b){ return String(grupos[a][0].n).localeCompare(String(grupos[b][0].n)); }
+    : o === 'recente' ? function(a, b){ return dataN(b, true) - dataN(a, true); }
+    : o === 'com' ? function(a, b){ return somaC(b) - somaC(a); }
+    : function(a, b){ return dataN(a) - dataN(b); });
   h += '<div class="cm-busca"><input type="search" placeholder="🔎 Procurar cliente" aria-label="Procurar cliente" value="' + dspEsc(CMD.busca || '') + '" oninput="cmBuscar(this.value)">'
-    + '<select aria-label="Ordenar" onchange="cmOrdem(this.value)">' + [['com', 'Maior comissão'], ['data', 'Pagamento mais recente'], ['nome', 'Nome (A–Z)']].map(function(x){ return '<option value="' + x[0] + '"' + (o === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>'
+    + '<select aria-label="Ordenar" onchange="cmOrdem(this.value)">' + [['data', 'Por data (início do mês primeiro)'], ['recente', 'Mais recente primeiro'], ['com', 'Maior comissão'], ['nome', 'Nome (A–Z)']].map(function(x){ return '<option value="' + x[0] + '"' + (o === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>'
     + '<span class="hint" id="cm-busca-n"></span></div>';
   // escada do Legado: quantas linhas de Legado contam no mês de cada pessoa (mesma conta da planilha: Tipo Legado, conta Sim, valor > 0, mês da venda = mês)
   var nLeg = {};
@@ -28487,7 +28527,8 @@ function _cmDetCloser(p, todos, bt) {
       + (prim.t !== 'extra' ? '<div class="cm-cli-av" style="background:linear-gradient(135deg,' + v2grad(prim.n) + ');">' + v2ini(prim.n) + '</div>' : '<div class="cm-cli-av" style="background:linear-gradient(135deg,#ffd166,#f6a350);">⭐</div>')
       + '<div class="cm-cli-nome"><b>' + dspEsc(prim.n) + '</b>' + (todos ? ' <span class="cm-quem">' + dspEsc(prim.q || '') + '</span>' : '') + '<small>' + sub + '</small>'
       + '<div class="cm-cli-tags">' + (prim.t !== 'extra' ? _cmTagOrigem(prim) : '')
-      + (prim.t !== 'extra' && (prim.tp === 'Legado' || /legado|club/i.test(prim.p || '')) ? ' <span class="cm-tag" style="background:rgba(185,138,255,.14);color:#b98aff;" title="Legado Club e Legado Digital entram juntos na escada do Legado">🏛️ Legado · escada</span>' : '') + '</div></div>'
+      + (prim.t !== 'extra' && (prim.tp === 'Legado' || /legado|club/i.test(prim.p || '')) ? ' <span class="cm-tag" style="background:rgba(185,138,255,.14);color:#b98aff;" title="Legado Club e Legado Digital entram juntos na escada do Legado">🏛️ Legado · escada</span>' : '')
+      + (prim.t !== 'extra' ? _cmSeloReuniao(ls, window._cmCards.length) : '') + '</div></div>'
       + '<div class="cm-cli-valor"><small>comissão</small><b>' + cmR(com) + '</b><small>de ' + cmR(rec, false) + ' recebido</small></div></div>'
       + '<div class="cm-cli-parte" title="' + (sc ? (com / sc * 100).toFixed(1).replace('.', ',') : '0') + '% da comissão na tela"><i data-w="' + (sc ? Math.max(0, Math.min(100, com / sc * 100)) : 0).toFixed(1) + '%"></i></div>'
       + '<div class="cm-pags">';
@@ -28604,6 +28645,97 @@ function cmDadosAbrir(el, ci) {
   if (ws) h += '<div class="cm-dados-sec"><div class="cm-dados-tit">🎓 Workshop</div>' + ws + '</div>';
   box.innerHTML = h;
 }
+// 📅🎥 reunião e gravação de cada cliente (Bruno 02/10/2026: "que possa vincular a reunião a cada pagamento e quando não tiver
+// gravação tenha aviso ou selo; nos casos que tenha gravação tenha aviso também"). A reunião sai do telefone do formulário de
+// pagamento (ou do vínculo ##PAGVINC## feito à mão, ou do nome); a gravação, da lista de gravações (mesmo telefone, ±2 dias).
+function _cmPagsDoCliente(ls) {
+  var kc = _cmChaveCliente((ls[0] || {}).n), ks = {};
+  ls.forEach(function(l){ if (/^\d{8}\|/.test(l.k || '')) ks[l.k] = 1; });
+  return (PAG.rows || []).filter(function(p){ return ks[_cmYmd(p.date) + '|' + _cmNomeChave(p.nome)] || (kc && _cmChaveCliente(p.nome) === kc); });
+}
+function _cmReuniaoDoCliente(ls) {
+  var pags = _cmPagsDoCliente(ls), t8s = {}, kc = _cmChaveCliente((ls[0] || {}).n);
+  pags.forEach(function(p){ var t = ldTel8(p.celular); if (t) t8s[t] = 1; });
+  var cand = (V2.rows || []).filter(function(r) {
+    var t = ldTel8(r.telefone), mv = String(r.obs || '').match(/##PAGVINC:(\d+)##/);
+    if (mv && t8s[String(mv[1]).slice(-8)]) { r._cmComo = 'vínculo feito à mão'; return true; }
+    if (t && t8s[t]) { r._cmComo = 'telefone do formulário'; return true; }
+    if (kc && _cmChaveCliente(r.nome) === kc) { r._cmComo = 'nome'; return true; }
+    return false;
+  });
+  cand.sort(function(a, b){ var va = (a.sn || v2norm(a.status || '')) === 'vendido' ? 1 : 0, vb = (b.sn || v2norm(b.status || '')) === 'vendido' ? 1 : 0; return (vb - va) || ((b.date || 0) - (a.date || 0)); });
+  return { r: cand[0] || null, t8s: t8s, pags: pags };
+}
+function _cmGravDe(r, t8s) {
+  if (!r || !GRAV.carregado) return null;
+  var ts = {}; Object.keys(t8s || {}).forEach(function(t){ ts[t] = 1; }); var tr = ldTel8(r.telefone); if (tr) ts[tr] = 1;
+  var alvo = r.date ? r.date.getTime() : 0, melhor = null, dist = Infinity;
+  // gravação sem telefone (algumas vêm só com o nome no título — Iane, David, Zarhena): casa pelo nome, na mesma data (±2 dias)
+  var pal = function(n){ return v2norm(String(n || '').replace(/\([^)]*\)/g, ' ')).replace(/[^a-z ]/g, ' ').split(/\s+/).filter(function(w){ return w.length > 2 && !/^(dos?|das?|de|diagnostico|finalizacao|entrevista|equipe)$/.test(w); }); };
+  var nr = pal(r.nome), nomeBate = function(x) {
+    var ng = pal(gravPartes(x.t).nome); if (!ng.length || !nr.length || ng[0] !== nr[0]) return false;
+    return ng.length === 1 || nr.length === 1 || ng.slice(1).some(function(w){ return nr.indexOf(w) !== -1; });
+  };
+  (GRAV.itens || []).forEach(function(x) {
+    if (!(x.rec || []).length) return;
+    var porTel = !!ts[String(x.tel || '').slice(-8)];
+    if (!porTel && !nomeBate(x)) return;
+    var d = x.d ? new Date(x.d.slice(0, 10) + 'T12:00:00').getTime() : 0, dd = Math.abs(d - alvo) + (porTel ? 0 : 1);
+    if (dd <= 2 * 864e5 + 1 && dd < dist) { dist = dd; melhor = x; }
+  });
+  return melhor;
+}
+// gravações ainda não carregadas: pega a lista guardada (ou pede ao robô) e redesenha a janela quando chegar
+function _cmGravPedir() {
+  if (GRAV.carregado || window._cmGravEsperando) return;
+  try { if (gravDaMemoria(60)) return; } catch (e) {}
+  window._cmGravEsperando = true;
+  try { if (!GRAV.carregando) gravCarregar(); } catch (e) {}
+  var n = 0, t = setInterval(function(){ n++; if (GRAV.carregado || n > 60) { clearInterval(t); window._cmGravEsperando = false; if (GRAV.carregado && document.getElementById('cm-det-fundo')) cmDetRender(); } }, 1000);
+}
+function _cmSeloReuniao(ls, ci) {
+  var prim = ls[0] || {};
+  if (/sem reuni/i.test(prim.o || '')) return ' <span class="cm-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;" title="Venda direta, sem reunião">💰 venda sem reunião</span>';
+  var x = _cmReuniaoDoCliente(ls), r = x.r;
+  if (!r) return ' <button type="button" class="cm-tag cm-vinc" onclick="event.stopPropagation();cmVincularReu(' + ci + ')" title="Não achei a reunião desta venda — escolha qual é">🔗 vincular reunião</button>';
+  var iR = v2reg(r), h = ' <button type="button" class="cm-tag cm-reu" onclick="event.stopPropagation();cmAbrirLead(' + iR + ')" title="Reunião achada pelo ' + dspEsc(r._cmComo || '') + ' — clique para abrir a ficha">📅 reunião ' + (r.date ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : '') + (r.sdr ? ' · SDR ' + dspEsc(r.sdr) : '') + '</button>';
+  if (!GRAV.carregado) return h + ' <span class="cm-tag" style="background:rgba(255,255,255,.05);color:#9aa3b2;">⏳ gravação…</span>';
+  var g = _cmGravDe(r, x.t8s);
+  if (g) return h + ' <a class="cm-tag cm-grav-ok" href="https://drive.google.com/file/d/' + encodeURIComponent(g.rec[0]) + '/view" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Abrir a gravação da reunião">🎥 com gravação' + (g.dur ? ' · ' + gravDur(g.dur) : '') + '</a>';
+  return h + ' <span class="cm-tag cm-grav-nao" title="Não achei a gravação desta reunião (lista dos últimos ' + (GRAV.dias || 60) + ' dias)">⚠️ sem gravação</span>';
+}
+// 🔗 escolher a reunião da venda: grava ##PAGVINC:telefone do formulário## na observação da reunião (o mesmo vínculo de
+// "Vendido sem os dados" — o robô também usa)
+function cmVincularReu(ci) {
+  var c = (window._cmCards || [])[ci]; if (!c) return;
+  var pags = _cmPagsDoCliente(c.ls), telD = pags.length ? String(pags[0].celular || '').replace(/\D/g, '') : '';
+  if (!telD) { alert('Não achei o formulário de pagamento desta pessoa (sem telefone para vincular). Confira o nome no formulário.'); return; }
+  var alvo = v2norm(c.n || '').split(' ')[0];
+  var cands = (V2.rows || []).filter(function(r){ return r.nome; }).sort(function(a, b) {
+    var pa = alvo && v2norm(a.nome).indexOf(alvo) !== -1 ? 0 : 1, pb = alvo && v2norm(b.nome).indexOf(alvo) !== -1 ? 0 : 1;
+    return (pa - pb) || ((b.date || 0) - (a.date || 0));
+  }).slice(0, 30);
+  var ov = document.createElement('div'); ov.className = 'modal-overlay open'; ov.style.zIndex = 9500; ov.id = 'cm-vinc';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal" style="width:560px;"><div class="modal-head"><div style="flex:1;"><h2 style="margin-bottom:2px;">🔗 Qual é a reunião de ' + dspEsc(c.n) + '?</h2>'
+    + '<span style="font-size:.72rem;color:var(--muted);font-weight:600;">O vínculo fica anotado na reunião (aba Vendas) e liga ela a este pagamento.</span></div><button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    + '<input class="edit-in" type="search" placeholder="Procurar pelo nome" style="width:100%;text-align:left;margin-bottom:8px;" oninput="var t=v2norm(this.value);Array.prototype.forEach.call(document.querySelectorAll(\'#cm-vinc [data-n]\'),function(b){b.style.display=!t||b.getAttribute(\'data-n\').indexOf(t)!==-1?\'\':\'none\';});">'
+    + '<div style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto;">'
+    + cands.map(function(r){ var i = v2reg(r); return '<button type="button" class="btn" data-n="' + dspEsc(v2norm(r.nome)) + '" style="text-align:left;background:var(--card);color:var(--text);border:1px solid var(--border);padding:9px 12px;" onclick="cmVincularReuOk(' + i + ',\'' + telD + '\',' + ci + ')"><b>' + dspEsc(r.nome) + '</b><br><span style="font-size:.74rem;color:var(--muted);font-weight:600;">'
+      + [r.date ? r.date.toLocaleDateString('pt-BR') : '', r.status || '', r.produto || '', r.closer ? 'closer ' + r.closer : '', r.sdr ? 'SDR ' + r.sdr : ''].filter(Boolean).map(dspEsc).join(' · ') + '</span></button>'; }).join('')
+    + '</div></div>';
+  document.body.appendChild(ov);
+}
+function cmVincularReuOk(i, telD, ci) {
+  var r = _v2reg[i]; if (!r || !telD) return;
+  if (!confirm('Vincular a reunião de "' + (r.nome || '') + '" (' + (r.date ? r.date.toLocaleDateString('pt-BR') : '') + ') a este pagamento?')) return;
+  r.obs = String(r.obs || '').replace(/\s*\|?\s*##PAGVINC:\d+##/g, '').trim();
+  r.obs = (r.obs ? r.obs + ' | ' : '') + '##PAGVINC:' + telD + '##';
+  sendToGAS({ action: 'updateCell', cpf: '', nome: r.nome, campo: 'observacao', valor: r.obs, dataRef: v2dataRef(r), gid: V2_GID });
+  var ov = document.getElementById('cm-vinc'); if (ov) ov.remove();
+  avisoRapido('🔗 Reunião vinculada a este pagamento');
+  cmDetRender();
+}
 // "una os pagamentos de um mesmo lead quando possível" (Bruno 02/10/2026): nomes diferentes que no formulário de pagamento
 // têm o mesmo CPF ou celular viram um cartão só (ex.: a pessoa preencheu o nome de um jeito num formulário e de outro no outro)
 function _cmMesmaPessoa(V) {
@@ -28643,6 +28775,22 @@ function _cmQuebra(m, tot) {
     + '<div class="cm-leg">' + ks.map(function(k, i){ return '<span><em style="background:' + cores[i % cores.length] + ';"></em>' + dspEsc(k) + ' <b>' + cmR(m[k], false) + '</b></span>'; }).join('') + '</div>';
 }
 // ---------- SDR / Social Selling: reuniões com "conta / não conta" e observação ----------
+// quanto cada reunião rendeu e por quê (Bruno 02/10/2026: "aqui dentro deve aparecer os dados — x pela realização, x pela venda,
+// x por ser Spark ou Growth"); na Social Selling, origem que não é Social Selling paga pela tabela do SDR
+function _cmReuQuebra(r, gk, aba) {
+  var G = ((CM.dados || {}).grupos || []).filter(function(x){ return x.k === gk; })[0]; if (!G) return '';
+  var P = G.pessoas.filter(function(x){ return x.aba === aba; })[0], V = G.valores || {}; if (!P) return '';
+  if (!r.conta) return 'tirada pelo financeiro';
+  if (!r.re) return 'não apareceu';
+  if (r.o === 'Workshop') return 'workshop: só ' + cmR(V.wk || 10, false);
+  var tabSdr = gk === 'ss' && !/social/i.test(r.o || ''), rate = tabSdr ? P.faixaSdr : P.faixa, pts = ['realização ' + cmR(rate, false)];
+  if (r.vd) {
+    pts.push('venda ' + cmR(rate, false));
+    if (r.cat === 'Spark') pts.push('Spark ' + cmR(tabSdr ? V.sdrSpark : V.spark, false));
+    else if (r.cat === 'Growth') pts.push('Growth ' + cmR(tabSdr ? V.sdrGrowth : V.growth, false));
+  }
+  return (tabSdr ? 'fora do Social Selling: valor do SDR no mesmo nível · ' : '') + pts.join(' + ');
+}
 function _cmDetPre(p, g, todos, bt) {
   var R = p.reunioes || [], ok = function(r){ return r.conta; };
   var h = '<div class="cm-filtros">' + bt('tudo', 'Todas', R.length) + bt('realizada', 'Realizadas', R.filter(function(r){ return r.re && ok(r); }).length) + bt('venda', 'Viraram venda', R.filter(function(r){ return r.vd && ok(r); }).length)
@@ -28654,13 +28802,14 @@ function _cmDetPre(p, g, todos, bt) {
   h += '<div class="cm-pv-resumo"><div class="ok"><b>' + nAp + '</b><small>✅ apareceram — pagam</small></div><div class="nao"><b>' + nNao + '</b><small>🚫 não apareceram — não pagam</small></div>'
     + '<div class="vd"><b>' + nVd + '</b><small>💰 viraram venda</small></div><div class="ws"><b>' + nWs + '</b><small>🎓 de workshop (R$ 10 cada)</small></div></div>'
     + '<div class="cm-busca"><input type="search" placeholder="🔎 Procurar lead" aria-label="Procurar lead" value="' + dspEsc(CMD.busca || '') + '" oninput="cmBuscar(this.value)"><span class="hint" id="cm-busca-n"></span></div>';
-  h += '<div class="cm-tab-wrap"><table class="cm-tab"><thead><tr><th>Data</th>' + (todos ? '<th>Quem</th>' : '') + '<th>Lead</th><th>Origem</th><th>Status</th><th>Produto</th><th>Closer</th><th>Situação</th><th>Conta?</th></tr></thead><tbody>'
+  h += '<div class="cm-tab-wrap"><table class="cm-tab"><thead><tr><th>Data</th>' + (todos ? '<th>Quem</th>' : '') + '<th>Lead</th><th>Origem</th><th>Status</th><th>Produto</th><th>Closer</th><th>Situação</th><th style="text-align:right;">R$</th><th>Conta?</th></tr></thead><tbody>'
     + V.map(function(r){
         var id = 'cmr-' + (r.k || 'l' + r.ln).replace(/[^a-z0-9]/gi, '') + (r.aba || ''), gk = r.gk || CMD.gk;
         var tags = (r.re ? '<span class="cm-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;">✅ apareceu · paga</span> ' : '<span class="cm-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;">🚫 não apareceu · não paga</span> ')
           + (r.vd ? '<span class="cm-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;">venda</span> ' : '')
           + (r.o === 'Workshop' && r.re ? '<span class="cm-tag" style="background:rgba(176,132,255,.16);color:#b084ff;">R$ 10</span> ' : '');
         return '<tr class="' + (!r.conta ? 'tirada' : r.re ? 'apareceu' : 'naoapareceu') + '" data-busca="' + dspEsc(v2norm(r.n + ' ' + (r.cl || '') + ' ' + (r.q || ''))) + '"><td>' + dspEsc(r.d) + '</td>' + (todos ? '<td>' + dspEsc(r.q || '') + '</td>' : '') + '<td><b>' + dspEsc(r.n) + '</b>' + (r.u ? '<div class="cm-sub">' + dspEsc(r.u) + '</div>' : '') + '</td><td>' + dspEsc(r.o || '—') + '</td><td>' + dspEsc(r.s || '—') + '</td><td>' + dspEsc(r.cat || r.p || '—') + '</td><td>' + dspEsc(r.cl || '—') + '</td><td>' + tags + '</td>'
+          + '<td class="cm-reu-v"><b' + (r.v ? '' : ' style="color:#9aa3b2;"') + '>' + (r.v != null ? cmR(r.v, false) : '—') + '</b><small>' + dspEsc(_cmReuQuebra(r, gk, r.aba || CMD.aba)) + '</small></td>'
           + '<td style="white-space:nowrap;"><button class="cm-conta ' + (r.conta ? 'sim' : 'nao') + '" title="' + (r.conta ? 'Conta para o SDR — clique para tirar' : 'Não conta — clique para voltar a contar') + '" onclick="cmPreConta(this,\'' + gk + '\',\'' + dspEsc(r.aba || CMD.aba) + '\',\'' + dspEsc(r.k || '') + '\',' + (r.ln || 0) + ',\'' + dspEsc(r.n).replace(/'/g, '') + '\',' + (r.conta ? 'false' : 'true') + ')">' + (r.conta ? '✓ conta' : '✕ não conta') + '</button></td></tr>';
       }).join('')
     + '</tbody></table></div>';
