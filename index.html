@@ -960,7 +960,7 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .chart-chip.on { background:var(--accent); border-color:var(--accent); color:#191204; }
 
 /* Metas do mês */
-.metas-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; }
+.metas-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:22px; }
 
 /* Faixa "no ritmo atual terminamos em..." */
 .ritmo {
@@ -1006,6 +1006,7 @@ a.sg-fixo:hover { transform:translateY(-2px); border-color:rgba(110,168,255,.4);
 .meta-foot { display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:.7rem; color:var(--muted); font-weight:600; }
 .meta-foot > b { color:var(--text); font-size:.78rem; }
 .meta-foot span b { color:var(--text2); }
+@media (max-width:1180px){ .metas-grid{grid-template-columns:repeat(2,1fr);} }
 @media (max-width:900px){ .metas-grid{grid-template-columns:1fr;} }
 
 /* Vídeo da reunião dentro do painel */
@@ -2853,7 +2854,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-1550';
+var VERSAO_DASH = '2026-10-03-1741';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -5682,7 +5683,8 @@ function renderV2() {
   var METAS_V2 = [
     { k:'p', nome:'Meta P', valor:450000, cor:'#ff6b6b', grad:'linear-gradient(90deg,#ff6b6b,#ff9a8a)' },
     { k:'m', nome:'Meta M', valor:600000, cor:'#f6a350', grad:'linear-gradient(90deg,#f6a350,#ffd166)' },
-    { k:'g', nome:'Meta G', valor:800000, cor:'#3ddc97', grad:'linear-gradient(90deg,#3ddc97,#8ef0c6)' }
+    { k:'g', nome:'Meta G', valor:800000, cor:'#3ddc97', grad:'linear-gradient(90deg,#3ddc97,#8ef0c6)' },
+    { k:'gg', nome:'Meta GG', valor:1000000, cor:'#b98aff', grad:'linear-gradient(90deg,#b98aff,#d9c2ff)' }   // 03/10/2026 (Bruno): GG 1 milhão
   ];
   window.METAS_PLANO = {};
   var restam = pj ? pj.restam : 1;
@@ -5722,7 +5724,7 @@ function renderV2() {
     h += '<div class="meta" id="meta-' + mt.k + '" onclick="verMeta(\'' + mt.k + '\')">'
       + '<div class="meta-head"><span class="meta-nome" style="color:' + mt.cor + ';">' + mt.nome + '</span><b>' + v2mil(mt.valor) + '</b></div>'
       + '<div class="rk-tubo" style="margin:5px 0 3px;">'
-      + '<i style="width:' + pct.toFixed(1) + '%;background:' + mt.grad + ';box-shadow:0 0 18px ' + mt.cor + 'aa, inset 0 2px 3px rgba(255,255,255,.5);" data-ceo="' + (['joao', 'pv', 'ambos'][iM] || 'pv') + '"></i>'
+      + '<i style="width:' + pct.toFixed(1) + '%;background:' + mt.grad + ';box-shadow:0 0 18px ' + mt.cor + 'aa, inset 0 2px 3px rgba(255,255,255,.5);" data-ceo="' + (['joao', 'pv', 'ambos', 'joao'][iM] || 'pv') + '"></i>'
       + (pctMesa > 0.5 ? '<u style="left:' + pct.toFixed(1) + '%;width:' + pctMesa.toFixed(1) + '%;" title="🔒 Bloqueio de oferta + Entrada · ' + v2mil(mesaV) + '"><b>BLOQUEIO + ENTRADA</b></u>' : '')
       + (projPct !== null ? '<s style="left:' + Math.min(projPct, 99).toFixed(1) + '%;background:#fff;"></s>' : '')
       + '<b class="rk-pct">' + Math.round(pct) + '%</b>'
@@ -26240,7 +26242,7 @@ function agNaHora(pedido, ctx, depois) {
 .rl-leg i { display:inline-block; width:12px; height:12px; border-radius:4px; margin-right:6px; vertical-align:-2px; }
 
 /* ---------- META ---------- */
-.rl-metas { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+.rl-metas { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; }
 .rl-meta { padding:18px; border-radius:20px; background:var(--rl-card); border:1px solid var(--rl-borda); }
 .rl-meta.ok { border-color:rgba(61,220,151,.5); background:linear-gradient(160deg, rgba(61,220,151,.1), rgba(255,255,255,.02)); }
 .rl-meta h4 { margin:0; font-size:.72rem; letter-spacing:1.6px; text-transform:uppercase; }
@@ -26659,8 +26661,9 @@ function rlValor(r) { return r.valor || r._valorDoForm || 0; }
 // pelo dia em que aconteceu e a venda é o status "Vendido" (o valor da própria linha).
 function rlPessoaNome(n) { n = String(n || '').trim(); if (!n) return ''; try { if (typeof plPessoa === 'function') return plPessoa(n) || n; } catch (e) {} return n; }
 function rlLinhas(p) { return (V2.rows || []).filter(function(r) { if (!r.date) return false; var tt = r.date.getTime(); return tt >= p.ini && tt < p.fim; }); }
-function rlCalc(p) {
+function rlCalc(p, filtro) {
   var rows = rlLinhas(p), agora = Date.now();
+  if (filtro) rows = rows.filter(filtro);   // 03/10/2026: relatório de uma pessoa (closer, SDR ou Social Selling)
   var t = { marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, fe: 0, feV: 0, pend: 0, mesaQ: 0, mesaV: 0, l: { marc: [], re: [], ns: [], vd: [], fe: [], pend: [], mesa: [], nf: [] } };
   var CL = {}, SD = {};
   var pess = function(M, nome) { var k = v2norm(nome); return M[k] || (M[k] = { nome: nome, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }); };
@@ -27000,6 +27003,10 @@ function rlRender() {
     box.innerHTML = (typeof mvSkTela === 'function') ? mvSkTela('painel', 'Lendo a planilha para montar o relatório…') : '<div class="rl-vazio">Lendo a planilha…</div>';
     clearTimeout(RL.espera); RL.espera = setTimeout(rlRender, 1500); return;
   }
+  // 03/10/2026 (Bruno: "o relatório deve ser ajustado à função de cada"): quem é do time vê só o seu; admin vê o do time ou escolhe uma pessoa
+  var _Q = (typeof rlAplicarAcesso === 'function') ? rlAplicarAcesso() : { adm: true };
+  if (_Q.fora) { box.innerHTML = '<div class="rl-vazio">O Relatório é só do time comercial.</div>'; return; }
+  if (RL.quem) { rlRenderPessoa(box, _Q); return; }
   RL_L = {}; RL.nL = 0; RL.nSec = 0;
   var p = rlPeriodo(RL.per, RL.de, RL.ate), A, B, C, X;
   RL._antRot = p.ant.rot;
@@ -27018,6 +27025,7 @@ function rlRender() {
   h += rlBarra(p);
   h += rlHero(p, A, B);
   h += rlKpis(p, A, B, C);
+  try { if (typeof rlSecMetasTime === 'function') h += rlSecMetasTime(); } catch (eMt) {}
   h += rlHistorico();
   h += rlFunil(A, B);
   h += rlWorkshop(A, B);
@@ -27048,7 +27056,7 @@ function rlRender() {
 }
 function rlBarra(p) {
   var ops = [['mes', 'Este mês'], ['mesant', 'Mês passado'], ['semana', 'Esta semana'], ['semant', 'Semana passada'], ['30d', 'Últimos 30 dias']];
-  return '<div class="rl-barra">' + ops.map(function(o) { return '<span class="chart-chip' + (RL.per === o[0] ? ' on' : '') + '" onclick="rlPer(\'' + o[0] + '\')">' + o[1] + '</span>'; }).join('')
+  return '<div class="rl-barra">' + (typeof rlChipsQuem === 'function' ? rlChipsQuem() : '') + ops.map(function(o) { return '<span class="chart-chip' + (RL.per === o[0] ? ' on' : '') + '" onclick="rlPer(\'' + o[0] + '\')">' + o[1] + '</span>'; }).join('')
     + '<input class="edit-in" id="rl-datas" readonly placeholder="📅 escolher datas" style="width:150px;padding:7px 10px;font-size:.72rem;" value="' + (RL.per === 'custom' ? rlE(p.rot) : '') + '">'
     + '<label class="rl-cmp">comparar com <select onchange="rlCmp(this.value)">'
     +   [['auto', 'período anterior'], ['mescheio', 'mês passado inteiro'], ['2m', 'mesmo período, 2 meses atrás'], ['3m', 'mesmo período, 3 meses atrás'], ['12m', 'mesmo período, 1 ano atrás'], ['custom', '📅 escolher datas…']]
@@ -27072,10 +27080,10 @@ function rlHero(p, A, B) {
     for (var d = new Date(mes); d < fimMes; d = new Date(d.getTime() + 864e5)) { var wd = d.getDay(); if (wd !== 0) { du++; if (d <= h) dp++; } }
     pr = dp ? A.fat / dp * du : 0;
   }
-  var metaG = 800000, metaM = 600000, metaP = 450000;
-  var alvo = p.mes ? metaG : 0, frac = alvo ? Math.min(1, A.fat / alvo) : 0;
+  var metaG = 800000, metaM = 600000, metaP = 450000, metaGG = 1000000;   // 03/10/2026: + GG 1 milhão
+  var alvo = p.mes ? metaGG : 0, frac = alvo ? Math.min(1, A.fat / alvo) : 0;
   var R = 110, C = 2 * Math.PI * R;
-  var mk = function(v, rot) { var a = v / metaG * 2 * Math.PI - Math.PI / 2, x1 = 140 + (R - 14) * Math.cos(a), y1 = 140 + (R - 14) * Math.sin(a), x2 = 140 + (R + 14) * Math.cos(a), y2 = 140 + (R + 14) * Math.sin(a), xt = 140 + (R + 30) * Math.cos(a), yt = 140 + (R + 30) * Math.sin(a);
+  var mk = function(v, rot) { var a = v / metaGG * 2 * Math.PI - Math.PI / 2, x1 = 140 + (R - 14) * Math.cos(a), y1 = 140 + (R - 14) * Math.sin(a), x2 = 140 + (R + 14) * Math.cos(a), y2 = 140 + (R + 14) * Math.sin(a), xt = 140 + (R + 30) * Math.cos(a), yt = 140 + (R + 30) * Math.sin(a);
     return '<line class="marca" x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"/><text class="rot-m" x="' + xt.toFixed(1) + '" y="' + yt.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle">' + rot + '</text>'; };
   // cada pessoa uma vez só (Bruno 27/09/2026: "não repita pessoas" — o Bruno é closer e também aparece como SDR)
   var time = [], jaTem = {}, chaveP = function(n) { return v2norm(String(n || '')).replace(/^(ss|sdr|closer)\s+/, '').split(/\s+/)[0]; };
@@ -27086,9 +27094,9 @@ function rlHero(p, A, B) {
   var anel = p.mes
     ? '<div class="rl-anel rl-st" style="--i:2"' + rlL('Vendas do mês', vdL) + '><svg viewBox="-10 -10 300 300" aria-label="Meta do mês"><defs><linearGradient id="rlGradAnel" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#f6a350"/><stop offset=".6" stop-color="#ffd166"/><stop offset="1" stop-color="#3ddc97"/></linearGradient></defs>'
       + '<circle class="trilho" cx="140" cy="140" r="' + R + '"/><circle class="arco" cx="140" cy="140" r="' + R + '" stroke="url(#rlGradAnel)" transform="rotate(-90 140 140)" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '" data-rl-arco="' + (C * (1 - frac)).toFixed(1) + '"/>'
-      + mk(metaP, 'P') + mk(metaM, 'M') + '<text class="rot-m" x="140" y="16" text-anchor="middle">G</text>'
-      + '<foreignObject x="40" y="80" width="200" height="120"><div xmlns="http://www.w3.org/1999/xhtml" class="rl-anel-c" style="text-align:center;">' + rlNumAnim(frac * 100, 'pct') + '<div style="font-size:.66rem;font-weight:800;color:var(--text2);letter-spacing:1px;">DA META G (R$ 800 MIL)</div></div></foreignObject></svg>'
-      + '<div class="rl-anel-l">' + [['P', metaP], ['M', metaM], ['G', metaG]].map(function(m) { return '<span class="' + (A.fat >= m[1] ? 'ok' : '') + '">' + (A.fat >= m[1] ? '✓ ' : '') + 'Meta ' + m[0] + ' ' + rlMil(m[1]) + '</span>'; }).join('') + '</div>'
+      + mk(metaP, 'P') + mk(metaM, 'M') + mk(metaG, 'G') + '<text class="rot-m" x="140" y="16" text-anchor="middle">GG</text>'
+      + '<foreignObject x="40" y="80" width="200" height="120"><div xmlns="http://www.w3.org/1999/xhtml" class="rl-anel-c" style="text-align:center;">' + rlNumAnim(frac * 100, 'pct') + '<div style="font-size:.66rem;font-weight:800;color:var(--text2);letter-spacing:1px;">DA META GG (R$ 1 MILHÃO)</div></div></foreignObject></svg>'
+      + '<div class="rl-anel-l">' + [['P', metaP], ['M', metaM], ['G', metaG], ['GG', metaGG]].map(function(m) { return '<span class="' + (A.fat >= m[1] ? 'ok' : '') + '">' + (A.fat >= m[1] ? '✓ ' : '') + 'Meta ' + m[0] + ' ' + rlMil(m[1]) + '</span>'; }).join('') + '</div>'
       + (pr ? '<div style="font-size:.78rem;color:var(--text2);font-weight:700;">Projeção do mês: <b style="color:var(--text);">' + rlMil(pr) + '</b></div>' : '') + '</div>'
     : '<div class="rl-anel rl-st" style="--i:2"><div class="rl-kpi" style="width:100%;max-width:320px;"' + rlL('Lead apareceu na reunião', rlOrdemStatus(A.t.l.re)) + '><small>Vendido por reunião realizada</small>' + rlNumAnim(A.porReuniao, 'moeda') + rlDelta(A.porReuniao, B.porReuniao) + '</div></div>';
   return '<section class="rl-sec rl-hero" id="rl-capa" data-rl="capa"><div>'
@@ -27128,6 +27136,7 @@ function rlKpis(p, A, B, C) {
     k('Taxa de fechamento', A.conv * 100, 'pct', B.conv * 100, '#3ddc97', null, 'vendas ÷ reuniões em que o lead apareceu', false, rlL('Lead apareceu (vendas primeiro)', reL)),
     k('No-show', A.nsPct * 100, 'pct', B.nsPct * 100, '#ff6b6b', null, A.ns + ' faltas · referência: até 15%', true, rlL('No-show do período', A.t.l.ns))
   ]);
+  if (typeof rlKGrupoWs === 'function') h += rlKGrupoWs(A, B, 20);   // 03/10/2026: dentro × fora do workshop
   var lz = [
     k('Leads', A.leads, 'int', B.leads, '#6ea8ff', serie('leads'), A.pago + ' de anúncio · ' + A.org + ' orgânico', false, rlL('Leads do período', A.L, 'lead')),
     k('Qualificados (MQL)', A.mql, 'int', B.mql, '#b98aff', null, rlPct(A.leads ? A.mql / A.leads : 0) + ' dos leads · R$ 500+/mês', false, rlL('Leads qualificados (MQL)', A.mqlL, 'lead'))
@@ -27213,17 +27222,17 @@ function rlMeta(p, A) {
   var hoje = new Date(), mes = new Date(p.ini), fimMes = new Date(mes.getFullYear(), mes.getMonth() + 1, 1), restam = 0;
   for (var d = new Date(Math.max(hoje.getTime() + 864e5, mes.getTime())); d < fimMes; d = new Date(d.getTime() + 864e5)) { d.setHours(0, 0, 0, 0); if (d.getDay() !== 0) restam++; }
   if (p.k === 'mesant') restam = 0;
-  var metas = [['P', 450000, '#ff6b6b', 'linear-gradient(90deg,#ff6b6b,#ff9a8a)'], ['M', 600000, '#f6a350', 'linear-gradient(90deg,#f6a350,#ffd166)'], ['G', 800000, '#3ddc97', 'linear-gradient(90deg,#3ddc97,#8ef0c6)']];
+  var metas = [['P', 450000, '#ff6b6b', 'linear-gradient(90deg,#ff6b6b,#ff9a8a)'], ['M', 600000, '#f6a350', 'linear-gradient(90deg,#f6a350,#ffd166)'], ['G', 800000, '#3ddc97', 'linear-gradient(90deg,#3ddc97,#8ef0c6)'], ['GG', 1000000, '#b98aff', 'linear-gradient(90deg,#b98aff,#d9c2ff)']];
   var h = '<div class="rl-metas">';
   metas.forEach(function(m, i) {
     var falta = Math.max(0, m[1] - A.fat), pct = Math.min(100, A.fat / m[1] * 100), ok = A.fat >= m[1];
     var vendas = A.ticket ? Math.ceil(falta / A.ticket) : 0;
     h += '<div class="rl-meta rl-st' + (ok ? ' ok' : '') + '" style="--i:' + i + '"' + rlL('Vendas do mês · Meta ' + m[0], A.t.l.vd) + '><h4 style="color:' + m[2] + ';">Meta ' + m[0] + ' · ' + rlMil(m[1]) + '</h4>' + rlNumAnim(pct, 'pct')
-      + '<div class="rl-meta-bar"><i style="width:' + pct.toFixed(1) + '%;background:' + m[3] + ';" class="rl-corrida" data-ceo="' + (['joao', 'pv', 'ambos'][i] || 'pv') + '"></i></div>'
+      + '<div class="rl-meta-bar"><i style="width:' + pct.toFixed(1) + '%;background:' + m[3] + ';" class="rl-corrida" data-ceo="' + (['joao', 'pv', 'ambos', 'joao'][i] || 'pv') + '"></i></div>'
       + '<p>' + (ok ? '<strong>🎉 Batida!</strong> ' + rlMil(A.fat - m[1]) + ' acima.' : 'Falta <strong>' + rlMil(falta) + '</strong>' + (restam ? ' em ' + restam + ' dias úteis — <strong>' + rlMil(falta / restam) + '/dia</strong>' : '') + (vendas ? ' · cerca de <strong>' + vendas + ' vendas</strong> no ticket atual' : '') + '.') + '</p></div>';
   });
   h += '</div>';
-  return rlSec('meta', 'Meta', 'Onde estamos na meta', 'Metas P, M e G do mês sobre o Vendido (o mesmo da Visão Geral). O ritmo por dia considera os dias úteis que faltam (segunda a sábado).', h);
+  return rlSec('meta', 'Meta', 'Onde estamos na meta', 'Metas P, M, G e GG do mês sobre o Vendido (o mesmo da Visão Geral). O ritmo por dia considera os dias úteis que faltam (segunda a sábado).', h);
 }
 function rlClosers(A, B) {
   var antes = {}; ((B && B.d.closers) || []).forEach(function(c) { antes[v2norm(c.nome)] = c; });
@@ -27614,10 +27623,10 @@ function rlDisparos(p) {
 // 🎬 GRAVAÇÕES PARA ESTUDAR (Bruno 27/09/2026: "coloque as que viraram e as que não viraram" / "que deveriam ter fechado"):
 // ✅ as que viraram venda e ⚠️ as que DEVERIAM ter fechado = reunião feita, não comprou, e o lead era qualificado
 // (prioridade máxima ou menor no formulário) — prioridade máxima primeiro
-function rlGravacoes(p, X) {
+function rlGravacoes(p, X, soPn) {
   if (typeof GRAV === 'undefined') return '';
   if (!GRAV.itens || !GRAV.itens.length) return GRAV.carregado ? '' : rlSec('gravacoes', 'Gravações', 'Reuniões para o time estudar', '', '<div class="rl-vazio"><span class="mv-brilho-txt">Carregando as gravações…</span></div>');
-  var noPer = GRAV.itens.filter(function(x) { var tt = x.d ? new Date(x.d.slice(0, 10) + 'T12:00:00').getTime() : 0; return tt >= p.ini && tt < p.fim && (x.rec || []).length; });
+  var noPer = GRAV.itens.filter(function(x) { var tt = x.d ? new Date(x.d.slice(0, 10) + 'T12:00:00').getTime() : 0; return tt >= p.ini && tt < p.fim && (x.rec || []).length && (!soPn || rlPn((GRAV.closers || {})[x.k] || x.k) === soPn); });
   var vend = noPer.filter(function(x) { return gravStatus(x) === 'vendido'; });
   var rk = { alta: 2, media: 1 };
   var dev = noPer.filter(function(x) { return gravStatus(x) === 'naovendido'; })
@@ -27637,7 +27646,7 @@ function rlGravacoes(p, X) {
   };
   var h = bloco('✅ Viraram venda — o que fazer igual', vend, 'ok', 'Gravações que viraram venda')
     + bloco('⚠️ Deveriam ter fechado — lead qualificado que não comprou', dev, 'dev', 'Gravações que deveriam ter fechado');
-  return rlSec('gravacoes', 'Gravações', 'Reuniões para o time estudar', 'As que viraram venda e as que deveriam ter fechado (reunião feita com lead de prioridade máxima ou menor, sem venda). Clique para assistir.', h);
+  return rlSec('gravacoes', 'Gravações', soPn ? 'Suas reuniões gravadas' : 'Reuniões para o time estudar', 'As que viraram venda e as que deveriam ter fechado (reunião feita com lead de prioridade máxima ou menor, sem venda). Clique para assistir.', h);
 }
 // 🧭 ERROS A MELHORAR — o que a consultoria da Thalita Gaku apontou (reuniões de 08/09, 14/09 e 15/09), medido com os números do período
 function rlGaku(p, A, X) {
@@ -27650,9 +27659,9 @@ function rlGaku(p, A, X) {
   var semQ = A.mqlL.filter(function(l) { return !(l.tel8 && X.comReu[l.tel8]); });
   // (Bruno 27/09/2026: "considere MQL também"): a taxa dos qualificados aparece ao lado da taxa de todos
   var mqlMarcou = A.mql - semQ.length, txM = A.mql ? mqlMarcou / A.mql : 0;
-  cards.push({ ico: '📅', t: 'Marcar pelo menos 30% dos leads', gk: '“O SDR não dá conta de marcar todo mundo que chega.” Meta: 30% do total de leads vira reunião; inverter a fila (primeiro quem acabou de chegar).',
+  cards.push({ ico: '📅', t: 'Marcar 17% dos leads (30% dos MQL)', gk: '“O SDR não dá conta de marcar todo mundo que chega.” Meta ajustada em 03/10: 17% de todos os leads e 30% dos qualificados (MQL) viram reunião; inverter a fila (primeiro quem acabou de chegar).',
     v: rlNumAnim(tx * 100, 'pct') + '<em class="rl-gc-v2"' + rlL('MQL que já tiveram reunião', A.mqlL.filter(function(l) { return l.tel8 && X.comReu[l.tel8]; }), 'lead') + '>MQL ' + rlNumAnim(txM * 100, 'pct') + '</em>',
-    sub: 'todos: ' + marcou.length + ' de ' + A.leads + ' leads · MQL: ' + mqlMarcou + ' de ' + A.mql + ' qualificados já tiveram reunião', s: nv(tx >= 0.3, tx >= 0.2),
+    sub: 'todos: ' + marcou.length + ' de ' + A.leads + ' leads · MQL: ' + mqlMarcou + ' de ' + A.mql + ' qualificados já tiveram reunião', s: nv(tx >= 0.17 && txM >= 0.3, tx >= 0.12 || txM >= 0.2),
     faz: '<b>' + semQ.length + ' leads qualificados</b> ainda sem reunião — é a fila do SDR.', lst: rlL('Leads qualificados que ainda não marcaram', semQ, 'lead') });
   // 2) no-show
   cards.push({ ico: '🙈', t: 'No-show perto de 15%', gk: 'Estava perto de 50%. Lembretes 48 h / 24 h / 2 h com case do nicho, “evento” no WhatsApp logo após agendar e o closer abrindo o dia confirmando as reuniões.',
@@ -27855,6 +27864,595 @@ function rlImprimir() {
   rlSecs().forEach(rlRevelar);
   document.body.classList.add('rl-imprimindo');
   setTimeout(function() { window.print(); setTimeout(function() { document.body.classList.remove('rl-imprimindo'); }, 600); }, 400);
+}
+</script>
+<style id="rl-pessoa-estilo">
+/* 👤 Relatório por função (03/10/2026) */
+html.rl-fora .nav-item[data-s="relatorio"], html.rl-fora #s-relatorio, html.rl-fora .tb-tile[data-s="relatorio"], html.rl-fora .tb-it[data-s="relatorio"] { display:none !important; }
+.rl-quem { display:flex; align-items:center; gap:6px; flex-wrap:wrap; width:100%; padding:0 0 10px; margin:0 0 2px; border-bottom:1px solid var(--rl-borda); }
+.rl-quem > small { font-size:.6rem; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-right:4px; }
+.rl-qc { display:inline-flex; align-items:center; gap:7px; min-height:32px; padding:3px 12px 3px 3px; border-radius:99px; border:1px solid var(--rl-borda); background:rgba(255,255,255,.03); color:var(--text2); font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; transition:background .2s, border-color .2s, color .2s; }
+.rl-qc .rl-av { width:26px; height:26px; border-radius:50%; background:#2a2f3a center/cover no-repeat; display:grid; place-items:center; font-style:normal; font-weight:900; color:#fff; font-size:.6rem; }
+.rl-qc.time { padding-left:12px; }
+.rl-qc:hover { border-color:rgba(246,163,80,.4); color:var(--text); }
+.rl-qc.on { background:rgba(246,163,80,.16); border-color:rgba(246,163,80,.6); color:var(--text); }
+.rl-qc:focus-visible { outline:2px solid var(--rl-y); outline-offset:2px; }
+.rl-eu { display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; }
+.rl-eu-f { width:min(190px, 44vw); aspect-ratio:1; border-radius:50%; background:#2a2f3a center/cover no-repeat; display:grid; place-items:center; font-family:var(--rl-disp); font-style:normal; font-weight:900; font-size:3rem; color:#fff;
+  box-shadow:0 0 0 6px rgba(246,163,80,.16), 0 22px 50px rgba(0,0,0,.35); }
+.rl-eu b { font-family:var(--rl-disp); font-size:1.5rem; font-weight:900; text-transform:uppercase; letter-spacing:.5px; }
+.rl-fn { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+.rl-fn span { padding:4px 11px; border-radius:99px; font-size:.6rem; font-weight:900; letter-spacing:1.3px; text-transform:uppercase; background:rgba(255,255,255,.06); border:1px solid var(--rl-borda); color:var(--text2); }
+.rl-fn span.closer { color:#ffd166; border-color:rgba(255,209,102,.35); } .rl-fn span.sdr { color:#ff8fc0; border-color:rgba(255,143,192,.35); } .rl-fn span.ss { color:#b98aff; border-color:rgba(185,138,255,.35); }
+.rl-vendo { max-width:260px; font-size:.7rem; line-height:1.4; color:var(--muted); font-weight:700; }
+.rl-tref { display:block; margin-top:5px; font-size:.62rem; font-weight:800; color:var(--muted); letter-spacing:.2px; }
+.rl-tref b { display:inline !important; font-size:inherit !important; font-family:inherit !important; color:var(--text2); }
+.rl-mini2 { margin-top:12px; }
+.rl-mini2-t { margin:18px 0 0; font-size:.6rem; font-weight:900; letter-spacing:1.4px; text-transform:uppercase; color:#b98aff; }
+.rl-cx-sub { margin:-6px 0 12px; font-size:.68rem; color:var(--muted); font-weight:700; }
+.rl-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.rl-tags span { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:99px; background:rgba(0,0,0,.22); border:1px solid var(--rl-borda); font-size:.68rem; font-weight:800; color:var(--text2); cursor:pointer; }
+.rl-tags span b { color:var(--text); }
+.rl-pl.rl-pl-cl .nm { min-width:0; } .rl-pl.rl-pl-cl .nm small { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rl-fx { display:flex; flex-direction:column; gap:6px; margin-top:14px; }
+.rl-fx > div { display:grid; grid-template-columns:12px minmax(0,1fr) repeat(3, minmax(48px,auto)); gap:10px; align-items:center; padding:8px 10px; border-radius:12px; background:rgba(0,0,0,.18); font-size:.72rem; font-weight:700; color:var(--text2); }
+.rl-fx > div.cab { background:transparent; padding-top:0; padding-bottom:0; font-size:.56rem; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+.rl-fx i { width:10px; height:10px; border-radius:3px; } .rl-fx span { text-align:right; font-variant-numeric:tabular-nums; }
+@media (max-width:760px) {
+  .rl-fx > div { grid-template-columns:12px minmax(0,1fr) repeat(3, minmax(40px,auto)); gap:8px; }
+  .rl-eu-f { width:min(150px, 40vw); font-size:2.4rem; }
+}
+</style>
+<script>
+// ===== 👤 RELATÓRIO POR FUNÇÃO (Bruno 03/10/2026: "o relatório deve ser ajustado à função de cada"; "os admin possam ver o
+// desempenho de cada e o do time"; "só o time vê, pessoas de outras áreas não"; Visitante nenhum; Financeiro só Comissões) =====
+// Quem entra com o próprio nome (closer, SDR, Social Selling) vê SÓ o próprio relatório, do jeito da função dele.
+// Admin (Bruno, Adm) vê o do time e escolhe uma pessoa para ver como ela vê. Juliane (CS), Visitante e Suellen não veem a aba.
+// Função de cada um (mesma divisão das comissões). Quem entrar no time e não estiver aqui: closer se está em CLOSERS,
+// SDR se marcou reuniões nos últimos 14 dias.
+var RL_FUNCOES = { bruno: ['closer'], tony: ['closer'], wesllene: ['closer'], sarah: ['closer', 'ss'], selina: ['sdr'], ismael: ['sdr'] };
+var RL_FUNCAO_TXT = { closer: 'Closer', sdr: 'SDR', ss: 'Social Selling' };
+function rlPn(n) { return v2norm(plPessoa(n || '') || '').split(/\s+/)[0] || ''; }
+function rlFuncoesDe(pn) {
+  if (RL_FUNCOES[pn]) return RL_FUNCOES[pn];
+  if ((typeof CLOSERS !== 'undefined' ? CLOSERS : []).some(function(c) { return c.key === pn; })) return ['closer'];
+  try { if ((plSdrsAtivos() || []).some(function(n) { return rlPn(n) === pn; })) return ['sdr']; } catch (e) {}
+  return [];
+}
+function rlQuem() {
+  var login = ''; try { login = localStorage.getItem('v2Login') || ''; } catch (e) {}
+  var hn = location.hostname, local = !hn || hn === 'localhost' || hn === '127.0.0.1';
+  var a = null; (typeof ACESSOS !== 'undefined' ? ACESSOS : []).forEach(function(x) { if (x.nome === login) a = x; });
+  if (!a) return local ? { adm: true } : { fora: true };
+  if (a.adm) return { adm: true };
+  if (a.soOlha || a.executivo || a.contratos || a.financeiro) return { fora: true };
+  var pn = v2norm(login).split(/\s+/)[0];
+  return rlFuncoesDe(pn).length ? { pessoa: pn } : { fora: true };
+}
+function rlNomeDe(pn) {
+  var n = '';
+  (typeof ACESSOS !== 'undefined' ? ACESSOS : []).forEach(function(x) { if (!n && v2norm(x.nome).split(/\s+/)[0] === pn) n = x.nome; });
+  if (!n) (typeof CLOSERS !== 'undefined' ? CLOSERS : []).forEach(function(c) { if (!n && c.key === pn) n = c.nome; });
+  n = String(n || (pn.charAt(0).toUpperCase() + pn.slice(1))).replace(/\s+Promov$/i, '');
+  return n;
+}
+// some com a aba de quem não é do time comercial (e tira da tela se estiver aberta)
+function rlAplicarAcesso() {
+  var Q = rlQuem();
+  document.documentElement.classList.toggle('rl-fora', !!Q.fora);
+  if (Q.fora) {
+    var at = document.querySelector('.screen.active');
+    if (at && at.id === 's-relatorio') { var ini = document.querySelector('.nav-item[data-s="visao"]'); if (ini) ini.click(); }
+  }
+  if (Q.pessoa) RL.quem = Q.pessoa; else if (!Q.adm) RL.quem = '';
+  return Q;
+}
+try { rlAplicarAcesso(); } catch (eRlA) {}
+if (typeof window.mostrarAcessoAtual === 'function') {
+  var _rlMaa = window.mostrarAcessoAtual;
+  window.mostrarAcessoAtual = function () { var r = _rlMaa.apply(this, arguments); try { rlAplicarAcesso(); } catch (e) {} return r; };
+}
+// admin: escolhe de quem é o relatório (time ou uma pessoa)
+function rlChipsQuem() {
+  if (!rlQuem().adm) return '';
+  return '<div class="rl-quem"><small>Relatório de</small>'
+    + '<button type="button" class="rl-qc time' + (!RL.quem ? ' on' : '') + '" onclick="rlVerQuem(\'\')" aria-pressed="' + (!RL.quem) + '">👥 Time</button>'
+    + Object.keys(RL_FUNCOES).map(function(k) {
+        var n = rlNomeDe(k), fs = RL_FUNCOES[k].map(function(f) { return RL_FUNCAO_TXT[f]; }).join(' + ');
+        return '<button type="button" class="rl-qc' + (RL.quem === k ? ' on' : '') + '" onclick="rlVerQuem(\'' + k + '\')" title="' + rlE(n + ' · ' + fs) + '" aria-pressed="' + (RL.quem === k) + '">' + rlAvatar(n) + rlE(n.split(' ')[0]) + '</button>';
+      }).join('')
+    + '</div>';
+}
+function rlVerQuem(k) { RL.quem = k; RL.tent = 0; rlRender(); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {} }
+// ---------- números de uma pessoa ----------
+function rlCalcPessoa(p, pn, f) {
+  var dela = f === 'closer' ? function(r) { return rlPn(r.closer) === pn; } : function(r) { return rlPn(r.sdr) === pn; };
+  // média do time (sem nomes) para comparar: todos os closers, ou todas as reuniões marcadas por SDR/Social Selling
+  var time = f === 'closer' ? function(r) { return !!rlPn(r.closer) && !foraDoDash(r.closer); }
+    : function(r) { var n = rlPn(r.sdr); if (!n || foraDoDash(r.sdr)) return false; try { return !plEhCloser(r.sdr); } catch (e) { return true; } };
+  var o = { A: rlCalc(p, dela), B: rlCalc(p.ant, dela), T: rlCalc(p, time) };
+  if (f !== 'closer') { o.LA = rlLeadsDe(p, pn); o.LB = rlLeadsDe(p.ant, pn); }
+  return o;
+}
+// leads que chegaram no período e são da pessoa na Clint: recebeu → MQL → marcou → compareceu (a mesma conta do Placar)
+function rlLeadsDe(p, pn) {
+  var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
+  var vistos = {}, f = { rec: [], mql: [], ag: [], comp: [], pre: null, mqlAg: 0, mqlSem: [] };
+  (LD.rows || []).forEach(function(l) {
+    var tc = tcPor[l.tel8], lT = (tc && tc.chegou) ? tc.chegou : (l.date ? l.date.getTime() : null);
+    if (lT == null || lT < p.ini || lT >= p.fim) return;
+    if (l.tel8) { if (vistos[l.tel8]) return; vistos[l.tel8] = 1; }
+    var ci = null; try { ci = clintInfoDe(l); } catch (e) {}
+    if (!ci || rlPn(ci.dono) !== pn) return;
+    f.rec.push(l);
+    if (l.faixa === 'alta' || l.faixa === 'media') f.mql.push(l);
+    var sit = null; try { sit = ldSituacao(l); } catch (e) {}
+    if (sit) { f.ag.push(l); if (sit.re || sit.vd) f.comp.push(l); }
+    if (l.faixa === 'alta' || l.faixa === 'media') { if (sit) f.mqlAg++; else f.mqlSem.push(l); }
+  });
+  // 📲 pré-agendamento: quem foi para o WhatsApp da social seller (quadro de comentários)
+  try {
+    if (typeof DONO_COMENTARIOS !== 'undefined' && rlPn(DONO_COMENTARIOS) === pn)
+      f.pre = (COMENT.rows || []).filter(function(c) { return c.preEm && c.preEm.getTime() >= p.ini && c.preEm.getTime() < p.fim; })
+        .map(function(c) { return { nome: c.nome || ('@' + c.insta), insta: c.insta, date: c.preEm, origem: c.origem || 'Instagram', tel: c.telefone || '', tel8: ldTel8(c.telefone || '') }; });
+  } catch (e) { f.pre = null; }
+  return f;
+}
+// direto × resgate (das reuniões da pessoa): quanto tempo entre o lead chegar e a reunião ser marcada
+function rlComoMarca(rows) {
+  var porTel = {}; (LD.rows || []).forEach(function(l) { if (l.tel8) (porTel[l.tel8] = porTel[l.tel8] || []).push(l); });
+  var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
+  var o = { direto: [], meio: [], resgate: [], sem: [], pago: [], org: [] };
+  rows.forEach(function(r) {
+    var mT = plDataMarcacao(r), t8 = ldTel8(r.telefone || ''), l = null;
+    (porTel[t8] || []).forEach(function(x) { if (x.date && mT != null && x.date.getTime() <= mT + 3600000 && (!l || x.date > l.date)) l = x; });
+    var tc = tcPor[t8], tF = (tc && tc.chegou && mT != null && tc.chegou <= mT + 3600000) ? tc.chegou : (l && l.date ? l.date.getTime() : null);
+    if (tF == null || mT == null) { o.sem.push(r); return; }
+    var hs = (mT - tF) / 3600000;
+    (hs <= 24 ? o.direto : hs >= 48 ? o.resgate : o.meio).push(r);
+    var tp = ''; try { tp = ldTipoTrafego(l || {}); } catch (e) {}
+    (tp === 'pago' ? o.pago : o.org).push(r);
+  });
+  return o;
+}
+// ---------- peças ----------
+function rlTref(txt) { return '<span class="rl-tref">média do time: <b>' + txt + '</b></span>'; }
+function rlKCard(rot, v, fmt, b, cor, sp, sub, menos, lst, i) {
+  return '<div class="rl-kpi rl-st" style="--i:' + i + '"' + (lst || '') + '><small>' + rot + '</small>' + rlNumAnim(v, fmt) + (b === null ? '' : rlDelta(v, b, menos, fmt === 'pct' ? 1 : 0)) + (sub ? '<span class="rl-sub">' + sub + '</span>' : '') + (sp ? rlSpark(sp, cor) : '') + '</div>';
+}
+function rlKGrupo(tit, cards) { return '<div class="rl-kgrupo"><div class="rl-kg-t rl-st">' + tit + '</div><div class="rl-kg" style="--n:' + cards.length + '">' + cards.join('') + '</div></div>'; }
+function rlFunilEt(et, fim) {
+  var mx = Math.max(1, et[0][1]), h = '<div class="rl-funil">';
+  et.forEach(function(e, i) {
+    var w = Math.max(9, Math.sqrt(e[1] / mx) * 100);
+    if (i) { var ant = et[i - 1][1]; h += '<div class="rl-fe-cv rl-st" style="--i:' + (i * 2 - 1) + '"><em>↓ ' + (ant ? rlPct(e[1] / ant) : '—') + ' seguem</em></div>'; }
+    h += '<div class="rl-fe rl-st" style="--i:' + (i * 2) + '"' + (e[5] || '') + '><span>' + e[0] + '</span><div class="rl-fe-b"><i style="--w:' + w.toFixed(1) + '%;--c1:' + e[3] + ';--c2:' + e[4] + ';">' + e[1].toLocaleString('pt-BR') + '</i></div><b>' + (e[2] == null ? '' : rlDelta(e[1], e[2])) + '</b></div>';
+  });
+  if (fim) h += '<div class="rl-fe rl-st" style="--i:' + (et.length * 2) + '"' + fim.lst + '><span>' + fim.rot + '</span><div class="rl-fe-b"><i style="--w:100%;--c1:#f6a350;--c2:#ffd166;">' + rlMoeda(fim.v) + '</i></div><b>' + rlDelta(fim.v, fim.b) + '</b></div>';
+  return h + '</div>';
+}
+function rlTrocaId(html, id, novo) { return novo === id ? html : String(html || '').replace('id="rl-' + id + '" data-rl="' + id + '"', 'id="rl-' + novo + '" data-rl="' + novo + '"'); }
+// ---------- capa ----------
+function rlHeroPessoa(p, pn, nome, fs, D, Q) {
+  var pri = nome.split(' ')[0], f0 = fs[0], A = D[f0].A, B = D[f0].B, esq = '';
+  var comp = function(x) { return (x.re + x.ns) ? x.re / (x.re + x.ns) : 0; };
+  if (f0 === 'closer') {
+    esq = '<div class="rl-fat rl-st" style="--i:2"' + rlL('Suas vendas', A.t.l.vd) + '><span>Você vendeu</span>' + rlNumAnim(A.fat, 'moeda') + rlDelta(A.fat, B.fat)
+      + '<div class="rl-regra">Reuniões em que você foi o closer, pelo dia da reunião, com status “Vendido” na planilha (os mesmos números da Visão Geral).'
+      + (A.t.mesaV ? ' <span class="rl-mesa"' + rlL('Na mesa (bloqueio de oferta + entrada)', A.t.l.mesa) + '>+ ' + rlMil(A.t.mesaV) + ' na mesa (bloqueio + entrada) ›</span>' : '') + '</div></div>'
+      + '<div class="rl-mini rl-st" style="--i:3">'
+      + '<div' + rlL('Suas vendas', A.t.l.vd) + '><small>Vendas</small>' + rlNumAnim(A.vd, 'int') + rlDelta(A.vd, B.vd) + '</div>'
+      + '<div' + rlL('Suas vendas', A.t.l.vd) + '><small>Ticket médio</small>' + rlNumAnim(A.ticket, 'mil') + rlDelta(A.ticket, B.ticket) + '</div>'
+      + '<div' + rlL('Lead apareceu na sua reunião', rlOrdemStatus(A.t.l.re)) + '><small>Lead apareceu</small>' + rlNumAnim(A.re, 'int') + rlDelta(A.re, B.re) + '</div>'
+      + '<div' + rlL('Lead apareceu (vendas primeiro)', rlOrdemStatus(A.t.l.re)) + '><small>Fechamento</small>' + rlNumAnim(A.conv * 100, 'pct') + rlDelta(A.conv, B.conv, false, 100) + '</div></div>';
+  } else {
+    esq = '<div class="rl-fat rl-st" style="--i:2"' + rlL('Reuniões que você marcou', rlOrdemStatus(A.t.l.marc)) + '><span>Reuniões que você marcou</span>' + rlNumAnim(A.marc, 'int') + rlDelta(A.marc, B.marc)
+      + '<div class="rl-regra">Reuniões em que você aparece como ' + (f0 === 'ss' ? 'Social Selling' : 'SDR') + ', pelo dia da reunião (como na Visão Geral).</div></div>'
+      + '<div class="rl-mini rl-st" style="--i:3">'
+      + '<div' + rlL('Lead apareceu', rlOrdemStatus(A.t.l.re)) + '><small>Lead apareceu</small>' + rlNumAnim(A.re, 'int') + rlDelta(A.re, B.re) + '</div>'
+      + '<div' + rlL('Lead apareceu', rlOrdemStatus(A.t.l.re)) + '><small>Comparecimento</small>' + rlNumAnim(comp(A) * 100, 'pct') + rlDelta(comp(A), comp(B), false, 100) + '</div>'
+      + '<div' + rlL('Viraram venda', A.t.l.vd) + '><small>Viraram venda</small>' + rlNumAnim(A.vd, 'int') + rlDelta(A.vd, B.vd) + '</div>'
+      + '<div' + rlL('Viraram venda', A.t.l.vd) + '><small>Vendido</small>' + rlNumAnim(A.fat, 'mil') + rlDelta(A.fat, B.fat) + '</div></div>';
+  }
+  // segunda função (Sarah: closer + Social Selling) numa linha a mais
+  fs.slice(1).forEach(function(f) {
+    var a = D[f].A, b = D[f].B;
+    esq += '<div class="rl-mini2-t rl-st" style="--i:4">Como ' + RL_FUNCAO_TXT[f] + '</div><div class="rl-mini rl-mini2 rl-st" style="--i:4">'
+      + '<div' + rlL('Reuniões que você marcou (' + RL_FUNCAO_TXT[f] + ')', rlOrdemStatus(a.t.l.marc)) + '><small>Marcou</small>' + rlNumAnim(a.marc, 'int') + rlDelta(a.marc, b.marc) + '</div>'
+      + '<div' + rlL('Lead apareceu', rlOrdemStatus(a.t.l.re)) + '><small>Lead apareceu</small>' + rlNumAnim(a.re, 'int') + rlDelta(a.re, b.re) + '</div>'
+      + '<div' + rlL('Viraram venda', a.t.l.vd) + '><small>Viraram venda</small>' + rlNumAnim(a.vd, 'int') + rlDelta(a.vd, b.vd) + '</div>'
+      + '<div' + rlL('Viraram venda', a.t.l.vd) + '><small>Vendido</small>' + rlNumAnim(a.fat, 'mil') + rlDelta(a.fat, b.fat) + '</div></div>';
+  });
+  var f = rlFoto(nome);
+  var dir = '<div class="rl-anel rl-st" style="--i:2"><div class="rl-eu">'
+    + '<i class="rl-eu-f"' + (f ? ' style="background-image:url(' + f + ')"' : ' style="background:linear-gradient(135deg,' + v2grad(nome) + ')"') + '>' + (f ? '' : rlE(v2ini(nome))) + '</i>'
+    + '<b>' + rlE(nome) + '</b><div class="rl-fn">' + fs.map(function(x) { return '<span class="' + x + '">' + RL_FUNCAO_TXT[x] + '</span>'; }).join('') + '</div>'
+    + (Q.adm ? '<span class="rl-vendo">Você está vendo o relatório do jeito que ' + rlE(pri) + ' vê. Para voltar ao do time, toque em “👥 Time” lá em cima.</span>' : '')
+    + '</div></div>';
+  return '<section class="rl-sec rl-hero" id="rl-capa" data-rl="capa"><div>'
+    + '<span class="rl-eb rl-st">' + (Q.adm ? 'Relatório de ' + rlE(pri) : 'Seu relatório, ' + rlE(pri)) + ' · ' + fs.map(function(x) { return RL_FUNCAO_TXT[x]; }).join(' + ') + '</span>'
+    + '<h1 class="rl-st" style="--i:1">' + rlE(p.rot) + '<small>' + (p.k === 'mes' ? 'até hoje, ' + rlDia(Date.now()) : 'fechado') + ' · comparado com ' + rlE(p.ant.rot) + '</small></h1>'
+    + esq + '</div>' + dir + '</section>';
+}
+// ---------- closer ----------
+function rlPessoaCloser(p, pn, d, X, pre) {
+  var A = d.A, B = d.B, T = d.T, S = A.S, serie = function(k) { return S.map(function(x) { return x[k]; }); }, i = 0;
+  var vdL = A.t.l.vd, reL = rlOrdemStatus(A.t.l.re), h = '';
+  var nsT = T.nsPct * 100;
+  var k = '<div class="rl-kpis2">'
+    + rlKGrupo('💰 Suas vendas', [
+        rlKCard('Vendido', A.fat, 'moeda', B.fat, '#f6a350', serie('fat'), 'antes: ' + rlMil(B.fat), false, rlL('Suas vendas', vdL), i++),
+        rlKCard('Vendas', A.vd, 'int', B.vd, '#3ddc97', serie('vd'), 'antes: ' + B.vd, false, rlL('Suas vendas', vdL), i++),
+        rlKCard('Ticket médio', A.ticket, 'moeda', B.ticket, '#ffd166', null, rlTref(rlMil(T.ticket)), false, rlL('Suas vendas', vdL), i++),
+        rlKCard('Vendido por reunião', A.porReuniao, 'moeda', B.porReuniao, '#f6a350', null, 'vendido ÷ reuniões em que o lead apareceu' + rlTref(rlMil(T.porReuniao)), false, rlL('Lead apareceu na sua reunião', reL), i++)])
+    + rlKGrupo('📅 Suas reuniões', [
+        rlKCard('Reuniões', A.marc, 'int', B.marc, '#ff8fc0', serie('marc'), 'antes: ' + B.marc, false, rlL('Suas reuniões', rlOrdemStatus(A.t.l.marc)), i++),
+        rlKCard('Lead apareceu', A.re, 'int', B.re, '#5eead4', serie('re'), A.pend ? A.pend + ' ainda sem resultado na planilha' : 'antes: ' + B.re, false, rlL('Lead apareceu na sua reunião', reL), i++),
+        rlKCard('Taxa de fechamento', A.conv * 100, 'pct', B.conv * 100, '#3ddc97', null, 'vendas ÷ reuniões em que o lead apareceu' + rlTref(rlPct(T.conv)), false, rlL('Lead apareceu (vendas primeiro)', reL), i++),
+        rlKCard('No-show', A.nsPct * 100, 'pct', B.nsPct * 100, '#ff6b6b', null, A.ns + ' faltas · referência: até 15%' + rlTref(Math.round(nsT) + '%'), true, rlL('Seus no-shows', A.t.l.ns), i++)])
+    + rlKGrupoWs(A, B, i)
+    + '</div>';
+  h += rlSec(pre + 'kpis', 'Closer', 'Seus números como closer', 'Cada número compara com ' + rlE(p.ant.rot) + ' (a seta). Embaixo, a <b>média do time</b> no mesmo período, sem nomes, para você ter referência. <b>Clique em qualquer número para ver as reuniões.</b>', k);
+  if (A.t.l.pend.length) h = h.replace('</section>', '<div class="rl-regra" style="margin-top:14px;"><span class="rl-mesa"' + rlL('Reuniões que já passaram e estão sem resultado na planilha', rlOrdemStatus(A.t.l.pend)) + '>⏳ ' + A.t.l.pend.length + (A.t.l.pend.length === 1 ? ' reunião já passou e está' : ' reuniões já passaram e estão') + ' sem resultado na planilha — atualize para os números ficarem certos ›</span></div></section>');
+  h += rlSec(pre + 'funil', 'Funil', 'Da reunião à venda', 'Das suas reuniões, quantas o lead apareceu e quantas viraram venda.', rlFunilEt([
+    ['Reuniões', A.marc, B.marc, '#ff8fc0', '#ffb3d4', rlL('Suas reuniões', rlOrdemStatus(A.t.l.marc))],
+    ['Lead apareceu', A.re, B.re, '#5eead4', '#99f6e4', rlL('Lead apareceu na sua reunião', reL)],
+    ['Vendas', A.vd, B.vd, '#3ddc97', '#8ef0c6', rlL('Suas vendas', vdL)]
+  ], { rot: 'Vendido', v: A.fat, b: B.fat, lst: rlL('Suas vendas', vdL) }));
+  h += rlTrocaId(rlEvolucao(p, A), 'evolucao', pre + 'evolucao');
+  h += rlTrocaId(rlProdutos(A), 'produtos', pre + 'produtos');
+  h += rlTrocaId(rlOrigens(A, B), 'origens', pre + 'origens');
+  try { h += rlTrocaId(rlGravacoes(p, X, pn), 'gravacoes', pre + 'gravacoes'); } catch (e) {}
+  return h;
+}
+// ---------- SDR e Social Selling ----------
+function rlPessoaSdr(p, pn, f, d, X, pre) {
+  var A = d.A, B = d.B, T = d.T, LA = d.LA, LB = d.LB, S = A.S, serie = function(k) { return S.map(function(x) { return x[k]; }); }, i = 0, h = '';
+  var comp = function(x) { return (x.re + x.ns) ? x.re / (x.re + x.ns) : 0; }, mL = rlOrdemStatus(A.t.l.marc), reL = rlOrdemStatus(A.t.l.re), nomeF = RL_FUNCAO_TXT[f];
+  var k = '<div class="rl-kpis2">'
+    + rlKGrupo('📅 Suas reuniões', [
+        rlKCard('Marcou', A.marc, 'int', B.marc, '#ff8fc0', serie('marc'), 'antes: ' + B.marc, false, rlL('Reuniões que você marcou', mL), i++),
+        rlKCard('Lead apareceu', A.re, 'int', B.re, '#5eead4', serie('re'), A.pend ? A.pend + ' ainda sem resultado na planilha' : 'antes: ' + B.re, false, rlL('Lead apareceu', reL), i++),
+        rlKCard('Comparecimento', comp(A) * 100, 'pct', comp(B) * 100, '#3ddc97', null, 'apareceram ÷ (apareceram + faltaram)' + rlTref(rlPct(comp(T))), false, rlL('Lead apareceu', reL), i++),
+        rlKCard('No-show', A.nsPct * 100, 'pct', B.nsPct * 100, '#ff6b6b', null, A.ns + ' faltas · referência: até 15%' + rlTref(Math.round(T.nsPct * 100) + '%'), true, rlL('No-shows das suas reuniões', A.t.l.ns), i++)])
+    + rlKGrupo('💰 O que virou venda', [
+        rlKCard('Viraram venda', A.vd, 'int', B.vd, '#3ddc97', serie('vd'), 'antes: ' + B.vd, false, rlL('Viraram venda', A.t.l.vd), i++),
+        rlKCard('Vendido', A.fat, 'moeda', B.fat, '#f6a350', serie('fat'), 'das reuniões que você marcou', false, rlL('Viraram venda', A.t.l.vd), i++),
+        rlKCard('Venda por reunião', A.conv * 100, 'pct', B.conv * 100, '#ffd166', null, 'vendas ÷ reuniões em que o lead apareceu' + rlTref(rlPct(T.conv)), false, rlL('Lead apareceu (vendas primeiro)', reL), i++)])
+    + rlKGrupo('🙋 Seus leads na Clint', [
+        rlKCard('Leads recebidos', LA.rec.length, 'int', LB.rec.length, '#6ea8ff', null, 'chegaram no período e são seus na Clint', false, rlL('Seus leads recebidos', LA.rec, 'lead'), i++),
+        rlKCard('Qualificados (MQL)', LA.mql.length, 'int', LB.mql.length, '#b98aff', null, rlPct(LA.rec.length ? LA.mql.length / LA.rec.length : 0) + ' dos seus leads · R$ 500+/mês', false, rlL('Seus leads qualificados (MQL)', LA.mql, 'lead'), i++),
+        rlKCard('Marcação', LA.rec.length ? LA.ag.length / LA.rec.length * 100 : 0, 'pct', LB.rec.length ? LB.ag.length / LB.rec.length * 100 : 0, '#ff8fc0', null, LA.ag.length + ' dos ' + LA.rec.length + ' marcaram reunião · meta: 17%', false, rlL('Seus leads que marcaram reunião', LA.ag, 'lead'), i++),
+        rlKCard('Marcação dos MQL', LA.mql.length ? LA.mqlAg / LA.mql.length * 100 : 0, 'pct', LB.mql.length ? LB.mqlAg / LB.mql.length * 100 : 0, '#b98aff', null, LA.mqlAg + ' dos ' + LA.mql.length + ' MQL marcaram · meta: 30%', false, rlL('Seus MQL sem reunião', LA.mqlSem, 'lead'), i++)])
+    + rlKGrupoWs(A, B, i)
+    + '</div>';
+  var semClint = !(typeof CLINT_PAINEL !== 'undefined' && CLINT_PAINEL && CLINT_PAINEL.success);
+  h += rlSec(pre + 'kpis', nomeF, 'Seus números como ' + nomeF, 'Cada número compara com ' + rlE(p.ant.rot) + ' (a seta). Embaixo, a <b>média do time</b> no mesmo período, sem nomes. <b>Clique em qualquer número para ver quem são.</b>'
+    + (semClint ? ' <span class="mv-brilho-txt">Carregando a Clint para os seus leads…</span>' : ''), k);
+  if (A.t.l.pend.length) h = h.replace('</section>', '<div class="rl-regra" style="margin-top:14px;"><span class="rl-mesa"' + rlL('Reuniões que já passaram e estão sem resultado na planilha', rlOrdemStatus(A.t.l.pend)) + '>⏳ ' + A.t.l.pend.length + (A.t.l.pend.length === 1 ? ' reunião já passou e está' : ' reuniões já passaram e estão') + ' sem resultado na planilha ›</span></div></section>');
+  // funil dos leads da pessoa
+  var et = [['Leads recebidos', LA.rec.length, LB.rec.length, '#6ea8ff', '#8fbaff', rlL('Seus leads recebidos', LA.rec, 'lead')],
+    ['Qualificados (MQL)', LA.mql.length, LB.mql.length, '#b98aff', '#d2bcff', rlL('Seus leads qualificados (MQL)', LA.mql, 'lead')]];
+  if (LA.pre) et.push(['Pré-agendamento', LA.pre.length, LB.pre ? LB.pre.length : null, '#3ddc97', '#8ef0c6', rlL('Foram para o WhatsApp (pré-agendamento)', LA.pre, 'lead')]);
+  et.push(['Marcaram reunião', LA.ag.length, LB.ag.length, '#ff8fc0', '#ffb3d4', rlL('Seus leads que marcaram reunião', LA.ag, 'lead')]);
+  et.push(['Compareceram', LA.comp.length, LB.comp.length, '#5eead4', '#99f6e4', rlL('Seus leads que compareceram', LA.comp, 'lead')]);
+  h += rlSec(pre + 'funil', 'Funil', 'Dos seus leads à reunião', 'Leads que chegaram no período e são seus na Clint' + (LA.pre ? ', e quem foi para o seu WhatsApp pelos comentários' : '') + '. A % é de uma etapa para a outra.', rlFunilEt(et));
+  // como marca: direto × resgate, pago × orgânico e a faixa do formulário
+  var cm = rlComoMarca(A.t.l.marc), totM = Math.max(1, cm.direto.length + cm.meio.length + cm.resgate.length);
+  var partes = [['direto', 'Direto (até 24 h)', '#6ea8ff'], ['meio', 'Entre 1 e 2 dias', '#9aa3b2'], ['resgate', 'Resgate (48 h ou mais)', '#ffd166']];
+  var emp = '<div class="rl-empilha">' + partes.map(function(q) { return '<i style="width:' + (cm[q[0]].length / totM * 100).toFixed(1) + '%;background:' + q[2] + ';" title="' + q[1] + ': ' + cm[q[0]].length + '"' + rlL('Marcadas · ' + q[1], rlOrdemStatus(cm[q[0]])) + '></i>'; }).join('') + '</div>'
+    + '<div class="rl-emp-l">' + partes.map(function(q) { return '<span' + rlL('Marcadas · ' + q[1], rlOrdemStatus(cm[q[0]])) + '><i style="background:' + q[2] + '"></i>' + q[1] + ' · <b>' + cm[q[0]].length + '</b> (' + rlPct(cm[q[0]].length / totM) + ')</span>'; }).join('')
+    + '</div><div class="rl-tags"><span' + rlL('Marcadas · lead de anúncio', rlOrdemStatus(cm.pago)) + '>📣 lead de anúncio <b>' + cm.pago.length + '</b></span>'
+    + '<span' + rlL('Marcadas · lead do orgânico', rlOrdemStatus(cm.org)) + '>🌱 lead do orgânico <b>' + cm.org.length + '</b></span>'
+    + (cm.sem.length ? '<span' + rlL('Marcadas sem a hora de chegada do lead', rlOrdemStatus(cm.sem)) + '>❔ sem a hora de chegada <b>' + cm.sem.length + '</b></span>' : '') + '</div>';
+  var fxs = [['alta', 'Prioridade máxima', '#3ddc97'], ['media', 'Prioridade menor', '#f6a350'], ['nda', 'Sem disponibilidade', '#6b7280'], ['sem', 'Não respondeu', '#3a3f4b'], ['', 'Sem formulário', '#262a33']], FX = {};
+  fxs.forEach(function(q) { FX[q[0]] = { m: [], re: [], vd: [] }; });
+  A.t.l.marc.forEach(function(r) { var fx = ''; try { fx = X ? X.fxDe(r) : ''; } catch (e) {} if (!FX[fx]) fx = ''; FX[fx].m.push(r); if (isRe(r.sn)) FX[fx].re.push(r); if (r.sn === 'vendido') FX[fx].vd.push(r); });
+  var tab = '<div class="rl-fx"><div class="cab"><i></i><b>Faixa do formulário</b><span>Marcadas</span><span>Apareceu</span><span>Vendas</span></div>'
+    + fxs.filter(function(q) { return FX[q[0]].m.length; }).map(function(q) { var x = FX[q[0]]; return '<div' + rlL('Marcadas · ' + q[1], rlOrdemStatus(x.m)) + '><i style="background:' + q[2] + '"></i><b>' + q[1] + '</b><span>' + x.m.length + '</span><span>' + x.re.length + '</span><span>' + x.vd.length + '</span></div>'; }).join('')
+    + '</div>';
+  h += rlSec(pre + 'como', 'Como você marca', 'Direto, resgate e o perfil dos leads', 'Direto = marcou até 24 h depois de o lead chegar; resgate = 48 h ou mais. A faixa é a resposta de investimento do formulário. Clique para ver quem são.',
+    '<div class="rl-lz"><div class="rl-cx rl-st"><h4>Quando você marcou</h4><p class="rl-cx-sub">' + (cm.direto.length + cm.meio.length + cm.resgate.length) + ' das ' + A.t.l.marc.length + ' reuniões têm a hora em que o lead chegou' + (cm.sem.length ? ' (as outras vieram de fora do formulário)' : '') + '</p>' + emp + '</div><div class="rl-cx rl-st" style="--i:1"><h4>Faixa dos leads que você marcou</h4>' + tab + '</div></div>');
+  // para quem foram as reuniões
+  var CL = {};
+  A.t.l.marc.forEach(function(r) { var n = plPessoa(r.closer) || 'Sem closer', kk = rlPn(n) || 'sem'; var c = CL[kk] || (CL[kk] = { nome: n, m: [], re: 0, ns: 0, vd: 0, vdV: 0 }); c.m.push(r); if (isRe(r.sn)) c.re++; if (r.sn === 'no show') c.ns++; if (r.sn === 'vendido') { c.vd++; c.vdV += r.valor || 0; } });
+  var cls = Object.keys(CL).map(function(kk) { return CL[kk]; }).sort(function(a, b) { return b.m.length - a.m.length || b.vdV - a.vdV; });
+  if (cls.length) {
+    var mx = Math.max.apply(null, cls.map(function(c) { return c.m.length; }).concat([1]));
+    h += rlSec(pre + 'closers', 'Closers', 'Para quem foram as suas reuniões', 'Quantas reuniões suas cada closer pegou, quantas o lead apareceu e quantas viraram venda.',
+      '<div class="rl-pess">' + cls.map(function(c, j) {
+        var cv = c.re ? c.vd / c.re : 0;
+        return '<div class="rl-pl rl-pl-cl rl-st" style="--i:' + j + '"' + rlL('Suas reuniões com ' + c.nome + ' (vendas primeiro)', rlOrdemStatus(c.m)) + '>' + rlAvatar(c.nome) + '<div class="nm"><b>' + rlE(c.nome) + '</b><small>' + c.re + ' apareceram · ' + c.ns + ' no-show · fecha ' + rlPct(cv) + '</small></div>'
+          + '<div class="br"><i style="width:' + (c.m.length / mx * 100).toFixed(1) + '%;background:linear-gradient(90deg,#b98aff,#ff8fc0);"></i></div>'
+          + '<div class="v"><b>' + c.m.length + '</b><small>reuniões</small></div><div class="v"><b>' + c.vd + '</b><small>vendas</small></div>'
+          + '<div class="v x"><b>' + c.re + '</b><small>apareceu</small></div><div class="v x"><b>' + rlMil(c.vdV) + '</b><small>vendido</small></div></div>';
+      }).join('') + '</div>');
+  }
+  h += rlTrocaId(rlEvolucao(p, A), 'evolucao', pre + 'evolucao');
+  h += rlTrocaId(rlOrigens(A, B), 'origens', pre + 'origens');
+  return h;
+}
+// ---------- tela da pessoa ----------
+function rlRenderPessoa(box, Q) {
+  RL_L = {}; RL.nL = 0; RL.nSec = 0;
+  var pn = RL.quem, fs = rlFuncoesDe(pn), p = rlPeriodo(RL.per, RL.de, RL.ate), X = null, D = {};
+  if (!fs.length) { RL.quem = ''; box.innerHTML = '<div class="rl-vazio">Não achei a função dessa pessoa.</div>'; return; }
+  RL._antRot = p.ant.rot; RL._p = p;
+  try { X = rlCruzar(); } catch (e) {}
+  try {
+    fs.forEach(function(f) { D[f] = rlCalcPessoa(p, pn, f); });
+  } catch (e) { box.innerHTML = '<div class="rl-vazio">Não consegui montar o relatório: ' + rlE(e.message) + '</div>'; return; }
+  // o que ainda falta chegar: gravações (closer), Clint e comentários (SDR/Social Selling)
+  var ehCl = fs.indexOf('closer') !== -1, ehSd = fs.some(function(f) { return f !== 'closer'; });
+  try { if (ehCl && typeof GRAV !== 'undefined' && !GRAV.carregado && !GRAV.carregando) gravCarregar(); } catch (e) {}
+  try { if (ehSd && !CLINT_PAINEL && typeof _cpPedindo !== 'undefined' && !_cpPedindo) carregarClintPainel(); } catch (e) {}
+  try { if (fs.indexOf('ss') !== -1 && !COMENT.carregado) carregarComentarios(); } catch (e) {}
+  var nome = rlNomeDe(pn), dois = fs.length > 1, h = '';
+  h += rlBarra(p);
+  h += rlHeroPessoa(p, pn, nome, fs, D, Q);
+  try { fs.forEach(function(f) { h += rlSecMeta(p, pn, f, Q, dois ? (f === 'closer' ? 'cl-' : f + '-') : ''); }); } catch (eMt) {}
+  try { h += rlSecEnergia(p, pn, fs, D, Q, X); } catch (eEn) {}
+  fs.forEach(function(f) { h += f === 'closer' ? rlPessoaCloser(p, pn, D[f], X, dois ? 'cl-' : '') : rlPessoaSdr(p, pn, f, D[f], X, dois ? f + '-' : ''); });
+  h += '<div class="rl-ctrl"><button class="btn" onclick="rlIr(-1)" aria-label="Anterior">←</button><span id="rl-cont">1 / 1</span>'
+    + '<div class="rl-pg"><i id="rl-pgi" style="width:0"></i></div><button class="btn" onclick="rlIr(1)" aria-label="Próximo">→</button><button class="btn" onclick="rlSair()">✕ Sair</button></div>';
+  box.innerHTML = h;
+  box.classList.toggle('rl-anim', !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches));
+  rlObservar();
+  clearTimeout(RL.espera);
+  var falta = (ehCl && typeof GRAV !== 'undefined' && !GRAV.carregado) || (ehSd && !(CLINT_PAINEL && CLINT_PAINEL.success)) || (fs.indexOf('ss') !== -1 && !COMENT.carregado);
+  if (falta) {
+    RL.tent = (RL.tent || 0) + 1;
+    if (RL.tent <= 6) RL.espera = setTimeout(function() { try { if (telaVisivel('s-relatorio') && !document.documentElement.classList.contains('rl-show') && !document.querySelector('#modal-a.open')) rlRender(); } catch (e) {} }, 5000);
+  }
+}
+</script>
+<style id="rl-metas-estilo">
+/* 🎯 Metas pessoais (03/10/2026) */
+.rl-mp { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:18px; }
+.rl-mp-tiers { display:flex; flex-direction:column; gap:10px; }
+.rl-mp-t { padding:12px 14px; border-radius:16px; background:var(--rl-card); border:1px solid var(--rl-borda); }
+.rl-mp-t.ok { border-color:rgba(61,220,151,.5); background:rgba(61,220,151,.06); }
+.rl-mp-th { display:flex; align-items:baseline; gap:8px; }
+.rl-mp-th b { font-family:var(--rl-disp); font-size:.95rem; font-weight:900; letter-spacing:.5px; }
+.rl-mp-th span { font-size:.72rem; color:var(--text2); font-weight:700; }
+.rl-mp-th em { margin-left:auto; font-style:normal; font-size:.72rem; font-weight:900; font-variant-numeric:tabular-nums; }
+.rl-mp-bar { position:relative; height:12px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; margin:8px 0 6px; }
+.rl-mp-bar i { position:absolute; left:0; top:0; bottom:0; border-radius:99px; }
+.rl-mp-bar s { position:absolute; top:-2px; bottom:-2px; width:2px; background:#fff; opacity:.85; }
+.rl-mp-t p { margin:0; font-size:.72rem; color:var(--text2); font-weight:600; line-height:1.45; }
+.rl-mp-t p b { color:var(--text); }
+.rl-mp-lado { display:flex; flex-direction:column; gap:10px; }
+.rl-mp-gap { padding:14px 16px; border-radius:16px; border:1px solid rgba(246,163,80,.45); background:rgba(246,163,80,.07); }
+.rl-mp-gap.ok { border-color:rgba(61,220,151,.5); background:rgba(61,220,151,.07); }
+.rl-mp-gap small { display:block; font-size:.6rem; font-weight:900; letter-spacing:1.3px; text-transform:uppercase; color:var(--muted); }
+.rl-mp-gap b.n { display:block; font-family:var(--rl-disp); font-size:1.7rem; font-weight:900; line-height:1.1; margin:2px 0; }
+.rl-mp-gap p { margin:0; font-size:.74rem; color:var(--text2); font-weight:600; line-height:1.45; }
+.rl-mp-dia { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+.rl-mp-dia div { padding:10px 12px; border-radius:14px; background:var(--rl-card); border:1px solid var(--rl-borda); }
+.rl-mp-dia small { display:block; font-size:.58rem; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); }
+.rl-mp-dia b { display:block; font-family:var(--rl-disp); font-size:1.05rem; font-weight:900; margin-top:2px; }
+.rl-mp-dia span { font-size:.64rem; color:var(--muted); font-weight:700; }
+.rl-mp-sem { margin-top:16px; overflow-x:auto; }
+.rl-mp-sem table { width:100%; border-collapse:collapse; font-size:.74rem; min-width:520px; }
+.rl-mp-sem th { text-align:left; font-size:.58rem; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--rl-borda); }
+.rl-mp-sem td { padding:8px; border-bottom:1px solid rgba(255,255,255,.05); color:var(--text2); font-weight:700; font-variant-numeric:tabular-nums; }
+.rl-mp-sem tr.agora td { background:rgba(246,163,80,.08); color:var(--text); }
+.rl-mp-sem td.ok { color:#3ddc97; } .rl-mp-sem td.ruim { color:#ff6b6b; }
+.rl-en { display:flex; flex-direction:column; gap:10px; }
+.rl-en > div { display:grid; grid-template-columns:34px minmax(0,1fr); gap:12px; align-items:start; padding:12px 14px; border-radius:16px; background:var(--rl-card); border:1px solid var(--rl-borda); }
+.rl-en > div.f1 { border-color:rgba(255,107,107,.5); background:rgba(255,107,107,.06); }
+.rl-en > div.f2 { border-color:rgba(246,163,80,.45); }
+.rl-en i { width:34px; height:34px; border-radius:12px; display:grid; place-items:center; font-style:normal; font-size:1.05rem; background:rgba(255,255,255,.06); }
+.rl-en b { display:block; font-size:.86rem; }
+.rl-en p { margin:3px 0 0; font-size:.74rem; color:var(--text2); font-weight:600; line-height:1.45; }
+.rl-en p b { display:inline; font-size:inherit; color:var(--text); }
+.rl-mt { display:flex; flex-direction:column; gap:8px; }
+.rl-mt-l { display:grid; grid-template-columns:44px minmax(110px,1fr) minmax(0,2fr) minmax(90px,.7fr) minmax(110px,.8fr); gap:12px; align-items:center; padding:10px 12px; border-radius:16px; background:var(--rl-card); border:1px solid var(--rl-borda); cursor:pointer; }
+.rl-mt-l:hover { border-color:rgba(246,163,80,.45); }
+.rl-mt-l .rl-av { width:44px; height:44px; border-radius:50%; background:#2a2f3a center/cover no-repeat; display:grid; place-items:center; font-style:normal; font-weight:900; color:#fff; font-size:.85rem; }
+.rl-mt-l .nm b { display:block; font-size:.86rem; } .rl-mt-l .nm small { font-size:.62rem; color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:.8px; }
+.rl-mt-l .v { text-align:right; } .rl-mt-l .v b { display:block; font-family:var(--rl-disp); font-size:.98rem; font-weight:900; } .rl-mt-l .v small { font-size:.6rem; color:var(--muted); font-weight:800; }
+.rl-mt-l .nm .gp { display:none; text-transform:none; letter-spacing:0; }
+.rl-mt-h { margin:14px 0 2px; font-size:.62rem; font-weight:900; letter-spacing:1.4px; text-transform:uppercase; color:var(--text2); }
+@media (max-width:980px) { .rl-mp { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:760px) {
+  .rl-mt-l { grid-template-columns:40px minmax(0,1fr) minmax(80px,auto); }
+  .rl-mt-l .rl-mp-bar, .rl-mt-l .v.x { display:none; }
+  .rl-mt-l .nm .gp { display:block; }
+  .rl-mp-dia { grid-template-columns:minmax(0,1fr); }
+}
+</style>
+<script>
+// ===== 🎯 METAS PESSOAIS (Bruno 03/10/2026: "construa uma meta e divida individualmente entre o time com base na função e tempo
+// para alcançarmos 1 milhão — P 700 mil, M 850, G 1 milhão"; "divida com base neste mês"; "quero um plano pessoal, dividido por
+// pessoa, semanal e diário, mostrando onde está o gap e onde colocar energia"). Base: o setembro de cada um, ajustado ao tempo de
+// agenda de outubro — a Wesllene começou em 09/09 (19 dias úteis → o mês cheio dela vale ~R$ 94 mil) e a Sarah faz 1 ou 2 reuniões
+// de closer no fim do dia. Closer: meta em vendido (status Vendido). SDR/Social Selling: reuniões em que o lead apareceu.
+// As metas do mês da empresa no dash continuam P 450 · M 600 · G 800 · GG 1 milhão (Bruno, 03/10/2026).
+var RL_METAS = {
+  '2026-10': {
+    nome: 'Outubro', time: { P: 700000, M: 850000, G: 1000000 }, feriados: ['2026-10-12'],
+    closer: {
+      tony:     { P: 305000, M: 370000, G: 435000, ticket: 9400,  conv: 0.436, base: 'setembro: R$ 385 mil · 41 vendas · fecha 44% · ticket R$ 9,4 mil' },
+      bruno:    { P: 300000, M: 365000, G: 430000, ticket: 15855, conv: 0.436, base: 'setembro: R$ 381 mil · 24 vendas · fecha 44% · ticket R$ 15,9 mil' },
+      wesllene: { P: 75000,  M: 90000,  G: 105000, ticket: 4033,  conv: 0.425, base: 'setembro (desde 09/09): R$ 69 mil · 17 vendas · fecha 43% — no mês cheio seriam ~R$ 94 mil' },
+      sarah:    { P: 20000,  M: 25000,  G: 30000,  ticket: 3947,  conv: 0.364, base: 'setembro: R$ 16 mil · 4 vendas · 1 ou 2 reuniões no fim do dia' }
+    },
+    sdr: {
+      selina: { P: 106, M: 127, G: 150, ns: 0.24,  base: 'setembro: 117 com o lead presente · no-show 24%' },
+      ismael: { P: 35,  M: 42,  G: 50,  ns: 0.39,  base: 'setembro: 39 com o lead presente · no-show 39%' },
+      sarah:  { P: 36,  M: 44,  G: 51,  ns: 0.245, base: 'setembro: 40 com o lead presente · no-show 25%' }
+    }
+  }
+};
+var RL_TIER_COR = { P: '#ff6b6b', M: '#f6a350', G: '#3ddc97' };
+function rlYm(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); }
+function rlDiaKey(d) { return rlYm(d) + '-' + ('0' + d.getDate()).slice(-2); }
+function rlDiaUtil(d, fer) { return d.getDay() !== 0 && (fer || []).indexOf(rlDiaKey(d)) < 0; }
+// o mês da meta: o mês de hoje (a meta é do mês; o período do relatório não muda a conta)
+function rlMetaMes() {
+  var h = new Date(), k = rlYm(h), M = RL_METAS[k]; if (!M) return null;
+  var ini = new Date(h.getFullYear(), h.getMonth(), 1), fim = new Date(h.getFullYear(), h.getMonth() + 1, 1), hoje0 = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+  var du = 0, passou = 0, sem = [], cur = null;
+  for (var d = new Date(ini); d < fim; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    if (!cur || d.getDay() === 1) { cur = { ini: d.getTime(), fim: 0, du: 0, duPassou: 0 }; sem.push(cur); }
+    cur.fim = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+    if (rlDiaUtil(d, M.feriados)) { du++; cur.du++; if (d <= hoje0) { passou++; cur.duPassou++; } }
+  }
+  return { k: k, M: M, ini: ini.getTime(), fim: fim.getTime(), ate: hoje0.getTime() + 864e5, du: du, passou: passou, resta: du - passou, sem: sem };
+}
+function rlFmtV(v, tipo) { return tipo === 'r' ? rlMil(v) : Math.round(v).toLocaleString('pt-BR'); }
+// ---------- números da pessoa no mês ----------
+function rlMetaDados(pn, f, MM) {
+  var dela = f === 'closer' ? function(r) { return rlPn(r.closer) === pn; } : function(r) { return rlPn(r.sdr) === pn; };
+  var cfg = f === 'closer' ? (MM.M.closer || {})[pn] : (MM.M.sdr || {})[pn]; if (!cfg) return null;
+  var A = rlCalc({ ini: MM.ini, fim: Math.min(MM.fim, MM.ate) }, dela);
+  var real = f === 'closer' ? A.fat : A.re;
+  var semanas = MM.sem.map(function(s) {
+    var S = s.ini < MM.ate ? rlCalc({ ini: s.ini, fim: Math.min(s.fim, MM.ate) }, dela) : null;
+    return { ini: s.ini, fim: s.fim, du: s.du, duPassou: s.duPassou, real: S ? (f === 'closer' ? S.fat : S.re) : null, S: S };
+  });
+  return { cfg: cfg, A: A, real: real, semanas: semanas, tipo: f === 'closer' ? 'r' : 'n', dela: dela };
+}
+// ---------- seção "Sua meta" ----------
+function rlSecMeta(p, pn, f, Q, pre) {
+  var MM = rlMetaMes(); if (!MM) return '';
+  var X = rlMetaDados(pn, f, MM); if (!X) return '';
+  var c = X.cfg, real = X.real, tp = X.tipo, A = X.A, pri = rlNomeDe(pn).split(' ')[0];
+  var esperado = function(t) { return c[t] * MM.passou / MM.du; };
+  var proj = MM.passou ? real / MM.passou * MM.du : 0;
+  var unid = tp === 'r' ? '' : ' com o lead presente';
+  // as três faixas
+  var tiers = ['P', 'M', 'G'].map(function(t) {
+    var pct = Math.min(100, real / c[t] * 100), esp = Math.min(100, MM.passou / MM.du * 100), ok = real >= c[t];
+    var falta = Math.max(0, c[t] - real), porDia = MM.resta ? falta / MM.resta : falta;
+    var det = '';
+    if (!ok) {
+      if (tp === 'r') { var vd = Math.ceil(falta / (c.ticket || 1)); det = 'Faltam <b>' + rlMil(falta) + '</b> · <b>' + rlMil(porDia) + '</b> por dia útil · ~' + vd + (vd === 1 ? ' venda' : ' vendas') + ' · ~' + Math.ceil(vd / (c.conv || .4)) + ' reuniões com o lead presente · ' + vd + (vd === 1 ? ' indicação' : ' indicações'); }
+      else { var nsM = c.ns || .25, marc = Math.ceil(falta / (1 - nsM)), marc15 = Math.ceil(falta / .85); det = 'Faltam <b>' + Math.ceil(falta) + '</b>' + unid + ' · <b>' + (porDia).toFixed(1).replace('.', ',') + '</b> por dia útil · marcar ~' + marc + ' com o no-show de setembro (' + Math.round(nsM * 100) + '%) ou ~' + marc15 + ' com 15%'; }
+    } else det = '<b>✅ Batida!</b> ' + rlFmtV(real - c[t], tp) + (tp === 'r' ? '' : unid) + ' acima.';
+    return '<div class="rl-mp-t rl-st' + (ok ? ' ok' : '') + '"><div class="rl-mp-th"><b style="color:' + RL_TIER_COR[t] + '">META ' + t + '</b><span>' + rlFmtV(c[t], tp) + (tp === 'r' ? '' : ' reuniões') + '</span><em>' + Math.round(real / c[t] * 100) + '%</em></div>'
+      + '<div class="rl-mp-bar"><i style="width:' + pct.toFixed(1) + '%;background:' + RL_TIER_COR[t] + ';"></i><s style="left:' + esp.toFixed(1) + '%" title="onde deveria estar hoje"></s></div><p>' + det + '</p></div>';
+  }).join('');
+  // gap de hoje (contra a P e a G) e ritmo
+  var espP = esperado('P'), espG = esperado('G'), gapP = real - espP;
+  if (tp !== 'r') gapP = Math.round(gapP);
+  var okP = gapP >= 0;
+  var gap = '<div class="rl-mp-gap rl-st' + (okP ? ' ok' : '') + '"><small>Gap até hoje · ' + MM.passou + ' de ' + MM.du + ' dias úteis</small>'
+    + '<b class="n" style="color:' + (okP ? '#3ddc97' : '#ff8a6b') + '">' + (okP ? '+' : '−') + rlFmtV(Math.abs(gapP), tp) + '</b>'
+    + '<p>' + (tp === 'r' ? 'Vendido' : 'Reuniões' + unid) + ' até hoje: <b>' + rlFmtV(real, tp) + '</b>. No ritmo da P deveria ter <b>' + rlFmtV(espP, tp) + '</b>; no da G, <b>' + rlFmtV(espG, tp) + '</b>.'
+    + (MM.passou >= 3 ? ' No ritmo de agora, o mês fecha em <b>' + rlFmtV(proj, tp) + '</b> (' + Math.round(proj / c.G * 100) + '% da G).' : '') + '</p></div>';
+  var dia = '<div class="rl-mp-dia rl-st">' + ['P', 'M', 'G'].map(function(t) {
+    var falta = Math.max(0, c[t] - real), porDia = MM.resta ? falta / MM.resta : 0, porSem = porDia * 6;
+    return '<div><small style="color:' + RL_TIER_COR[t] + '">Por dia · ' + t + '</small><b>' + (tp === 'r' ? rlMil(porDia) : porDia.toFixed(1).replace('.', ',')) + '</b><span>~' + (tp === 'r' ? rlMil(porSem) : Math.round(porSem)) + ' por semana de 6 dias</span></div>';
+  }).join('') + '</div>';
+  // semana a semana
+  var hojeT = Date.now();
+  var linhas = X.semanas.map(function(s, i) {
+    var mP = c.P * s.du / MM.du, mG = c.G * s.du / MM.du, agora = hojeT >= s.ini && hojeT < s.fim, passada = s.fim <= MM.ate - 864e5 + 1 && !agora;
+    var rot = rlDia(s.ini) + ' a ' + rlDia(s.fim - 1);
+    var cls = s.real == null ? '' : (s.real >= mG ? 'ok' : s.real >= mP ? '' : (passada ? 'ruim' : ''));
+    var lst = s.S ? rlL('Semana de ' + rot + ' · ' + pri, rlOrdemStatus(tp === 'r' ? s.S.t.l.vd : s.S.t.l.re)) : '';
+    return '<tr class="' + (agora ? 'agora' : '') + '"' + lst + '><td>' + (agora ? '▶ ' : '') + rot + '</td><td>' + s.du + '</td><td>' + rlFmtV(mP, tp) + '</td><td>' + rlFmtV(c.M * s.du / MM.du, tp) + '</td><td>' + rlFmtV(mG, tp) + '</td><td class="' + cls + '">' + (s.real == null ? '—' : rlFmtV(s.real, tp)) + '</td></tr>';
+  }).join('');
+  var sem = '<div class="rl-mp-sem rl-st"><table><tr><th>Semana</th><th>Dias úteis</th><th>Meta P</th><th>Meta M</th><th>Meta G</th><th>' + (tp === 'r' ? 'Vendido' : 'Feitas') + '</th></tr>' + linhas + '</table></div>';
+  var tit = (Q.adm ? 'Meta de ' + pri : 'Sua meta') + ' de ' + MM.M.nome.toLowerCase() + (f === 'closer' ? ' como closer' : f === 'ss' ? ' como Social Selling' : ' como SDR');
+  var sub = (tp === 'r' ? 'Em vendido (status Vendido na planilha).' : 'Em reuniões em que o lead apareceu (as que você marcou).') + ' Base: ' + c.base + '. O time soma P 700 mil · M 850 mil · G 1 milhão. O risco branco na barra é onde você deveria estar hoje. Feriado de 12/10 fora da conta.';
+  return rlSec(pre + 'meta', 'Meta pessoal', tit, sub, '<div class="rl-mp"><div class="rl-mp-tiers">' + tiers + '</div><div class="rl-mp-lado">' + gap + dia + '</div></div>' + sem);
+}
+// ---------- onde colocar energia ----------
+function rlTempoResp(pn) {   // tempo até um humano falar (últimos dias do painel de tempos), só leads de seg a sex 9h–18h
+  var L = (typeof TC !== 'undefined' && TC.dados && TC.dados.leads) || [], o = { n: 0, ate4: 0, hum: [], nunca: 0, dias: (TC && TC.dados && TC.dados.dias) || 7 };
+  L.forEach(function(x) {
+    if (!x.chegou) return;
+    var dn = x.dono || '';   // o painel de tempos às vezes vem sem o dono: pega o dono da Clint pelo telefone
+    if (!dn) { try { var ci = clintInfoDe({ tel8: x.t8, nome: x.nome }); dn = (ci && ci.dono) || ''; } catch (e) {} }
+    if (rlPn(dn) !== pn) return;
+    var d = new Date(x.chegou), h = d.getHours() + d.getMinutes() / 60; if (d.getDay() < 1 || d.getDay() > 5 || h < 9 || h >= 18) return;
+    o.n++; if (x.humano && x.humano >= x.chegou) { var m = (x.humano - x.chegou) / 60000; o.hum.push(m); if (m <= 4) o.ate4++; } else o.nunca++;
+  });
+  o.hum.sort(function(a, b) { return a - b; }); o.med = o.hum.length ? o.hum[Math.floor(o.hum.length / 2)] : null;
+  return o;
+}
+function rlMinTxt(m) { if (m == null) return '—'; if (m < 60) return Math.round(m) + ' min'; var h = Math.floor(m / 60), r = Math.round(m % 60); return h + ' h' + (r ? ' ' + ('0' + r).slice(-2) : ''); }
+function rlSecEnergia(p, pn, fs, D, Q, X) {
+  var MM = rlMetaMes(), itens = [], pri = rlNomeDe(pn).split(' ')[0];
+  var add = function(peso, ico, tit, txt, lst) { itens.push({ peso: peso, h: '<div' + (lst || '') + '><i>' + ico + '</i><div><b>' + tit + '</b><p>' + txt + '</p></div></div>' }); };
+  fs.forEach(function(f) {
+    var d = D[f], A = d.A, T = d.T, nsP = A.nsPct, Xm = MM ? rlMetaDados(pn, f, MM) : null;
+    if (f === 'closer') {
+      var c = Xm && Xm.cfg;
+      // indicações: a meta é 1 por venda (por enquanto contamos as reuniões com origem "Indicação" deste closer)
+      var ind = A.t.l.marc.filter(function(r) { return rlGrupo(r.origem) === 'Indicação'; });
+      var vdM = Xm ? Xm.A.vd : A.vd, indM = Xm ? Xm.A.t.l.marc.filter(function(r) { return rlGrupo(r.origem) === 'Indicação'; }).length : ind.length;
+      var faltaInd = c ? Math.max(0, Math.ceil(c.G / c.ticket) - indM) : 0;
+      add(!vdM ? 20 : vdM > indM ? 70 : 10, '🤝', 'Indicações: ' + indM + ' para ' + vdM + (vdM === 1 ? ' venda' : ' vendas') + ' no mês', 'A meta da Thalita é <b>1 indicação por venda</b>, e você mesmo marca o indicado. ' + (c ? 'Para a sua G são ~' + Math.ceil(c.G / c.ticket) + ' vendas, então ~' + Math.ceil(c.G / c.ticket) + ' indicações (faltam ' + faltaInd + ').' : '') + ' Peça na hora do pagamento: "quem mais você conhece que está no mesmo momento?"', rlL('Reuniões por indicação · ' + pri, rlOrdemStatus(ind)));
+      // fechamento
+      var semWs = rlCalc(p, function(r) { return rlPn(r.closer) === pn && !/workshop/i.test(r.origem || ''); });
+      if (A.re >= 4) add(semWs.conv < 0.33 ? 80 : semWs.conv < 0.4 ? 45 : 5, '🎯', 'Fechamento: ' + rlPct(A.conv) + ' (sem o workshop, ' + rlPct(semWs.conv) + ')', 'Média do time: ' + rlPct(T.conv) + '. Sem o workshop é onde está o espaço: recapitular as dores em pequenos sins <b>antes do preço</b> e perguntar "existe mais alguma objeção?". Cada 5 pontos a mais no seu fechamento valem ~' + rlMil((c ? Math.ceil(c.G / c.ticket / c.conv) : (A.re || 1)) * 0.05 * ((c && c.ticket) || A.ticket || 0)) + (c ? ' no mês' : ' no período') + '.', rlL('Reuniões sem o workshop (vendas primeiro) · ' + pri, rlOrdemStatus(semWs.t.l.re)));
+      // no-show
+      if (A.re + A.ns >= 4) add(nsP > 0.25 ? 75 : nsP > 0.15 ? 40 : 0, '📅', 'No-show das suas reuniões: ' + rlPct(nsP), 'A meta é <b>15%</b>. Comece o dia confirmando as reuniões de hoje às 8h, principalmente as que a IA ou o formulário marcaram, e mande um case do nicho na véspera.', rlL('Seus no-shows', A.t.l.ns));
+      // ritmo da meta
+      if (Xm && MM.passou) { var esp = c.P * MM.passou / MM.du; if (Xm.real < esp) add(90, '⏱', (fs.length > 1 ? 'Ritmo como closer: ' : 'Ritmo: ') + rlMil(Xm.real) + ' de ' + rlMil(esp) + ' esperados até hoje (P)', 'Para voltar ao ritmo da P: <b>' + rlMil((c.P - Xm.real) / Math.max(1, MM.resta)) + ' por dia útil</b>. Olhe primeiro os bloqueios e entradas na mesa e os follow-ups dos últimos 7 dias.', rlL('Na mesa (bloqueio + entrada) · ' + pri, Xm.A.t.l.mesa)); }
+      // líder: recuperação dos perdidos (só o Bruno)
+      if (pn === 'bruno') {
+        var tot = rlCalc({ ini: Date.now() - 45 * 864e5, fim: Date.now() - 7 * 864e5 }), perd = tot.t.l.ns.concat(tot.t.l.nf);
+        add(85, '♻️', 'Recuperação dos perdidos: ' + perd.length + ' esperando o líder', 'No-shows e "não comprou" de 7 a 45 dias atrás. A Thalita espera que ~30% voltem quando o líder chama ("sou o Bruno, líder do time…"). É o lugar onde a sua hora rende mais para a meta.', rlL('Perdidos há mais de 7 dias (no-show e não comprou)', rlOrdemStatus(perd)));
+      }
+    } else {
+      var tr = rlTempoResp(pn), LA = d.LA, cm = rlComoMarca(A.t.l.marc);
+      if (tr.n >= 5) { var p4 = tr.ate4 / tr.n; add(p4 < 0.5 ? 100 : p4 < 0.8 ? 60 : 5, '⚡', 'Responder em 4 minutos: ' + Math.round(p4 * 100) + '% dos seus leads', 'Últimos ' + tr.dias + ' dias, leads de seg a sex das 9h às 18h: ' + tr.n + ' leads, mediana até uma pessoa falar <b>' + rlMinTxt(tr.med) + '</b>, ' + tr.nunca + ' sem nenhuma mensagem humana. Quem é atendido em até 15 min marca reunião 2,7× mais. Primeiro quem acabou de chegar.', ''); }
+      if (A.re + A.ns >= 4) {
+        var nsd = cm.direto.length ? cm.direto.filter(function(r) { return r.sn === 'no show'; }).length / cm.direto.length : 0;
+        add(nsP > 0.3 ? 95 : nsP > 0.2 ? 55 : nsP > 0.15 ? 30 : 0, '🙈', 'No-show: ' + rlPct(nsP) + (cm.direto.length >= 4 ? ' (nas marcadas direto: ' + rlPct(nsd) + ')' : ''), 'A meta é <b>15%</b>. Em toda reunião, inclusive as da IA e do formulário, em até 1 hora: evento no WhatsApp + vídeo de case do nicho + "se acontecer algo, você me avisa antes para eu liberar o horário?". Lembretes de 48h, 24h e 2h.', rlL('No-shows das suas reuniões', A.t.l.ns));
+      }
+      if (LA && LA.rec.length >= 10) {
+        var tx = LA.ag.length / LA.rec.length, txM = LA.mql.length ? (LA.mqlAg || 0) / LA.mql.length : 0;
+        add(tx < 0.1 ? 70 : tx < 0.17 ? 40 : 0, '📈', 'Marcação: ' + rlPct(tx) + ' dos seus leads · ' + rlPct(txM) + ' dos MQL', 'A meta é <b>17% de todos e 30% dos MQL</b>. ' + Math.max(0, LA.mql.length - (LA.mqlAg || 0)) + ' MQL seus ainda sem reunião.', rlL('Seus MQL sem reunião', (LA.mqlSem || []), 'lead'));
+      }
+      if (Xm && MM.passou) { var c2 = Xm.cfg, esp2 = c2.P * MM.passou / MM.du; if (Math.round(esp2 - Xm.real) >= 1) add(90, '⏱', (fs.length > 1 ? 'Ritmo como ' + RL_FUNCAO_TXT[f] + ': ' : 'Ritmo: ') + Xm.real + ' reuniões com o lead presente de ' + Math.round(esp2) + ' esperadas até hoje (P)', 'Para voltar ao ritmo da P: <b>' + ((c2.P - Xm.real) / Math.max(1, MM.resta)).toFixed(1).replace('.', ',') + ' por dia útil</b> com o lead presente. Com o seu no-show de hoje, isso é marcar ~' + Math.ceil((c2.P - Xm.real) / Math.max(1, MM.resta) / Math.max(0.5, 1 - (A.nsPct || c2.ns))) + ' por dia.', ''); }
+      if (f === 'ss' && LA && LA.pre) add(LA.pre.length ? 10 : 35, '📲', 'Pré-agendamentos: ' + LA.pre.length, 'Quem foi para o seu WhatsApp pelos comentários no período. Conversa nutrida antes de passar para a reunião (a Thalita chamou de "nível um" do social selling em 08/09).', rlL('Pré-agendamentos', LA.pre, 'lead'));
+    }
+  });
+  if (!itens.length) return '';
+  itens.sort(function(a, b) { return b.peso - a.peso; });
+  var h = '<div class="rl-en">' + itens.slice(0, 4).map(function(it, i) { return it.h.replace('<div', '<div class="rl-st ' + (i === 0 ? 'f1' : i === 1 ? 'f2' : '') + '" style="--i:' + i + '"'); }).join('') + '</div>';
+  return rlSec('energia', 'Onde colocar energia', (Q.adm ? 'Onde ' + pri + ' deve' : 'Onde você deve') + ' colocar energia', 'Os pontos que a Thalita pediu, medidos com os seus números e em ordem do que mais pesa agora: o primeiro é o maior gap. Clique para ver quem são.', h);
+}
+// ---------- dentro × fora do workshop (Bruno 03/10/2026: "mostre no relatório a conversão dentro e fora do workshop") ----------
+function rlWsDiv(A) {
+  var w = { re: 0, vd: 0, ns: 0, fat: 0, reL: [], vdL: [] }, d = { re: 0, vd: 0, ns: 0, fat: 0, reL: [], vdL: [] };
+  (A.rows || []).forEach(function(r) { var o = rlGrupo(r.origem) === 'Workshop' ? w : d, sn = r.sn || ''; if (isRe(sn)) { o.re++; o.reL.push(r); } if (sn === 'no show') o.ns++; if (sn === 'vendido') { o.vd++; o.fat += r.valor || 0; o.vdL.push(r); } });
+  [w, d].forEach(function(o) { o.conv = o.re ? o.vd / o.re : 0; o.nsp = (o.re + o.ns) ? o.ns / (o.re + o.ns) : 0; });
+  return { w: w, d: d };
+}
+function rlKGrupoWs(A, B, i0) {
+  var a = rlWsDiv(A), b = rlWsDiv(B);
+  return rlKGrupo('🎓 Dentro × fora do workshop', [
+    rlKCard('Fecha no workshop', a.w.conv * 100, 'pct', b.w.conv * 100, '#f6a350', null, a.w.vd + (a.w.vd === 1 ? ' venda' : ' vendas') + ' em ' + a.w.re + ' reuniões com o lead presente · no-show ' + rlPct(a.w.nsp), false, rlL('Workshop · lead apareceu (vendas primeiro)', rlOrdemStatus(a.w.reL)), i0),
+    rlKCard('Fecha fora do workshop', a.d.conv * 100, 'pct', b.d.conv * 100, '#6ea8ff', null, a.d.vd + (a.d.vd === 1 ? ' venda' : ' vendas') + ' em ' + a.d.re + ' reuniões com o lead presente · no-show ' + rlPct(a.d.nsp), false, rlL('Fora do workshop · lead apareceu (vendas primeiro)', rlOrdemStatus(a.d.reL)), i0 + 1),
+    rlKCard('Vendido fora do workshop', a.d.fat, 'moeda', b.d.fat, '#6ea8ff', null, 'no workshop: ' + rlMil(a.w.fat), false, rlL('Vendas fora do workshop', a.d.vdL), i0 + 2)
+  ]);
+}
+// ---------- visão do time (só admin): a meta de cada um ----------
+function rlSecMetasTime() {
+  var MM = rlMetaMes(); if (!MM) return '';
+  var linha = function(pn, f) {
+    var X = rlMetaDados(pn, f, MM); if (!X) return '';
+    var c = X.cfg, real = X.real, tp = X.tipo, nome = rlNomeDe(pn), esp = c.P * MM.passou / MM.du, gap = tp === 'r' ? real - esp : Math.round(real - esp);
+    var max = c.G * 1.05, mk = function(t) { return '<s style="left:' + (c[t] / max * 100).toFixed(1) + '%;background:' + RL_TIER_COR[t] + ';width:3px;opacity:1"></s>'; };
+    return '<div class="rl-mt-l rl-st" onclick="rlVerQuem(\'' + pn + '\')" role="button" tabindex="0" title="Ver o relatório de ' + rlE(nome) + '">' + rlAvatar(nome)
+      + '<div class="nm"><b>' + rlE(nome) + '</b><small>' + RL_FUNCAO_TXT[f] + '</small><small class="gp" style="color:' + (gap >= 0 ? '#3ddc97' : '#ff8a6b') + '">' + (gap >= 0 ? 'no ritmo da P' : '−' + rlFmtV(Math.abs(gap), tp) + ' do ritmo da P') + '</small></div>'
+      + '<div class="rl-mp-bar" style="margin:0"><i style="width:' + Math.min(100, real / max * 100).toFixed(1) + '%;background:linear-gradient(90deg,#f6a350,#ffd166);"></i>' + mk('P') + mk('M') + mk('G') + '<s style="left:' + Math.min(100, esp / max * 100).toFixed(1) + '%" title="onde deveria estar hoje (P)"></s></div>'
+      + '<div class="v"><b>' + rlFmtV(real, tp) + '</b><small>de ' + rlFmtV(c.P, tp) + ' · ' + rlFmtV(c.M, tp) + ' · ' + rlFmtV(c.G, tp) + '</small></div>'
+      + '<div class="v x"><b style="color:' + (gap >= 0 ? '#3ddc97' : '#ff8a6b') + '">' + (gap === 0 && tp !== 'r' ? 'em dia' : (gap >= 0 ? '+' : '−') + rlFmtV(Math.abs(gap), tp)) + '</b><small>gap até hoje (P) · ' + (tp === 'r' ? rlMil(Math.max(0, c.P - real) / Math.max(1, MM.resta)) : (Math.max(0, c.P - real) / Math.max(1, MM.resta)).toFixed(1).replace('.', ',')) + '/dia</small></div></div>';
+  };
+  var cls = Object.keys(MM.M.closer || {}).map(function(k) { return linha(k, 'closer'); }).join('');
+  var sds = Object.keys(MM.M.sdr || {}).map(function(k) { return linha(k, k === 'sarah' ? 'ss' : 'sdr'); }).join('');
+  var somaReal = Object.keys(MM.M.closer || {}).reduce(function(s, k) { var X = rlMetaDados(k, 'closer', MM); return s + (X ? X.real : 0); }, 0);
+  var h = '<div class="rl-mt-h rl-st">Closers · vendido do mês (somam P 700 mil · M 850 mil · G 1 milhão) · até hoje ' + rlMil(somaReal) + '</div><div class="rl-mt">' + cls + '</div>'
+    + '<div class="rl-mt-h rl-st">SDR e Social Selling · reuniões com o lead presente</div><div class="rl-mt">' + sds + '</div>';
+  return rlSec('metas-pessoais', 'Metas pessoais', 'A meta de cada um em ' + MM.M.nome.toLowerCase(), 'Dividida pelo setembro de cada um e pelo tempo de agenda de outubro. Marcas coloridas = P, M e G; o risco branco = onde deveria estar hoje. ' + MM.passou + ' de ' + MM.du + ' dias úteis. Clique numa pessoa para ver o plano dela (por semana, por dia e onde colocar energia).', h);
 }
 </script>
 
