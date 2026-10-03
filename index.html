@@ -2853,7 +2853,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-1338';
+var VERSAO_DASH = '2026-10-03-1353';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21190,7 +21190,6 @@ var ACESSOS = [
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
   { nome: 'Ismael',        pin: '6180' },
-  { nome: 'Luana',         pin: '9113' },   // acesso criado em 28/09/2026 (Bruno: "crie um acesso para luana, com senha")
   { nome: 'Adm',           pin: '8520', adm: true },     // acesso geral; não vira "Você" sozinho
   { nome: 'Visitante',     pin: '0000', soOlha: true }   // vê tudo, não mexe em nada
 ];
@@ -21211,7 +21210,14 @@ function soOlhar() {
 function loginPrecisa() {
   var hn = location.hostname;
   if (!hn || hn === 'localhost' || hn === '127.0.0.1') return false;   // uso local: entra direto
-  return localStorage.getItem('v2Login') === null;
+  // 03/10/2026 (Bruno: "Luana… pode tirar acesso"): quem saiu da lista de acessos é deslogado na hora (antes continuava dentro
+  // porque o aparelho lembrava o nome)
+  var lg = localStorage.getItem('v2Login');
+  if (lg !== null && !ACESSOS.some(function(a) { return a.nome === lg; })) {
+    try { ['v2Login', 'v2LeadEu', 'comPainelTok', 'comPainelCache'].forEach(function(k) { localStorage.removeItem(k); }); } catch (e) {}
+    return true;
+  }
+  return lg === null;
 }
 function montarLogin() {
   var ov = document.createElement('div');
