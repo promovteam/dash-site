@@ -2355,10 +2355,10 @@ function verMeta(k){
     + '<div class="mp-titulo">O que precisamos para a <b style="color:' + p.cor + ';">' + p.nome + ' (' + p.alvo + ')</b> — faltam <b>' + p.falta + '</b> em <b>11 dias úteis</b>:</div>'
     + '<div class="mp-grid">'
     + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.agendadas + '</b><span>Agendadas no total</span></div>'
-    + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.realizadas + '</b><span>Realizadas no total</span></div>'
+    + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.realizadas + '</b><span>Lead apareceu (total)</span></div>'
     + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.vendas + '</b><span>Vendas no total</span></div>'
     + '<div class="g-stat"><b>' + p.dia.ag + '</b><span>Agendadas / dia</span></div>'
-    + '<div class="g-stat"><b>' + p.dia.re + '</b><span>Realizadas / dia</span></div>'
+    + '<div class="g-stat"><b>' + p.dia.re + '</b><span>Lead apareceu / dia</span></div>'
     + '<div class="g-stat"><b>' + p.dia.fat + '</b><span>Faturamento / dia</span></div>'
     + '</div>'
     + '<div class="mp-sub">Conta com o histórico: ticket médio R$ 20,5 mil · 81,5% de realização · 36,4% de fechamento</div>'
@@ -2675,7 +2675,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-0623';
+var VERSAO_DASH = '2026-10-03-0706';
 var _versaoNova = null;
 
 // =====================================================================
@@ -5360,7 +5360,7 @@ function renderV2() {
     + '<div class="g-value money">' + v2moeda(mc.fat) + '</div>'
     + '<div class="g-sub"><b>' + mc.fe + ' fechamentos</b> · Ticket médio <b>' + v2moeda0(mc.ticket) + '</b></div>'
     + '<div class="g-stats">'
-    + '<div class="g-stat"><b style="color:#3ddc97;">' + v2pct(mc.txRe) + '</b><span>Realização</span></div>'
+    + '<div class="g-stat"><b style="color:#3ddc97;">' + v2pct(mc.txRe) + '</b><span>Comparecimento</span></div>'
     + '<div class="g-stat"><b style="color:#f6a350;">' + v2pct(mc.txFe) + '</b><span>Fechamento</span></div>'
     + '<div class="g-stat"><b style="color:#ff6b6b;">' + v2pct(mc.txNs) + '</b><span>No-show</span></div>'
     + '</div></div>';
@@ -5416,11 +5416,13 @@ function renderV2() {
   var fPag  = mesRows.filter(function(r){ return r.sn === 'vendido'; }).length;
   function pconv(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; }
   h += '<div class="kpis">';
-  h += mini(_sm('Agendadas', 'Suas agendadas'), fAg, '#f6a350', 'rgba(246,163,80,.14)', 'agendadas', function(){ return true; }, '', '🔜 ' + fFut + ' futuras');
-  h += mini(_sm('Realizadas', 'Suas realizadas'), fReal, '#ffd166', 'rgba(255,209,102,.14)', 'realizadas', isReal, '↳ ' + pconv(fReal, fAg) + ' das agendadas');
-  h += mini(_sm('Compareceram', 'Compareceram (suas)'), fComp, '#6ea8ff', 'rgba(110,168,255,.14)', 'compareceram', isComp, '↳ ' + pconv(fComp, fReal) + ' das realizadas');
-  h += mini(_sm('Fechou em reunião', 'Fechou (suas)'), fFech, '#b98aff', 'rgba(185,138,255,.14)', 'fechamento', isFechouReuniao, '↳ ' + pconv(fFech, fComp) + ' dos que compareceram');
-  h += mini(_sm('Pagaram tudo', 'Pagaram tudo (suas)'), fPag, '#3ddc97', 'rgba(61,220,151,.14)', 'pagaram', function(sn){ return sn === 'vendido'; }, '↳ ' + pconv(fPag, fFech) + ' dos que fecharam');
+  // 03/10/2026 (Bruno: "a pessoa não achar que realizada é que a reunião aconteceu"): nomes que dizem o que cada número conta
+  var fFalt = mesRows.filter(function(r){ return r.sn === 'no show'; }).length;
+  h += mini(_sm('Marcadas', 'Suas marcadas'), fAg, '#f6a350', 'rgba(246,163,80,.14)', 'agendadas', function(){ return true; }, '', '🔜 ' + fFut + ' futuras');
+  h += mini(_sm('Data já passou', 'Suas: data já passou'), fReal, '#ffd166', 'rgba(255,209,102,.14)', 'realizadas', isReal, '↳ ' + pconv(fReal, fAg) + ' das marcadas · inclui faltas');
+  h += mini(_sm('Lead apareceu', 'Lead apareceu (suas)'), fComp, '#6ea8ff', 'rgba(110,168,255,.14)', 'compareceram', isComp, '↳ ' + pconv(fComp, fReal) + ' das que já passaram' + (fFalt ? ' · ' + fFalt + (fFalt === 1 ? ' faltou' : ' faltaram') : ''));
+  h += mini(_sm('Disse sim na reunião', 'Disse sim (suas)'), fFech, '#b98aff', 'rgba(185,138,255,.14)', 'fechamento', isFechouReuniao, '↳ ' + pconv(fFech, fComp) + ' de quem apareceu');
+  h += mini(_sm('Pagou tudo', 'Pagou tudo (suas)'), fPag, '#3ddc97', 'rgba(61,220,151,.14)', 'pagaram', function(sn){ return sn === 'vendido'; }, '↳ 100% pago · ' + pconv(fPag, fFech) + ' de quem disse sim');
   h += '</div>';
 
   // === METAS ===
@@ -5441,7 +5443,7 @@ function renderV2() {
       vendas: vendas, realizadas: realiz, agendadas: agend,
       dia: { ag: (agend/restam).toFixed(1).replace('.', ','), re: (realiz/restam).toFixed(1).replace('.', ','),
              fe: (vendas/restam).toFixed(1).replace('.', ','), fat: v2moeda0(falta/restam) },
-      hist: 'ticket médio ' + v2moeda0(hc.ticket) + ' · ' + v2pct(hc.txRe) + ' de realização · ' + v2pct(hc.txFe) + ' de fechamento'
+      hist: 'ticket médio ' + v2moeda0(hc.ticket) + ' · ' + v2pct(hc.txRe) + ' de comparecimento · ' + v2pct(hc.txFe) + ' de fechamento'
     };
   });
   var _hAntesMetas = h.length;   // 👤 só o meu: as metas são da empresa — somem enquanto a pessoa vê só o dela
@@ -5452,7 +5454,7 @@ function renderV2() {
     h += '<div class="ritmo"><span class="ritmo-titulo">📈 No ritmo atual, o mês termina em:</span>'
       + '<span class="ritmo-item"><b style="color:var(--accent);">' + v2mil(pj.proj) + '</b> faturados</span>'
       + '<span class="ritmo-item"><b>' + Math.round(mc.ag * fator) + '</b> agendadas</span>'
-      + '<span class="ritmo-item"><b>' + Math.round(mc.re * fator) + '</b> realizadas</span>'
+      + '<span class="ritmo-item"><b>' + Math.round(mc.re * fator) + '</b> com o lead presente</span>'
       + '<span class="ritmo-item"><b>' + Math.round(mc.fe * fator) + '</b> fechamentos</span>'
       + '<span class="ritmo-sub">' + pj.uP + ' de ' + pj.uT + ' dias úteis · ritmo de ' + v2moeda0(pj.media) + '/dia</span></div>';
   }
@@ -5518,7 +5520,7 @@ function renderV2() {
       } else {
         num = String(p.re); rotulo = 'REALIZADAS';
         pct = topV > 0 ? Math.min((p.vdV || 0) / topV * 100, 100) : Math.min(p.re / topRe * 100, 100);
-        projTxt = fatorProj ? '📈 projeção: ' + Math.round(p.re * fatorProj) + ' realizadas' : '';
+        projTxt = fatorProj ? '📈 projeção: ' + Math.round(p.re * fatorProj) + ' com o lead presente' : '';
         // o que o SDR VENDEU de verdade (só status Vendido). O bloqueio e a entrada
         // continuam na linha de "possíveis" — ainda não é venda (Bruno 19/08/2026)
         linhas = '<span class="vd">💰 ' + p.vd + ' vendida' + (p.vd === 1 ? '' : 's') + ' · ' + v2mil(p.vdV) + '</span>'
@@ -5573,7 +5575,7 @@ function renderV2() {
   h += '<div class="panel"><h3 id="chart-titulo">Agendamentos por Semana</h3>'
     + '<div class="chart-chips" id="chips-metrica">'
     + '<button class="chart-chip on" data-m="agendamentos" onclick="mudarMetrica(this)">📅 Agendamentos</button>'
-    + '<button class="chart-chip" data-m="realizadas" onclick="mudarMetrica(this)">✅ Realizadas</button>'
+    + '<button class="chart-chip" data-m="realizadas" onclick="mudarMetrica(this)">✅ Lead apareceu</button>'
     + '<button class="chart-chip" data-m="fechamentos" onclick="mudarMetrica(this)">🏆 Fechamentos</button>'
     + '<button class="chart-chip" data-m="vendidos" onclick="mudarMetrica(this)">💰 Vendidos</button>'
     + '<button class="chart-chip" data-m="todos" onclick="mudarMetrica(this)">📊 Todos</button>'
@@ -5654,7 +5656,7 @@ function montarGrafico() {
   }
   var defs = {
     agendamentos: { nome:'Agendamentos', cor:'#f6a350', f:function(sn){ return isAgSt(sn) || isFut(sn); } },
-    realizadas:   { nome:'Reuniões Realizadas', cor:'#6ea8ff', f:isRe },
+    realizadas:   { nome:'Lead apareceu na reunião', cor:'#6ea8ff', f:isRe },
     fechamentos:  { nome:'Fechamentos', cor:'#b98aff', f:isFe },
     vendidos:     { nome:'Vendidos', cor:'#3ddc97', f:function(sn){ return sn === 'vendido'; } }
   };
@@ -5716,10 +5718,10 @@ function verMeta(k) {
     + '<div class="mp-titulo">O que precisamos para a <b style="color:' + p.cor + ';">' + p.nome + ' (' + p.alvo + ')</b> — faltam <b>' + p.falta + '</b> em <b>' + p.restam + ' dias úteis</b>:</div>'
     + '<div class="mp-grid">'
     + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.agendadas + '</b><span>Agendadas no total</span></div>'
-    + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.realizadas + '</b><span>Realizadas no total</span></div>'
+    + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.realizadas + '</b><span>Lead apareceu (total)</span></div>'
     + '<div class="g-stat"><b style="color:' + p.cor + ';">' + p.vendas + '</b><span>Vendas no total</span></div>'
     + '<div class="g-stat"><b>' + p.dia.ag + '</b><span>Agendadas / dia</span></div>'
-    + '<div class="g-stat"><b>' + p.dia.re + '</b><span>Realizadas / dia</span></div>'
+    + '<div class="g-stat"><b>' + p.dia.re + '</b><span>Lead apareceu / dia</span></div>'
     + '<div class="g-stat"><b>' + p.dia.fat + '</b><span>Faturamento / dia</span></div>'
     + '</div><div class="mp-sub">Conta com o histórico: ' + p.hist + '</div></div>';
 }
@@ -5730,7 +5732,7 @@ function abrirListaOrigem(origem, etapa) {
   var L = origem === '*' ? _ORG_TOT : _ORG_LISTAS[origem];
   if (!L || !L[etapa] || !L[etapa].length) return;
   var rows = L[etapa].slice().sort(function(a, b){ return (b.date || 0) - (a.date || 0); });
-  var nomes = { ag: 'Agendadas', re: 'Realizadas', fe: 'Fecharam', vd: 'Vendas' };
+  var nomes = { ag: 'Marcadas', re: 'Lead apareceu', fe: 'Fecharam', vd: 'Vendas' };
   var icos = { ag: '📅', re: '✅', fe: '🏆', vd: '💰' };
   var comValor = (etapa === 'vd' || etapa === 'fe');
   var total = comValor ? rows.reduce(function(s, r){ return s + (r.valor || 0); }, 0) : 0;
@@ -5825,12 +5827,12 @@ function filtrarListaModal(txt, listaId) {
 function abrirB(tipo) {
   var mesRows = v2mesAtual();
   var cfg = {
-    agendadas: { t:'Agendadas', ico:'📅', f:function(){ return true; } },
+    agendadas: { t:'Marcadas', ico:'📅', f:function(){ return true; } },
     futuras: { t:'Reuniões futuras marcadas', ico:'🔜', f:function(r){ return isFut(r.sn); } },
-    compareceram: { t:'Compareceram', ico:'🤝', f:function(r){ return isComp(r.sn); } },
-    realizadas: { t:'Realizadas', ico:'✅', f:function(r){ return isReal(r.sn); } },
-    fechamento: { t:'Fechou em reunião', ico:'🏆', f:function(r){ return isFechouReuniao(r.sn); } },
-    pagaram: { t:'Pagaram tudo', ico:'💰', f:function(r){ return r.sn === 'vendido'; } },
+    compareceram: { t:'Lead apareceu', ico:'🤝', f:function(r){ return isComp(r.sn); } },
+    realizadas: { t:'Data já passou (inclui faltas)', ico:'✅', f:function(r){ return isReal(r.sn); } },
+    fechamento: { t:'Disse sim na reunião', ico:'🏆', f:function(r){ return isFechouReuniao(r.sn); } },
+    pagaram: { t:'Pagou tudo (100% pago)', ico:'💰', f:function(r){ return r.sn === 'vendido'; } },
     vendidos: { t:'Vendidos', ico:'💰', f:function(r){ return r.sn === 'vendido'; } },
     noshow: { t:'No-show', ico:'👻', f:function(r){ return r.sn === 'no show'; } }
   }[tipo] || { t:'Reuniões', ico:'📋', f:function(){ return true; } };
@@ -5859,7 +5861,7 @@ var FUNIL_SDR = null;   // dados do SDR aberto na janela
 var _fsEtapa = 'ag';    // etapa cuja lista de clientes está aberta
 var FS_ETAPAS = [
   { k:'ag', nome:'Reuniões agendadas',  ico:'📅', cor:'#f6a350', sub:'todas as reuniões do período' },
-  { k:'re', nome:'Reuniões realizadas', ico:'✅', cor:'#6ea8ff', sub:'vendido + não vendido + bloqueio + entrada + estorno' },
+  { k:'re', nome:'Lead apareceu na reunião', ico:'✅', cor:'#6ea8ff', sub:'vendido + não vendido + bloqueio + entrada + estorno' },
   { k:'vd', nome:'Vendas',              ico:'💰', cor:'#3ddc97', sub:'só status "Vendido"' },
   { k:'sp', nome:'Vendas Spark',        ico:'⚡', cor:'#ffd166', sub:'vendido · produto Spark · bônus R$ ' + BONUS_SPARK + '/venda' },
   { k:'gr', nome:'Vendas Growth',       ico:'🚀', cor:'#b98aff', sub:'vendido · produto Growth · bônus R$ ' + BONUS_GROWTH + '/venda' }
@@ -5918,7 +5920,7 @@ function desenharFunilSdr() {
     var larg = Math.max(q / topo * 100, 4);
     // taxa comparada com a etapa anterior (Spark e Growth comparam com Vendas)
     var base = e.k === 're' ? et.ag.length : e.k === 'vd' ? et.re.length : (e.k === 'sp' || e.k === 'gr') ? et.vd.length : 0;
-    var tx = base ? Math.round(q / base * 100) + '%' + (e.k === 're' ? ' das agendadas' : e.k === 'vd' ? ' das realizadas' : ' das vendas') : '';
+    var tx = base ? Math.round(q / base * 100) + '%' + (e.k === 're' ? ' das agendadas' : e.k === 'vd' ? ' de quem apareceu' : ' das vendas') : '';
     h += '<div class="fs-et' + (e.k === 'sp' || e.k === 'gr' ? ' fs-sub2' : '') + (_fsEtapa === e.k ? ' on' : '') + '" onclick="mudarEtapaFunil(\'' + e.k + '\')">'
       + '<span class="fs-fill" style="width:' + larg.toFixed(1) + '%;background:' + e.cor + ';"></span>'
       + '<b class="fs-num" style="color:' + e.cor + ';">' + q + '</b>'
@@ -5985,7 +5987,7 @@ function _fsRelatorio() {
     gerado: new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR').slice(0, 5),
     etapas: FS_ETAPAS.map(function(e) {
       var base = e.k === 're' ? et.ag.length : e.k === 'vd' ? et.re.length : (e.k === 'sp' || e.k === 'gr') ? et.vd.length : 0;
-      var tx = base ? Math.round(et[e.k].length / base * 100) + '%' + (e.k === 're' ? ' das agendadas' : e.k === 'vd' ? ' das realizadas' : ' das vendas') : '';
+      var tx = base ? Math.round(et[e.k].length / base * 100) + '%' + (e.k === 're' ? ' das agendadas' : e.k === 'vd' ? ' de quem apareceu' : ' das vendas') : '';
       return { k: e.k, nome: e.nome, ico: e.ico, cor: e.cor, q: et[e.k].length, tx: tx,
         rows: et[e.k].slice().sort(function(a, b){ return (a.date || 0) - (b.date || 0); }) };
     }),
@@ -9066,7 +9068,7 @@ function ldAconteceuNoPeriodo(per) {
 function verAconteceu(qual) {
   if (!_ldAcont) return;
   var lista = _ldAcont[qual] || [];
-  var titulo = { ag: '📅 Reuniões agendadas no período', re: '✅ Reuniões realizadas no período', vd: '💰 Vendas no período' }[qual];
+  var titulo = { ag: '📅 Reuniões marcadas no período', re: '✅ Lead apareceu na reunião (período)', vd: '💰 Vendas no período' }[qual];
   var h = '<div style="display:flex;flex-direction:column;gap:6px;">';
   if (!lista.length) h += '<div class="hint">Nada no período.</div>';
   lista.slice(0, 200).forEach(function(r) {
@@ -10054,17 +10056,17 @@ function renderAnuncios() {
   };
   h += '<div class="panel or-painel" style="margin-bottom:18px;">'
     + '<div class="or-topo"><h3>🧲 Detalhamento por origem</h3>'
-    + '<span class="hint">toque nos números para ver quem são · conversão = vendas ÷ reuniões realizadas</span>'
+    + '<span class="hint">toque nos números para ver quem são · conversão = vendas ÷ reuniões em que o lead apareceu</span>'
     + '<span class="or-per">' + perO.label + (OR.closer ? ' · ' + orEsc(OR.closerRot || OR.closer) : '') + (OR.prod ? ' · ' + orEsc(OR.prod) : '') + '</span></div>'
     // (os filtros próprios da tabela saíram a pedido do Bruno 06/09/2026: ela segue o período da aba, que tem o calendário)
     + '<div class="or-tab" role="table" aria-label="Reuniões e vendas por origem">'
-    + '<div class="or-row or-cab" role="row"><span>Origem</span><span>Agendadas</span><span>Realizadas</span><span>Fecharam</span><span>Vendas</span><span>Faturamento</span><span>Conversão</span></div>';
+    + '<div class="or-row or-cab" role="row"><span>Origem</span><span>Marcadas</span><span>Apareceu</span><span>Fecharam</span><span>Vendas</span><span>Faturamento</span><span>Conversão</span></div>';
   lista.forEach(function(k, i) {
     var o = org[k], pf = totO.fat ? o.fat / totO.fat * 100 : 0, w = o.fat ? Math.max(3, o.fat / maxFatO * 100) : 0;
     h += '<div class="or-row' + (i < 3 && o.fat ? ' top' : '') + '" role="row">'
       + '<div class="or-nome"><i class="or-pos">' + (i + 1) + '</i><b title="' + orEsc(k) + '">' + orEsc(k) + '</b></div>'
       + '<div class="or-c c-ag" data-r="Agendadas">' + orN(k, o.ag, 'ag') + '</div>'
-      + '<div class="or-c c-re" data-r="Realizadas">' + orN(k, o.re, 're') + '</div>'
+      + '<div class="or-c c-re" data-r="Apareceu">' + orN(k, o.re, 're') + '</div>'
       + '<div class="or-c c-fe" data-r="Fecharam">' + orN(k, o.fe, 'fe') + '</div>'
       + '<div class="or-c c-vd" data-r="Vendas">' + orN(k, o.vd, 'vd', 'verde') + '</div>'
       + '<div class="or-fat"><div class="or-fat-l"><b>' + (o.fat ? rs(o.fat) : '—') + '</b><small>' + (pf >= 1 ? Math.round(pf) + '% do total' : pf > 0 ? '<1% do total' : '') + '</small></div>'
@@ -10075,7 +10077,7 @@ function renderAnuncios() {
   if (lista.length) h += '<div class="or-row or-tot" role="row">'
     + '<div class="or-nome"><b>Total</b></div>'
     + '<div class="or-c c-ag" data-r="Agendadas">' + orN('*', totO.ag, 'ag') + '</div>'
-    + '<div class="or-c c-re" data-r="Realizadas">' + orN('*', totO.re, 're') + '</div>'
+    + '<div class="or-c c-re" data-r="Apareceu">' + orN('*', totO.re, 're') + '</div>'
     + '<div class="or-c c-fe" data-r="Fecharam">' + orN('*', totO.fe, 'fe') + '</div>'
     + '<div class="or-c c-vd" data-r="Vendas">' + orN('*', totO.vd, 'vd', 'verde') + '</div>'
     + '<div class="or-fat"><div class="or-fat-l"><b>' + rs(totO.fat) + '</b><small>' + lista.length + (lista.length === 1 ? ' origem' : ' origens') + '</small></div></div>'
@@ -12950,6 +12952,8 @@ function ldSituacao(l) {
   return r;
 }
 function _ldSituacaoCalc(l) {
+  // garante o índice montado com os dados atuais (só compara referências: barato)
+  if (!_ldIdx || !_ldIdxRefs || _ldIdxRefs[0] !== LD.rows || _ldIdxRefs[1] !== PAG.rows || _ldIdxRefs[2] !== V2.rows) { try { _ldMontarIdx(); } catch (eI) {} }
   if (l.tel8 && _ldIdx && _ldIdx[l.tel8]) return _ldIdx[l.tel8];
   if (!_ldIdxAlt) return null;
   var e = idEmail(l.email);
@@ -13818,7 +13822,7 @@ function ldUnicos(rows) {
 }
 function abrirEtapaLeads(k) {
   if (!_ldEtapas) return;
-  var cfg = { tot:['📥','Leads que chegaram'], mql:['🎯','MQL — declarou investimento'], ag:['📅','Agendaram reunião'], re:['✅','Realizaram reunião'], vd:['💰','Vendidos'] }[k];
+  var cfg = { tot:['📥','Leads que chegaram'], mql:['🎯','MQL — declarou investimento'], ag:['📅','Agendaram reunião'], re:['✅','Lead apareceu na reunião'], vd:['💰','Vendidos'] }[k];
   var rows = _ldEtapas[k] || [];
   document.getElementById('mb-titulo').textContent = cfg[1] + ' — ' + rows.length;
   document.getElementById('mb-ico').textContent = cfg[0];
@@ -14148,7 +14152,10 @@ function renderLeads(agora) {
 }
 function _renderLeadsCorpo(agora) {
   if (!LD.carregado) return;
-  if (!telaVisivel('s-leads')) { TELA_PENDENTE.leads = true; return; }   // ⚡ escondida: desenha quando abrir (era montada ~15× na abertura)
+  // ⚡ escondida: desenha quando abrir (era montada ~15× na abertura). 03/10/2026: o ÍNDICE (quem tem reunião, venda…) continua
+  // sendo montado aqui mesmo com a aba escondida — Relatório, Criativos, Placar, Comissões e avisos dependem dele (sem isto as
+  // reuniões dos criativos apareciam zeradas até alguém abrir a aba Leads)
+  if (!telaVisivel('s-leads')) { TELA_PENDENTE.leads = true; try { _ldMontarIdx(); } catch (eIdx) {} return; }
   // redesenho de FUNDO (Clint/IA respondendo) no meio de um clique: espera um instante e tenta de novo.
   // Clique do usuário num filtro (agora=true) desenha na hora (Bruno 06/09/2026: "os filtros ainda demoram")
   if (!agora && Date.now() - _ultimoClique < 900) { renderLeadsLogo(); return; }
@@ -14195,7 +14202,7 @@ function _renderLeadsCorpo(agora) {
     { k:'tot', nome:'Leads que chegaram', ico:'📥', cor:'#6ea8ff', sub:'todos que preencheram a pesquisa', q: rows.length, base: 0 },
     { k:'mql', nome:'MQL — declarou investimento', ico:'🎯', cor:'#f6a350', sub:'qualquer valor declarado (dentro deles estão os de perfil HT)', q: mql.length, base: rows.length },
     { k:'ag',  nome:'Agendaram reunião', ico:'📅', cor:'#ffd166', sub:'telefone encontrado na aba Vendas', q: ag.length, base: mql.length },
-    { k:'re',  nome:'Realizaram reunião', ico:'✅', cor:'#b98aff', sub:'vendido + não vendido + bloqueio + entrada + estorno', q: re.length, base: ag.length },
+    { k:'re',  nome:'Lead apareceu na reunião', ico:'✅', cor:'#b98aff', sub:'vendido + não vendido + bloqueio + entrada + estorno', q: re.length, base: ag.length },
     { k:'vd',  nome:'Vendido', ico:'💰', cor:'#3ddc97', sub:'fechou de verdade', q: vd.length, base: re.length }
   ];
   var topo = Math.max(rows.length, 1);
@@ -14456,7 +14463,7 @@ function _renderLeadsCorpo(agora) {
     // funil de TUDO que aconteceu no período (leads de qualquer época)
     ET = [
       { k:'acAg', nome:'Reuniões agendadas', ico:'📅', cor:'#ffd166', sub:'todas as reuniões marcadas para o período', q: acFun.ag.length, base: 0 },
-      { k:'acRe', nome:'Reuniões realizadas', ico:'✅', cor:'#b98aff', sub:'vendido + não vendido + bloqueio + entrada + estorno', q: acFun.re.length, base: acFun.ag.length },
+      { k:'acRe', nome:'Lead apareceu na reunião', ico:'✅', cor:'#b98aff', sub:'vendido + não vendido + bloqueio + entrada + estorno', q: acFun.re.length, base: acFun.ag.length },
       { k:'acVd', nome:'Vendas', ico:'💰', cor:'#3ddc97', sub:'fechou de verdade' + (acFun.valor ? ' · R$ ' + Math.round(acFun.valor).toLocaleString('pt-BR') : ''), q: acFun.vd.length, base: acFun.re.length }
     ];
     topo = Math.max(acFun.ag.length, 1);
@@ -22079,7 +22086,7 @@ function plVer(tipo, chave, met, _denovo) {
     });
   }
   var um = rows.length === 1;
-  var rotPx = { direto: 'marcadas DIRETO (até 24 h após chegar)', resgate: 'marcadas por RESGATE (48 h ou mais)', meio: 'marcadas entre 1 e 2 dias', perNovas: 'reuniões NOVAS no período', perRet: 'RETORNOS no período', perRe: 'realizadas no período', perVd: 'fechamentos no período', perEnt: 'entradas/bloqueios no período', perNao: 'não vendidos no período', perNs: 'no-shows no período', perPend: 'reuniões sem resultado', fup: 'follow-ups que vencem no período', mgRecuperar: 'para RECUPERAR — no-show ou não vendido há 7+ dias, sem retorno depois', mgRecuperados: 'RECUPERADOS — voltaram a marcar ou compraram', mgFalhaMql: 'MQL que NÃO COMPARECERAM', mgFalhaNao: 'reuniões realizadas que NÃO FECHARAM', semForm: 'VENDIDOS SEM FORMULÁRIO DE PAGAMENTO — não contam no placar até preencherem' };
+  var rotPx = { direto: 'marcadas DIRETO (até 24 h após chegar)', resgate: 'marcadas por RESGATE (48 h ou mais)', meio: 'marcadas entre 1 e 2 dias', perNovas: 'reuniões NOVAS no período', perRet: 'RETORNOS no período', perRe: 'lead apareceu no período', perVd: 'fechamentos no período', perEnt: 'entradas/bloqueios no período', perNao: 'não vendidos no período', perNs: 'no-shows no período', perPend: 'reuniões sem resultado', fup: 'follow-ups que vencem no período', mgRecuperar: 'para RECUPERAR — no-show ou não vendido há 7+ dias, sem retorno depois', mgRecuperados: 'RECUPERADOS — voltaram a marcar ou compraram', mgFalhaMql: 'MQL que NÃO COMPARECERAM', mgFalhaNao: 'reuniões realizadas que NÃO FECHARAM', semForm: 'VENDIDOS SEM FORMULÁRIO DE PAGAMENTO — não contam no placar até preencherem' };
   var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', todas: um ? 'REUNIÃO no período' : 'REUNIÕES no período', pend: um ? 'reunião AINDA SEM RESULTADO' : 'reuniões AINDA SEM RESULTADO' }[met] || rotPx[met] || met;
   var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + lista.nome.replace(/</g, '&lt;') + ' — ' + rows.length + ' ' + rot + '</b>'
@@ -22446,7 +22453,7 @@ function plPainelSdrs(p, d) {
       +   '<br><span class="px-tag">pago ' + canal.pago + '</span><span class="px-tag g">orgânico ' + canal.organico + '</span></div></div>'
       + '<div class="px-row"><div class="px-k">Perdidos<small>leads que chegaram ' + rotP + ' e estão como perdido/desqualificado na Clint · motivo: fase 2</small></div><div class="px-v"><b class="n" style="color:#ff6b6b;" onclick="plPxAbrirLista(\'p_' + chave + '\')">' + perdidos.length + '</b></div></div>'
       + '<div class="px-row"><div class="px-k">Tempo até um humano falar<small>leads que chegaram ' + rotP + ' · quem agendou × quem não (mediana)</small></div><div class="px-v">' + (mAg !== null ? '<b style="color:#3ddc97;">' + tcTempoTxt(mAg) + '</b><small>agendou</small> ' : '') + (mPe !== null ? '<b style="color:#ff6b6b;">' + tcTempoTxt(mPe) + '</b><small>não</small>' : '') + ((mAg === null && mPe === null) ? (rp ? '<b>' + tcTempoTxt(rp.minutos * 60000) + '</b><small>média geral · ' + rp.qtd + ' conversas</small>' : '<span class="px-falta">sem medição</span>') : '') + '</div></div>'
-      + '<div class="px-row"><div class="px-k">No-shows ' + rotP + '<small>motivo: fase 2</small></div><div class="px-v">' + plPxNum(x.ns, 'sdr', chave, 'ns', '#ff6b6b') + plPxAntes(x.ns, ant ? ant.ns : null) + (x.re + x.ns ? '<br><small>' + Math.round(x.ns / Math.max(x.re + x.ns, 1) * 100) + '% das realizadas+faltas</small>' : '') + '</div></div>'
+      + '<div class="px-row"><div class="px-k">No-shows ' + rotP + '<small>motivo: fase 2</small></div><div class="px-v">' + plPxNum(x.ns, 'sdr', chave, 'ns', '#ff6b6b') + plPxAntes(x.ns, ant ? ant.ns : null) + (x.re + x.ns ? '<br><small>' + Math.round(x.ns / Math.max(x.re + x.ns, 1) * 100) + '% de quem tinha reunião (apareceu + faltou)</small>' : '') + '</div></div>'
       + '</div>';
   }).join('');
   return '<div class="px-wrap"><div class="px-titulo"><h3>📞 Acompanhamento por SDR</h3><span class="hint">' + p.rot.replace(/</g, '&lt;') + ' · ▲▼ compara com o período anterior · clique nos números para ver quem são</span></div><div class="px-grid">' + cards + '</div></div>';
@@ -22493,13 +22500,13 @@ function plPainelClosers(p, d) {
     var conv = x.l.perRe.length ? Math.round(x.l.perVd.length / x.l.perRe.length * 100) : null;
     return '<div class="px-card">'
       + '<div class="px-head">' + plAvHtml(x.nome).replace('pl-av', 'sg-avatar') + '<div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>CLOSER</span></div></div>'
-      + '<div class="mg-linha">' + (conv !== null ? '<span class="mg-pill" style="color:#fff;">FECHAMENTO ' + conv + '%<small>' + x.l.perVd.length + ' de ' + x.l.perRe.length + ' realizadas</small></span>' : '<span class="mg-pill">FECHAMENTO —</span>') + mgPill('NO-SHOW', (x.l.perRe.length + x.l.perNs.length) ? Math.round(x.l.perNs.length / (x.l.perRe.length + x.l.perNs.length) * 100) : null, MG_META.ns, true) + (x.l.perPend.length ? '<span class="mg-pill nao">' + x.l.perPend.length + ' SEM RESULTADO ❌<small>lançar hoje</small></span>' : '') + (x.l.semForm.length ? '<span class="mg-pill nao" style="cursor:pointer;" onclick="plVer(\'closer\',\'' + chave + '\',\'semForm\')" title="Estão Vendido na planilha, mas o formulário de pagamento não foi preenchido — não contam no placar">' + x.l.semForm.length + ' VENDIDO SEM FORMULÁRIO 💳<small>não conta — preencher</small></span>' : '') + '</div>'
+      + '<div class="mg-linha">' + (conv !== null ? '<span class="mg-pill" style="color:#fff;">FECHAMENTO ' + conv + '%<small>' + x.l.perVd.length + ' de ' + x.l.perRe.length + ' com o lead</small></span>' : '<span class="mg-pill">FECHAMENTO —</span>') + mgPill('NO-SHOW', (x.l.perRe.length + x.l.perNs.length) ? Math.round(x.l.perNs.length / (x.l.perRe.length + x.l.perNs.length) * 100) : null, MG_META.ns, true) + (x.l.perPend.length ? '<span class="mg-pill nao">' + x.l.perPend.length + ' SEM RESULTADO ❌<small>lançar hoje</small></span>' : '') + (x.l.semForm.length ? '<span class="mg-pill nao" style="cursor:pointer;" onclick="plVer(\'closer\',\'' + chave + '\',\'semForm\')" title="Estão Vendido na planilha, mas o formulário de pagamento não foi preenchido — não contam no placar">' + x.l.semForm.length + ' VENDIDO SEM FORMULÁRIO 💳<small>não conta — preencher</small></span>' : '') + '</div>'
       + '<div class="px-row"><div class="px-k">Reuniões ' + rotP + '<small>novas × retornos (2ª reunião, remarcada, follow-up)</small></div><div class="px-v">' + plPxNum(x.l.perNovas.length, 'closer', chave, 'perNovas', '#6ea8ff') + '<small>novas</small> ' + plPxNum(x.l.perRet.length, 'closer', chave, 'perRet', '#b98aff') + '<small>retornos</small></div></div>'
       + '<div class="px-row"><div class="px-k">Mais quentes' + ((p.per === 'hoje' || p.per === 'ontem') ? ' do dia' : ' ainda por acontecer ' + rotP) + '<small>investimento declarado, nota da IA, seguidores, origem</small></div><div class="px-v"></div></div>'
       + (quentes.length ? quentes.map(function(q, i) { var iR = -1; try { iR = v2reg(q.r); } catch (e) {} return '<div class="px-quente"><i>' + ['🔥', '🌶', '✨'][i] + '</i><b onclick="abrirLead(' + iR + ')">' + (q.r.nome || '').replace(/</g, '&lt;') + '</b><span class="hint">' + (q.r.date ? q.r.date.toLocaleDateString('pt-BR').slice(0, 5) + ' · ' : '') + (q.por.length ? q.por.join(' · ') : 'sem dados do formulário') + '</span></div>'; }).join('') : '<div class="px-falta">nenhuma</div>')
       + '<div class="px-row" style="margin-top:6px;"><div class="px-k">Compromisso do dia<small>fase 2: o closer digita de manhã e o placar compara no fim do dia</small></div><div class="px-v"><span class="px-falta">em breve</span></div></div>'
-      + '<div class="px-row"><div class="px-k">Resultado ' + rotP + '<small>realizadas · fechamentos · entrada/bloqueio · não · no-show' + (x.l.perPend.length ? ' · <b style="color:#ffd166;">' + x.l.perPend.length + ' sem resultado</b>' : '') + '</small></div><div class="px-v" style="white-space:normal;">' + plPxNum(x.l.perRe.length, 'closer', chave, 'perRe', '#6ea8ff') + ' · ' + plPxNum(x.l.perVd.length, 'closer', chave, 'perVd', '#3ddc97') + ' · ' + plPxNum(x.l.perEnt.length, 'closer', chave, 'perEnt', '#ffd166') + ' · ' + plPxNum(x.l.perNao.length, 'closer', chave, 'perNao', '#ff9a5a') + ' · ' + plPxNum(x.l.perNs.length, 'closer', chave, 'perNs', '#ff6b6b')
-      +   '<br>' + (conv !== null ? '<small>fecha ' + conv + '% das realizadas</small> ' : '') + (ant ? plPxAntes(x.l.perVd.length, ant.vd).replace('antes', 'fechamentos antes') : '') + '</div></div>'
+      + '<div class="px-row"><div class="px-k">Resultado ' + rotP + '<small>apareceram · fechamentos · entrada/bloqueio · não · no-show' + (x.l.perPend.length ? ' · <b style="color:#ffd166;">' + x.l.perPend.length + ' sem resultado</b>' : '') + '</small></div><div class="px-v" style="white-space:normal;">' + plPxNum(x.l.perRe.length, 'closer', chave, 'perRe', '#6ea8ff') + ' · ' + plPxNum(x.l.perVd.length, 'closer', chave, 'perVd', '#3ddc97') + ' · ' + plPxNum(x.l.perEnt.length, 'closer', chave, 'perEnt', '#ffd166') + ' · ' + plPxNum(x.l.perNao.length, 'closer', chave, 'perNao', '#ff9a5a') + ' · ' + plPxNum(x.l.perNs.length, 'closer', chave, 'perNs', '#ff6b6b')
+      +   '<br>' + (conv !== null ? '<small>fecha ' + conv + '% de quem apareceu</small> ' : '') + (ant ? plPxAntes(x.l.perVd.length, ant.vd).replace('antes', 'fechamentos antes') : '') + '</div></div>'
       + '<div class="px-row"><div class="px-k">Follow-ups ' + rotP + '<small>retornos combinados que vencem ' + (p.per === 'mes' ? 'até o fim do mês' : 'no período') + ' · respondidos</small></div><div class="px-v">' + plPxNum(x.l.fup.length, 'closer', chave, 'fup', '#ff9a5a') + '<small>vencem</small> <b style="color:#3ddc97;">' + fupOk + '</b><small>respondidos</small></div></div>'
       + '<div class="px-row"><div class="px-k">Espaços na agenda<small>horários livres que ainda não passaram</small></div><div class="px-v">' + plPxEspacosTxt([agKey], janelas) + '</div></div>'
       + '<div class="px-row"><div class="px-k">Motivos de não fechamento<small>' + x.l.perNao.length + ' não vendidos ' + rotP + (semMotivo ? ' · ' + semMotivo + ' sem motivo anotado' : '') + '</small></div><div class="px-v"></div></div>'
@@ -22611,8 +22618,8 @@ function renderPlacar() {
     return hh + '</div>';
   };
   h += '<div class="pl-grid">'
-    + coluna('📞 SDRs', 'ordem: reuniões marcadas · depois realizadas', d.sdrs, 'sdr', topS, 'Nenhuma marcação neste período ainda — a primeira leva o 🥇')
-    + coluna('🏆 Closers', 'ordem: valor vendido · depois nº de vendas', d.closers, 'closer', topC, 'Nenhuma reunião realizada neste período ainda')
+    + coluna('📞 SDRs', 'ordem: reuniões marcadas · depois em que o lead apareceu', d.sdrs, 'sdr', topS, 'Nenhuma marcação neste período ainda — a primeira leva o 🥇')
+    + coluna('🏆 Closers', 'ordem: valor vendido · depois nº de vendas', d.closers, 'closer', topC, 'Nenhuma reunião com o lead presente neste período ainda')
     + '</div>';
   h += plDiaADia() + plRecordes();
   try { h += plMetasGaku(p, d); } catch (eMg) { try { console.warn('metas da consultoria', eMg); } catch (e3) {} }
@@ -25810,6 +25817,33 @@ function agNaHora(pedido, ctx, depois) {
 .rl-kpi small { display:block; font-size:.62rem; font-weight:900; letter-spacing:1.3px; text-transform:uppercase; color:var(--muted); }
 .rl-kpi b { display:block; font-size:2.15rem; line-height:1.05; margin:4px 0 6px; }
 .rl-kpi .rl-sub { display:block; font-size:.66rem; color:var(--muted); font-weight:700; margin-top:5px; }
+/* 03/10/2026: cartões do investimento por tipo — uma informação por linha + funil */
+.rl-kpi .rl-sub .rl-fl { display:flex; gap:6px; align-items:baseline; margin-top:3px; font-size:.72rem; color:var(--text2); font-weight:600; }
+.rl-kpi .rl-sub .rl-fl i { font-style:normal; width:16px; flex:none; }
+.rl-kpi .rl-sub .rl-fl b { display:inline; font:inherit; font-size:inherit; font-weight:800; letter-spacing:0; line-height:inherit; color:var(--text); font-variant-numeric:tabular-nums; margin:0; }
+.rl-kpi .rl-sub .rl-ver { display:inline-block; margin-top:8px; font-size:.7rem; font-weight:800; color:var(--rl-o); }
+.rl-kpi[data-rl-funil] { cursor:pointer; transition:transform .15s, border-color .15s; }
+.rl-kpi[data-rl-funil]:hover { transform:translateY(-2px); border-color:rgba(255,255,255,.2); }
+.rl-kpi[data-rl-funil]:focus-visible { outline:2px solid var(--rl-o); outline-offset:3px; }
+.rl-fu-top { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.rl-fu-top > div { padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); }
+.rl-fu-top small { display:block; font-size:.64rem; font-weight:800; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); }
+.rl-fu-top b { display:block; font-size:1.35rem; font-weight:900; margin-top:2px; font-variant-numeric:tabular-nums; }
+.rl-fu-top span { font-size:.7rem; color:var(--text2); font-weight:700; }
+.rl-fu { display:flex; flex-direction:column; gap:6px; }
+.rl-fu-et { position:relative; display:grid; grid-template-columns:1fr auto auto; grid-template-areas:"rot n seta" "sub sub seta"; align-items:center; column-gap:10px; text-align:left; font:inherit; color:var(--text); background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px; cursor:pointer; overflow:hidden; }
+.rl-fu-et:hover, .rl-fu-et:focus-visible { border-color:rgba(255,255,255,.22); outline:none; }
+.rl-fu-bar { position:absolute; left:0; top:0; bottom:0; border-right:1px solid; border-radius:12px 0 0 12px; pointer-events:none; }
+.rl-fu-rot { grid-area:rot; position:relative; font-size:.8rem; font-weight:800; }
+.rl-fu-et b { grid-area:n; position:relative; font-size:1.05rem; font-weight:900; font-variant-numeric:tabular-nums; }
+.rl-fu-et small { grid-area:sub; position:relative; font-size:.68rem; color:var(--text2); font-weight:600; margin-top:2px; }
+.rl-fu-et i { grid-area:seta; position:relative; font-style:normal; color:var(--muted); font-size:1.1rem; }
+.rl-fu-cp { margin-top:14px; }
+.rl-fu-cpt { font-size:.64rem; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.rl-fu-cpl { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:10px; padding:7px 0; border-top:1px solid rgba(255,255,255,.06); }
+.rl-fu-cpl span { font-size:.72rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rl-fu-cpl b { font-size:.74rem; font-variant-numeric:tabular-nums; }
+.rl-fu-cpl small { grid-column:1 / -1; font-size:.64rem; color:var(--text2); }
 .rl-kpi svg { display:block; width:100%; height:34px; margin-top:8px; }
 .rl-kpi svg polyline { fill:none; stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
 .rl-kpi svg path { opacity:.16; }
@@ -26374,7 +26408,25 @@ function rlCriativos(p) {
   var org = lista.filter(function(x) { return x.ehPost || x.tipo === 'organico'; }).sort(function(a, b) { return score(b) - score(a); });
   var vendasPagas = 0, fatPago = 0, leadsPagos = 0;
   pagos.forEach(function(x) { vendasPagas += x.vd; fatPago += x.fat; leadsPagos += x.n; });
-  return { pagos: pagos, org: org, metaOk: metaOk, gasto: gasto, gastoTipo: gastoTipo, vendasPagas: vendasPagas, fatPago: fatPago, leadsPagos: leadsPagos };
+  // 03/10/2026 (Bruno: "dentro tenha as informações detalhadas além dos leads, um funil — quem sabe o mesmo no workshop"):
+  // o funil de cada tipo de campanha — cada anúncio vai para o tipo onde mais gastou; campanhas com o gasto do Facebook
+  var funil = {}, MPf = metaOk ? metaPorAnuncio() : {};
+  var fNovo = function() { return { n: 0, mql: 0, ag: 0, re: 0, vd: 0, fat: 0, L: { n: [], mql: [], ag: [], re: [], vd: [] }, camp: {} }; };
+  Object.keys(an).forEach(function(k) {
+    var a = an[k]; if (anEhOrigem(k) || String(k).indexOf('POST:') === 0 || a.tipo === 'organico') return;
+    var mp = MPf[_chaveAnuncio(k)], tp = 'diagnostico';
+    if (mp && mp._porTipo) tp = Object.keys(mp._porTipo).sort(function(x, y) { return mp._porTipo[y] - mp._porTipo[x]; })[0] || 'diagnostico';
+    var F = funil[tp] || (funil[tp] = fNovo());
+    ['n', 'mql', 'ag', 're', 'vd'].forEach(function(c) { F[c] += a[c] || 0; F.L[c] = F.L[c].concat((a.quem && a.quem[c]) || []); });
+    F.fat += a.fat || 0;
+    var cp = (mp && mp.campanha) || a.camp || '(sem campanha no Facebook)', CP = F.camp[cp] || (F.camp[cp] = { gasto: 0, n: 0, vd: 0, fat: 0 });
+    CP.n += a.n || 0; CP.vd += a.vd || 0; CP.fat += a.fat || 0;
+  });
+  if (metaOk) (META.dados.anuncios || []).forEach(function(m) {
+    var tp = metaTipoCampanha(m.campanha), F = funil[tp] || (funil[tp] = fNovo()), cp = m.campanha || '(sem nome)';
+    var CP = F.camp[cp] || (F.camp[cp] = { gasto: 0, n: 0, vd: 0, fat: 0 }); CP.gasto += +m.gasto || 0;
+  });
+  return { pagos: pagos, org: org, metaOk: metaOk, gasto: gasto, gastoTipo: gastoTipo, vendasPagas: vendasPagas, fatPago: fatPago, leadsPagos: leadsPagos, funil: funil };
 }
 // ---------- pedaços visuais ----------
 function rlDelta(a, b, menosEhMelhor, pp) {
@@ -26422,14 +26474,101 @@ function rlL(titulo, rows, tipo, sub) {
   RL_L[k] = { t: titulo, rows: rows || [], tipo: tipo || 'v2', sub: sub || '' };
   return ' data-rl-l="' + k + '" tabindex="0" role="button"';
 }
+// ===== 🔻 FUNIL DO INVESTIMENTO (Bruno 03/10/2026) =====
+// workshop: ingressos (app do workshop) → aplicaram → reuniões com o time → compareceram → vendas, no período do Relatório
+function rlFunilWorkshop(p, C) {
+  var r = { ok: !!(WSL && WSL.carregado), ing: [], part: [], apl: [], ag: [], re: [], vd: (C && C.wsVd) || [], fat: (C && C.wsFat) || 0, temPresenca: false };
+  if (!p) return r;
+  var noP = function(d) { var t = d instanceof Date ? d.getTime() : 0; return t >= p.ini && t < p.fim; };
+  if (r.ok) {
+    var ws = Object.keys(WSL.porTel).map(function(t8) { return WSL.porTel[t8]; }).filter(function(x) { return x.prog !== 'ILD'; });
+    r.ing = ws.filter(function(x) { return noP(x.ing); });
+    r.part = r.ing.filter(function(x) { return x.p1 || x.p2 || x.p3; });
+    // o app só manda presença de algumas edições (julho): a etapa só aparece se a presença cobre boa parte dos ingressos
+    r.temPresenca = r.ing.length > 0 && r.part.length >= r.ing.length * 0.3;
+    r.apl = ws.filter(function(x) { return noP(x.apl); });
+  }
+  r.ag = (V2.rows || []).filter(function(v) { return v.date && noP(v.date) && /workshop/i.test(v.origem || ''); });
+  r.re = r.ag.filter(function(v) { return isComp(v.sn); });
+  return r;
+}
+// pessoa do app do workshop como "lead" para as listas (a linha da planilha de leads, se existir)
+function _rlWsLead(x) {
+  var l = null; try { l = (LD.rows || []).filter(function(y) { return y.tel8 === x.t8; })[0]; } catch (e) {}
+  if (l) return l;
+  var d = x.apl instanceof Date ? x.apl : x.ing instanceof Date ? x.ing : null;
+  return { nome: x.nome, tel: x.tel || x.t8, tel8: x.t8, insta: String(x.ig || '').replace(/^@+/, ''), email: '', origem: 'Workshop ' + _wsMes(x), fonte: 'workshop', utm: '', campanha: '',
+    faixa: leadFaixa(_wsInvTxt(x.inv)), seg: '', renda: '', obj: '', invest: _wsInvTxt(x.inv), score: 0, date: d, dataTxt: d ? d.toLocaleDateString('pt-BR') : '', i: 'ws', _ws: true, dono: x.sdr || '' };
+}
+function _rlRegLista(t, rows, tipo, sub) { var k = 'l' + (++RL.nL); RL_L[k] = { t: t, rows: rows || [], tipo: tipo || 'v2', sub: sub || '' }; return k; }
+function rlAbrirFunil(tipo) {
+  var C = RL._C, p = RL._p; if (!C || !p) return;
+  if (document.documentElement.classList.contains('rl-show')) { try { rlSair(); } catch (e) {} }
+  var mo = document.getElementById('modal-a'), mm = mo && mo.querySelector('.modal'); if (!mm) return;
+  var GT = C.gastoTipo || {}, inv = GT[tipo] || 0, tot = (GT.diagnostico || 0) + (GT.workshop || 0) + (GT.imersao || 0);
+  var nomeT = { diagnostico: '🩺 Anúncios de Diagnóstico', workshop: '🎓 Anúncios do Workshop', imersao: '🏟️ Anúncios da Imersão (ILD)' }[tipo] || 'Anúncios';
+  var cor = { diagnostico: '#6ea8ff', workshop: '#b084ff', imersao: '#f6a350' }[tipo] || '#6ea8ff';
+  var et = [], fat = 0, notas = [];
+  if (tipo === 'workshop') {
+    var W = rlFunilWorkshop(p, C);
+    if (!W.ok) { try { carregarWS(); } catch (eW) {} RL._funilTent = (RL._funilTent || 0) + 1; if (RL._funilTent < 6) setTimeout(function() { if (mo.classList.contains('open')) rlAbrirFunil('workshop'); }, 1500); }
+    if (W.ok) {
+      et.push({ rot: '🎟️ Compraram o ingresso', n: W.ing.length, L: _rlRegLista('Compraram o ingresso do workshop', W.ing.map(_rlWsLead), 'lead') });
+      if (W.temPresenca) et.push({ rot: '✅ Participaram', n: W.part.length, L: _rlRegLista('Participaram do workshop', W.part.map(_rlWsLead), 'lead') });
+      else notas.push('A presença nos dias do workshop ainda não vem do app (só julho tem) — por isso não há a etapa "participaram".');
+      et.push({ rot: '📝 Fizeram a aplicação', n: W.apl.length, L: _rlRegLista('Fizeram a aplicação do workshop', W.apl.map(_rlWsLead), 'lead') });
+    } else notas.push('Carregando os dados do app do workshop…');
+    et.push({ rot: '📅 Reuniões com o time', n: W.ag.length, L: _rlRegLista('Reuniões de leads do workshop', W.ag) });
+    et.push({ rot: '🤝 Compareceram', n: W.re.length, L: _rlRegLista('Compareceram (workshop)', W.re) });
+    et.push({ rot: '💰 Compraram', n: W.vd.length, L: _rlRegLista('Vendas do workshop', W.vd) });
+    fat = W.fat;
+    notas.push('Ingressos e aplicações pela data em que aconteceram; reuniões e vendas com origem "Workshop" no período.');
+  } else {
+    var F = (C.funil || {})[tipo] || { n: 0, mql: 0, ag: 0, re: 0, vd: 0, fat: 0, L: { n: [], mql: [], ag: [], re: [], vd: [] } };
+    et.push({ rot: '🙋 Leads de anúncio', n: F.n, L: _rlRegLista('Leads de anúncio (' + nomeT.replace(/^\S+ /, '') + ')', F.L.n, 'lead') });
+    et.push({ rot: '⭐ Qualificados (MQL)', n: F.mql, L: _rlRegLista('Leads qualificados (MQL) de anúncio', F.L.mql, 'lead') });
+    et.push({ rot: '📅 Agendaram reunião', n: F.ag, L: _rlRegLista('Agendaram reunião (anúncio)', F.L.ag, 'lead') });
+    et.push({ rot: '🤝 Compareceram', n: F.re, L: _rlRegLista('Compareceram (anúncio)', F.L.re, 'lead') });
+    et.push({ rot: '💰 Compraram', n: F.vd, L: _rlRegLista('Vendas de anúncio', F.L.vd, 'lead') });
+    fat = F.fat;
+    notas.push('Leads e reuniões de quem chegou no período; vendas que aconteceram no período (inclui lead antigo que comprou agora).');
+    if (tipo === 'imersao') notas.push('As vendas da imersão (ingressos) não passam pelo dash — aqui só o que veio como lead de diagnóstico.');
+  }
+  var topo = Math.max.apply(null, et.map(function(e) { return e.n; }).concat([1]));
+  var h = '<div class="modal-head"><div class="alerta-ico" style="background:rgba(255,255,255,.06);">🔻</div><h2>' + nomeT + '</h2><button class="close-x" onclick="fecharA()">✕</button></div>'
+    + '<div class="rl-fu-top"><div><small>Investido · ' + rlE(p.rot || '') + '</small><b>' + rlMoeda(inv) + '</b><span>' + (tot ? Math.round(inv / tot * 100) : 0) + '% de ' + rlMoeda(tot) + '</span></div>'
+    + '<div><small>Faturamento</small><b style="color:#3ddc97;">' + rlMoeda(fat) + '</b><span>' + (tipo === 'imersao' ? 'sem vendas no dash' : 'retorno ' + (inv ? (fat / inv).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0') + 'x') + '</span></div></div>'
+    + '<div class="rl-fu">';
+  et.forEach(function(e, i) {
+    var ant = i ? et[i - 1].n : 0, conv = i && ant ? Math.round(e.n / ant * 100) + '% da etapa anterior' : '';
+    h += '<button type="button" class="rl-fu-et" onclick="RL._voltarFunil=\'' + tipo + '\';rlAbrirLista(\'' + e.L + '\')" title="Ver quem está nesta etapa">'
+      + '<span class="rl-fu-bar" style="width:' + Math.max(3, Math.round(e.n / topo * 100)) + '%;background:' + cor + '33;border-color:' + cor + '88;"></span>'
+      + '<span class="rl-fu-rot">' + e.rot + '</span><b>' + e.n.toLocaleString('pt-BR') + '</b>'
+      + '<small>' + [conv, inv && e.n ? rlMoeda(inv / e.n) + ' cada' : ''].filter(Boolean).join(' · ') + '</small><i>›</i></button>';
+  });
+  h += '</div>';
+  // campanhas do tipo
+  var CP = tipo === 'workshop' ? (((C.funil || {}).workshop) || {}).camp || {} : (((C.funil || {})[tipo]) || {}).camp || {};
+  var cps = Object.keys(CP).map(function(n) { return { nome: n, x: CP[n] }; }).filter(function(c) { return c.x.gasto > 0 || c.x.n > 0; }).sort(function(a, b) { return b.x.gasto - a.x.gasto; });
+  if (cps.length) {
+    h += '<div class="rl-fu-cp"><div class="rl-fu-cpt">Campanhas</div>' + cps.slice(0, 12).map(function(c) {
+      return '<div class="rl-fu-cpl"><span title="' + rlE(c.nome) + '">' + rlE(c.nome) + '</span><b>' + rlMoeda(c.x.gasto) + '</b><small>'
+        + [tipo !== 'workshop' ? c.x.n + ' leads' + (c.x.n && c.x.gasto ? ' · ' + rlMoeda(c.x.gasto / c.x.n) + ' cada' : '') : '', c.x.vd ? c.x.vd + ' vendas' : ''].filter(Boolean).join(' · ') + '</small></div>';
+    }).join('') + '</div>';
+  }
+  h += notas.map(function(n) { return '<div class="hint" style="margin-top:8px;">' + n + '</div>'; }).join('');
+  mm.innerHTML = h;
+  mo.classList.add('open');
+}
 function rlAbrirLista(k) {
   var L = RL_L[k]; if (!L) return;
+  var _volta = RL._voltarFunil; RL._voltarFunil = null;   // lista aberta pelo funil: botão de voltar
   if (document.documentElement.classList.contains('rl-show')) { try { rlSair(); } catch (e) {} }
   var mo = document.getElementById('modal-a'), mm = mo && mo.querySelector('.modal'); if (!mm) return;
   var total = 0, nV = 0;
   if (L.tipo === 'v2') L.rows.forEach(function(r) { if (r.sn === 'vendido') { total += r.valor || 0; nV++; } });
   var ico = { v2: '📋', lead: '🙋', grav: '🎬' }[L.tipo] || '📋';
-  mm.innerHTML = '<div class="modal-head"><div class="alerta-ico" style="background:rgba(246,163,80,.15);">' + ico + '</div><h2>' + rlE(L.t) + ' — ' + L.rows.length + '</h2><button class="close-x" onclick="fecharA()">✕</button></div>'
+  mm.innerHTML = '<div class="modal-head">' + (_volta ? '<button class="btn" style="padding:6px 10px;font-size:.72rem;" onclick="rlAbrirFunil(\'' + _volta + '\')" title="Voltar ao funil">‹ funil</button>' : '') + '<div class="alerta-ico" style="background:rgba(246,163,80,.15);">' + ico + '</div><h2>' + rlE(L.t) + ' — ' + L.rows.length + '</h2><button class="close-x" onclick="fecharA()">✕</button></div>'
     + (L.sub ? '<div class="hint" style="margin:-6px 0 10px;">' + L.sub + '</div>' : '')
     + (nV ? '<div class="modal-total"><div class="g-stat"><b style="color:#3ddc97;">' + v2moeda0(total) + '</b><span>Vendido · ' + nV + (nV === 1 ? ' venda' : ' vendas') + '</span></div><div class="g-stat"><b>' + v2moeda0(total / nV) + '</b><span>Ticket médio</span></div></div>' : '')
     + '<input class="search-input" style="margin:4px 0 10px;" placeholder="🔍  Buscar nesta lista..." oninput="clearTimeout(window._rlBt);var v=this.value;window._rlBt=setTimeout(function(){_rlListaMostrar(v,0);},250);">'
@@ -26474,8 +26613,14 @@ document.addEventListener('click', function(ev) {
   var a = ev.target.closest('a, button, input'); if (a && el.contains(a) && a !== el) return;
   rlAbrirLista(el.getAttribute('data-rl-l'));
 });
+document.addEventListener('click', function(ev) {
+  var el = ev.target && ev.target.closest ? ev.target.closest('#rl-corpo [data-rl-funil]') : null; if (!el) return;
+  RL._funilTent = 0; rlAbrirFunil(el.getAttribute('data-rl-funil'));
+});
 document.addEventListener('keydown', function(ev) {
   if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  var ef = ev.target && ev.target.closest ? ev.target.closest('#rl-corpo [data-rl-funil]') : null;
+  if (ef && ef === ev.target) { ev.preventDefault(); RL._funilTent = 0; rlAbrirFunil(ef.getAttribute('data-rl-funil')); return; }
   var el = ev.target && ev.target.closest ? ev.target.closest('#rl-corpo [data-rl-l]') : null;
   if (el && el === ev.target) { ev.preventDefault(); rlAbrirLista(el.getAttribute('data-rl-l')); }
 });
@@ -26576,7 +26721,7 @@ function rlHero(p, A, B) {
       + '<foreignObject x="40" y="80" width="200" height="120"><div xmlns="http://www.w3.org/1999/xhtml" class="rl-anel-c" style="text-align:center;">' + rlNumAnim(frac * 100, 'pct') + '<div style="font-size:.66rem;font-weight:800;color:var(--text2);letter-spacing:1px;">DA META G (R$ 800 MIL)</div></div></foreignObject></svg>'
       + '<div class="rl-anel-l">' + [['P', metaP], ['M', metaM], ['G', metaG]].map(function(m) { return '<span class="' + (A.fat >= m[1] ? 'ok' : '') + '">' + (A.fat >= m[1] ? '✓ ' : '') + 'Meta ' + m[0] + ' ' + rlMil(m[1]) + '</span>'; }).join('') + '</div>'
       + (pr ? '<div style="font-size:.78rem;color:var(--text2);font-weight:700;">Projeção do mês: <b style="color:var(--text);">' + rlMil(pr) + '</b></div>' : '') + '</div>'
-    : '<div class="rl-anel rl-st" style="--i:2"><div class="rl-kpi" style="width:100%;max-width:320px;"' + rlL('Reuniões realizadas', rlOrdemStatus(A.t.l.re)) + '><small>Vendido por reunião realizada</small>' + rlNumAnim(A.porReuniao, 'moeda') + rlDelta(A.porReuniao, B.porReuniao) + '</div></div>';
+    : '<div class="rl-anel rl-st" style="--i:2"><div class="rl-kpi" style="width:100%;max-width:320px;"' + rlL('Lead apareceu na reunião', rlOrdemStatus(A.t.l.re)) + '><small>Vendido por reunião realizada</small>' + rlNumAnim(A.porReuniao, 'moeda') + rlDelta(A.porReuniao, B.porReuniao) + '</div></div>';
   return '<section class="rl-sec rl-hero" id="rl-capa" data-rl="capa"><div>'
     + '<span class="rl-eb rl-st">Relatório comercial · Promov</span>'
     + '<h1 class="rl-st" style="--i:1">' + rlE(p.rot) + '<small>' + (p.k === 'mes' ? 'até hoje, ' + rlDia(Date.now()) : 'fechado') + ' · comparado com ' + rlE(p.ant.rot) + '</small></h1>'
@@ -26586,8 +26731,8 @@ function rlHero(p, A, B) {
     + '<div class="rl-mini rl-st" style="--i:3">'
     +   '<div' + rlL('Vendas do período', vdL) + '><small>Vendas</small>' + rlNumAnim(A.vd, 'int') + rlDelta(A.vd, B.vd) + '</div>'
     +   '<div' + rlL('Vendas do período', vdL) + '><small>Ticket médio</small>' + rlNumAnim(A.ticket, 'mil') + rlDelta(A.ticket, B.ticket) + '</div>'
-    +   '<div' + rlL('Reuniões realizadas', rlOrdemStatus(A.t.l.re)) + '><small>Reuniões feitas</small>' + rlNumAnim(A.re, 'int') + rlDelta(A.re, B.re) + '</div>'
-    +   '<div' + rlL('Reuniões realizadas (vendas primeiro)', rlOrdemStatus(A.t.l.re)) + '><small>Fechamento</small>' + rlNumAnim(A.conv * 100, 'pct') + rlDelta(A.conv, B.conv, false, 100) + '</div></div>'
+    +   '<div' + rlL('Lead apareceu na reunião', rlOrdemStatus(A.t.l.re)) + '><small>Lead apareceu</small>' + rlNumAnim(A.re, 'int') + rlDelta(A.re, B.re) + '</div>'
+    +   '<div' + rlL('Lead apareceu (vendas primeiro)', rlOrdemStatus(A.t.l.re)) + '><small>Fechamento</small>' + rlNumAnim(A.conv * 100, 'pct') + rlDelta(A.conv, B.conv, false, 100) + '</div></div>'
     + (time.length ? '<div class="rl-time rl-st" style="--i:4">' + time.slice(0, 8).map(function(x) { var n = x.nome, f = rlFoto(n); return '<i title="' + rlE(n) + '"' + rlL('Reuniões de ' + n, rlOrdemStatus(x.l.marc)) + (f ? ' style="background-image:url(' + f + ')"' : ' style="background:linear-gradient(135deg,' + v2grad(n) + ')"') + '>' + (f ? '' : rlE(v2ini(n))) + '</i>'; }).join('')
       + '<span>' + time.length + ' pessoas no resultado</span></div>' : '')
     + '</div>' + anel + '</section>';
@@ -26606,12 +26751,12 @@ function rlKpis(p, A, B, C) {
     k('Vendido', A.fat, 'moeda', B.fat, '#f6a350', serie('fat'), 'antes: ' + rlMil(B.fat), false, rlL('Vendas do período', vdL)),
     k('Vendas', A.vd, 'int', B.vd, '#3ddc97', serie('vd'), 'antes: ' + B.vd, false, rlL('Vendas do período', vdL)),
     k('Ticket médio', A.ticket, 'moeda', B.ticket, '#ffd166', null, 'antes: ' + rlMil(B.ticket), false, rlL('Vendas do período', vdL)),
-    k('Vendido por reunião', A.porReuniao, 'moeda', B.porReuniao, '#f6a350', null, 'vendido ÷ reuniões realizadas', false, rlL('Reuniões realizadas', reL))
+    k('Vendido por reunião', A.porReuniao, 'moeda', B.porReuniao, '#f6a350', null, 'vendido ÷ reuniões em que o lead apareceu', false, rlL('Lead apareceu na reunião', reL))
   ]);
   h += grupo('📅 Reuniões', [
-    k('Agendadas', A.marc, 'int', B.marc, '#ff8fc0', serie('marc'), 'antes: ' + B.marc, false, rlL('Reuniões agendadas', rlOrdemStatus(A.t.l.marc))),
-    k('Realizadas', A.re, 'int', B.re, '#5eead4', serie('re'), A.pend ? A.pend + ' ainda sem resultado' : 'antes: ' + B.re, false, rlL('Reuniões realizadas', reL)),
-    k('Taxa de fechamento', A.conv * 100, 'pct', B.conv * 100, '#3ddc97', null, 'vendas ÷ reuniões realizadas', false, rlL('Reuniões realizadas (vendas primeiro)', reL)),
+    k('Marcadas', A.marc, 'int', B.marc, '#ff8fc0', serie('marc'), 'antes: ' + B.marc, false, rlL('Reuniões marcadas', rlOrdemStatus(A.t.l.marc))),
+    k('Lead apareceu', A.re, 'int', B.re, '#5eead4', serie('re'), A.pend ? A.pend + ' ainda sem resultado' : 'antes: ' + B.re, false, rlL('Lead apareceu na reunião', reL)),
+    k('Taxa de fechamento', A.conv * 100, 'pct', B.conv * 100, '#3ddc97', null, 'vendas ÷ reuniões em que o lead apareceu', false, rlL('Lead apareceu (vendas primeiro)', reL)),
     k('No-show', A.nsPct * 100, 'pct', B.nsPct * 100, '#ff6b6b', null, A.ns + ' faltas · referência: até 15%', true, rlL('No-show do período', A.t.l.ns))
   ]);
   var lz = [
@@ -26625,9 +26770,20 @@ function rlKpis(p, A, B, C) {
     if (C.gastoTipo) {
       var GT = C.gastoTipo, wsVd = A.t.l.vd.filter(function(r) { return /workshop/i.test(r.origem || ''); });
       var wsFat = wsVd.reduce(function(s2, r) { return s2 + (r.valor || 0); }, 0), RT = metaRetorno(GT, C.fatPago, wsFat), x1 = function(v) { return v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x'; };
-      if (GT.diagnostico) lz.push(k('Anúncios · Diagnóstico', GT.diagnostico, 'moeda', null, '#6ea8ff', null, Math.round(GT.diagnostico / C.gasto * 100) + '% do investimento · inclui distribuição/engajamento · ' + C.vendasPagas + ' vendas de anúncio · retorno ' + x1(RT.diag), false, rlL('Leads de anúncio', A.pagoL, 'lead')));
-      if (GT.workshop) lz.push(k('Anúncios · Workshop', GT.workshop, 'moeda', null, '#b084ff', null, wsVd.length + ' vendas do workshop' + (wsVd.length ? ' · ' + rlMoeda(GT.workshop / wsVd.length) + ' por venda · retorno ' + x1(RT.ws) : '') + ' · ' + Math.round(GT.workshop / C.gasto * 100) + '% do investimento', false, rlL('Vendas do workshop', wsVd)));
-      if (GT.imersao) lz.push(k('Anúncios · Imersão (ILD)', GT.imersao, 'moeda', null, '#f6a350', null, Math.round(GT.imersao / C.gasto * 100) + '% do investimento · as vendas da imersão não passam pelo dash', false, null));
+      // 03/10/2026 (Bruno: "que fique mais claro"): uma informação por linha e o funil ao tocar
+      var FD = (C.funil || {}).diagnostico || { n: 0, vd: 0, fat: 0 }, WF = rlFunilWorkshop(RL._p || p, C);
+      var lin = function(ico, txt) { return '<span class="rl-fl"><i>' + ico + '</i>' + txt + '</span>'; }, ver = '<span class="rl-ver">ver o funil ›</span>';
+      if (GT.diagnostico) lz.push(k('Anúncios · Diagnóstico', GT.diagnostico, 'moeda', null, '#6ea8ff', null,
+        lin('↩️', 'retorno <b>' + x1(RT.diag) + '</b>') + lin('🙋', '<b>' + FD.n + '</b> leads · ' + (FD.n ? rlMoeda(GT.diagnostico / FD.n) + ' cada' : '—'))
+        + lin('🤝', '<b>' + FD.vd + '</b> vendas · ' + (FD.vd ? rlMoeda(GT.diagnostico / FD.vd) + ' cada' : '—')) + lin('📊', Math.round(GT.diagnostico / C.gasto * 100) + '% do investimento (com distribuição)') + ver,
+        false, ' data-rl-funil="diagnostico" tabindex="0" role="button"'));
+      if (GT.workshop) lz.push(k('Anúncios · Workshop', GT.workshop, 'moeda', null, '#b084ff', null,
+        lin('↩️', 'retorno <b>' + x1(RT.ws) + '</b>') + (WF.ok ? lin('🎟️', '<b>' + WF.ing.length + '</b> ingressos · ' + (WF.ing.length ? rlMoeda(GT.workshop / WF.ing.length) + ' cada' : '—')) : '')
+        + lin('🤝', '<b>' + wsVd.length + '</b> vendas · ' + (wsVd.length ? rlMoeda(GT.workshop / wsVd.length) + ' cada' : '—')) + lin('📊', Math.round(GT.workshop / C.gasto * 100) + '% do investimento') + ver,
+        false, ' data-rl-funil="workshop" tabindex="0" role="button"'));
+      if (GT.imersao) lz.push(k('Anúncios · Imersão (ILD)', GT.imersao, 'moeda', null, '#f6a350', null,
+        lin('📊', Math.round(GT.imersao / C.gasto * 100) + '% do investimento') + lin('ℹ️', 'as vendas da imersão não passam pelo dash') + ver,
+        false, ' data-rl-funil="imersao" tabindex="0" role="button"'));
     }
     // 03/10/2026 (Bruno: "pode mudar"): custo por lead só com o investimento do diagnóstico (os leads da planilha vêm dele) e
     // retorno = vendas de anúncio + vendas do workshop ÷ investimento do diagnóstico + workshop (antes: tudo ÷ tudo)
@@ -26648,8 +26804,8 @@ function rlFunil(A, B) {
   var et = [
     ['Leads', A.leads, B.leads, '#6ea8ff', '#8fbaff', rlL('Leads do período', A.L, 'lead')],
     ['Qualificados (MQL)', A.mql, B.mql, '#b98aff', '#d2bcff', rlL('Leads qualificados (MQL)', A.mqlL, 'lead')],
-    ['Reuniões agendadas', A.marc, B.marc, '#ff8fc0', '#ffb3d4', rlL('Reuniões agendadas', rlOrdemStatus(A.t.l.marc))],
-    ['Reuniões realizadas', A.re, B.re, '#5eead4', '#99f6e4', rlL('Reuniões realizadas', rlOrdemStatus(A.t.l.re))],
+    ['Reuniões marcadas', A.marc, B.marc, '#ff8fc0', '#ffb3d4', rlL('Reuniões marcadas', rlOrdemStatus(A.t.l.marc))],
+    ['Lead apareceu', A.re, B.re, '#5eead4', '#99f6e4', rlL('Lead apareceu na reunião', rlOrdemStatus(A.t.l.re))],
     ['Vendas', A.vd, B.vd, '#3ddc97', '#8ef0c6', rlL('Vendas do período', A.t.l.vd)]
   ];
   var mx = Math.max(1, et[0][1]);
@@ -26681,8 +26837,8 @@ function rlEvolucao(p, A) {
   });
   var d = pts.map(function(q, i) { return (i ? 'L' : 'M') + q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ');
   h += '<path class="rl-lin" d="' + d + '" data-rl-lin="1" style="pointer-events:none;"/>' + pts.map(function(q) { return '<circle class="rl-pt" cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="3.5" style="pointer-events:none;"/>'; }).join('');
-  h += '</svg></div><div class="rl-leg rl-st"><span><i style="background:linear-gradient(#ffd166,#f6a350)"></i>Vendido ' + (A.passo > 1 ? 'por semana' : 'por dia') + '</span><span><i style="background:#6ea8ff"></i>Reuniões realizadas</span><span>Clique num dia para ver as reuniões dele</span></div>';
-  return rlSec('evolucao', 'Ritmo', 'Dia a dia', 'Vendido (barras) e reuniões realizadas (linha), pelo dia da reunião — como na Visão Geral.', h);
+  h += '</svg></div><div class="rl-leg rl-st"><span><i style="background:linear-gradient(#ffd166,#f6a350)"></i>Vendido ' + (A.passo > 1 ? 'por semana' : 'por dia') + '</span><span><i style="background:#6ea8ff"></i>Lead apareceu na reunião</span><span>Clique num dia para ver as reuniões dele</span></div>';
+  return rlSec('evolucao', 'Ritmo', 'Dia a dia', 'Vendido (barras) e reuniões em que o lead apareceu (linha), pelo dia da reunião — como na Visão Geral.', h);
 }
 function rlMeta(p, A) {
   var hoje = new Date(), mes = new Date(p.ini), fimMes = new Date(mes.getFullYear(), mes.getMonth() + 1, 1), restam = 0;
@@ -26723,7 +26879,7 @@ function rlClosers(A, B) {
       + '<div class="v"><b>' + rlMil(c.vdV) + '</b><small>vendeu ' + rlDelta(c.vdV, (antes[v2norm(c.nome)] || {}).vdV || 0) + '</small></div><div class="v"><b>' + c.vd + '</b><small>vendas</small></div>'
       + '<div class="v x"><b style="color:' + (conv >= 0.3 ? '#3ddc97' : conv >= 0.15 ? '#f6a350' : '#ff6b6b') + ';">' + rlPct(conv) + '</b><small>fecha</small></div><div class="v x"><b style="color:' + (nsp > 0.15 ? '#ff6b6b' : '#3ddc97') + ';">' + rlPct(nsp) + '</b><small>no-show</small></div></div>';
   }).join('') + '</div>';
-  return rlSec('closers', 'Closers', 'Quem fechou', 'Pódio pelo vendido. Fecha = vendas ÷ reuniões realizadas. Clique numa pessoa para ver as reuniões dela.', h);
+  return rlSec('closers', 'Closers', 'Quem fechou', 'Pódio pelo vendido. Fecha = vendas ÷ reuniões em que o lead apareceu. Clique numa pessoa para ver as reuniões dela.', h);
 }
 function rlSdrs(A, B) {
   var antes = {}; ((B && B.d.sdrs) || []).forEach(function(s) { antes[v2norm(s.nome)] = s; });
@@ -26757,7 +26913,7 @@ function rlOrigens(A, B) {
         var cv = o.re ? o.vd / o.re : 0;
         return '<div class="rl-tl rl-st" style="--i:' + i + '"' + rlL(o.nome + ' · reuniões (vendas primeiro)', rlOrdemStatus(o.rows)) + '><i style="background:' + (RL_COR_GRUPO[o.nome] || '#9aa3b2') + '"></i><b>' + rlE(o.nome) + ' <em class="rl-seta">›</em></b><span>' + o.marc + '</span><span>' + o.vd + '</span><span class="x">' + (o.re && o.vd <= o.re ? rlPct(cv) : '—') + '</span><span class="x">' + rlMil(o.fat) + ' ' + rlDelta(o.fat, (antes[o.nome] || {}).fat || 0) + '</span></div>';
       }).join('') + '</div>';
-  return rlSec('origens', 'Origens', 'De onde veio o resultado', 'Vendido por origem da reunião (planilha). Fecha = vendas ÷ reuniões realizadas daquela origem. Clique numa origem para ver as reuniões.', '<div class="rl-dois"><div class="rl-rosca rl-st">' + svg + '</div>' + tab + '</div>');
+  return rlSec('origens', 'Origens', 'De onde veio o resultado', 'Vendido por origem da reunião (planilha). Fecha = vendas ÷ reuniões em que o lead apareceu, daquela origem. Clique numa origem para ver as reuniões.', '<div class="rl-dois"><div class="rl-rosca rl-st">' + svg + '</div>' + tab + '</div>');
 }
 function rlCriCard(x, i) {
   var cpl = x.gasto && x.n ? x.gasto / x.n : 0; if (cpl < 1) cpl = 0;
@@ -26911,8 +27067,8 @@ function rlLeitura(p, A, B, C) {
   var vdL = rlL('Vendas do período', A.t.l.vd);
   if (A.fat > B.fat && B.fat) bom.push(['📈', 'Vendido <b>' + Math.round(var_(A.fat, B.fat) * 100) + '% maior</b> que ' + rlE(p.ant.rot) + ' (' + rlMil(A.fat) + ' contra ' + rlMil(B.fat) + ').', vdL]);
   else if (B.fat && A.fat < B.fat) ruim.push(['📉', 'Vendido <b>' + Math.abs(Math.round(var_(A.fat, B.fat) * 100)) + '% menor</b> que ' + rlE(p.ant.rot) + ' (' + rlMil(A.fat) + ' contra ' + rlMil(B.fat) + ').', vdL]);
-  var reL = rlL('Reuniões realizadas (vendas primeiro)', rlOrdemStatus(A.t.l.re));
-  if (A.conv >= 0.3) bom.push(['🎯', 'Fechamento de <b>' + rlPct(A.conv) + '</b> das reuniões realizadas.', reL]);
+  var reL = rlL('Lead apareceu (vendas primeiro)', rlOrdemStatus(A.t.l.re));
+  if (A.conv >= 0.3) bom.push(['🎯', 'Fechamento de <b>' + rlPct(A.conv) + '</b> das reuniões em que o lead apareceu.', reL]);
   else if (A.re >= 5) ruim.push(['🎯', 'Fechamento de <b>' + rlPct(A.conv) + '</b> — abaixo de 30%. Vale estudar as gravações que viraram venda com o time.', reL]);
   var nsL = rlL('No-show do período', A.t.l.ns);
   if (A.nsPct > 0.15) ruim.push(['🙈', 'No-show de <b>' + rlPct(A.nsPct) + '</b> (' + A.ns + ' faltas). A referência é até 15%: confirmação no dia e lembrete 1 h antes.', nsL]);
@@ -26921,8 +27077,8 @@ function rlLeitura(p, A, B, C) {
   if (A.leads) { var semR = A.fx.sem / A.leads; if (semR > 0.35) ruim.push(['📭', '<b>' + rlPct(semR) + ' dos leads não responderam</b> o formulário de qualificação.', rlL('Leads que não responderam a qualificação', A.fxL.sem, 'lead')]); }
   if (A.leads && A.fora / A.leads > 0.3) ruim.push(['🌙', '<b>' + rlPct(A.fora / A.leads) + ' dos leads chegam fora do horário comercial</b> — a IA e o primeiro contato no dia seguinte cedo fazem diferença.', rlL('Leads fora do horário comercial', A.foraL, 'lead')]);
   var os = A.origens.filter(function(o) { return o.re >= 3 && o.vd <= o.re; }).map(function(o) { return { o: o, cv: o.vd / o.re }; }).sort(function(a, b) { return b.cv - a.cv; });
-  if (os.length) bom.push(['🧲', '<b>' + rlE(os[0].o.nome) + '</b> é a origem que mais fecha: ' + rlPct(os[0].cv) + ' das reuniões realizadas.', rlL(os[0].o.nome + ' · reuniões (vendas primeiro)', rlOrdemStatus(os[0].o.rows))]);
-  if (os.length > 1 && os[os.length - 1].cv < 0.1) ruim.push(['🧲', '<b>' + rlE(os[os.length - 1].o.nome) + '</b> fecha só ' + rlPct(os[os.length - 1].cv) + ' das reuniões realizadas.', rlL(os[os.length - 1].o.nome + ' · reuniões', rlOrdemStatus(os[os.length - 1].o.rows))]);
+  if (os.length) bom.push(['🧲', '<b>' + rlE(os[0].o.nome) + '</b> é a origem que mais fecha: ' + rlPct(os[0].cv) + ' das reuniões em que o lead apareceu.', rlL(os[0].o.nome + ' · reuniões (vendas primeiro)', rlOrdemStatus(os[0].o.rows))]);
+  if (os.length > 1 && os[os.length - 1].cv < 0.1) ruim.push(['🧲', '<b>' + rlE(os[os.length - 1].o.nome) + '</b> fecha só ' + rlPct(os[os.length - 1].cv) + ' das reuniões em que o lead apareceu.', rlL(os[os.length - 1].o.nome + ' · reuniões', rlOrdemStatus(os[os.length - 1].o.rows))]);
   if (C.metaOk && C.gasto) {
     if (C.gastoTipo) {   // 03/10/2026: diagnóstico + workshop (cada um com as suas vendas); imersão fora — sem vendas no dash
       var RTl = metaRetorno(C.gastoTipo, C.fatPago, C.wsFat || 0), invl = (C.gastoTipo.diagnostico || 0) + (C.gastoTipo.workshop || 0), xx = function(v) { return v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'x'; };
@@ -26975,10 +27131,10 @@ function rlWsEdicoes() {
       + '<div class="rl-wed-h"><b>' + o.rot + '</b>' + (o.rodando ? '<span class="on">● contando</span>' : '<span>✔ encerrada</span>') + '</div><small>' + o.dias + '</small>'
       + '<div class="rl-wed-v"' + rlL(nm + ' · vendas', o.vd) + '><small>Vendido</small><b>' + rlMil(o.fat) + '</b>' + (a ? rlDelta(o.fat, a.fat) : '') + '</div>'
       + '<div class="rl-wed-g">'
-      +   st('Agendadas', o.marc.length, rlL(nm + ' · agendadas', rlOrdemStatus(o.marc)), a ? rlDelta(o.marc.length, a.marc.length) : '')
-      +   st('Realizadas', o.re.length, rlL(nm + ' · realizadas', rlOrdemStatus(o.re)), a ? rlDelta(o.re.length, a.re.length) : '')
+      +   st('Marcadas', o.marc.length, rlL(nm + ' · marcadas', rlOrdemStatus(o.marc)), a ? rlDelta(o.marc.length, a.marc.length) : '')
+      +   st('Lead apareceu', o.re.length, rlL(nm + ' · lead apareceu', rlOrdemStatus(o.re)), a ? rlDelta(o.re.length, a.re.length) : '')
       +   st('Vendas', o.vd.length, rlL(nm + ' · vendas', o.vd), a ? rlDelta(o.vd.length, a.vd.length) : '')
-      +   st('Fecha', rlPct(o.conv), rlL(nm + ' · realizadas (vendas primeiro)', rlOrdemStatus(o.re)), a ? rlDelta(o.conv, a.conv, false, 100) : '')
+      +   st('Fecha', rlPct(o.conv), rlL(nm + ' · lead apareceu (vendas primeiro)', rlOrdemStatus(o.re)), a ? rlDelta(o.conv, a.conv, false, 100) : '')
       +   st('No-show', rlPct(o.nsp), rlL(nm + ' · no-show', o.ns), a ? rlDelta(o.nsp, a.nsp, true, 100) : '')
       +   st('Ticket', o.ticket ? rlMil(o.ticket) : '—', rlL(nm + ' · vendas', o.vd), a && a.ticket ? rlDelta(o.ticket, a.ticket) : '')
       + '</div></div>';
@@ -27018,13 +27174,13 @@ function rlWorkshop(A, B) {
     return '<div class="rl-wc rl-st" style="--i:' + i + ';--c:' + cor + ';">'
       + '<div class="rl-wc-h"><span class="ico">' + ico + '</span><div><h3>' + nome + '</h3><small>' + (tot ? Math.round(o.fat / tot * 100) : 0) + '% do vendido no período</small></div></div>'
       + '<div class="rl-wc-v"' + rlL(nome + ' · vendas', o.vd) + '><small>Vendido</small>' + rlNumAnim(o.fat, 'moeda') + rlDelta(o.fat, ob.fat) + '</div>'
-      + '<div class="rl-wfs">' + barra('Agendadas', o.marc, 'linear-gradient(90deg,#ff8fc0,#ffb3d4)') + barra('Realizadas', o.re, 'linear-gradient(90deg,#5eead4,#99f6e4)') + barra('No-show', o.ns, 'linear-gradient(90deg,#ff6b6b,#ff9a8a)') + barra('Vendas', o.vd, 'linear-gradient(90deg,#3ddc97,#8ef0c6)') + '</div>'
+      + '<div class="rl-wfs">' + barra('Marcadas', o.marc, 'linear-gradient(90deg,#ff8fc0,#ffb3d4)') + barra('Apareceram', o.re, 'linear-gradient(90deg,#5eead4,#99f6e4)') + barra('No-show', o.ns, 'linear-gradient(90deg,#ff6b6b,#ff9a8a)') + barra('Vendas', o.vd, 'linear-gradient(90deg,#3ddc97,#8ef0c6)') + '</div>'
       + '<div class="rl-wg">'
-      +   st('Fechamento', rlPct(o.conv), rlL(nome + ' · realizadas (vendas primeiro)', rlOrdemStatus(o.re)), rlDelta(o.conv, ob.conv, false, 100))
+      +   st('Fechamento', rlPct(o.conv), rlL(nome + ' · lead apareceu (vendas primeiro)', rlOrdemStatus(o.re)), rlDelta(o.conv, ob.conv, false, 100))
       +   st('No-show', rlPct(o.nsp), rlL(nome + ' · no-show', o.ns), rlDelta(o.nsp, ob.nsp, true, 100))
       +   st('Ticket', o.ticket ? rlMil(o.ticket) : '—', rlL(nome + ' · vendas', o.vd))
-      +   st('Por reunião', o.porRe ? rlMil(o.porRe) : '—', rlL(nome + ' · realizadas', rlOrdemStatus(o.re)))
-      +   st('Não fecharam', o.nf.length, rlL(nome + ' · realizadas que não fecharam', o.nf))
+      +   st('Por reunião', o.porRe ? rlMil(o.porRe) : '—', rlL(nome + ' · lead apareceu', rlOrdemStatus(o.re)))
+      +   st('Não fecharam', o.nf.length, rlL(nome + ' · apareceram e não fecharam', o.nf))
       +   leadsHtml
       + '</div>'
       + (o.prods.length ? '<div class="rl-wp">' + o.prods.map(function(x) { return '<span' + rlL(nome + ' · ' + x.nome, x.rows) + '>' + rlE(x.nome) + ' · <b>' + rlMil(x.fat) + '</b></span>'; }).join('') + '</div>' : '')
@@ -27034,8 +27190,8 @@ function rlWorkshop(A, B) {
   var leadsW = '<div class="rl-ws" style="opacity:.75;"' + rlL('Workshop · todas as reuniões', rlOrdemStatus(W.rows)) + '><small>Leads</small><b>—</b><span class="rl-sub">vêm da aplicação do workshop</span></div>';
   var h = '<div class="rl-wd">' + card('Workshop', '🎓', '#f6a350', W, Wb, leadsW, 0) + card('Diagnóstico', '🩺', '#6ea8ff', D, Db, leadsD, 1) + '</div>';
   var frase = [];
-  if (W.re.length && D.re.length) frase.push('O <b>Workshop fecha ' + rlPct(W.conv) + '</b> das reuniões realizadas; o <b>Diagnóstico, ' + rlPct(D.conv) + '</b>.');
-  if (W.porRe && D.porRe) frase.push('Cada reunião realizada rende <b>' + rlMil(W.porRe) + '</b> no Workshop e <b>' + rlMil(D.porRe) + '</b> no Diagnóstico.');
+  if (W.re.length && D.re.length) frase.push('O <b>Workshop fecha ' + rlPct(W.conv) + '</b> das reuniões em que o lead apareceu; o <b>Diagnóstico, ' + rlPct(D.conv) + '</b>.');
+  if (W.porRe && D.porRe) frase.push('Cada reunião em que o lead apareceu rende <b>' + rlMil(W.porRe) + '</b> no Workshop e <b>' + rlMil(D.porRe) + '</b> no Diagnóstico.');
   if (frase.length) h += '<div class="rl-wfr rl-st">' + frase.join(' ') + '</div>';
   try { h += rlWsEdicoes(); } catch (eE) {}
   return rlSec('workshop', 'Funis', 'Workshop × Diagnóstico', 'Os dois funis separados. Workshop = reuniões com origem "Workshop"; Diagnóstico = todas as outras origens. As setas comparam com <b>' + rlE(RL._antRot || 'o período anterior') + '</b> — troque em “comparar com”, lá no alto.', h);
@@ -27217,9 +27373,9 @@ function rlHistorico() {
     ['Vendido', function(x) { return x.A.fat; }, rlMil, function(x) { return rlL('Vendas · ' + x.q.rot, x.A.t.l.vd); }],
     ['Vendas', function(x) { return x.A.vd; }, String, function(x) { return rlL('Vendas · ' + x.q.rot, x.A.t.l.vd); }],
     ['Ticket', function(x) { return x.A.ticket; }, function(v) { return v ? rlMil(v) : '—'; }, function(x) { return rlL('Vendas · ' + x.q.rot, x.A.t.l.vd); }],
-    ['Agendadas', function(x) { return x.A.marc; }, String, function(x) { return rlL('Agendadas · ' + x.q.rot, rlOrdemStatus(x.A.t.l.marc)); }],
-    ['Realizadas', function(x) { return x.A.re; }, String, function(x) { return rlL('Realizadas · ' + x.q.rot, rlOrdemStatus(x.A.t.l.re)); }],
-    ['Fecha', function(x) { return x.A.conv; }, rlPct, function(x) { return rlL('Realizadas (vendas primeiro) · ' + x.q.rot, rlOrdemStatus(x.A.t.l.re)); }, false, 100],
+    ['Marcadas', function(x) { return x.A.marc; }, String, function(x) { return rlL('Marcadas · ' + x.q.rot, rlOrdemStatus(x.A.t.l.marc)); }],
+    ['Lead apareceu', function(x) { return x.A.re; }, String, function(x) { return rlL('Lead apareceu · ' + x.q.rot, rlOrdemStatus(x.A.t.l.re)); }],
+    ['Fecha', function(x) { return x.A.conv; }, rlPct, function(x) { return rlL('Lead apareceu (vendas primeiro) · ' + x.q.rot, rlOrdemStatus(x.A.t.l.re)); }, false, 100],
     ['No-show', function(x) { return x.A.nsPct; }, rlPct, function(x) { return rlL('No-show · ' + x.q.rot, x.A.t.l.ns); }, true, 100],
     ['Leads', function(x) { return x.A.leads; }, function(v) { return v.toLocaleString('pt-BR'); }, function(x) { return rlL('Leads · ' + x.q.rot, x.A.L, 'lead'); }],
     ['MQL', function(x) { return x.A.mql; }, String, function(x) { return rlL('Leads qualificados · ' + x.q.rot, x.A.mqlL, 'lead'); }],
@@ -28559,7 +28715,7 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
     + '<div class="cm-marcas">' + fx.map(function(t, k){ return '<span class="' + (conta >= t[0] ? 'ok' : '') + '" style="left:' + _cmPct(t[0] / topo) + '">' + letra[k] + ' ' + t[0] + '</span>'; }).join('') + '</div>'
     + escada + '</div>'
     + (R ? _cmFunil(marc, apar, vds, cor) : '')
-    + '<div class="cm-stats">' + [['Realizadas', p.realizadas], ['Workshop', p.workshop], ['Vendas', p.vendas], ['Spark', p.spark], ['Growth', p.growth]].map(function(s){ return '<div class="cm-stat"><b>' + s[1] + '</b><small>' + s[0] + '</small></div>'; }).join('') + '</div>'
+    + '<div class="cm-stats">' + [['Lead apareceu', p.realizadas], ['Workshop', p.workshop], ['Vendas', p.vendas], ['Spark', p.spark], ['Growth', p.growth]].map(function(s){ return '<div class="cm-stat"><b>' + s[1] + '</b><small>' + s[0] + '</small></div>'; }).join('') + '</div>'
     + '<div class="cm-ver">Ver as reuniões do mês →</div></div>';
 }
 function _cmRosca(grupos, total) {
@@ -28615,7 +28771,7 @@ function renderComissoes() {
   var seletor = (d.meses && d.meses.length > 1) ? '<div class="cm-meses" role="tablist" aria-label="Mês">' + d.meses.map(function(m){ return '<button role="tab" aria-selected="' + (m === d.mes) + '" class="' + (m === d.mes ? 'on' : '') + '" onclick="cmMes(\'' + m + '\')">' + NM[+m.slice(5, 7) - 1] + '/' + m.slice(2, 4) + '</button>'; }).join('') + '</div>' : '';
   var selo = CM.carregando ? '<span class="cm-sync"><i></i>atualizando…</span>' : CM.aviso ? '<span class="cm-sync aviso">' + dspEsc(CM.aviso) + '</span>' : '';
   var h = '<div class="cm-topo-barra">' + seletor + selo + '</div>' + '<div class="panel cm-hero cm-entra"><div class="cm-topo"><div><div class="cm-olho">Folha de comissões</div><div class="cm-mes">' + dspEsc((d.mesTxt || d.mes).replace(/^\w/, function(c){ return c.toUpperCase(); })) + '</div>' + status
-    + '<div class="cm-resumo"><b>' + nVendas + '</b> vendas pagando comissão · <b>' + nReu + '</b> reuniões realizadas pelos SDRs e Social Selling</div></div>'
+    + '<div class="cm-resumo"><b>' + nVendas + '</b> vendas pagando comissão · <b>' + nReu + '</b> reuniões em que o lead apareceu (SDRs e Social Selling)</div></div>'
     + '<div class="cm-lado">' + _cmRosca(d.grupos, d.totalFolha) + '<div class="cm-total"><small>Total a pagar</small><b>' + _cmNum(d.totalFolha) + '</b><small>fixo + comissão + prêmio</small></div></div></div>'
     + '<div class="cm-folha">' + todas.map(function(x){ return '<i style="background:' + x.cor + ';" data-w="' + (x.p.total / (d.totalFolha || 1) * 100).toFixed(2) + '%" title="' + dspEsc(x.p.nome) + ': ' + cmR(x.p.total) + '"></i>'; }).join('') + '</div>'
     + '<div class="cm-leg">' + todas.map(function(x){ return '<span><em style="background:' + x.cor + ';"></em>' + dspEsc(x.p.nome.replace(/\s*\(.*\)$/, '')) + (x.g.k !== 'closers' ? ' <span class="hint">(' + x.g.nome + ')</span>' : '') + ' <b>' + cmR(x.p.total, false) + '</b></span>'; }).join('') + '</div>'
@@ -29329,7 +29485,7 @@ function _cmGravSelo(r) {
   if (g) {
     var lk = 'href="https://drive.google.com/file/d/' + encodeURIComponent(g.rec[0]) + '/view" target="_blank" rel="noopener" onclick="event.stopPropagation();"';
     return r.re ? '<a class="cm-tag cm-grav-ok" ' + lk + ' title="Abrir a gravação">🎥 ' + (g.dur ? gravDur(g.dur) : 'gravação') + '</a>'
-      : '<a class="cm-tag cm-grav-nao" ' + lk + ' title="Está como não realizada, mas tem gravação — confira se a reunião aconteceu (poucos minutos = sala vazia)">🔎 tem gravação' + (g.dur ? ' (' + gravDur(g.dur) + ')' : '') + ' · conferir</a>';
+      : '<a class="cm-tag cm-grav-nao" ' + lk + ' title="Está como lead não apareceu, mas tem gravação — confira se a reunião aconteceu (poucos minutos = sala vazia)">🔎 tem gravação' + (g.dur ? ' (' + gravDur(g.dur) + ')' : '') + ' · conferir</a>';
   }
   return r.re ? (rv ? _cmBotaoClint(v2reg(rv)) : '<span class="cm-tag cm-grav-nao">⚠️ sem gravação</span>') : '';
 }
@@ -29363,8 +29519,8 @@ function cmConferirClint(btn, iR) {
 function _cmDetPre(p, g, todos, bt) {
   var R = p.reunioes || [], ok = function(r){ return r.conta; };
   _cmGravPedir();
-  var h = '<div class="cm-filtros">' + bt('tudo', 'Todas', R.length) + bt('realizada', 'Realizadas', R.filter(function(r){ return r.re && ok(r); }).length) + bt('venda', 'Viraram venda', R.filter(function(r){ return r.vd && ok(r); }).length)
-    + bt('workshop', '🎓 Workshop', R.filter(function(r){ return r.o === 'Workshop'; }).length) + bt('nao', 'Não realizadas', R.filter(function(r){ return !r.re; }).length) + bt('tirada', 'Tiradas pelo financeiro', R.filter(function(r){ return !r.conta; }).length) + '</div>';
+  var h = '<div class="cm-filtros">' + bt('tudo', 'Todas', R.length) + bt('realizada', 'Lead apareceu', R.filter(function(r){ return r.re && ok(r); }).length) + bt('venda', 'Viraram venda', R.filter(function(r){ return r.vd && ok(r); }).length)
+    + bt('workshop', '🎓 Workshop', R.filter(function(r){ return r.o === 'Workshop'; }).length) + bt('nao', 'Não apareceu', R.filter(function(r){ return !r.re; }).length) + bt('tirada', 'Tiradas pelo financeiro', R.filter(function(r){ return !r.conta; }).length) + '</div>';
   var V = R.filter(function(r){ return CMD.filtro === 'tudo' || (CMD.filtro === 'realizada' ? r.re && ok(r) : CMD.filtro === 'venda' ? r.vd && ok(r) : CMD.filtro === 'workshop' ? r.o === 'Workshop' : CMD.filtro === 'tirada' ? !r.conta : !r.re); });
   // lembrete do Bruno (02/10/2026): "SDR só recebe por reuniões que o lead apareceu" — "SS também"
   if ((p.extras || []).length) h += '<div class="cm-bonus"><b>⭐ Bônus do mês</b>' + p.extras.map(function(x){ return '<span>' + dspEsc(x.d) + ' <em>' + cmR(x.v, false) + '</em></span>'; }).join('') + '</div>';
@@ -29374,8 +29530,8 @@ function _cmDetPre(p, g, todos, bt) {
     + (GRAV.carregado ? (function(){
         var cg = 0, sg = 0, ns = 0;
         R.forEach(function(r){ var rv = _cmReuDaChave(r.k), gv = rv ? _cmGravDe(rv, {}) : null; if (r.re && ok(r)) { if (gv) cg++; else sg++; } else if (!r.re && gv) ns++; });
-        return '<div class="cm-grav-resumo"><span class="cm-tag cm-grav-ok">🎥 ' + cg + ' realizadas com gravação</span><span class="cm-tag cm-grav-nao">⚠️ ' + sg + ' realizadas sem gravação</span>'
-          + (ns ? '<span class="cm-tag cm-grav-nao">🔎 ' + ns + ' marcadas como não realizadas, mas com gravação — conferir</span>' : '') + '</div>';
+        return '<div class="cm-grav-resumo"><span class="cm-tag cm-grav-ok">🎥 ' + cg + ' com o lead presente e gravação</span><span class="cm-tag cm-grav-nao">⚠️ ' + sg + ' com o lead presente e sem gravação</span>'
+          + (ns ? '<span class="cm-tag cm-grav-nao">🔎 ' + ns + ' marcadas como "lead não apareceu", mas com gravação — conferir</span>' : '') + '</div>';
       })() : '')
     + '<div class="cm-busca"><input type="search" placeholder="🔎 Procurar lead" aria-label="Procurar lead" value="' + dspEsc(CMD.busca || '') + '" oninput="cmBuscar(this.value)"><span class="hint" id="cm-busca-n"></span></div>';
   h += '<div class="cm-tab-wrap"><table class="cm-tab"><thead><tr><th>Data</th>' + (todos ? '<th>Quem</th>' : '') + '<th>Lead</th><th>Origem</th><th>Status</th><th>Produto</th><th>Closer</th><th>Situação</th><th style="text-align:right;">R$</th><th>Conta?</th></tr></thead><tbody>'
