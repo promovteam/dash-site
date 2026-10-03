@@ -2671,7 +2671,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-02-2355';
+var VERSAO_DASH = '2026-10-03-0002';
 var _versaoNova = null;
 
 // =====================================================================
@@ -28569,6 +28569,8 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-tag.cm-reu, .cm-tag.cm-vinc { border:1px solid rgba(110,168,255,.35); background:rgba(110,168,255,.12); color:#6ea8ff; cursor:pointer; font:inherit; font-size:.68rem; font-weight:800; }
 .cm-tag.cm-reu:hover, .cm-tag.cm-vinc:hover { background:rgba(110,168,255,.22); }
 .cm-tag.cm-vinc { border-style:dashed; }
+.cm-tag.cm-clint { border:1px solid rgba(155,123,255,.45); background:rgba(124,92,255,.14); color:#b9a6ff; cursor:pointer; font:inherit; font-size:.68rem; font-weight:800; text-decoration:none; }
+.cm-tag.cm-clint:hover { background:rgba(124,92,255,.26); color:#d6ccff; }
 .cm-tag.cm-grav-ok { background:rgba(61,220,151,.14); color:#3ddc97; text-decoration:none; border:1px solid rgba(61,220,151,.35); }
 .cm-tag.cm-grav-ok:hover { background:rgba(61,220,151,.24); }
 .cm-tag.cm-grav-nao { background:rgba(246,163,80,.14); color:#f6a350; border:1px solid rgba(246,163,80,.35); }
@@ -28806,7 +28808,7 @@ function _cmDetCloser(p, todos, bt) {
       + '<div class="cm-cli-nome"><b>' + dspEsc(prim.n) + '</b>' + (todos ? ' <span class="cm-quem">' + dspEsc(prim.q || '') + '</span>' : '') + '<small>' + sub + '</small>'
       + '<div class="cm-cli-tags">' + (prim.t !== 'extra' ? _cmTagOrigem(prim) : '')
       + (prim.t !== 'extra' && (prim.tp === 'Legado' || /legado|club/i.test(prim.p || '')) ? ' <span class="cm-tag" style="background:rgba(185,138,255,.14);color:#b98aff;" title="Legado Club e Legado Digital entram juntos na escada do Legado">🏛️ Legado · escada</span>' : '')
-      + (prim.t !== 'extra' ? _cmSeloReuniao(ls, window._cmCards.length) : '') + '</div></div>'
+      + (prim.t !== 'extra' ? _cmSeloReuniao(ls, window._cmCards.length) + _cmClintDoCliente(ls, window._cmCards.length) : '') + '</div></div>'
       + '<div class="cm-cli-valor"><small>comissão</small><b>' + cmR(com) + '</b><small>de ' + cmR(rec, false) + ' recebido</small></div></div>'
       + '<div class="cm-cli-parte" title="' + (sc ? (com / sc * 100).toFixed(1).replace('.', ',') : '0') + '% da comissão na tela"><i data-w="' + (sc ? Math.max(0, Math.min(100, com / sc * 100)) : 0).toFixed(1) + '%"></i></div>'
       + '<div class="cm-pags">';
@@ -28970,6 +28972,39 @@ function _cmGravPedir() {
   window._cmGravEsperando = true;
   try { if (!GRAV.carregando) gravCarregar(); } catch (e) {}
   var n = 0, t = setInterval(function(){ n++; if (GRAV.carregado || n > 60) { clearInterval(t); window._cmGravEsperando = false; if (GRAV.carregado && document.getElementById('cm-det-fundo')) cmDetRender(); } }, 1000);
+}
+// 🟣 Clint para conferência (Bruno 02/10/2026: "na aba das comissões tenha o link da Clint para conferência"): o link que a
+// reunião já tem anotado na observação; senão o contato que o dash já conhece; senão, ao clicar, procura pelo telefone
+// (calcula de novo no clique: a janela pode ter aberto antes de chegarem o formulário de pagamento e a aba Vendas)
+function _cmClintUrl(tel, nome, obs) {
+  var m = String(obs || '').match(/https:\/\/app\.clint\.digital\/[^\s|"'<>]+/), url = m ? m[0] : '';
+  if (!url) { try { url = clintLinkApp({ tel: tel || '', nome: nome || '' }) || ''; } catch (e) {} }
+  return url;
+}
+function _cmClintBotao(url, tipo, ref) {
+  if (url) return ' <a class="cm-tag cm-clint" href="' + dspEsc(url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Abrir este lead na Clint para conferir">🟣 Clint</a>';
+  return ' <button type="button" class="cm-tag cm-clint" onclick="return cmClintAbrir(event,\'' + tipo + '\',\'' + dspEsc(String(ref == null ? '' : ref).replace(/['"\\<>]/g, '')) + '\')" title="Procurar este lead na Clint e abrir">🟣 Clint</button>';
+}
+function _cmClintDados(tipo, ref) {
+  if (tipo === 'c') {
+    var c = (window._cmCards || [])[+ref]; if (!c) return null;
+    var x = _cmReuniaoDoCliente(c.ls), r = x.r;
+    return { tel: r && r.telefone ? r.telefone : ((x.pags[0] || {}).celular || ''), nome: (r && r.nome) || (c.ls[0] || {}).n || '', obs: r ? r.obs : '' };
+  }
+  var rv = _cmReuDaChave(ref);
+  return rv ? { tel: rv.telefone || '', nome: rv.nome || '', obs: rv.obs || '' } : null;
+}
+function _cmClintDoCliente(ls, ci) {
+  var x = _cmReuniaoDoCliente(ls), r = x.r;
+  return _cmClintBotao(_cmClintUrl(r && r.telefone ? r.telefone : ((x.pags[0] || {}).celular || ''), (r && r.nome) || (ls[0] || {}).n, r && r.obs), 'c', ci);
+}
+function cmClintAbrir(ev, tipo, ref) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  var d = _cmClintDados(tipo, ref);
+  if (!d || (!d.tel && !d.nome)) { avisoRapido('Não achei o telefone desta pessoa para abrir na Clint'); return false; }
+  var url = _cmClintUrl(d.tel, d.nome, d.obs);
+  if (url) { clintAbrir(url); return false; }
+  return abrirAtendimentoClintPor(ev, String(d.tel || '').replace(/\D/g, ''), d.nome);
 }
 function _cmSeloReuniao(ls, ci) {
   var prim = ls[0] || {};
@@ -29147,7 +29182,8 @@ function _cmDetPre(p, g, todos, bt) {
         var tags = (r.re ? '<span class="cm-tag" style="background:rgba(61,220,151,.14);color:#3ddc97;">✅ apareceu · paga</span> ' : '<span class="cm-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;">🚫 não apareceu · não paga</span> ')
           + (r.vd ? '<span class="cm-tag" style="background:rgba(61,220,151,.16);color:#3ddc97;">venda</span> ' : '')
           + (r.o === 'Workshop' && r.re ? '<span class="cm-tag" style="background:rgba(176,132,255,.16);color:#b084ff;">R$ 10</span> ' : '')
-          + _cmGravSelo(r);
+          + _cmGravSelo(r)
+          + (function(){ var rv = _cmReuDaChave(r.k); return _cmClintBotao(rv ? _cmClintUrl(rv.telefone, rv.nome, rv.obs) : '', 'r', r.k || ''); })();
         return '<tr class="cm-reu-linha ' + (!r.conta ? 'tirada' : r.re ? 'apareceu' : 'naoapareceu') + '" title="Clique para abrir a ficha da reunião" onclick="cmAbrirReuPre(\'' + dspEsc(r.k || '') + '\')" data-busca="' + dspEsc(v2norm(r.n + ' ' + (r.cl || '') + ' ' + (r.q || ''))) + '"><td>' + dspEsc(r.d) + '</td>' + (todos ? '<td>' + dspEsc(r.q || '') + '</td>' : '') + '<td><b>' + dspEsc(r.n) + '</b>' + (r.u ? '<div class="cm-sub">' + dspEsc(r.u) + '</div>' : '') + '</td><td>' + dspEsc(r.o || '—') + '</td><td>' + dspEsc(r.s || '—') + '</td><td>' + dspEsc(r.cat || r.p || '—') + '</td><td>' + dspEsc(r.cl || '—') + '</td><td>' + tags + '</td>'
           + '<td class="cm-reu-v"><b' + (r.v ? '' : ' style="color:#9aa3b2;"') + '>' + (r.v != null ? cmR(r.v, false) : '—') + '</b><small>' + dspEsc(_cmReuQuebra(r, gk, r.aba || CMD.aba)) + '</small></td>'
           + '<td style="white-space:nowrap;"><button class="cm-conta ' + (r.conta ? 'sim' : 'nao') + '" title="' + (r.conta ? 'Conta para o SDR — clique para tirar' : 'Não conta — clique para voltar a contar') + '" onclick="event.stopPropagation();cmPreConta(this,\'' + gk + '\',\'' + dspEsc(r.aba || CMD.aba) + '\',\'' + dspEsc(r.k || '') + '\',' + (r.ln || 0) + ',\'' + dspEsc(r.n).replace(/'/g, '') + '\',' + (r.conta ? 'false' : 'true') + ')">' + (r.conta ? '✓ conta' : '✕ não conta') + '</button></td></tr>';
