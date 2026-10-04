@@ -2854,7 +2854,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-03-1741';
+var VERSAO_DASH = '2026-10-03-2351';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -27006,6 +27006,7 @@ function rlRender() {
   // 03/10/2026 (Bruno: "o relatório deve ser ajustado à função de cada"): quem é do time vê só o seu; admin vê o do time ou escolhe uma pessoa
   var _Q = (typeof rlAplicarAcesso === 'function') ? rlAplicarAcesso() : { adm: true };
   if (_Q.fora) { box.innerHTML = '<div class="rl-vazio">O Relatório é só do time comercial.</div>'; return; }
+  if (RL.vista && RL.vista !== 'rel' && typeof rlPlanoRender === 'function') { rlPlanoRender(box, _Q); return; }   // 03/10/2026: Plano · Closer / Plano · Pré-venda
   if (RL.quem) { rlRenderPessoa(box, _Q); return; }
   RL_L = {}; RL.nL = 0; RL.nSec = 0;
   var p = rlPeriodo(RL.per, RL.de, RL.ate), A, B, C, X;
@@ -27025,7 +27026,6 @@ function rlRender() {
   h += rlBarra(p);
   h += rlHero(p, A, B);
   h += rlKpis(p, A, B, C);
-  try { if (typeof rlSecMetasTime === 'function') h += rlSecMetasTime(); } catch (eMt) {}
   h += rlHistorico();
   h += rlFunil(A, B);
   h += rlWorkshop(A, B);
@@ -27056,7 +27056,7 @@ function rlRender() {
 }
 function rlBarra(p) {
   var ops = [['mes', 'Este mês'], ['mesant', 'Mês passado'], ['semana', 'Esta semana'], ['semant', 'Semana passada'], ['30d', 'Últimos 30 dias']];
-  return '<div class="rl-barra">' + (typeof rlChipsQuem === 'function' ? rlChipsQuem() : '') + ops.map(function(o) { return '<span class="chart-chip' + (RL.per === o[0] ? ' on' : '') + '" onclick="rlPer(\'' + o[0] + '\')">' + o[1] + '</span>'; }).join('')
+  return '<div class="rl-barra">' + (typeof rlVistasHtml === 'function' ? rlVistasHtml() : '') + (typeof rlChipsQuem === 'function' ? rlChipsQuem() : '') + ops.map(function(o) { return '<span class="chart-chip' + (RL.per === o[0] ? ' on' : '') + '" onclick="rlPer(\'' + o[0] + '\')">' + o[1] + '</span>'; }).join('')
     + '<input class="edit-in" id="rl-datas" readonly placeholder="📅 escolher datas" style="width:150px;padding:7px 10px;font-size:.72rem;" value="' + (RL.per === 'custom' ? rlE(p.rot) : '') + '">'
     + '<label class="rl-cmp">comparar com <select onchange="rlCmp(this.value)">'
     +   [['auto', 'período anterior'], ['mescheio', 'mês passado inteiro'], ['2m', 'mesmo período, 2 meses atrás'], ['3m', 'mesmo período, 3 meses atrás'], ['12m', 'mesmo período, 1 ano atrás'], ['custom', '📅 escolher datas…']]
@@ -28190,8 +28190,6 @@ function rlRenderPessoa(box, Q) {
   var nome = rlNomeDe(pn), dois = fs.length > 1, h = '';
   h += rlBarra(p);
   h += rlHeroPessoa(p, pn, nome, fs, D, Q);
-  try { fs.forEach(function(f) { h += rlSecMeta(p, pn, f, Q, dois ? (f === 'closer' ? 'cl-' : f + '-') : ''); }); } catch (eMt) {}
-  try { h += rlSecEnergia(p, pn, fs, D, Q, X); } catch (eEn) {}
   fs.forEach(function(f) { h += f === 'closer' ? rlPessoaCloser(p, pn, D[f], X, dois ? 'cl-' : '') : rlPessoaSdr(p, pn, f, D[f], X, dois ? f + '-' : ''); });
   h += '<div class="rl-ctrl"><button class="btn" onclick="rlIr(-1)" aria-label="Anterior">←</button><span id="rl-cont">1 / 1</span>'
     + '<div class="rl-pg"><i id="rl-pgi" style="width:0"></i></div><button class="btn" onclick="rlIr(1)" aria-label="Próximo">→</button><button class="btn" onclick="rlSair()">✕ Sair</button></div>';
@@ -28334,6 +28332,11 @@ function rlSecMeta(p, pn, f, Q, pre) {
     return '<div class="rl-mp-t rl-st' + (ok ? ' ok' : '') + '"><div class="rl-mp-th"><b style="color:' + RL_TIER_COR[t] + '">META ' + t + '</b><span>' + rlFmtV(c[t], tp) + (tp === 'r' ? '' : ' reuniões') + '</span><em>' + Math.round(real / c[t] * 100) + '%</em></div>'
       + '<div class="rl-mp-bar"><i style="width:' + pct.toFixed(1) + '%;background:' + RL_TIER_COR[t] + ';"></i><s style="left:' + esp.toFixed(1) + '%" title="onde deveria estar hoje"></s></div><p>' + det + '</p></div>';
   }).join('');
+  if (c.ws && typeof rlMoBarra === 'function') {   // 03/10/2026: a meta dividida entre diagnóstico e workshop
+    var dv = rlWsDiv(A), rW = tp === 'r' ? dv.w.fat : dv.w.re, rD = tp === 'r' ? dv.d.fat : dv.d.re, mD = { P: c.P - c.ws.P, M: c.M - c.ws.M, G: c.G - c.ws.G };
+    tiers += '<div class="rl-mp-t rl-st"><div class="rl-mp-th"><b>🩺 DIAGNÓSTICO</b><span>' + rlFmtV(rD, tp) + ' de ' + rlFmtV(mD.G, tp) + ' (G)</span></div>' + rlMoBarra(rD, mD, MM, { tipo: tp, g: 'linear-gradient(90deg,#6ea8ff,#a9c8ff)' })
+      + '<div class="rl-mp-th" style="margin-top:6px"><b>🎓 WORKSHOP</b><span>' + rlFmtV(rW, tp) + ' de ' + rlFmtV(c.ws.G, tp) + ' (G)</span></div>' + rlMoBarra(rW, c.ws, MM, { tipo: tp }) + '</div>';
+  }
   // gap de hoje (contra a P e a G) e ritmo
   var espP = esperado('P'), espG = esperado('G'), gapP = real - espP;
   if (tp !== 'r') gapP = Math.round(gapP);
@@ -28453,6 +28456,419 @@ function rlSecMetasTime() {
   var h = '<div class="rl-mt-h rl-st">Closers · vendido do mês (somam P 700 mil · M 850 mil · G 1 milhão) · até hoje ' + rlMil(somaReal) + '</div><div class="rl-mt">' + cls + '</div>'
     + '<div class="rl-mt-h rl-st">SDR e Social Selling · reuniões com o lead presente</div><div class="rl-mt">' + sds + '</div>';
   return rlSec('metas-pessoais', 'Metas pessoais', 'A meta de cada um em ' + MM.M.nome.toLowerCase(), 'Dividida pelo setembro de cada um e pelo tempo de agenda de outubro. Marcas coloridas = P, M e G; o risco branco = onde deveria estar hoje. ' + MM.passou + ' de ' + MM.du + ' dias úteis. Clique numa pessoa para ver o plano dela (por semana, por dia e onde colocar energia).', h);
+}
+</script>
+<style id="rl-mo-estilo">
+/* 🎯 Metas de outubro: time, diagnóstico × workshop, venda × pré-venda (03/10/2026) */
+.rl-mo-hero { position:relative; padding:22px 24px 20px; border-radius:22px; background:linear-gradient(150deg, rgba(246,163,80,.14), rgba(185,138,255,.07) 55%, rgba(255,255,255,.02)); border:1px solid rgba(246,163,80,.32); overflow:hidden; }
+.rl-mo-hero::before { content:''; position:absolute; inset:-40% -10% auto auto; width:60%; height:160%; background:radial-gradient(closest-side, rgba(246,163,80,.16), transparent); pointer-events:none; }
+.rl-mo-top { position:relative; display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; }
+.rl-mo-top small { display:block; font-size:.62rem; font-weight:900; letter-spacing:1.6px; text-transform:uppercase; color:var(--text2); }
+.rl-mo-top .rl-num { display:block; font-family:var(--rl-disp); font-size:clamp(2.2rem, 5vw, 3.6rem); font-weight:900; line-height:1; color:#fff; text-shadow:0 0 34px rgba(246,163,80,.35); }
+.rl-mo-top p { margin:6px 0 0; font-size:.78rem; color:var(--text2); font-weight:700; }
+.rl-mo-top p b { color:var(--text); }
+.rl-mo-pcts { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+.rl-mo-pc { min-width:92px; padding:8px 12px; border-radius:14px; background:rgba(0,0,0,.25); border:1px solid var(--rl-borda); text-align:center; }
+.rl-mo-pc small { color:var(--c); }
+.rl-mo-pc b { display:block; font-family:var(--rl-disp); font-size:1.15rem; font-weight:900; }
+.rl-mo-pc span { font-size:.6rem; color:var(--muted); font-weight:800; }
+.rl-mo-pc.ok { border-color:var(--c); box-shadow:0 0 0 1px var(--c) inset, 0 0 22px -6px var(--c); }
+.rl-mo-pc.ok b::after { content:' ✓'; color:var(--c); }
+.rl-mg-bar { position:relative; height:16px; border-radius:99px; background:rgba(255,255,255,.07); margin:14px 0 26px; }
+.rl-mg-bar.big { height:22px; margin-top:24px; }
+.rl-mg-bar.tem-ceo { margin-top:50px; }
+.rl-mg-bar > i { position:absolute; left:0; top:0; bottom:0; border-radius:99px; overflow:hidden; background:var(--g, linear-gradient(90deg,#f6a350,#ffd166)); box-shadow:0 0 18px rgba(246,163,80,.45); }
+.rl-mg-bar > i::after { content:''; position:absolute; inset:0; background:linear-gradient(100deg, transparent 20%, rgba(255,255,255,.45) 45%, transparent 70%); transform:translateX(-100%); }
+.rl-mg-bar > u { position:absolute; top:-5px; bottom:-5px; width:3px; border-radius:2px; background:var(--c); text-decoration:none; }
+.rl-mg-bar > u::after { content:attr(data-r); position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%); white-space:nowrap; font-size:.58rem; font-weight:900; letter-spacing:.6px; color:var(--c); }
+.rl-mg-bar > s { position:absolute; top:-3px; bottom:-3px; width:2px; background:#fff; opacity:.9; }
+.rl-mg-leg { display:flex; gap:14px; flex-wrap:wrap; margin-top:14px; font-size:.68rem; color:var(--text2); font-weight:700; }
+.rl-mg-leg b { color:var(--text); }
+.rl-mo-funis { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-top:14px; }
+.rl-mo-f { padding:16px 18px; border-radius:20px; background:var(--rl-card); border:1px solid var(--rl-borda); }
+.rl-mo-f h3 { margin:0; display:flex; align-items:center; gap:8px; font-size:.95rem; }
+.rl-mo-f h3 em { margin-left:auto; font-style:normal; font-size:.66rem; color:var(--muted); font-weight:800; }
+.rl-mo-f .rl-num { display:block; font-family:var(--rl-disp); font-size:1.9rem; font-weight:900; margin-top:6px; }
+.rl-mo-f p { margin:4px 0 0; font-size:.72rem; color:var(--text2); font-weight:600; line-height:1.45; }
+.rl-mo-f p b { color:var(--text); }
+.rl-mo-tabs { display:flex; gap:8px; margin:22px 0 4px; flex-wrap:wrap; }
+.rl-mo-tab { flex:1 1 220px; display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:12px 16px; border-radius:16px; border:1px solid var(--rl-borda); background:rgba(255,255,255,.03); color:var(--text2); font:inherit; cursor:pointer; text-align:left; transition:border-color .2s, background .2s, transform .2s; }
+.rl-mo-tab b { font-size:.92rem; color:var(--text); }
+.rl-mo-tab span { font-size:.7rem; font-weight:700; }
+.rl-mo-tab:hover { transform:translateY(-1px); border-color:rgba(246,163,80,.4); }
+.rl-mo-tab.on { border-color:rgba(246,163,80,.7); background:linear-gradient(150deg, rgba(246,163,80,.16), rgba(246,163,80,.04)); }
+.rl-mo-tab:focus-visible, .rl-mo-chip:focus-visible { outline:2px solid var(--rl-y); outline-offset:2px; }
+.rl-mo-chips { display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 6px; }
+.rl-mo-chip { display:inline-flex; align-items:center; gap:7px; min-height:34px; padding:3px 13px 3px 4px; border-radius:99px; border:1px solid var(--rl-borda); background:rgba(255,255,255,.03); color:var(--text2); font:inherit; font-size:.74rem; font-weight:800; cursor:pointer; }
+.rl-mo-chip.sem-av { padding-left:13px; }
+.rl-mo-chip .rl-av { width:26px; height:26px; border-radius:50%; background:#2a2f3a center/cover no-repeat; display:grid; place-items:center; font-style:normal; font-weight:900; color:#fff; font-size:.6rem; }
+.rl-mo-chip.on { background:rgba(246,163,80,.16); border-color:rgba(246,163,80,.6); color:var(--text); }
+.rl-mo-chip small { font-size:.58rem; color:var(--muted); font-weight:900; letter-spacing:.6px; text-transform:uppercase; }
+.rl-mo-lista { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.rl-mo-l { display:grid; grid-template-columns:44px minmax(120px,.9fr) minmax(0,2.2fr) minmax(120px,.8fr); gap:14px; align-items:center; padding:12px 14px; border-radius:16px; background:var(--rl-card); border:1px solid var(--rl-borda); cursor:pointer; transition:border-color .2s, transform .2s; }
+.rl-mo-l:hover { border-color:rgba(246,163,80,.45); transform:translateX(2px); }
+.rl-mo-l .rl-av { width:44px; height:44px; border-radius:50%; background:#2a2f3a center/cover no-repeat; display:grid; place-items:center; font-style:normal; font-weight:900; color:#fff; font-size:.85rem; }
+.rl-mo-l .nm b { display:block; font-size:.88rem; } .rl-mo-l .nm small { font-size:.6rem; color:var(--muted); font-weight:900; letter-spacing:.8px; text-transform:uppercase; }
+.rl-mo-l .rl-mo-bars { display:flex; flex-direction:column; gap:6px; }
+.rl-mo-l .rl-mo-bars .rl-mg-bar { margin:0; height:12px; width:100%; }
+.rl-mo-l .rl-mo-bars .rl-mg-bar.mini { height:7px; opacity:.9; }
+.rl-mo-l .rl-mo-bars .rl-mg-bar > u::after { display:none; }
+.rl-mo-split { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px; }
+.rl-mo-split em { display:block; font-style:normal; font-size:.6rem; color:var(--muted); font-weight:800; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rl-mo-l .rl-mo-bars em { display:flex; justify-content:space-between; font-style:normal; font-size:.6rem; color:var(--muted); font-weight:800; }
+.rl-mo-l .v { text-align:right; } .rl-mo-l .v b { display:block; font-family:var(--rl-disp); font-size:1.05rem; font-weight:900; } .rl-mo-l .v small { display:block; font-size:.6rem; color:var(--muted); font-weight:800; }
+.rl-mo-det { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px; margin-top:8px; padding:18px; border-radius:20px; background:var(--rl-card); border:1px solid var(--rl-borda); }
+.rl-mo-det .quem { display:flex; align-items:center; gap:12px; }
+.rl-mo-det .quem .rl-av { width:54px; height:54px; border-radius:50%; background:#2a2f3a center/cover no-repeat; display:grid; place-items:center; font-style:normal; font-weight:900; color:#fff; }
+.rl-mo-det .quem b { display:block; font-size:1.05rem; } .rl-mo-det .quem small { font-size:.62rem; color:var(--muted); font-weight:900; letter-spacing:.8px; text-transform:uppercase; }
+.rl-mo-det .rl-num { display:block; font-family:var(--rl-disp); font-size:2.2rem; font-weight:900; margin-top:10px; line-height:1; }
+.rl-mo-det table { width:100%; border-collapse:collapse; font-size:.74rem; font-variant-numeric:tabular-nums; }
+.rl-mo-det th { text-align:left; font-size:.56rem; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--rl-borda); }
+.rl-mo-det td { padding:8px; border-bottom:1px solid rgba(255,255,255,.05); color:var(--text2); font-weight:700; }
+.rl-mo-det td b { color:var(--text); }
+.rl-mo-det .acao { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+.rl-mo-det .gp { margin-top:10px; font-size:.74rem; color:var(--text2); font-weight:600; line-height:1.5; }
+.rl-mo-det .gp b { color:var(--text); }
+@keyframes rlEnche { from { width:0; } }
+@keyframes rlBrilho { 0% { transform:translateX(-100%); } 60%, 100% { transform:translateX(110%); } }
+@keyframes rlMarca { from { opacity:0; transform:translateY(-6px) scaleY(.2); } }
+.rl-anim .rl-sec:not(.rl-in) .rl-mg-bar > i, .rl-anim .rl-sec:not(.rl-in) .rl-mp-bar > i { width:0 !important; }
+.rl-anim .rl-sec.rl-in .rl-mg-bar > i { animation:rlEnche 1.7s cubic-bezier(.22,1,.36,1) both; }
+.rl-anim .rl-sec.rl-in .rl-mg-bar > i::after { animation:rlBrilho 3.2s ease-in-out 1.8s infinite; }
+.rl-anim .rl-sec.rl-in .rl-mg-bar > u { animation:rlMarca .5s cubic-bezier(.22,1,.36,1) both; animation-delay:calc(.9s + var(--k, 0) * .18s); }
+.rl-anim .rl-sec.rl-in .rl-mp-bar > i { animation:rlEnche 1.4s cubic-bezier(.22,1,.36,1) both; }
+@media (prefers-reduced-motion:reduce) { .rl-mg-bar > i, .rl-mg-bar > i::after, .rl-mg-bar > u, .rl-mp-bar > i { animation:none !important; } }
+@media (max-width:900px) {
+  .rl-mo-funis, .rl-mo-det { grid-template-columns:minmax(0,1fr); }
+  .rl-mo-pcts { margin-left:0; }
+  .rl-mo-l { grid-template-columns:40px minmax(0,1fr) minmax(90px,auto); }
+  .rl-mo-l .rl-mo-bars { grid-column:1 / -1; order:3; }
+}
+</style>
+<script>
+// ===== 🎯 METAS DE OUTUBRO NO RELATÓRIO DO TIME (Bruno 03/10/2026: "coloque um da meta total do time dividindo meta do diagnóstico e
+// meta do workshop"; "temos que fazer um trabalho muito bom, coloque animação nas metas"; "faça uma separação de meta por time de
+// venda e time de pré-venda, e dentro de cada possa filtrar o objetivo por closer ou por SDR ou SS"). Diagnóstico × workshop pelo
+// setembro de cada um: Tony vendeu 55% no workshop, Wesllene 70%, Bruno e Sarah ficam no funil normal; na pré-venda, 59% das
+// reuniões da Selina foram do workshop e as do Ismael e da Sarah, do diagnóstico.
+(function () {
+  var M = RL_METAS && RL_METAS['2026-10']; if (!M) return;
+  M.closer.tony.ws = { P: 165000, M: 200000, G: 235000 };
+  M.closer.wesllene.ws = { P: 55000, M: 65000, G: 75000 };
+  M.sdr.selina.ws = { P: 63, M: 75, G: 88 };
+  M.preVenda = { P: 177, M: 213, G: 251 };
+})();
+var RL_TIERS = [['P', '#ff6b6b'], ['M', '#f6a350'], ['G', '#3ddc97']];
+function rlMoWs(c, t) { return (c.ws && c.ws[t]) || 0; }
+// soma das metas de um grupo de pessoas (closer: R$; pré-venda: reuniões com o lead presente)
+function rlMoSoma(lista, MM, tipo) {
+  var o = { P: 0, M: 0, G: 0, wsP: 0, wsM: 0, wsG: 0 };
+  lista.forEach(function(x) { var c = (tipo === 'closer' ? MM.M.closer : MM.M.sdr)[x]; if (!c) return; ['P', 'M', 'G'].forEach(function(t) { o[t] += c[t]; o['ws' + t] += rlMoWs(c, t); }); });
+  return o;
+}
+// realizado de um grupo no mês, separado em diagnóstico × workshop
+function rlMoReal(lista, MM, tipo) {
+  var f = lista === '*' ? null : function(r) { var n = rlPn(tipo === 'closer' ? r.closer : r.sdr); return lista.indexOf(n) !== -1; };
+  var A = rlCalc({ ini: MM.ini, fim: Math.min(MM.fim, MM.ate) }, f), d = rlWsDiv(A);
+  return tipo === 'closer' ? { tot: d.w.fat + d.d.fat, ws: d.w.fat, dg: d.d.fat, A: A, d: d } : { tot: d.w.re + d.d.re, ws: d.w.re, dg: d.d.re, A: A, d: d };
+}
+// uma barra animada com as marcas P, M e G (e o risco branco de onde deveria estar hoje)
+function rlMoBarra(real, metas, MM, opt) {
+  opt = opt || {};
+  var max = metas.G * (opt.folga || 1.08), w = Math.min(100, real / max * 100), hoje = Math.min(100, metas.P * MM.passou / MM.du / max * 100);
+  var marcas = opt.semMarcas ? '' : RL_TIERS.map(function(t, k) { return '<u style="left:' + (metas[t[0]] / max * 100).toFixed(1) + '%;--c:' + t[1] + ';--k:' + k + '" data-r="' + t[0] + ' ' + (opt.tipo === 'r' ? rlMil(metas[t[0]]).replace('R$ ', '') : metas[t[0]]) + '"></u>'; }).join('');
+  return '<div class="rl-mg-bar' + (opt.cls ? ' ' + opt.cls : '') + '"' + (opt.lst || '') + '><i style="width:' + w.toFixed(1) + '%;' + (opt.g ? '--g:' + opt.g + ';' : '') + '"' + (opt.ceo ? ' data-ceo="' + opt.ceo + '"' : '') + '></i>' + marcas + (opt.semHoje ? '' : '<s style="left:' + hoje.toFixed(1) + '%" title="onde deveria estar hoje (ritmo da P)"></s>') + '</div>';
+}
+function rlMoPcs(real, metas, tipo) {
+  return '<div class="rl-mo-pcts">' + RL_TIERS.map(function(t) { var v = metas[t[0]], ok = real >= v; return '<div class="rl-mo-pc' + (ok ? ' ok' : '') + '" style="--c:' + t[1] + '"><small>Meta ' + t[0] + '</small><b>' + Math.round(real / v * 100) + '%</b><span>' + (tipo === 'r' ? rlMil(v) : v + ' reuniões') + '</span></div>'; }).join('') + '</div>';
+}
+function rlMoFalta(real, v, MM, tipo) { var f = Math.max(0, v - real), d = f / Math.max(1, MM.resta); return tipo === 'r' ? rlMil(d) : d.toFixed(1).replace('.', ','); }
+// ---------- a seção ----------
+function rlSecMetasOut() {
+  var MM = rlMetaMes(); if (!MM) return '';
+  RL.mtAba = RL.mtAba || 'venda'; RL.mtQuem = RL.mtQuem || '';
+  var M = MM.M, cls = Object.keys(M.closer), sds = Object.keys(M.sdr);
+  var T = rlMoReal('*', MM, 'closer'), mDg = { P: 0, M: 0, G: 0 }, mWs = { P: 0, M: 0, G: 0 }, sv = rlMoSoma(cls, MM, 'closer');
+  ['P', 'M', 'G'].forEach(function(t) { mWs[t] = sv['ws' + t]; mDg[t] = M.time[t] - sv['ws' + t]; });
+  var proj = MM.passou ? T.tot / MM.passou * MM.du : 0;
+  // 1) o time inteiro
+  var hero = '<div class="rl-mo-hero rl-st">'
+    + '<div class="rl-mo-top"><div><small>Meta do time · ' + M.nome.toLowerCase() + ' · vendido</small>' + rlNumAnim(T.tot, 'moeda')
+    + '<p>de <b>' + rlMil(M.time.G) + '</b> (G) · ' + MM.passou + ' de ' + MM.du + ' dias úteis' + (MM.passou >= 3 ? ' · no ritmo de agora fecha em <b>' + rlMil(proj) + '</b>' : '') + '</p></div>'
+    + rlMoPcs(T.tot, M.time, 'r') + '</div>'
+    + rlMoBarra(T.tot, M.time, MM, { tipo: 'r', cls: 'big', ceo: 'ambos', lst: rlL('Vendas do mês', T.A.t.l.vd) })
+    + '<div class="rl-mg-leg"><span>Para a P faltam <b>' + rlMil(Math.max(0, M.time.P - T.tot)) + '</b> · ' + rlMoFalta(T.tot, M.time.P, MM, 'r') + '/dia</span><span>Para a M: <b>' + rlMoFalta(T.tot, M.time.M, MM, 'r') + '/dia</b></span><span>Para a G: <b>' + rlMoFalta(T.tot, M.time.G, MM, 'r') + '/dia</b></span><span>risco branco = onde deveria estar hoje</span></div>'
+    + '</div>';
+  // 2) diagnóstico × workshop
+  var funil = function(nome, ico, real, metas, ceo, g, lst, quem) {
+    return '<div class="rl-mo-f rl-st"><h3><span>' + ico + '</span>' + nome + '<em>' + quem + '</em></h3>' + rlNumAnim(real, 'moeda')
+      + rlMoBarra(real, metas, MM, { tipo: 'r', ceo: ceo, g: g, lst: lst })
+      + '<p>Meta <b>P ' + rlMil(metas.P) + '</b> · M ' + rlMil(metas.M) + ' · <b>G ' + rlMil(metas.G) + '</b> · ' + Math.round(real / metas.G * 100) + '% da G. Para a G: <b>' + rlMoFalta(real, metas.G, MM, 'r') + ' por dia útil</b>.</p></div>';
+  };
+  var funis = '<div class="rl-mo-funis">'
+    + funil('Diagnóstico', '🩺', T.dg, mDg, 'pv', 'linear-gradient(90deg,#6ea8ff,#a9c8ff)', rlL('Vendas do diagnóstico no mês', T.d.d.vdL), 'você, Tony (HT), Wesllene e Sarah (Legado)')
+    + funil('Workshop', '🎓', T.ws, mWs, 'joao', 'linear-gradient(90deg,#f6a350,#ffd166)', rlL('Vendas do workshop no mês', T.d.w.vdL), 'Tony e Wesllene, na época do workshop')
+    + '</div>';
+  // 3) venda × pré-venda
+  var PV = rlMoReal(sds, MM, 'sdr');
+  var tabs = '<div class="rl-mo-tabs" role="tablist">'
+    + '<button type="button" role="tab" class="rl-mo-tab' + (RL.mtAba === 'venda' ? ' on' : '') + '" aria-selected="' + (RL.mtAba === 'venda') + '" onclick="rlMtFiltro(\'venda\',\'\')"><b>💰 Time de venda</b><span>closers · ' + rlMil(T.tot) + ' de ' + rlMil(M.time.G) + '</span></button>'
+    + '<button type="button" role="tab" class="rl-mo-tab' + (RL.mtAba === 'pre' ? ' on' : '') + '" aria-selected="' + (RL.mtAba === 'pre') + '" onclick="rlMtFiltro(\'pre\',\'\')"><b>📞 Time de pré-venda</b><span>SDR e Social Selling · ' + PV.tot + ' de ' + M.preVenda.G + ' reuniões com o lead presente</span></button></div>';
+  var h = hero + funis + tabs + '<div id="rl-mt-corpo">' + rlMtConteudo(RL.mtAba, RL.mtQuem, MM) + '</div>';
+  return rlSec('metas-out', 'Metas de ' + M.nome.toLowerCase(), 'A meta do time, por funil e por pessoa', 'P 700 mil · M 850 mil · G 1 milhão, divididos entre diagnóstico e workshop e entre o time de venda (vendido) e o de pré-venda (reuniões em que o lead apareceu). Filtre por pessoa: tudo o que aparece aqui é do mês inteiro, até hoje.', h);
+}
+// conteúdo da aba (troca sem redesenhar o relatório)
+function rlMtConteudo(aba, quem, MM) {
+  MM = MM || rlMetaMes(); if (!MM) return '';
+  var M = MM.M, venda = aba !== 'pre', tipo = venda ? 'closer' : 'sdr', tp = venda ? 'r' : 'n';
+  var pessoas = venda ? Object.keys(M.closer) : Object.keys(M.sdr);
+  var fn = function(k) { return venda ? 'closer' : (k === 'sarah' ? 'ss' : 'sdr'); };
+  var chip = function(k, rot, sub, av) { return '<button type="button" class="rl-mo-chip' + (av ? '' : ' sem-av') + (quem === k ? ' on' : '') + '" aria-pressed="' + (quem === k) + '" onclick="rlMtFiltro(\'' + aba + '\',\'' + k + '\')">' + (av ? rlAvatar(av) : '') + rot + (sub ? ' <small>' + sub + '</small>' : '') + '</button>'; };
+  var chips = '<div class="rl-mo-chips">' + chip('', venda ? '👥 Todos os closers' : '👥 Toda a pré-venda', '', '')
+    + (venda ? '' : chip('@sdr', '📞 SDR', 'Selina + Ismael', '') + chip('@ss', '📲 Social Selling', 'Sarah', ''))
+    + pessoas.map(function(k) { var n = rlNomeDe(k); return chip(k, rlE(n.split(' ')[0]), venda ? 'closer' : RL_FUNCAO_TXT[fn(k)], n); }).join('') + '</div>';
+  var grupo = quem === '@sdr' ? pessoas.filter(function(k) { return fn(k) === 'sdr'; }) : quem === '@ss' ? pessoas.filter(function(k) { return fn(k) === 'ss'; }) : (quem ? [quem] : pessoas);
+  var corpo = '';
+  if (quem && quem.charAt(0) !== '@') corpo = rlMtDetalhe(quem, venda, MM);
+  else {
+    // o grupo somado (com runner) + a lista das pessoas
+    var met = rlMoSoma(grupo, MM, tipo), real = rlMoReal(grupo, MM, tipo), mt = { P: met.P, M: met.M, G: met.G };
+    var rot = venda ? 'Closers' : quem === '@sdr' ? 'SDR' : quem === '@ss' ? 'Social Selling' : 'Pré-venda';
+    corpo += '<div class="rl-mo-f rl-st" style="margin-top:8px"><h3><span>' + (venda ? '💰' : '📞') + '</span>' + rot + ' · ' + (venda ? 'vendido' : 'reuniões com o lead presente') + '<em>' + MM.passou + ' de ' + MM.du + ' dias úteis</em></h3>'
+      + rlNumAnim(real.tot, venda ? 'moeda' : 'int') + rlMoBarra(real.tot, mt, MM, { tipo: tp, ceo: venda ? 'pv' : 'joao', g: venda ? '' : 'linear-gradient(90deg,#b98aff,#ff8fc0)', lst: rlL(rot + ' · ' + (venda ? 'vendas' : 'lead apareceu'), rlOrdemStatus(venda ? real.A.t.l.vd : real.A.t.l.re)) })
+      + '<p>Diagnóstico <b>' + rlFmtV(real.dg, tp) + '</b> de ' + rlFmtV(mt.G - met.wsG, tp) + ' (G) · Workshop <b>' + rlFmtV(real.ws, tp) + '</b> de ' + rlFmtV(met.wsG, tp) + ' (G) · para a P: <b>' + rlMoFalta(real.tot, mt.P, MM, tp) + '/dia</b>, para a G: <b>' + rlMoFalta(real.tot, mt.G, MM, tp) + '/dia</b>.</p></div>';
+    corpo += '<div class="rl-mo-lista">' + grupo.map(function(k, i) {
+      var c = (venda ? M.closer : M.sdr)[k], r = rlMoReal([k], MM, tipo), n = rlNomeDe(k), wsG = rlMoWs(c, 'G');
+      var esp = c.P * MM.passou / MM.du, gap = tp === 'r' ? r.tot - esp : Math.round(r.tot - esp);
+      var mini = wsG ? '<div class="rl-mo-split"><div><em>🩺 diagnóstico ' + rlFmtV(r.dg, tp) + ' de ' + rlFmtV(c.G - wsG, tp) + '</em>' + rlMoBarra(r.dg, { P: c.P - rlMoWs(c, 'P'), M: c.M - rlMoWs(c, 'M'), G: c.G - wsG }, MM, { cls: 'mini', g: 'linear-gradient(90deg,#6ea8ff,#a9c8ff)', semHoje: 1, semMarcas: 1, folga: 1 }) + '</div>'
+        + '<div><em>🎓 workshop ' + rlFmtV(r.ws, tp) + ' de ' + rlFmtV(wsG, tp) + '</em>' + rlMoBarra(r.ws, c.ws, MM, { cls: 'mini', semHoje: 1, semMarcas: 1, folga: 1 }) + '</div></div>' : '';
+      return '<div class="rl-mo-l rl-st" style="--i:' + i + '" role="button" tabindex="0" onclick="rlMtFiltro(\'' + (venda ? 'venda' : 'pre') + '\',\'' + k + '\')" title="Ver a meta de ' + rlE(n) + '">' + rlAvatar(n)
+        + '<div class="nm"><b>' + rlE(n) + '</b><small>' + RL_FUNCAO_TXT[fn(k)] + '</small></div>'
+        + '<div class="rl-mo-bars">' + rlMoBarra(r.tot, c, MM, { tipo: tp }) + mini + '</div>'
+        + '<div class="v"><b>' + rlFmtV(r.tot, tp) + '</b><small>P ' + rlFmtV(c.P, tp) + ' · M ' + rlFmtV(c.M, tp) + ' · G ' + rlFmtV(c.G, tp) + '</small><small style="color:' + (gap >= 0 ? '#3ddc97' : '#ff8a6b') + '">' + (gap === 0 && tp !== 'r' ? 'em dia' : (gap >= 0 ? '+' : '−') + rlFmtV(Math.abs(gap), tp) + ' do ritmo da P') + '</small></div></div>';
+    }).join('') + '</div>';
+  }
+  return chips + corpo;
+}
+// uma pessoa: o objetivo dela por funil e por faixa
+function rlMtDetalhe(k, venda, MM) {
+  var M = MM.M, c = (venda ? M.closer : M.sdr)[k]; if (!c) return '';
+  var tipo = venda ? 'closer' : 'sdr', tp = venda ? 'r' : 'n', n = rlNomeDe(k), f = venda ? 'closer' : (k === 'sarah' ? 'ss' : 'sdr');
+  var r = rlMoReal([k], MM, tipo), esp = c.P * MM.passou / MM.du;
+  var linhas = ['P', 'M', 'G'].map(function(t, i) {
+    var ws = rlMoWs(c, t), extra = '';
+    if (venda) { var vd = Math.ceil((c[t] - r.tot > 0 ? c[t] - r.tot : 0) / (c.ticket || 1)); extra = '<td>~' + Math.ceil(c[t] / c.ticket) + ' vendas · ' + Math.ceil(c[t] / c.ticket) + ' indicações</td>'; }
+    else extra = '<td>marcar ~' + Math.ceil(c[t] / (1 - (c.ns || .25))) + ' (~' + Math.ceil(c[t] / .85) + ' com 15% de no-show)</td>';
+    return '<tr><td><b style="color:' + RL_TIERS[i][1] + '">' + t + '</b></td><td><b>' + rlFmtV(c[t], tp) + '</b></td><td>' + rlFmtV(c[t] - ws, tp) + '</td><td>' + (ws ? rlFmtV(ws, tp) : '—') + '</td><td>' + rlMoFalta(r.tot, c[t], MM, tp) + '</td>' + extra + '</tr>';
+  }).join('');
+  var gap = tp === 'r' ? r.tot - esp : Math.round(r.tot - esp);
+  return '<div class="rl-mo-det rl-st"><div>'
+    + '<div class="quem">' + rlAvatar(n) + '<div><b>' + rlE(n) + '</b><small>' + RL_FUNCAO_TXT[f] + ' · ' + (venda ? 'vendido no mês' : 'reuniões com o lead presente no mês') + '</small></div></div>'
+    + rlNumAnim(r.tot, venda ? 'moeda' : 'int') + rlMoBarra(r.tot, c, MM, { tipo: tp, ceo: venda ? 'pv' : 'joao', g: venda ? '' : 'linear-gradient(90deg,#b98aff,#ff8fc0)', lst: rlL((venda ? 'Vendas' : 'Reuniões com o lead presente') + ' · ' + n, rlOrdemStatus(venda ? r.A.t.l.vd : r.A.t.l.re)) })
+    + '<div class="gp">Até hoje: <b>' + rlFmtV(r.tot, tp) + '</b> (🩺 ' + rlFmtV(r.dg, tp) + ' · 🎓 ' + rlFmtV(r.ws, tp) + '). No ritmo da P deveria ter <b>' + rlFmtV(esp, tp) + '</b>: ' + (gap >= 0 ? '<b style="color:#3ddc97">em dia</b>' : '<b style="color:#ff8a6b">−' + rlFmtV(Math.abs(gap), tp) + '</b>') + '. Base: ' + rlE(c.base) + '.</div>'
+    + '<div class="acao"><button type="button" class="btn primary" onclick="rlVerQuem(\'' + k + '\')">Abrir o relatório de ' + rlE(n.split(' ')[0]) + ' →</button><button type="button" class="btn" onclick="rlMtFiltro(\'' + (venda ? 'venda' : 'pre') + '\',\'\')">← todos</button></div>'
+    + '</div><div><table><tr><th>Meta</th><th>Total</th><th>🩺 Diagnóstico</th><th>🎓 Workshop</th><th>Por dia</th><th>' + (venda ? 'Precisa de' : 'Marcar') + '</th></tr>' + linhas + '</table></div></div>';
+}
+function rlMtFiltro(aba, quem) {
+  RL.mtAba = aba; RL.mtQuem = quem || '';
+  var box = document.getElementById('rl-mt-corpo'); if (!box) { rlRender(); return; }
+  document.querySelectorAll('#rl-metas-out .rl-mo-tab').forEach(function(b, i) { var on = (i === 0) === (aba !== 'pre'); b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+  box.innerHTML = rlMtConteudo(aba, quem);
+  box.querySelectorAll('[data-rl-v]').forEach(function(e) { e._rlFeito = false; rlContar(e); });
+}
+</script>
+<style id="rl-plano-estilo">
+/* 🧭 Relatório · Plano Closer · Plano Pré-venda (03/10/2026) */
+.rl-vistas { display:flex; gap:6px; flex-wrap:wrap; width:100%; padding:0 0 10px; margin:0 0 2px; border-bottom:1px solid var(--rl-borda); }
+.rl-vista { display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:6px 16px; border-radius:12px; border:1px solid var(--rl-borda); background:rgba(255,255,255,.03); color:var(--text2); font:inherit; font-size:.8rem; font-weight:900; cursor:pointer; transition:background .2s, border-color .2s, color .2s, transform .2s; }
+.rl-vista:hover { transform:translateY(-1px); color:var(--text); border-color:rgba(246,163,80,.4); }
+.rl-vista.on { color:#1a1208; background:linear-gradient(135deg,#f6a350,#ffd166); border-color:transparent; box-shadow:0 8px 24px -10px rgba(246,163,80,.7); }
+.rl-vista:focus-visible { outline:2px solid var(--rl-y); outline-offset:2px; }
+.rl-pl-info { margin-left:auto; align-self:center; font-size:.7rem; color:var(--muted); font-weight:800; }
+.rl-conta { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; align-items:stretch; }
+.rl-cp { position:relative; padding:14px 16px; border-radius:18px; background:var(--rl-card); border:1px solid var(--rl-borda); }
+.rl-cp + .rl-cp::before { content:'→'; position:absolute; left:-12px; top:50%; transform:translate(-50%,-50%); color:var(--muted); font-weight:900; }
+.rl-cp small { display:block; font-size:.6rem; font-weight:900; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); }
+.rl-cp .rl-num { display:block; font-family:var(--rl-disp); font-size:1.7rem; font-weight:900; line-height:1.1; margin:4px 0 2px; }
+.rl-cp p { margin:0; font-size:.7rem; color:var(--text2); font-weight:700; line-height:1.45; }
+.rl-cp p b { color:var(--text); }
+.rl-cp .rl-mg-bar { margin:10px 0 4px; height:8px; }
+.rl-cp.ok { border-color:rgba(61,220,151,.5); }
+.rl-rot { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; }
+.rl-rt { padding:14px 16px; border-radius:18px; background:var(--rl-card); border:1px solid var(--rl-borda); }
+.rl-rt h4 { margin:0 0 8px; display:flex; align-items:center; gap:8px; font-size:.82rem; }
+.rl-rt h4 em { font-style:normal; font-size:.62rem; font-weight:900; letter-spacing:1px; padding:3px 8px; border-radius:99px; background:rgba(246,163,80,.14); color:#ffd166; }
+.rl-rt ul { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:6px; }
+.rl-rt li { position:relative; padding-left:16px; font-size:.74rem; color:var(--text2); font-weight:600; line-height:1.45; }
+.rl-rt li::before { content:''; position:absolute; left:2px; top:.55em; width:6px; height:6px; border-radius:50%; background:#f6a350; }
+.rl-rt li b { color:var(--text); }
+.rl-rt li .tg { display:inline-block; margin-left:4px; font-size:.58rem; font-weight:900; padding:1px 6px; border-radius:99px; background:rgba(185,138,255,.16); color:#d2bcff; }
+.rl-pl-funis { display:flex; flex-direction:column; gap:14px; }
+.rl-pl-tab { overflow-x:auto; margin-top:10px; }
+.rl-pl-tab table { width:100%; border-collapse:collapse; min-width:560px; font-variant-numeric:tabular-nums; }
+.rl-pl-tab th { text-align:left; font-size:.56rem; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:var(--muted); padding:6px 10px; border-bottom:1px solid var(--rl-borda); }
+.rl-pl-tab td { padding:10px; border-bottom:1px solid rgba(255,255,255,.05); vertical-align:top; font-size:.78rem; color:var(--text2); }
+.rl-pl-tab td > b { display:block; font-family:var(--rl-disp); font-size:1.15rem; font-weight:900; color:var(--text); }
+.rl-pl-tab td small { display:block; font-size:.62rem; color:var(--muted); font-weight:700; line-height:1.4; }
+.rl-pl-tab td small b { color:var(--text2); }
+.rl-pl-tab td:first-child b { font-family:inherit; font-size:.86rem; }
+.rl-pl-tab td.rl-pl-m > b { color:#ffd166; font-size:1.4rem; }
+.rl-pl-tab td[data-rl-l] { cursor:pointer; }
+.rl-cp b.rl-num { font-size:1.7rem; }
+@media (max-width:760px) { .rl-cp + .rl-cp::before { display:none; } .rl-pl-info { margin-left:0; width:100%; } }
+</style>
+<script>
+// ===== números do plano de outubro (Bruno 03/10/2026, ajustes): "não considere a Sarah no plano, ela é um extra" (as reuniões de
+// closer dela somam, mas não têm meta — a parte dela foi para os outros três); "quantas reuniões HT têm que ser marcadas? quantas
+// Legado?"; "separe diagnóstico de workshop". Cada funil × produto usa o ticket, o fechamento e o no-show de setembro dele.
+(function () {
+  var M = RL_METAS && RL_METAS['2026-10']; if (!M) return;
+  delete M.closer.sarah;
+  M.closer.tony = { P: 315000, M: 380000, G: 450000, ticket: 11250, conv: 0.44, ws: { P: 170000, M: 205000, G: 245000 }, base: 'setembro: R$ 385 mil · 41 vendas (26 no workshop) · outubro: HT no diagnóstico + workshop' };
+  M.closer.bruno = { P: 310000, M: 375000, G: 445000, ticket: 24900, conv: 0.378, base: 'setembro no HT: R$ 348 mil · 14 vendas · fecha 38% · ticket R$ 24,9 mil · outubro: só HT' };
+  M.closer.wesllene = { P: 75000, M: 95000, G: 105000, ticket: 3900, conv: 0.415, ws: { P: 45000, M: 60000, G: 65000 }, base: 'setembro (desde 09/09): R$ 69 mil · 17 vendas · outubro: Legado no diagnóstico + workshop' };
+  M.sdr.selina = { P: 85, M: 104, G: 120, ns: 0.24, ws: { P: 58, M: 71, G: 82 }, base: 'setembro: 117 com o lead presente (69 do workshop) · no-show 24%' };
+  M.sdr.ismael = { P: 28, M: 35, G: 40, ns: 0.39, base: 'setembro: 39 com o lead presente · no-show 39%' };
+  M.sdr.sarah = { P: 28, M: 34, G: 40, ns: 0.245, base: 'setembro: 40 com o lead presente · no-show 25%' };
+  M.preVenda = { P: 141, M: 173, G: 200 };
+  M.funis = [
+    { k: 'dg', nome: 'Diagnóstico', ico: '🩺', linhas: [
+      { k: 'ht', nome: 'HT · Spark e Growth', quem: 'Bruno e Tony', P: 455000, M: 550000, G: 650000, ticket: 24350, conv: 0.317, ns: 0.292 },
+      { k: 'lg', nome: 'Legado', quem: 'Wesllene · Sarah é extra', P: 30000, M: 35000, G: 40000, ticket: 3826, conv: 0.348, ns: 0.34 } ] },
+    { k: 'ws', nome: 'Workshop', ico: '🎓', linhas: [
+      { k: 'ht', nome: 'HT · Spark e Growth', quem: 'Tony e Wesllene', P: 125000, M: 155000, G: 180000, ticket: 18333, conv: 0.409, ns: 0.083 },
+      { k: 'lg', nome: 'Legado', quem: 'Tony e Wesllene', P: 90000, M: 110000, G: 130000, ticket: 3400, conv: 0.686, ns: 0.203 } ] } ];
+})();
+// produto da reunião: Legado × HT (Spark, Growth, entrevista WLD); sem produto, pela função de quem fez
+function rlProdTipo(r) { var p = v2norm(r.produto || ''); if (/legado/.test(p)) return 'lg'; if (/spark|growth|wld|entrevista/.test(p)) return 'ht'; var c = rlPn(r.closer); return (c === 'wesllene' || c === 'sarah') ? 'lg' : 'ht'; }
+function rlFunilDe(r) { return rlGrupo(r.origem) === 'Workshop' ? 'ws' : 'dg'; }
+// ===== 🧭 RELATÓRIO × PLANO (Bruno 03/10/2026: "deixe o relatório separado do plano, pois são duas coisas diferentes";
+// "lembrando, o objetivo é 1 milhão"; "construa um plano para closer e para pré-venda"; "relatório - closer - pré-venda").
+// No topo da aba: 📊 Relatório (o que aconteceu) · 💰 Plano · Closer · 📞 Plano · Pré-venda (o objetivo e o que fazer).
+// Admin vê os dois planos e filtra por pessoa; cada pessoa vê o Relatório e o plano da função dela (só o dela).
+function rlVistasHtml() {
+  var Q = rlQuem(), fs = Q.pessoa ? rlFuncoesDe(Q.pessoa) : ['closer', 'sdr'], v = RL.vista || 'rel';
+  var temCl = fs.indexOf('closer') !== -1, temPre = fs.some(function(f) { return f !== 'closer'; });
+  if (!RL_METAS[rlYm(new Date())]) return '';
+  var bt = function(k, rot) { return '<button type="button" class="rl-vista' + (v === k ? ' on' : '') + '" aria-pressed="' + (v === k) + '" onclick="rlVista(\'' + k + '\')">' + rot + '</button>'; };
+  return '<div class="rl-vistas">' + bt('rel', '📊 Relatório') + (temCl ? bt('closer', '💰 Plano · Closer') : '') + (temPre ? bt('pre', '📞 Plano · Pré-venda') : '')
+    + (v !== 'rel' ? (function() { var MM = rlMetaMes(); return MM ? '<span class="rl-pl-info">' + MM.M.nome + ' · ' + MM.passou + ' de ' + MM.du + ' dias úteis · objetivo R$ 1 milhão</span>' : ''; })() : '') + '</div>';
+}
+function rlVista(v) { RL.vista = v; RL.plQuem = ''; RL.tent = 0; rlRender(); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {} }
+function rlPlQuem(k) { RL.plQuem = k; rlRender(); try { var s = document.getElementById('rl-pl-pessoas'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+// ---------- a tela do plano ----------
+function rlPlanoRender(box, Q) {
+  RL_L = {}; RL.nL = 0; RL.nSec = 0;
+  var MM = rlMetaMes(), tipo = RL.vista === 'pre' ? 'pre' : 'closer';
+  if (!MM) { RL.vista = 'rel'; rlRender(); return; }
+  var pn = Q.pessoa || '', fs = pn ? rlFuncoesDe(pn) : [];
+  if (pn && tipo === 'closer' && fs.indexOf('closer') === -1) tipo = 'pre';
+  if (pn && tipo === 'pre' && !fs.some(function(f) { return f !== 'closer'; })) tipo = 'closer';
+  try { if (typeof GRAV !== 'undefined' && !GRAV.carregado && !GRAV.carregando) gravCarregar(); } catch (e) {}
+  var h = '<div class="rl-barra">' + rlVistasHtml() + '</div>';
+  try {
+    h += rlPlanoObjetivo(MM, tipo);
+    h += rlPlanoConta(MM, tipo, pn);
+    h += rlPlanoRotina(tipo, pn);
+    h += rlPlanoPessoas(MM, tipo, Q);
+  } catch (e) { h += '<div class="rl-vazio">Não consegui montar o plano: ' + rlE(e.message) + '</div>'; }
+  h += '<div class="rl-ctrl"><button class="btn" onclick="rlIr(-1)" aria-label="Anterior">←</button><span id="rl-cont">1 / 1</span><div class="rl-pg"><i id="rl-pgi" style="width:0"></i></div><button class="btn" onclick="rlIr(1)" aria-label="Próximo">→</button><button class="btn" onclick="rlSair()">✕ Sair</button></div>';
+  box.innerHTML = h;
+  box.classList.toggle('rl-anim', !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches));
+  rlObservar();
+}
+// 1) o objetivo: o milhão (closer) ou as reuniões que a pré-venda entrega
+function rlPlanoObjetivo(MM, tipo) {
+  var M = MM.M;
+  if (tipo === 'closer') {
+    var T = rlMoReal('*', MM, 'closer'), proj = MM.passou ? T.tot / MM.passou * MM.du : 0;
+    var hero = '<div class="rl-mo-hero rl-st"><div class="rl-mo-top"><div><small>Objetivo de ' + M.nome.toLowerCase() + ' · time de venda · vendido</small>' + rlNumAnim(T.tot, 'moeda')
+      + '<p>de <b>R$ 1 milhão</b> · ' + MM.passou + ' de ' + MM.du + ' dias úteis' + (MM.passou >= 3 ? ' · no ritmo de agora fecha em <b>' + rlMil(proj) + '</b>' : '') + '</p></div>' + rlMoPcs(T.tot, M.time, 'r') + '</div>'
+      + rlMoBarra(T.tot, M.time, MM, { tipo: 'r', cls: 'big', ceo: 'ambos', lst: rlL('Vendas do mês', T.A.t.l.vd) })
+      + '<div class="rl-mg-leg"><span>Para o milhão: <b>' + rlMoFalta(T.tot, M.time.G, MM, 'r') + ' por dia útil</b></span><span>M: ' + rlMoFalta(T.tot, M.time.M, MM, 'r') + '/dia</span><span>P: ' + rlMoFalta(T.tot, M.time.P, MM, 'r') + '/dia</span><span>🩺 diagnóstico ' + rlMil(T.dg) + ' · 🎓 workshop ' + rlMil(T.ws) + '</span></div></div>';
+    return rlSec('pl-obj', 'Objetivo', 'R$ 1 milhão em ' + M.nome.toLowerCase(), 'O objetivo do mês é o milhão (G); P 700 mil e M 850 mil são as etapas. Embaixo, a conta separada em diagnóstico e workshop, e em HT e Legado.', hero);
+  }
+  var sds = Object.keys(M.sdr), R = rlMoReal(sds, MM, 'sdr'), mt = M.preVenda;
+  var hero2 = '<div class="rl-mo-hero rl-st"><div class="rl-mo-top"><div><small>Objetivo de ' + M.nome.toLowerCase() + ' · time de pré-venda</small>' + rlNumAnim(R.tot, 'int')
+    + '<p>de <b>' + mt.G + ' reuniões com o lead presente</b>, o que os closers precisam para o milhão · ' + MM.passou + ' de ' + MM.du + ' dias úteis</p></div>' + rlMoPcs(R.tot, mt, 'n') + '</div>'
+    + rlMoBarra(R.tot, mt, MM, { tipo: 'n', cls: 'big', ceo: 'ambos', g: 'linear-gradient(90deg,#b98aff,#ff8fc0)', lst: rlL('Reuniões com o lead presente (pré-venda)', rlOrdemStatus(R.A.t.l.re)) })
+    + '<div class="rl-mg-leg"><span>Para o objetivo: <b>' + rlMoFalta(R.tot, mt.G, MM, 'n') + ' por dia útil</b> com o lead presente</span><span>M: ' + rlMoFalta(R.tot, mt.M, MM, 'n') + '/dia</span><span>P: ' + rlMoFalta(R.tot, mt.P, MM, 'n') + '/dia</span><span>🩺 diagnóstico ' + R.dg + ' · 🎓 workshop ' + R.ws + '</span></div></div>';
+  return rlSec('pl-obj', 'Objetivo', mt.G + ' reuniões com o lead presente', 'Para os closers chegarem ao milhão, a pré-venda entrega ' + mt.G + ' reuniões em que o lead aparece (P ' + mt.P + ' · M ' + mt.M + '): Selina 60% (o workshop é com ela), Ismael 20%, Sarah 20%.', hero2);
+}
+// 2) a conta, funil por funil: diagnóstico × workshop, HT × Legado — do objetivo até quantas marcar
+function rlPlTier(t) { RL.plTier = t; rlRender(); }
+function rlPlanoConta(MM, tipo, pn) {
+  var M = MM.M, T = RL.plTier || 'G', pre = tipo === 'pre';
+  var mesP = { ini: MM.ini, fim: Math.min(MM.fim, MM.ate) };
+  var conta = function(L) { var vd = Math.ceil(L[T] / L.ticket), re = Math.ceil(vd / L.conv), m = Math.ceil(re / (1 - L.ns)), m15 = Math.ceil(re / (1 - Math.min(L.ns, 0.15))); return { vd: vd, re: re, m: m, m15: m15 }; };
+  var tot = { obj: 0, vd: 0, re: 0, m: 0, m15: 0, ht: 0, lg: 0, ht15: 0, lg15: 0, fat: 0, fvd: 0, fre: 0, fm: 0 };
+  var dia = function(alvo, feito) { return (Math.max(0, alvo - feito) / Math.max(1, MM.resta)).toFixed(1).replace('.', ','); };
+  var blocos = M.funis.map(function(F, iF) {
+    var objF = 0, feitoF = 0, linhas = F.linhas.map(function(L) {
+      var c = conta(L), A = rlCalc(mesP, function(r) { return rlFunilDe(r) === F.k && rlProdTipo(r) === L.k; });
+      objF += L[T]; feitoF += A.fat; tot.obj += L[T]; tot.vd += c.vd; tot.re += c.re; tot.m += c.m; tot.m15 += c.m15; tot[L.k] += c.m; tot[L.k + '15'] += c.m15; tot.fat += A.fat; tot.fvd += A.vd; tot.fre += A.re; tot.fm += A.marc;
+      var cel = function(alvo, feito, fmt, lst) { var pct = alvo ? Math.min(100, feito / alvo * 100) : 0; return '<td' + (lst || '') + '><b>' + (fmt === 'r' ? rlMil(alvo) : alvo) + '</b><div class="rl-mg-bar" style="margin:6px 0 2px;height:6px"><i style="width:' + pct.toFixed(1) + '%;"></i></div><small>feito ' + (fmt === 'r' ? rlMil(feito) : feito) + '</small></td>'; };
+      return '<tr><td><b>' + (L.k === 'ht' ? '💎 ' : '📗 ') + L.nome + '</b><small>' + L.quem + '</small><small>ticket ' + rlMil(L.ticket) + ' · fecha ' + Math.round(L.conv * 100) + '% · no-show ' + Math.round(L.ns * 100) + '%</small></td>'
+        + (pre ? '' : cel(L[T], A.fat, 'r', rlL(F.nome + ' · ' + L.nome + ' · vendas', A.t.l.vd)) + cel(c.vd, A.vd, 'n', rlL(F.nome + ' · ' + L.nome + ' · vendas', A.t.l.vd)))
+        + cel(c.re, A.re, 'n', rlL(F.nome + ' · ' + L.nome + ' · lead apareceu', rlOrdemStatus(A.t.l.re)))
+        + '<td class="rl-pl-m"><b>' + c.m + '</b>' + (c.m15 !== c.m ? '<small>' + c.m15 + ' com 15% de no-show</small>' : '') + '<small>feito ' + A.marc + ' · <b>' + dia(c.m, A.marc) + '/dia</b></small></td></tr>';
+    }).join('');
+    return '<div class="rl-mo-f rl-st" style="--i:' + iF + '"><h3><span>' + F.ico + '</span>' + F.nome + '<em>objetivo ' + rlMil(objF) + ' · feito ' + rlMil(feitoF) + '</em></h3>'
+      + '<div class="rl-pl-tab"><table><tr><th>Produto</th>' + (pre ? '' : '<th>Vendido</th><th>Vendas</th>') + '<th>Com o lead presente</th><th>Marcar</th></tr>' + linhas + '</table></div></div>';
+  }).join('');
+  var tiers = '<div class="rl-mo-chips">' + ['P', 'M', 'G'].map(function(t) { return '<button type="button" class="rl-mo-chip sem-av' + (T === t ? ' on' : '') + '" aria-pressed="' + (T === t) + '" onclick="rlPlTier(\'' + t + '\')">' + (t === 'G' ? '🎯 Objetivo · R$ 1 milhão' : 'Meta ' + t + ' · ' + rlMil(M.time[t])) + '</button>'; }).join('') + '</div>';
+  var resumo = '<div class="rl-conta rl-st" style="margin-top:14px">'
+    + '<div class="rl-cp"><small>Marcar no mês</small><b class="rl-num">' + tot.m + '</b><p>' + tot.m15 + ' se o no-show cair para 15% · feito ' + tot.fm + ' · <b>' + dia(tot.m, tot.fm) + '/dia útil</b></p></div>'
+    + '<div class="rl-cp"><small>💎 Marcar HT</small><b class="rl-num">' + tot.ht + '</b><p>' + tot.ht15 + ' com 15% de no-show · diagnóstico + workshop</p></div>'
+    + '<div class="rl-cp"><small>📗 Marcar Legado</small><b class="rl-num">' + tot.lg + '</b><p>' + tot.lg15 + ' com 15% de no-show · diagnóstico + workshop</p></div>'
+    + '<div class="rl-cp"><small>Com o lead presente</small><b class="rl-num">' + tot.re + '</b><p>feito ' + tot.fre + ' · <b>' + dia(tot.re, tot.fre) + '/dia útil</b></p></div>'
+    + (pre ? '<div class="rl-cp"><small>Leads para marcar ' + tot.m15 + '</small><b class="rl-num">' + Math.ceil(tot.m15 / 0.17).toLocaleString('pt-BR') + '</b><p>marcando 17% de todos · ou ' + Math.ceil(tot.m15 / 0.30) + ' MQL marcando 30%</p></div>'
+          : '<div class="rl-cp"><small>Vendas · indicações</small><b class="rl-num">' + tot.vd + '</b><p>feito ' + tot.fvd + ' vendas · <b>' + tot.vd + ' indicações</b> (1 por venda, o closer marca)</p></div>')
+    + '</div>';
+  return rlSec('pl-conta', 'A conta', (pre ? 'Quantas reuniões marcar: HT e Legado' : 'A conta do milhão: diagnóstico e workshop'), 'Cada linha usa o ticket, o fechamento e o no-show de setembro daquele funil e produto. "Marcar" = com o no-show de setembro; embaixo, quantas bastariam se o no-show caísse para 15%. A barrinha é o feito no mês. Troque a meta para ver a conta da P ou da M.', tiers + '<div class="rl-pl-funis">' + blocos + '</div>' + resumo);
+}
+// 3) a rotina (o que a Thalita pediu, por função)
+function rlPlanoRotina(tipo, pn) {
+  var bloco = function(tit, quando, itens) { return '<div class="rl-rt rl-st"><h4>' + tit + (quando ? '<em>' + quando + '</em>' : '') + '</h4><ul>' + itens.map(function(x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>'; };
+  var h;
+  if (tipo === 'closer') {
+    h = '<div class="rl-rot">'
+      + bloco('🌅 Começo do dia', '08:00', ['<b>Confirmar as reuniões de hoje</b>, primeiro as que a IA ou o formulário marcaram.', 'Mandar o <b>case do nicho</b> para quem tem reunião amanhã.', 'Às 08:20, na daily: reuniões de ontem, fechamentos, indicações e as mais quentes de hoje (com quanto você se compromete).'])
+      + bloco('🎯 Em cada reunião', '1 hora', ['<b>15% conexão · 70% diagnóstico · 15% fechamento</b>; o tempo combinado no começo.', 'Perguntar <b>no começo</b> quem decide.', 'Fazer o lead <b>falar a dor</b> com a própria boca, mais de uma vez (contraste e números dele).', '<b>Antes do preço</b>: recapitular as dores em pequenos sins + "existe mais alguma objeção?".', 'Na objeção: não discordar; "me explica em que ponto?".'])
+      + bloco('🤝 Na venda', '1 por venda', ['<b>Pedir indicação</b> na hora do pagamento: "quem mais você conhece que está no mesmo momento?".', 'Você mesmo <b>marca o indicado</b> (não passa para o SDR).', 'Registrar a venda e o pagamento no mesmo dia.'])
+      + bloco('🌙 Fim do dia e semana', '', ['<b>Follow-up</b> de quem não fechou nos últimos 7 dias.', 'Atualizar na planilha toda reunião que já passou.', '<b>Toda semana</b>: 2 gravações para a Thalita; sexta, olhar as reuniões que deveriam ter fechado.', '<b>Líder (Bruno)</b>: recuperar os perdidos com mais de 7 dias <span class="tg">~30% voltam</span>.'])
+      + '</div>';
+    return rlSec('pl-rotina', 'Rotina', 'O plano do closer, todo dia', 'O que a consultoria da Thalita pediu (reuniões de 08/09, 14/09, 15/09 e 01/10), na ordem do dia.', h);
+  }
+  h = '<div class="rl-rot">'
+    + bloco('⚡ Lead chegou', '4 minutos', ['<b>Responder em até 4 minutos</b> (uma pessoa, não a IA), no seu horário.', '<b>Fila invertida</b>: primeiro quem acabou de chegar, depois os antigos.', 'Distribuição para quem está online na Clint.'])
+    + bloco('📅 Marcou a reunião', 'em até 1 hora', ['<b>Evento no WhatsApp</b> + <b>vídeo de case</b> do nicho, inclusive nas que a IA ou o formulário marcaram.', 'Pergunta de compromisso: "se acontecer algo, você me avisa antes para eu liberar o horário?".', 'Lembretes de <b>48h, 24h e 2h</b>, no tom de quem já conta com a pessoa (nunca "passando para confirmar").'])
+    + bloco('🗓 Daily 08:20', 'todo dia', ['Quantas marcou nas últimas 24h e quantas com o lead presente.', '<b>Espaços na agenda × leads quentes</b>: quem você tem para cada horário.', 'No-shows de ontem e o porquê; tempo de resposta de ontem.'])
+    + bloco('🧩 Quem faz o quê', '', ['<b>Selina</b>: responsável pela IA <span class="tg">desde 03/10</span>: toda semana revisar as conversas da IA que deram no-show ou travaram.', '<b>Ismael</b>: turno estendido até 20h–21h; foco em cortar o no-show (39% → 25% → 15%).', '<b>Sarah (Social Selling)</b>: pré-agendamento pelos comentários, com conversa antes de passar para a reunião.', 'Marcação: <b>17% de todos os leads e 30% dos MQL</b>.'])
+    + '</div>';
+  return rlSec('pl-rotina', 'Rotina', 'O plano da pré-venda, todo dia', 'O que a consultoria da Thalita pediu, na ordem em que o lead anda.', h);
+}
+// 4) as pessoas: admin filtra; a pessoa vê só o dela
+function rlPlanoPessoas(MM, tipo, Q) {
+  var M = MM.M, venda = tipo === 'closer', quem = Q.pessoa || RL.plQuem || '', h = '';
+  if (!Q.pessoa) {
+    var pessoas = venda ? Object.keys(M.closer) : Object.keys(M.sdr), fn = function(k) { return venda ? 'closer' : (k === 'sarah' ? 'ss' : 'sdr'); };
+    var chip = function(k, rot, sub, av) { return '<button type="button" class="rl-mo-chip' + (av ? '' : ' sem-av') + (quem === k ? ' on' : '') + '" aria-pressed="' + (quem === k) + '" onclick="rlPlQuem(\'' + k + '\')">' + (av ? rlAvatar(av) : '') + rot + (sub ? ' <small>' + sub + '</small>' : '') + '</button>'; };
+    h += '<div class="rl-mo-chips">' + chip('', venda ? '👥 Todos os closers' : '👥 Toda a pré-venda', '', '') + (venda ? '' : chip('@sdr', '📞 SDR', 'Selina + Ismael', '') + chip('@ss', '📲 Social Selling', 'Sarah', ''))
+      + pessoas.map(function(k) { var n = rlNomeDe(k); return chip(k, rlE(n.split(' ')[0]), venda ? 'closer' : RL_FUNCAO_TXT[fn(k)], n); }).join('') + '</div>';
+    if (!quem || quem.charAt(0) === '@') { h += rlMtConteudo(venda ? 'venda' : 'pre', quem, MM).replace(/^<div class="rl-mo-chips">[\s\S]*?<\/div>(?=<div class="rl-mo-f|<div class="rl-mo-lista|<div class="rl-mo-det)/, ''); h = h.replace(/onclick="rlMtFiltro\('(?:venda|pre)','([^']*)'\)"/g, 'onclick="rlPlQuem(\'$1\')"'); }
+    else h += rlMtDetalhe(quem, venda, MM).replace(/onclick="rlMtFiltro\('(?:venda|pre)',''\)"/g, 'onclick="rlPlQuem(\'\')"');
+  } else if (!(venda ? M.closer : M.sdr)[quem]) h += '<div class="rl-vazio">As suas reuniões de closer são <b>extra</b>: não têm meta própria, e tudo o que você vender soma no milhão do time. 💪</div>';
+  else h += rlMtDetalhe(quem, venda, MM).replace(/<button type="button" class="btn" onclick="rlMtFiltro[^<]*<\/button>/, '').replace(/<button type="button" class="btn primary" onclick="rlVerQuem[^<]*<\/button>/, '<button type="button" class="btn primary" onclick="rlVista(\'rel\')">📊 Ver o meu relatório</button>');
+  var sec = rlSec('pl-pessoas', venda ? 'Por closer' : 'Por pessoa', Q.pessoa ? 'O seu objetivo' : (venda ? 'O objetivo de cada closer' : 'O objetivo de cada um da pré-venda'), Q.pessoa ? 'A sua parte do objetivo do mês, por faixa e por funil.' : 'Filtre por pessoa para ver a meta dela por semana e por dia, o gap e onde colocar energia.', h);
+  // a pessoa escolhida (ou a própria): meta pessoal semana a semana + onde colocar energia
+  if (quem && quem.charAt(0) !== '@') {
+    var f = venda ? 'closer' : (quem === 'sarah' ? 'ss' : 'sdr'), p = rlPeriodo('mes'), D = {}; D[f] = rlCalcPessoa(p, quem, f);
+    var Qx = Q.pessoa ? Q : { adm: true };
+    try { sec += rlSecMeta(p, quem, f, Qx, ''); } catch (e) {}
+    try { sec += rlSecEnergia(p, quem, [f], D, Qx, rlCruzar()); } catch (e) {}
+  }
+  return sec;
 }
 </script>
 
@@ -29401,6 +29817,8 @@ setInterval(function(){ try { carregarWS(); } catch (e) {} }, 30 * 60000);
 .cm-parte { display:grid; grid-template-columns:1fr 90px 78px; align-items:center; gap:8px; font-size:.76rem; }
 .cm-parte .cm-trilho { height:6px; }
 .cm-parte b { text-align:right; font-variant-numeric:tabular-nums; }
+.cm-parte.cm-soma { padding-top:7px; border-top:1px dashed rgba(255,255,255,.14); font-weight:800; }
+.cm-parte.cm-soma b { color:var(--text); }
 .cm-stats { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; }
 .cm-stat { text-align:center; padding:8px 4px; border-radius:12px; background:rgba(255,255,255,.04); }
 .cm-stat b { display:block; font-size:1.1rem; font-weight:900; font-variant-numeric:tabular-nums; }
@@ -29613,8 +30031,19 @@ function _cmBotaoAtu(rot) {
   return '<button type="button" class="cm-card-atu' + (CM.carregando ? ' girando' : '') + '" onclick="event.stopPropagation();cmCarregar(true)"' + (CM.carregando ? ' disabled' : '')
     + ' title="Atualizar os números (lê as planilhas de novo)" aria-label="Atualizar"><i>↻</i>' + (rot ? ' ' + (CM.carregando ? 'Atualizando…' : rot) : '') + '</button>';
 }
+// 03/10/2026 (Bruno: "separe bônus de extra de prêmio"): extra = dia de workshop, mentor, plantão…; bônus = meta do time
+// (ex.: os R$ 500 da meta de 800 mil de setembro); prêmio = faixa do vendido do mês. Bônus e extra vêm da mesma linha "Extra"
+// da planilha: o que diz "bônus"/"meta" na descrição é bônus. O formulário de lançar já pergunta qual dos dois é.
+function _cmEhBonus(desc) { return /\bb[oô]nus\b|meta do time|meta de \d|meta extraordin/i.test(String(desc || '')); }
+function _cmExtrasDe(p) {
+  var o = { bonus: 0, extra: 0, temLinhas: false };
+  (p.linhas || []).forEach(function(l) { if (l.t !== 'extra') return; o.temLinhas = true; var v = +l.c || 0; if (_cmEhBonus(l.n || l.p)) o.bonus += v; else o.extra += v; });
+  (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { o.temLinhas = true; var v = +x.v || 0; if (_cmEhBonus(x.d)) o.bonus += v; else o.extra += v; });
+  return o;
+}
 function _cmCardCloser(p, cor, premios, mes, i, pos) {
-  var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', p.comissao, '#3ddc97'], ['Prêmio', p.premio, '#ffd166']].filter(function(x){ return x[1] > 0; });
+  var EX = _cmExtrasDe(p), comV = (+p.comissao || 0) - EX.extra - EX.bonus;
+  var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', comV, '#3ddc97'], ['Extras', EX.extra, '#5eead4'], ['Bônus', EX.bonus, '#b98aff'], ['Prêmio', p.premio, '#ffd166']].filter(function(x){ return x[1] > 0; });
   var lider = pos === 1 && p.total > 0, pm = p.recebido ? p.comissao / p.recebido : 0;
   var h = '<div class="cm-card cm-clica cm-entra' + (lider ? ' cm-lider' : '') + '" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'closers\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as vendas do mês">'
     + _cmBotaoAtu()
@@ -29635,11 +30064,22 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
       + '<div class="cm-marcas">' + vis.map(function(t){ return '<span class="' + (p.meta >= t[0] ? 'ok' : '') + '" style="left:' + _cmPct(t[0] / topo) + '">' + cmMil(t[0]) + '</span>'; }).join('') + '</div>'
       + '<div class="cm-dica">' + (prox ? 'Faltam <b>' + cmR(prox[0] - p.meta, false) + '</b> para o prêmio de <b>' + cmR(prox[1], false) + '</b>.' : '🎉 Bateu a faixa mais alta do prêmio.') + '</div></div>';
   }
-  var partes = (p.partes || []).filter(function(q){ return Math.abs(q.comissao) >= 0.005; });
-  if (partes.length) {
-    var mx = Math.max.apply(null, partes.map(function(q){ return Math.abs(q.comissao); })) || 1;
-    h += '<div class="cm-bloco"><div class="cm-bloco-t"><span>De onde veio a comissão</span><span>comissão</span></div><div class="cm-partes">'
+  var partes = (p.partes || []).filter(function(q){ return Math.abs(q.comissao) >= 0.005 && !(EX.temLinhas && /^extras/i.test(q.nome || '')); });
+  // 03/10/2026 (Bruno: "por que não está na discriminação?"): a lista fecha com o prêmio, o fixo e o total a receber,
+  // igual ao quadro "Como é a conta do mês" da planilha (antes ela só listava as partes da comissão)
+  if (partes.length || p.premio > 0 || p.fixo > 0) {
+    var somaP = partes.reduce(function(s, q){ return s + (+q.comissao || 0); }, 0), outros = (EX.temLinhas ? comV : (+p.comissao || 0)) - somaP;
+    var mx = Math.max.apply(null, partes.map(function(q){ return Math.abs(q.comissao); }).concat([+p.premio || 0, +p.fixo || 0, Math.abs(outros), EX.extra, EX.bonus])) || 1;
+    var soma = function(rot, v) { return '<div class="cm-parte cm-soma"><span>' + rot + '</span><span></span><b>' + cmR(v, false) + '</b></div>'; };
+    h += '<div class="cm-bloco"><div class="cm-bloco-t"><span>De onde veio o total</span><span>valor</span></div><div class="cm-partes">'
       + partes.map(function(q){ return '<div class="cm-parte" title="Recebido ' + cmR(q.recebido) + (q.pct ? ' · ' + (q.pct * 100).toFixed(2).replace('.', ',') + '% médio' : '') + '"><span>' + dspEsc(q.nome) + '</span>' + _cmTrilho(Math.abs(q.comissao) / mx, cor) + '<b>' + cmR(q.comissao, false) + '</b></div>'; }).join('')
+      + (Math.abs(outros) >= 0.01 && partes.length ? '<div class="cm-parte"><span>Outros ajustes</span>' + _cmTrilho(Math.abs(outros) / mx, '#9aa3b2') + '<b>' + cmR(outros, false) + '</b></div>' : '')
+      + soma(EX.temLinhas ? 'Comissões das vendas' : 'Total das comissões', EX.temLinhas ? comV : (+p.comissao || 0))
+      + (EX.extra > 0 ? '<div class="cm-parte"><span>⭐ Extras (workshop, mentor, plantão…)</span>' + _cmTrilho(EX.extra / mx, '#5eead4') + '<b>' + cmR(EX.extra, false) + '</b></div>' : '')
+      + (EX.bonus > 0 ? '<div class="cm-parte"><span>🎁 Bônus (meta do time)</span>' + _cmTrilho(EX.bonus / mx, '#b98aff') + '<b>' + cmR(EX.bonus, false) + '</b></div>' : '')
+      + (p.premio > 0 ? '<div class="cm-parte"><span>🏆 Prêmio pela meta</span>' + _cmTrilho(p.premio / mx, '#ffd166') + '<b>' + cmR(p.premio, false) + '</b></div>' : '')
+      + (p.fixo > 0 ? '<div class="cm-parte"><span>Fixo</span>' + _cmTrilho(p.fixo / mx, '#6ea8ff') + '<b>' + cmR(p.fixo, false) + '</b></div>' : '')
+      + soma('Total a receber', +p.total || 0)
       + '</div></div>';
   }
   return h + _cmRevCard({ k: 'closers' }, p) + '<div class="cm-ver">Ver as vendas do mês →</div></div>';
@@ -29649,7 +30089,9 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
   var atual = null, prox = null, letra = tipo === 'sdr' ? ['P', 'M', 'G', 'GG', 'GG+'] : ['1', '2', '3', '4', '5'];
   fx.forEach(function(t, k){ if (conta >= t[0]) atual = { t: t, i: k }; else if (!prox) prox = t; });
   var bon = +p.bonus || 0;   // bônus da aba Extras (meta do time, plantão à noite…) — já está dentro do Variável na planilha
-  var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Variável', p.variavel - bon, '#3ddc97'], ['Bônus', bon, '#ffd166']].filter(function(x){ return x[1] > 0; });
+  var EXp = _cmExtrasDe({ extras: Array.isArray(p.extras) ? p.extras : [] });   // 03/10/2026: bônus (meta do time) × extra (plantão à noite…)
+  if (!EXp.temLinhas) EXp = { bonus: bon, extra: 0 };
+  var compo = [['Fixo', p.fixo, '#6ea8ff'], ['Variável', p.variavel - bon, '#3ddc97'], ['Extras', EXp.extra, '#5eead4'], ['Bônus', EXp.bonus, '#b98aff']].filter(function(x){ return x[1] > 0; });
   // Bruno 02/10/2026 ("no SDR em outubro mostre todas as faixas e quantos faltam para a próxima"): a barra vai até a última
   // faixa (todas aparecem) e embaixo vem a escada: cada faixa com reuniões e R$, a atual destacada e quanto falta para as próximas
   var topo = Math.max(conta, (fx.length ? fx[fx.length - 1][0] : conta) * 1.08) || 1;
@@ -30067,7 +30509,7 @@ function cmDetRender() {
   var h = '<div class="cm-det"' + (jaAberta ? ' style="animation:none"' : '') + ' role="dialog" aria-modal="true" aria-label="Detalhe de ' + dspEsc(p.nome) + '"><div class="cm-det-topo">'
     + (todos ? '<div class="avatar" style="background:linear-gradient(135deg,#b084ff,#6ea8ff);">📋</div>' : _cmAvatar(p.nome, (window._cmCorAba || {})[g.k + '|' + p.aba] || '#b084ff', 52, ''))
     + '<div class="cm-nome"><b style="font-size:1.08rem;">' + dspEsc(p.nome) + '</b><small>' + dspEsc((d.mesTxt || d.mes)) + ' · ' + dspEsc(g.nome)
-    + (!todos ? ' · ' + [['fixo', p.fixo], [g.k === 'closers' ? 'comissão' : 'variável', g.k === 'closers' ? p.comissao : p.variavel], ['prêmio', p.premio]].filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') : '') + '</small></div>'
+    + (!todos ? ' · ' + (function(){ var E = _cmExtrasDe(p); return [['fixo', p.fixo], [g.k === 'closers' ? 'comissão' : 'variável', (g.k === 'closers' ? p.comissao : p.variavel) - E.extra - E.bonus], ['extras', E.extra], ['bônus', E.bonus], ['prêmio', p.premio]]; })().filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') : '') + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(p.total) + '</b><small>a receber</small></div>'
     + _cmBotaoAtu('Atualizar') + '<button class="cm-det-x" onclick="cmFechar()" aria-label="Fechar">✕</button></div>';
   h += _cmValidaBarra(g, p, todos);   // v226: quanto falta revisar · validar o mês (financeiro) · contestar (dono)
@@ -30143,7 +30585,7 @@ function _cmDetCloser(p, todos, bt) {
       + '<div class="cm-cli-parte" title="' + (sc ? (com / sc * 100).toFixed(1).replace('.', ',') : '0') + '% da comissão na tela"><i data-w="' + (sc ? Math.max(0, Math.min(100, com / sc * 100)) : 0).toFixed(1) + '%"></i></div>'
       + '<div class="cm-pags">';
     ls.forEach(function(l) {
-      var tp = TIPO[l.t] || ['', '#9aa3b2'], soRegistro = l.t === 'venda' && !l.r && !l.c && ls.length > 1, id = 'cme-' + (l.k || 'l' + l.ln).replace(/[^a-z0-9]/gi, '');
+      var tp = (l.t === 'extra' && _cmEhBonus(l.n || l.p) ? ['🎁 Bônus', '#b98aff'] : TIPO[l.t]) || ['', '#9aa3b2'], soRegistro = l.t === 'venda' && !l.r && !l.c && ls.length > 1, id = 'cme-' + (l.k || 'l' + l.ln).replace(/[^a-z0-9]/gi, '');
       h += '<div class="cm-pag' + (soRegistro ? ' muda' : '') + (l.e === 'Não' ? ' fora' : '') + '">'
         + '<span class="cm-pag-data">' + dspEsc(l.pg || l.fe || '—') + '</span>'
         + '<span class="cm-tag" style="background:' + tp[1] + '1f;color:' + tp[1] + ';">' + tp[0] + '</span>'
@@ -30551,7 +30993,8 @@ function cmPreConta(btn, gk, aba, k, ln, nome, conta) {
 function cmExtraAbrir() {
   var el = document.getElementById('cm-extra-form'); if (!el) return;
   if (el.innerHTML) { el.innerHTML = ''; return; }
-  el.innerHTML = '<div class="cm-edita" style="display:grid;"><label class="cm-edita-larga">O que é o extra<input id="cm-ex-d" placeholder="ex.: 3 dias de workshop, reunião de mentor, bônus"></label>'
+  el.innerHTML = '<div class="cm-edita" style="display:grid;"><label>É um<select id="cm-ex-t"><option value="extra">⭐ Extra (workshop, mentor, plantão…)</option><option value="bonus">🎁 Bônus (meta do time…)</option></select></label>'
+    + '<label class="cm-edita-larga">Descrição<input id="cm-ex-d" placeholder="ex.: 3 dias de workshop · reunião de mentor · meta de 800 mil"></label>'
     + '<label>Valor (R$)<input id="cm-ex-v" inputmode="decimal" placeholder="300,00"></label>'
     + '<div class="cm-edita-bts"><button class="btn" onclick="cmExtraSalvar()">Lançar extra</button><span class="hint" id="cm-ex-msg"></span></div></div>';
   setTimeout(function(){ var i = document.getElementById('cm-ex-d'); if (i) i.focus(); }, 40);
@@ -30559,6 +31002,7 @@ function cmExtraAbrir() {
 function cmExtraSalvar() {
   var d = (document.getElementById('cm-ex-d') || {}).value || '', v = (document.getElementById('cm-ex-v') || {}).value || '', m = document.getElementById('cm-ex-msg');
   if (!d.trim() || !v.trim()) { m.textContent = 'Preencha o que é e o valor.'; return; }
+  if ((document.getElementById('cm-ex-t') || {}).value === 'bonus' && !_cmEhBonus(d)) d = 'Bônus: ' + d.trim();
   m.textContent = 'Lançando…';
   _cmPedir({ action: 'comissoesNovoExtra', token: _cmTok(), aba: CMD.aba, mes: CM.dados.mes, descricao: d.trim(), valor: v.trim(), quem: _cmQuem() }).then(function(r){
     if (r && r.success) { m.textContent = r.jaTinha ? 'Esse extra já estava lançado.' : '✓ Lançado. Atualizando…'; _cmRecarregarDetalhe(); } else m.textContent = '❌ ' + ((r && r.error) || 'o robô não respondeu');
