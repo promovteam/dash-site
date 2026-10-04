@@ -2854,7 +2854,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-04-0000';
+var VERSAO_DASH = '2026-10-04-1056';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -3955,7 +3955,7 @@ function filtrarUltimas(txt, mais) {
   }
   var base = v2fRows(V2.rows || []).filter(function(r){ return r.date; }).sort(function(a, b){ return b.date - a.date; });
   var achou = base.filter(function(r){ return _buscaBate([r.nome, r.closer, r.sdr, r.status, r.produto, r.telefone, r.leadId, r.origem, r.insta].filter(Boolean).join(' '), q, r.nome); });
-  achou = achou.map(function(r, i){ return { r: r, k: _buscaRank(r.nome, q), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; });
+  achou = achou.map(function(r, i){ return { r: r, k: _buscaRank(r.nome, q), i: i }; }).filter(_buscaSoNome).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; });
   var qE = q.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   var uh = '<div class="ult-achou" style="font-size:.74rem;font-weight:700;color:var(--text2);margin:0 0 10px;">🔎 '
     + (achou.length ? '<b style="color:var(--accent);">' + achou.length + '</b> ' + (achou.length === 1 ? 'reunião encontrada' : 'reuniões encontradas') + ' com "' + qE + '"'
@@ -6016,7 +6016,7 @@ function _orgListaMostrar(filtro, ate) {
   var rows = window._orgListaRows || [];
   var f = v2norm(filtro || '');
   var vis = f ? rows.filter(function(r){ return _buscaBate([r.nome, r.telefone, r.produto, r.closer, r.sdr, r.origem, r.status].join(' '), filtro, r.nome); })
-    .map(function(r, i){ return { r: r, k: _buscaRank(r.nome, filtro), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; }) : rows;
+    .map(function(r, i){ return { r: r, k: _buscaRank(r.nome, filtro), i: i }; }).filter(_buscaSoNome).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; }) : rows;
   var fim = Math.min(vis.length, (ate || 0) + _ORG_BLOCO);
   var box = document.getElementById('ma-lista');
   if (!box) return;
@@ -6105,13 +6105,26 @@ function _buscaRank(nome, q) {
   if (n.indexOf(qn) === 0 || n.indexOf(p) === 0) return 0;
   return (' ' + n).indexOf(' ' + p) !== -1 ? 1 : 2;
 }
+// 04/10/2026 (Bruno, print da lista "Marcadas" com "An": "resolva isso, nos cards não puxa"): NOME PRIMEIRO. Quando o que foi
+// digitado bate com o nome de alguém, a lista mostra só essas pessoas (quem começa pelo primeiro nome vem no topo); anúncio,
+// produto, closer… só entram quando nenhum nome bate — "An" acha Ana e Andressa, e não quem tem "Spark Anual" ou um anúncio.
+function _buscaSoNome(x, i, arr) { if (arr._tem == null) arr._tem = arr.some(function(y){ return y.k < 2; }); return !arr._tem || x.k < 2; }
 function filtrarListaModal(txt, listaId) {
   var vis = 0, box = document.getElementById(listaId); if (!box) return;
-  box.querySelectorAll('.cliente-row').forEach(function(el) {
-    var nb = el.querySelector('b');
-    var ok = _buscaBate((el.getAttribute('data-q') || '') + ' ' + el.textContent, txt, nb ? nb.textContent : '');
-    el.style.display = ok ? '' : 'none'; if (ok) vis++;
-  });
+  var rows = Array.prototype.slice.call(box.querySelectorAll('.cliente-row'));
+  rows.forEach(function(el, i) { if (el._ord == null) el._ord = i; });
+  rows.sort(function(a, b) { return a._ord - b._ord; });
+  var nm = function(el) { var nb = el.querySelector('b'); return nb ? nb.textContent : ''; };
+  var ach = rows.map(function(el, i) { return { el: el, ok: _buscaBate((el.getAttribute('data-q') || '') + ' ' + el.textContent, txt, nm(el)), k: _buscaRank(nm(el), txt), i: i }; })
+    .filter(function(x) { return x.ok; }).filter(_buscaSoNome).sort(function(a, b) { return a.k - b.k || a.i - b.i; });
+  var mostra = ach.map(function(x) { return x.el; });
+  rows.forEach(function(el) { var ok = mostra.indexOf(el) !== -1; el.style.display = ok ? '' : 'none'; if (ok) vis++; });
+  // reordena (só quando as linhas estão todas no mesmo lugar): quem bate com o nome vem primeiro; sem busca, volta à ordem original
+  var pai = rows.length ? rows[0].parentNode : null;
+  if (pai && rows.every(function(el) { return el.parentNode === pai; })) {
+    (String(txt || '').trim() ? mostra.concat(rows.filter(function(el) { return mostra.indexOf(el) === -1; })) : rows).forEach(function(el) { pai.appendChild(el); });
+    var mm = pai.querySelector(':scope > #ma-mais'); if (mm) pai.appendChild(mm);
+  }
   var av = box.querySelector(':scope > .busca-nada');
   if (!vis && String(txt || '').trim() && box.querySelector('.cliente-row')) {
     if (!av) { av = document.createElement('div'); av.className = 'busca-nada'; av.style.cssText = 'color:var(--muted);font-size:.8rem;text-align:center;padding:16px;'; box.appendChild(av); }
@@ -14473,7 +14486,7 @@ function _renderLeadsCorpo(agora) {
   if (LD_BUSCA) {
     var t = v2norm(LD_BUSCA);
     var _exatos = rows.filter(function(l){ return _buscaBate([l.nome, l.tel, l.insta, l.email].filter(Boolean).join(' '), LD_BUSCA, l.nome); })
-      .map(function(l, i){ return { l: l, k: _buscaRank(l.nome, LD_BUSCA), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.l; });
+      .map(function(l, i){ return { l: l, k: _buscaRank(l.nome, LD_BUSCA), i: i }; }).filter(_buscaSoNome).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.l; });
     // nao achou nada e a pessoa digitou um NOME (nao telefone): mostra os parecidos
     // (caso Iane "Denicci" x "Denucci" na base — Bruno 02/09/2026)
     if (!_exatos.length && !/\d/.test(t) && t.length >= 5) {
@@ -15578,7 +15591,7 @@ function montarPesquisa(forcar) {
   var LIMITE_PESQ = 300;
   var buscando = !!String(_fp.txt || '').trim(), filtrando = buscando || _fp.st !== 'todos' || _fp.prod !== 'todos' || _fp.mes !== 'todos';
   var achadas = todas.filter(_pesqPassa);
-  if (buscando) achadas = achadas.map(function(r, i){ return { r: r, k: _buscaRank(r.nome, _fp.txt), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; });
+  if (buscando) achadas = achadas.map(function(r, i){ return { r: r, k: _buscaRank(r.nome, _fp.txt), i: i }; }).filter(_buscaSoNome).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; });
   var cortou = achadas.length > LIMITE_PESQ;
   var rows = cortou ? achadas.slice(0, LIMITE_PESQ) : achadas;
   // desenha só a visão que está aparecendo — a outra fica para quando alguém trocar
@@ -26956,7 +26969,7 @@ function _rlListaMostrar(filtro, ate) {
   };
   var nmDe = function(r) { return L.tipo === 'grav' ? gravPartes(r.t).nome : r.nome; };
   var vis = f ? L.rows.filter(function(r) { return _buscaBate(txt(r), filtro, nmDe(r)); })
-    .map(function(r, i){ return { r: r, k: _buscaRank(nmDe(r), filtro), i: i }; }).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; }) : L.rows;
+    .map(function(r, i){ return { r: r, k: _buscaRank(nmDe(r), filtro), i: i }; }).filter(_buscaSoNome).sort(function(a, b){ return a.k - b.k || a.i - b.i; }).map(function(x){ return x.r; }) : L.rows;
   var box = document.getElementById('ma-lista'); if (!box) return;
   var ini = ate || 0, fim = Math.min(vis.length, ini + 80), h = '';
   if (!ini) box.innerHTML = ''; else { var b0 = document.getElementById('ma-mais'); if (b0) b0.remove(); }
