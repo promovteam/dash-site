@@ -2892,7 +2892,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-04-1933';
+var VERSAO_DASH = '2026-10-04-1956';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -24712,6 +24712,7 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .sc-ev-l { display:flex; flex-direction:column; gap:3px; margin-top:6px; } .sc-ev-l span { font-size:.72rem; color:var(--text2); }
 .sc-ev-l i { display:inline-block; width:12px; height:4px; border-radius:3px; margin-right:6px; vertical-align:middle; }
 .sc-ev-l em { font-style:normal; font-weight:900; } .sc-ev-l em.up { color:#3ddc97; } .sc-ev-l em.dn { color:#ff6b6b; }
+.sc-res-l .sc-res-nota { display:block; width:100%; font-style:normal; font-size:.6rem; color:var(--muted); font-weight:600; margin-top:2px; }
 /* SCORE-CSS-FIM */
 .gx-pill:focus-visible, .gx-a:focus-visible, .tb-it:focus-visible, .tb-tile:focus-visible, .gv-abas button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .gx-linha { display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap; }
@@ -32284,6 +32285,10 @@ function scEhSdr(nome) { return SC_SDRS.indexOf(scK(nome)) !== -1 && !scEhSs(nom
 function scPapelL(l) { return l && (l.papel === 'ss' || scEhSs(l.sdr)) ? 'ss' : 'sdr'; }
 function scRegL(l) { var D = SCORE.d; return scPapelL(l) === 'ss' ? D.sdr.regua.social : D.sdr.regua[l.tipo]; }
 function scRotPapel(p) { return p === 'ss' ? '📲 Social Selling' : p === 'sdr' ? '📞 SDR' : '🎯 Closer'; }
+// ⚖️ 80% condução + 20% resultado, resultado comparado ao tipo (Bruno 04/10/2026: "pode seguir sua sugestão")
+var SC_PESO = { cond: 0.8, res: 0.2 }, SC_RES_PTS = { diagnostico: { vendeu: 10, entrada: 7, data: 4, nada: 0 }, entrevista: { vendeu: 6, entrada: 5, data: 3, nada: 0 } };
+function scRc(r) { return r.rc || ({ 10: 'vendeu', 7: 'entrada', 4: 'data', 0: 'nada' }[r.resn] || (r.g === 'fechou' ? 'vendeu' : r.g === 'bloqueio' ? 'entrada' : 'nada')); }
+function scPtsRc(r) { return SC_RES_PTS[r.tipo === 'entrevista' ? 'entrevista' : 'diagnostico'][scRc(r)]; }
 function scEhSs(nome) { return /^\s*ss\b/i.test(String(nome || '')) || /social/i.test(String(nome || '')); }
 function scEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 function scN1(x) { return x == null ? '—' : (Math.round(x * 10) / 10).toFixed(1).replace('.', ','); }
@@ -32443,7 +32448,7 @@ function scColunasMeta(P, eu) {
   var cols = [];
   if (temS) cols.push(col('📞 SDR Score', '· meta G ' + scN1(M.sdr.G) + ' · a conversa na Clint até a reunião', P.sdrs, 'sdr'));
   if (temSS) cols.push(col('📲 Social Selling Score', '· meta G ' + scN1(M.ss.G) + ' · Direct do Instagram + WhatsApp até a reunião', P.ss, 'ss'));
-  if (temC) cols.push(col('🏆 Closer Score', '· meta G ' + scN1(M.closer.G) + ' · 70% condução + 30% resultado', P.closers, 'closer'));
+  if (temC) cols.push(col('🏆 Closer Score', '· meta G ' + scN1(M.closer.G) + ' · 80% condução + 20% resultado', P.closers, 'closer'));
   h += '<div class="' + (cols.length > 1 ? 'grid2' : '') + ' sc-metas" style="margin-bottom:18px;">' + cols.join('') + '</div>';
   return h;
 }
@@ -32549,13 +32554,14 @@ function scMelhorar(B, parte) {
   if (RE.length) {
     var cond = scMedia(RE.map(function(r) { return r.cond; })), res = scMedia(RE.map(function(r) { return r.resn; })), fin = scMedia(RE.map(function(r) { return r.fin; }));
     var cnt = function(fn) { return RE.filter(fn).length; };
-    var R10 = cnt(function(r) { return r.resn === 10; }), R7 = cnt(function(r) { return r.resn === 7; }), R4 = cnt(function(r) { return r.resn === 4; }), R0 = cnt(function(r) { return r.resn === 0; });
+    var R10 = cnt(function(r) { return scRc(r) === 'vendeu'; }), R7 = cnt(function(r) { return scRc(r) === 'entrada'; }), R4 = cnt(function(r) { return scRc(r) === 'data'; }), R0 = cnt(function(r) { return scRc(r) === 'nada'; });
     h += '<div class="sc-pts"><div class="sc-pts-h">🏆 CLOSER SCORE · como a nota é feita</div><div class="sc-pts-l">'
-      + '<div class="bx2"><small>CONDUÇÃO</small><b style="color:' + scCor(cond, 'closer') + ';">' + scN1(cond) + '</b><span>o passo a passo abaixo</span></div><span class="op">× 70% +</span>'
-      + '<div class="bx2"><small>RESULTADO</small><b style="color:' + scCor(res, 'closer') + ';">' + scN1(res) + '</b><span>vendeu, bloqueio ou data</span></div><span class="op">× 30% =</span>'
-      + '<div class="bx2 fin"><small>NOTA FINAL</small><b style="color:' + scCor(fin, 'closer') + ';">' + scN1(fin) + '</b><span>' + scN1(cond * 0.7) + ' + ' + scN1(res * 0.3) + ' pontos · meta G ' + scN1(MC.G) + '</span></div></div>'
+      + '<div class="bx2"><small>CONDUÇÃO</small><b style="color:' + scCor(cond, 'closer') + ';">' + scN1(cond) + '</b><span>o passo a passo de cada reunião</span></div><span class="op">× 80% +</span>'
+      + '<div class="bx2"><small>RESULTADO</small><b style="color:' + scCor(res, 'closer') + ';">' + scN1(res) + '</b><span>média dos pontos: vendeu 10 · bloqueio 7 · data 4 · nada 0 no diagnóstico; na entrevista do workshop 6 · 5 · 3 · 0</span></div><span class="op">× 20% =</span>'
+      + '<div class="bx2 fin"><small>NOTA FINAL</small><b style="color:' + scCor(fin, 'closer') + ';">' + scN1(fin) + '</b><span>' + scN1(cond * SC_PESO.cond) + ' + ' + scN1(res * SC_PESO.res) + ' pontos · meta G ' + scN1(MC.G) + '</span></div></div>'
       + '<div class="sc-res-l"><span>O RESULTADO DAS ' + RE.length + ' REUNIÕES</span>'
-      + '<i class="v">🏆 vendeu <b>' + R10 + '</b> <small>10 pts</small></i><i class="b">🔒 entrada ou bloqueio <b>' + R7 + '</b> <small>7 pts</small></i><i class="d">📅 saiu com data <b>' + R4 + '</b> <small>4 pts</small></i><i class="z">⛔ sem nada <b>' + R0 + '</b> <small>0 pts</small></i></div>'
+      + '<i class="v">🏆 vendeu <b>' + R10 + '</b> <small>10 · 6 pts</small></i><i class="b">🔒 entrada ou bloqueio <b>' + R7 + '</b> <small>7 · 5 pts</small></i><i class="d">📅 saiu com data <b>' + R4 + '</b> <small>4 · 3 pts</small></i><i class="z">⛔ sem nada <b>' + R0 + '</b> <small>0 pts</small></i>'
+      + '<em class="sc-res-nota">pontos no diagnóstico · na entrevista do workshop (que já chega pronta e fecha mais)</em></div>'
       + '<div class="stack-r">' + [[R10, '#3ddc97'], [R7, '#ffd166'], [R4, '#6ea8ff'], [R0, 'rgba(255,107,107,.6)']].map(function(z) { return z[0] ? '<i style="flex-grow:' + z[0] + ';background:' + z[1] + ';"></i>' : ''; }).join('') + '</div></div>';
   }
   if (LE.length) {
@@ -32669,7 +32675,7 @@ function scRegua() {
     +   '<div class="hint" style="margin-top:8px;">' + (D.sdr.risco[t] || []).map(function(r) { return r[0] + ': aparecem <b>' + r[2] + '%</b> (' + r[1] + ')'; }).join(' · ') + ' — risco = lead avisou dificuldade de agenda, reunião para 7 dias ou mais, ou só a IA conversou</div></div>'
     + '<div><h4 style="font-size:.7rem;letter-spacing:1px;font-weight:800;color:#f6a350;margin:0 0 6px;">🏆 CLOSER SCORE · ' + (t === 'diagnostico' ? 'MANUAL DO CLOSER' : 'RÉGUA DA ENTREVISTA') + ' · meta P ' + scN1(SC_METAS.closer.P) + ' · M ' + scN1(SC_METAS.closer.M) + ' · G ' + scN1(SC_METAS.closer.G) + '</h4>' + regua(REGC, 0)
     +   '<div style="margin-top:14px;font-size:.74rem;font-weight:800;">Quanto fecha em cada faixa de condução</div>' + faixas(D.closer.valid[t], '#3ddc97', 'reuniões')
-    +   '<div class="hint" style="margin-top:8px;">Nota final = 70% condução + 30% resultado (vendeu 10 · entrada ou bloqueio 7 · saiu com data 4 · nada 0)</div></div>'
+    +   '<div class="hint" style="margin-top:8px;">Nota final = 80% condução + 20% resultado. Resultado no diagnóstico: vendeu 10 · entrada ou bloqueio 7 · saiu com data 4 · nada 0; na entrevista do workshop: 6 · 5 · 3 · 0</div></div>'
     + '</div></details>';
 }
 // ---------- reuniões, uma a uma (só as que a pessoa pode ver) ----------
@@ -32891,8 +32897,8 @@ function scFichaReuniao(r) {
     + '<button class="btn" style="padding:6px 12px;font-size:.7rem;" onclick="if(SCORE._fi)scJanela(SCORE._fi.c,SCORE._fi.s)">Ver a nota inteira →</button></div>'
     + '<div class="sc-fi-et">'
     + '<div><small>' + (s && scPapelL(s) === 'ss' ? '📲 SOCIAL SELLING' : '📞 SDR') + '</small><b style="color:' + scCor(s ? s.nota : null, 'sdr') + ';">' + (s ? scN1(s.nota) : '—') + '</b><span>' + (s ? scEsc(s.sdr) + ' · meta ' + scN1(MS.G) : kc.s ? 'só o SDR e a gestão veem' : 'sem conversa lida') + '</span></div><i>→</i>'
-    + '<div><small>🎯 CLOSER</small><b style="color:' + scCor(c ? c.fin : null, 'closer') + ';">' + (c ? scN1(c.fin) : '—') + '</b><span>' + (c ? 'condução ' + scN1(c.cond) + ' × 70% + resultado ' + c.resn + ' × 30%' : kc.c ? 'só o closer e a gestão veem' : 'sem gravação lida') + '</span></div><i>→</i>'
-    + '<div><small>🏁 RESULTADO</small><b class="res" style="color:' + corRes + ';">' + res + '</b><span>' + (c ? 'nesta reunião · ' + (c.resn === 10 ? 'vendeu · 10 pts' : c.resn === 7 ? 'entrada ou bloqueio · 7 pts' : c.resn === 4 ? 'saiu com data · 4 pts' : 'sem nada · 0 pts') : (s ? (s.show ? 'lead apareceu' : 'lead faltou') : '')) + '</span></div></div>';
+    + '<div><small>🎯 CLOSER</small><b style="color:' + scCor(c ? c.fin : null, 'closer') + ';">' + (c ? scN1(c.fin) : '—') + '</b><span>' + (c ? 'condução ' + scN1(c.cond) + ' × 80% + resultado ' + scPtsRc(c) + ' × 20%' : kc.c ? 'só o closer e a gestão veem' : 'sem gravação lida') + '</span></div><i>→</i>'
+    + '<div><small>🏁 RESULTADO</small><b class="res" style="color:' + corRes + ';">' + res + '</b><span>' + (c ? 'nesta reunião · ' + ({ vendeu: 'vendeu', entrada: 'entrada ou bloqueio', data: 'saiu com data', nada: 'sem nada' }[scRc(c)]) + ' · ' + scPtsRc(c) + ' pts' : (s ? (s.show ? 'lead apareceu' : 'lead faltou') : '')) + '</span></div></div>';
   if (c) {
     var reg = D.closer.regua[tipo], tot = 0, max = 0;
     var doCloser = D.closer.reun.filter(function(x) { return x.ck === c.ck && x.tipo === c.tipo; });
@@ -33059,7 +33065,7 @@ function scLinhasReunioes(B) {
 }
 function scResDe(o) {
   if (o.c) {
-    var sub = o.c.resn === 10 ? 'vendeu' : o.c.resn === 7 ? (o.c.r === 'entrada' ? 'pagou a entrada' : 'pagou o bloqueio') : o.c.resn === 4 ? 'saiu com data marcada' : 'saiu sem nada';
+    var rc = scRc(o.c), sub = rc === 'vendeu' ? 'vendeu' : rc === 'entrada' ? (o.c.r === 'entrada' ? 'pagou a entrada' : 'pagou o bloqueio') : rc === 'data' ? 'saiu com data marcada' : 'saiu sem nada';
     return o.c.g === 'fechou' ? { k: 'fechou', rot: 'Fechou', cor: '#3ddc97', sub: sub } : o.c.g === 'bloqueio' ? { k: 'bloqueio', rot: 'Bloqueio', cor: '#ffd166', sub: sub } : { k: 'nao', rot: 'Não fechou', cor: '#ff6b6b', sub: sub };
   }
   if (o.s && !o.s.show) return { k: 'faltou', rot: 'Lead faltou', cor: '#ff9a5a', sub: 'no-show' };
@@ -33107,7 +33113,7 @@ function scCardReuniao(o, i, loja) {
     + '<div class="sc-rc-res" style="--rc:' + res.cor + ';"><b>' + res.rot + '</b><small>' + scEsc(res.sub) + '</small></div></header>'
     + (porque ? '<p class="sc-rc-pq">🏁 ' + scEsc(porque) + '</p>' : '')
     + '<div class="sc-rc-notas">'
-    + (c ? '<div class="nt"><small>🎯 ' + scEsc((SC_CLOSERS[c.ck] || c.ck).split(' ')[0]) + '</small><b style="color:' + scCor(c.fin, 'closer') + ';">' + scN1(c.fin) + '</b><span>condução ' + scN1(c.cond) + ' · resultado ' + c.resn + '</span></div>'
+    + (c ? '<div class="nt"><small>🎯 ' + scEsc((SC_CLOSERS[c.ck] || c.ck).split(' ')[0]) + '</small><b style="color:' + scCor(c.fin, 'closer') + ';">' + scN1(c.fin) + '</b><span>condução ' + scN1(c.cond) + ' · resultado ' + scPtsRc(c) + '</span></div>'
          : '<div class="nt vazio"><small>🎯 Closer</small><b>—</b><span>' + (s && !s.show ? 'o lead não apareceu' : 'gravação ainda não lida') + '</span></div>')
     + (s ? '<div class="nt"><small>' + iconeS + ' ' + scEsc(String(s.sdr).replace(/^(ss|sdr)\s+/i, '')) + '</small><b style="color:' + scCor(s.nota, papelS) + ';">' + scN1(s.nota) + '</b><span>' + (papelS === 'ss' ? 'Social Selling' : 'SDR') + (s.ig ? ' · Direct' : '') + '</span></div>'
          : '<div class="nt vazio"><small>📞 SDR</small><b>—</b><span>sem conversa lida</span></div>')
