@@ -1978,6 +1978,9 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 //      → entra sozinha, os campos ficam marcados "do cliente" até o closer mexer; o programa/pagamento do link só completa
 // Com o link enviado e a tela aberta, confere a conversa a cada minuto: quando o cliente manda, os campos aparecem.
 // =====================================================================
+// 🔒 robô v229 (04/10/2026): a conversa da Clint só vem com a senha própria — a mesma das 💰 Comissões, que o dash guarda
+// neste aparelho (comPainelTok; o formulário abre dentro do dash, no mesmo site, e lê dali)
+function _tokClint() { try { return localStorage.getItem('comPainelTok') || ''; } catch (e) { return ''; } }
 (function () {
   var q = {}; try { location.search.replace(/^\?/, '').split('&').forEach(function (p) { if (!p) return; var i = p.indexOf('='); q[decodeURIComponent(p.slice(0, i))] = decodeURIComponent((p.slice(i + 1) || '').replace(/\+/g, ' ')); }); } catch (e) {}
   if (q.modo === 'bloqueio') return;
@@ -2147,6 +2150,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
     else if (tipo === 'ja') linha('pre-cli', 'ok', '📥', '<span class="pre-tx">Os dados que o cliente mandou ' + esc(quando(x.quando)) + ' já estão na tela.</span><button type="button" class="pre-bt" id="pre-ver">ver mensagem</button><button type="button" class="pre-bt" id="pre-reaplicar">preencher de novo</button><div class="pre-msg" id="pre-msgtx" hidden>' + esc(x.texto) + '</div>');
     else if (tipo === 'esperando') linha('pre-cli', 'espera', '<i class="pre-pulso"></i>', '<span class="pre-tx"><b>Esperando o cliente</b> — link enviado ' + esc(quando(R.link)) + '. Quando ele mandar, os dados aparecem aqui sozinhos.</span>' + clintBt + '<button type="button" class="pre-bt" id="pre-buscar">🔄 procurar agora</button>');
     else if (tipo === 'nada') linha('pre-cli', '', '💬', '<span class="pre-tx">O cliente ainda não mandou os dados. Mande o link: ele preenche no celular e tudo entra aqui.</span>' + linkBt + '<button type="button" class="pre-bt" id="pre-buscar">🔄 procurar de novo</button>');
+    else if (tipo === 'senha') linha('pre-cli', '', '🔒', '<span class="pre-tx"><b>Para puxar sozinho o que o cliente mandou na Clint, entre uma vez nas 💰 Comissões do dash com a sua senha</b> (neste aparelho). Enquanto isso, se o cliente já mandou, cole a mensagem na parte 2.</span>' + linkBt + '<button type="button" class="pre-bt" id="pre-buscar">🔄 já entrei — procurar</button>');
     else if (tipo === 'erro') linha('pre-cli', '', '⚠️', '<span class="pre-tx">Não consegui ler a conversa da Clint agora' + (x ? ' (' + esc(String(x).slice(0, 90)) + ')' : '') + '. Se o cliente já mandou, cole a mensagem na parte 2.</span>' + linkBt + '<button type="button" class="pre-bt" id="pre-buscar">🔄 tentar de novo</button>');
     var bv = $('pre-ver'); if (bv) bv.onclick = function () { var m = $('pre-msgtx'); m.hidden = !m.hidden; bv.textContent = m.hidden ? 'ver mensagem' : 'esconder'; };
     var bb = $('pre-buscar'); if (bb) bb.onclick = function () { buscar(true); };
@@ -2154,6 +2158,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
   }
   function buscar(manual) {
     if (!cel8 || buscando || typeof GAS_URL === 'undefined') return;
+    var tok = _tokClint();
+    if (!tok) { clearTimeout(tP); estadoCliente('senha'); return; }   // sem a senha o robô não devolve a conversa
     buscando = true; clearTimeout(tP);
     if (manual || !R.msg) estadoCliente('buscando');
     var cb = 'preCli' + Date.now() + Math.floor(Math.random() * 1000), sc = document.createElement('script'), feito = false;
@@ -2165,10 +2171,11 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
     window[cb] = fim; sc.onerror = function () { fim({ success: false, error: 'sem resposta do robô' }); };
     setTimeout(function () { fim({ success: false, error: 'o robô demorou demais' }); }, 45000);
     var cid = (String(q.clint || '').match(/contacts\/([\w-]+)/) || [])[1] || '';
-    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 80, comCadastro: true }));
+    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 80, comCadastro: true, token: tok }));
     document.body.appendChild(sc);
   }
   function tratar(res, manual) {
+    if (res && res.precisaSenha) { estadoCliente('senha'); return; }   // senha vencida/trocada: para de procurar
     if (!res || !res.success) {
       if (R.link && !manual) { estadoCliente('esperando'); agendar(); return; }
       estadoCliente(/nao achado/i.test((res && res.error) || '') ? 'nada' : 'erro', res && res.error); return;
@@ -2220,7 +2227,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
     tP = setTimeout(function () { if (document.hidden) { agendar(); return; } rodadas++; buscar(false); }, 60000);
   }
   // quem copiou o link (botão da parte 1, da parte 2 ou daqui) passa a esperar o cliente
-  window.__preLinkEnviado = function () { R.link = Date.now(); R.sujo = true; rodadas = 0; salvar(); if (!R.msg) { estadoCliente('esperando'); agendar(); } };
+  window.__preLinkEnviado = function () { R.link = Date.now(); R.sujo = true; rodadas = 0; salvar(); if (!R.msg) { if (!_tokClint()) { estadoCliente('senha'); return; } estadoCliente('esperando'); agendar(); } };
 
   // venda registrada: o rascunho sai
   var tit = $('success-title');
@@ -2296,15 +2303,18 @@ function precoTabela(p) {
   var textoDe = function (m) { var t = String(m.texto || ''); if (/^\s*\{/.test(t)) { try { var o = JSON.parse(t); t = o.text || o.body || o.caption || o.message || ''; } catch (e) {} } return String(t || ''); };
   var doCliente = function (m) { return /customer|contact|client|lead/i.test(String(m.tipo || '')) || (!m.tipo && !m.user_id); };
   function agendar() { clearTimeout(tP); if (!esperando || rodadas >= 30) return; tP = setTimeout(function () { if (document.hidden) { agendar(); return; } rodadas++; buscar(); }, 60000); }
+  var semSenha = function () { esperando = false; clearTimeout(tP); if (msgEl) { msgEl.style.color = '#f6a350'; msgEl.textContent = '🔒 Para os dados do cliente entrarem sozinhos da Clint, entre uma vez nas 💰 Comissões do dash com a sua senha (neste aparelho). Enquanto isso, cole a mensagem aqui.'; } };
   function buscar() {
+    var tok = _tokClint(); if (!tok) { semSenha(); return; }   // robô v229: sem a senha não devolve a conversa
     var cb = 'bq' + Date.now(), sc = document.createElement('script'), feito = false;
     var fim = function (res) { if (feito) return; feito = true; try { sc.remove(); } catch (e) {} window[cb] = function () {}; tratar(res); };
     window[cb] = fim; sc.onerror = function () { fim(null); }; setTimeout(function () { fim(null); }, 45000);
     var cid = (String(q.clint || '').match(/contacts\/([\w-]+)/) || [])[1] || '';
-    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 60, comCadastro: true }));
+    sc.src = GAS_URL + '?callback=' + cb + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintMensagensBrutas', telefone: q.cel, contatoId: cid, limite: 60, comCadastro: true, token: tok }));
     document.body.appendChild(sc);
   }
   function tratar(res) {
+    if (res && res.precisaSenha) { semSenha(); return; }
     if (!res || !res.success) { agendar(); return; }
     var msgs = []; (res.chats || []).forEach(function (c) { (c.mensagens || []).forEach(function (m) { msgs.push(m); }); });
     msgs.sort(function (a, b) { return new Date(a.quando) - new Date(b.quando); });
