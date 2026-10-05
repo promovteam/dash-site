@@ -2892,7 +2892,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-04-1956';
+var VERSAO_DASH = '2026-10-05-0805';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -5717,7 +5717,7 @@ function renderV2() {
   var projVd = pj ? mc.vdV * (pj.uT / pj.uP) + mc.enV + mc.blV * taxaBloq : null;
   h += '<div class="glass click" style="--halo:rgba(61,220,151,.18);--tint:#3ddc97;" onclick="abrirA(\'vendido\')">'
     + (projVd !== null
-      ? '<div class="proj" style="top:auto;bottom:12px;" title="Conta: vendido no ritmo atual até o fim do mês + entradas na mesa + bloqueios × ' + Math.round(taxaBloq * 100) + '% (taxa histórica de bloqueio que paga)">'
+      ? '<div class="proj" title="Conta: vendido no ritmo atual até o fim do mês + entradas na mesa + bloqueios × ' + Math.round(taxaBloq * 100) + '% (taxa histórica de bloqueio que paga)">'
         + '<span class="proj-lbl">📈 Projeção do vendido</span>'
         + '<span class="proj-val" style="color:#3ddc97;">' + v2moeda0(projVd) + '</span></div>'
       : '')
@@ -32565,13 +32565,15 @@ function scMelhorar(B, parte) {
       + '<div class="stack-r">' + [[R10, '#3ddc97'], [R7, '#ffd166'], [R4, '#6ea8ff'], [R0, 'rgba(255,107,107,.6)']].map(function(z) { return z[0] ? '<i style="flex-grow:' + z[0] + ';background:' + z[1] + ';"></i>' : ''; }).join('') + '</div></div>';
   }
   if (LE.length) {
-    var sn = scMedia(LE.map(function(l) { return l.nota; })), ap = scPct(LE, function(l) { return l.show; }), cp = scPct(LE, function(l) { return l.venda; }), rs = LE.filter(function(l) { return l.riscos && l.riscos.length; }).length;
+    var sn = scMedia(LE.map(function(l) { return l.nota; })), pr = scMedia(LE.map(function(l) { return l.proc != null ? l.proc : l.nota; })), rr = scMedia(LE.map(function(l) { return l.rs != null ? l.rs : null; }).filter(function(v) { return v != null; })), ap = scPct(LE, function(l) { return l.show; }), cp = scPct(LE, function(l) { return l.venda; }), rs = LE.filter(function(l) { return l.riscos && l.riscos.length; }).length;
     var soSS = LE.every(function(l) { return scPapelL(l) === 'ss'; }), algSS = LE.some(function(l) { return scPapelL(l) === 'ss'; });
     h += '<div class="sc-pts"><div class="sc-pts-h">' + (soSS ? '📲 SOCIAL SELLING SCORE' : algSS ? '📞 SDR + 📲 SOCIAL SELLING' : '📞 SDR SCORE') + ' · como a nota é feita</div><div class="sc-pts-l">'
-      + '<div class="bx2 fin"><small>NOTA (o processo)</small><b style="color:' + scCor(sn, 'sdr') + ';">' + scN1(sn) + '</b><span>soma dos pontos do passo a passo · meta G ' + scN1(MS.G) + '</span></div>'
-      + '<div class="bx2"><small>O RESULTADO</small><b style="color:#6ea8ff;">' + ap + '%</b><span>dos leads apareceram na reunião</span></div>'
-      + '<div class="bx2"><small>E COMPRARAM</small><b style="color:#3ddc97;">' + cp + '%</b><span>dos leads das conversas</span></div>'
-      + '<div class="bx2"><small>COM RISCO</small><b style="color:#ff6b6b;">' + rs + '</b><span>agenda difícil, 7+ dias ou só IA</span></div></div></div>';
+      + '<div class="bx2"><small>PROCESSO</small><b style="color:' + scCor(pr, 'sdr') + ';">' + scN1(pr) + '</b><span>o passo a passo da conversa</span></div><span class="op">× 80% +</span>'
+      + '<div class="bx2"><small>RESULTADO</small><b style="color:' + scCor(rr, 'sdr') + ';">' + scN1(rr) + '</b><span>média dos pontos: comprou 10 · apareceu 7 · faltou 0 no diagnóstico; na entrevista do workshop 7 · 5 · 0</span></div><span class="op">× 20% =</span>'
+      + '<div class="bx2 fin"><small>NOTA FINAL</small><b style="color:' + scCor(sn, 'sdr') + ';">' + scN1(sn) + '</b><span>' + scN1(pr * SC_PESO.cond) + ' + ' + scN1(rr * SC_PESO.res) + ' pontos · meta G ' + scN1(MS.G) + '</span></div></div>'
+      + '<div class="sc-res-l"><span>O RESULTADO DAS ' + LE.length + ' CONVERSAS</span><i class="v">🏆 apareceu e comprou <b>' + LE.filter(function(l) { return l.venda; }).length + '</b> <small>10 · 7 pts</small></i>'
+      + '<i class="d">🙋 apareceu <b>' + LE.filter(function(l) { return l.show && !l.venda; }).length + '</b> <small>7 · 5 pts</small></i><i class="z">🚫 faltou <b>' + LE.filter(function(l) { return !l.show; }).length + '</b> <small>0 pts</small></i>'
+      + '<em class="sc-res-nota">apareceram ' + ap + '% · compraram ' + cp + '% · ' + rs + ' com risco (agenda difícil, 7+ dias ou só a IA) · pontos no diagnóstico · na entrevista do workshop</em></div></div>';
   }
   }
   if (parte === 'resumo') return h ? h + scEvolucao(RE, LE, nome) : '';
@@ -33115,7 +33117,7 @@ function scCardReuniao(o, i, loja) {
     + '<div class="sc-rc-notas">'
     + (c ? '<div class="nt"><small>🎯 ' + scEsc((SC_CLOSERS[c.ck] || c.ck).split(' ')[0]) + '</small><b style="color:' + scCor(c.fin, 'closer') + ';">' + scN1(c.fin) + '</b><span>condução ' + scN1(c.cond) + ' · resultado ' + scPtsRc(c) + '</span></div>'
          : '<div class="nt vazio"><small>🎯 Closer</small><b>—</b><span>' + (s && !s.show ? 'o lead não apareceu' : 'gravação ainda não lida') + '</span></div>')
-    + (s ? '<div class="nt"><small>' + iconeS + ' ' + scEsc(String(s.sdr).replace(/^(ss|sdr)\s+/i, '')) + '</small><b style="color:' + scCor(s.nota, papelS) + ';">' + scN1(s.nota) + '</b><span>' + (papelS === 'ss' ? 'Social Selling' : 'SDR') + (s.ig ? ' · Direct' : '') + '</span></div>'
+    + (s ? '<div class="nt"><small>' + iconeS + ' ' + scEsc(String(s.sdr).replace(/^(ss|sdr)\s+/i, '')) + '</small><b style="color:' + scCor(s.nota, papelS) + ';">' + scN1(s.nota) + '</b><span>' + (papelS === 'ss' ? 'Social Selling' : 'SDR') + (s.proc != null ? ' · processo ' + scN1(s.proc) + ' · resultado ' + s.rs : '') + (s.ig ? ' · Direct' : '') + '</span></div>'
          : '<div class="nt vazio"><small>📞 SDR</small><b>—</b><span>sem conversa lida</span></div>')
     + '</div>'
     + '<div class="sc-rc-corpo">' + mand + '<div class="sc-rc-info">'
@@ -33298,7 +33300,7 @@ function scPassosReuniao(x, papel) {
       + '<div class="sc-pr-c">' + corpo + '</div></details>';
   }).join('')
     + '<div class="sc-fi-soma">' + (papel === 'closer' ? 'Soma: <b>' + scN1(tot) + '</b> de ' + max + ' pontos = condução <b>' + scN1(max ? tot / max * 10 : null) + '</b> · meta do closer ' + scN1(SC_METAS.closer.G)
-      : 'nota <b style="color:' + scCor(x.nota, 'sdr') + ';">' + scN1(x.nota) + '</b> · meta ' + scN1(SC_METAS[papel === 'ss' ? 'ss' : 'sdr'].G) + (x.riscos && x.riscos.length ? ' · ⚠️ ' + scEsc(x.riscos.join(' · ')) : '')) + ' · toque em cada passo para ver</div></div>';
+      : 'processo <b>' + scN1(x.proc != null ? x.proc : x.nota) + '</b> × 80% + resultado <b>' + (x.rs != null ? x.rs : '—') + '</b> (' + ({ comprou: 'apareceu e comprou', apareceu: 'apareceu', faltou: 'faltou' }[x.rcs] || '') + ') × 20% = nota <b style="color:' + scCor(x.nota, 'sdr') + ';">' + scN1(x.nota) + '</b> · meta ' + scN1(SC_METAS[papel === 'ss' ? 'ss' : 'sdr'].G) + (x.riscos && x.riscos.length ? ' · ⚠️ ' + scEsc(x.riscos.join(' · ')) : '')) + ' · toque em cada passo para ver</div></div>';
   return h;
 }
 
