@@ -2892,7 +2892,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-05-0805';
+var VERSAO_DASH = '2026-10-05-1430';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -3309,7 +3309,7 @@ function soMeuQuem() {
   var login = ''; try { login = localStorage.getItem('v2Login') || ''; } catch (e) {}
   if (!login || typeof ACESSOS === 'undefined') return null;
   var a = null; ACESSOS.forEach(function(x) { if (x.nome === login) a = x; });
-  if (!a || a.soOlha || a.executivo || a.contratos || login === 'Adm') return null;
+  if (!a || a.soOlha || a.executivo || a.contratos || a.financeiro || login === 'Adm') return null;
   var p = v2norm(login).split(/\s+/)[0], ck = '';
   (typeof CLOSERS !== 'undefined' ? CLOSERS : []).forEach(function(c) { if (c.key === p) ck = c.key; });
   return { nome: login, primeiro: p, closerKey: ck, adm: !!a.adm };
@@ -5679,11 +5679,18 @@ function renderV2() {
   if (PA) {
     var _c = function(rot, a, b, fmt) { return '<div class="v2-du-c"><small>' + rot + '</small><b>' + fmt(a) + '</b>' + v2vs(a, b) + '<em>' + PA.mes + ': ' + fmt(b) + '</em></div>'; };
     var _n = function(fn) { return [PA.agora.filter(function(r){ return fn(r.sn); }).length, PA.antes.filter(function(r){ return fn(r.sn); }).length]; };
-    var _ap = _n(isComp), _fe = _n(isFechouReuniao);
+    var _ap = _n(isComp), _vdN = [PA.cg.vd, PA.ca.vd];
+    // Bruno 05/10/2026: "essas comparações devem ser feitas com base no vendido e nos leads que apareceram"
+    var _vi = function(n) { return n + ' vida' + (n === 1 ? '' : 's'); };
+    var _tx = [_ap[0] ? _vdN[0] / _ap[0] : null, _ap[1] ? _vdN[1] / _ap[1] : null];
+    var _pp = function(a, b) { if (a == null || b == null) return ''; var d = Math.round((a - b) * 100); return d ? '<span class="v2-vs ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ ' : '▼ ') + Math.abs(d) + ' pts</span>' : '<span class="v2-vs eq">= igual</span>'; };
+    var _pc = function(x) { return x == null ? '—' : Math.round(x * 100) + '%'; };
     faixaDU = '<div class="v2-du" title="' + PA.tit + '">'
       + '<div class="v2-du-t"><small>Dia útil</small><b>' + PA.n + ' <span>de ' + PA.uT + '</span></b></div>'
       + '<div class="v2-du-m"><div class="v2-du-bar"><i style="width:' + Math.min(100, PA.n / PA.uT * 100).toFixed(1) + '%;"></i></div><span>Hoje é o <b>' + PA.n + 'º dia útil de ' + PA.mesHojeC + '</b> (segunda a sexta, sem feriados). Tudo aqui compara com <b>' + PA.mesC + ' até o ' + PA.n + 'º dia útil (' + PA.diaN + ')</b>.</span></div>'
-      + _c('Faturamento', PA.cg.fat, PA.ca.fat, v2moeda0) + _c('Lead apareceu', _ap[0], _ap[1], String) + _c('Disse sim', _fe[0], _fe[1], String)
+      + '<div class="v2-du-c" title="Só o que está como Vendido (sem bloqueio e sem entrada)"><small>Vendido · ' + _vi(_vdN[0]) + '</small><b>' + v2moeda0(PA.cg.vdV) + '</b>' + v2vs(PA.cg.vdV, PA.ca.vdV) + '<em>' + PA.mes + ': ' + v2moeda0(PA.ca.vdV) + ' · ' + _vi(_vdN[1]) + '</em></div>'
+      + _c('Lead apareceu', _ap[0], _ap[1], String)
+      + '<div class="v2-du-c" title="Vidas vendidas ÷ leads que apareceram, até este dia útil"><small>Vendeu de quem apareceu</small><b>' + _pc(_tx[0]) + '</b>' + _pp(_tx[0], _tx[1]) + '<em>' + PA.mes + ': ' + _pc(_tx[1]) + '</em></div>'
       + '</div>';
   }
   var mc = v2calc(mesRows);
@@ -21344,7 +21351,7 @@ var ACESSOS = [
   { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
-  { nome: 'Suellen',       financeiro: true },   // Financeiro (03/10/2026): só a aba Comissões; a senha é conferida no robô — não fica no código
+  { nome: 'Suellen',       financeiro: true },   // Financeiro: vê o dash inteiro (05/10/2026: "libere tudo"; antes só Comissões); a senha é conferida no robô — não fica no código
   { nome: 'Juliane Promov', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
@@ -28411,8 +28418,8 @@ function rlQuem() {
   var hn = location.hostname, local = !hn || hn === 'localhost' || hn === '127.0.0.1';
   var a = null; (typeof ACESSOS !== 'undefined' ? ACESSOS : []).forEach(function(x) { if (x.nome === login) a = x; });
   if (!a) return local ? { adm: true } : { fora: true };
-  if (a.adm) return { adm: true };
-  if (a.soOlha || a.executivo || a.contratos || a.financeiro) return { fora: true };
+  if (a.adm || a.financeiro) return { adm: true };   // financeiro vê o relatório do time (Bruno 05/10/2026: "libere tudo")
+  if (a.soOlha || a.executivo || a.contratos) return { fora: true };
   var pn = v2norm(login).split(/\s+/)[0];
   return rlFuncoesDe(pn).length ? { pessoa: pn } : { fora: true };
 }
@@ -31644,7 +31651,7 @@ function cmExtraSalvar() {
 <style>
 html.cm-so-ler .cm-lapis, html.cm-so-ler .cm-edita, html.cm-so-ler .cm-extra-bt, html.cm-so-ler #cm-extra-form, html.cm-so-ler .cm-todas, html.cm-so-ler .cm-pe a { display:none !important; }
 html.cm-so-ler .cm-conta { pointer-events:none; }
-html.papel-fin .nav-item[data-s]:not([data-s="comissoes"]), html.papel-fin #tb, html.papel-fin #btn-someu, html.papel-fin .bt-ext { display:none !important; }
+/* Bruno 05/10/2026 ("libere tudo"): o financeiro (Suellen) vê o dash inteiro — antes só a aba Comissões */
 .cmp-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:.64rem; font-weight:800; white-space:nowrap; border:1px solid transparent; font-family:inherit; line-height:1.5; }
 .cmp-chip.auto { background:rgba(255,209,102,.12); color:#ffd166; border-color:rgba(255,209,102,.3); }
 .cmp-chip.ok { background:rgba(61,220,151,.12); color:#3ddc97; border-color:rgba(61,220,151,.3); }
@@ -32257,7 +32264,6 @@ function cmSairPessoa() {
 function _cmPapelNav() {
   var fin = _cmPapelLogin() === 'financeiro';
   document.documentElement.classList.toggle('papel-fin', fin);
-  if (fin) { var it = document.querySelector('.nav-item[data-s="comissoes"]'); if (it && !it.classList.contains('active')) setTimeout(function(){ it.click(); }, 200); }
 }
 try { _cmPapelNav(); } catch (eFin) {}
 try { cmMostrarMenu(); } catch (eMn) {}   // a aba aparece para quem tem comissão (antes era só o Bruno)
@@ -32930,7 +32936,7 @@ function scFichaReuniao(r) {
 function scMostrarMenu() {
   var it = document.querySelector('.nav-item[data-s="score"]'); if (!it) return;
   var p = ''; try { p = typeof _cmPapelLogin === 'function' ? _cmPapelLogin() : 'admin'; } catch (e) {}
-  it.style.display = (p === 'admin' || p === 'dono') ? '' : 'none';
+  it.style.display = (p === 'admin' || p === 'dono' || p === 'financeiro') ? '' : 'none';
 }
 try { setTimeout(scMostrarMenu, 1200); setInterval(scMostrarMenu, 5000); } catch (eMm) {}
 
