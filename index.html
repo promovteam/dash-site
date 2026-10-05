@@ -2755,7 +2755,7 @@ function abrirAgendar(dur, ck){
 var SEM_ORIGEM_OK = ['Sarah Promov', 'SS Sarah', 'Sarah'];
 function podeSemOrigem() {
   var eu = localStorage.getItem('v2Login') || '';
-  if (eu === 'Bruno Pardim' || eu === 'Adm') return true;     // quem administra sempre pode
+  if (eu === 'Bruno Pardim' || eu === 'Adm' || ehAdm()) return true;     // quem administra sempre pode
   return SEM_ORIGEM_OK.some(function(n){ return v2norm(n) === v2norm(eu); });
 }
 // zera os campos do lead ao abrir o formulário
@@ -2892,7 +2892,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-05-1430';
+var VERSAO_DASH = '2026-10-05-1757';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21351,6 +21351,7 @@ var ACESSOS = [
   { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
+  { nome: 'Gabriel',       adm: true, gestao: true, senhaRobo: true },   // 05/10/2026 (Bruno: "cria um deste para o gabriel com todos acessos · igual ao meu"): admin; a senha é dele, criada com o código no WhatsApp e conferida no robô — não fica no código
   { nome: 'Suellen',       financeiro: true },   // Financeiro: vê o dash inteiro (05/10/2026: "libere tudo"; antes só Comissões); a senha é conferida no robô — não fica no código
   { nome: 'Juliane Promov', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm
   { nome: 'Selina Promov', pin: '2846' },
@@ -21408,7 +21409,7 @@ function montarLogin() {
     b.style.cssText = 'padding:13px;font-size:.85rem;width:100%;';
     b.textContent = (a.soOlha ? '👁 ' : a.adm ? '🛡 ' : a.executivo ? '🤝 ' : a.financeiro ? '💼 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : a.executivo ? ' — Executiva (CS)' : a.financeiro ? ' — Financeiro' : '');
     b.onclick = function() {
-      if (a.financeiro) { _loginFinMostrar(ov, a, false); return; }
+      if (a.financeiro || a.senhaRobo) { _loginFinMostrar(ov, a, false); return; }
       window._lgEscolhido = a.nome;
       ov.querySelector('#lg-quem').textContent = a.nome;
       caixa.style.display = 'none';
@@ -21427,11 +21428,12 @@ function loginVoltar() {
 }
 // 💼 entrada do financeiro (Suellen): a senha é a das comissões, conferida no robô (v226); na 1ª vez, o código que o Bruno gera
 function _loginFinMostrar(ov, a, codigo) {
+  a = ACESSOS.filter(function(x){ return x.nome === a.nome; })[0] || a;   // o link "já tenho senha" manda só o nome
   window._lgEscolhido = a.nome; window._lgFin = true; window._lgFinCod = !!codigo;
   var caixa = ov.querySelector('#lg-nomes'), pin = ov.querySelector('#lg-pin');
   caixa.style.display = 'none'; pin.style.display = 'flex';
   var est = 'font-size:1rem;text-align:center;width:240px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;';
-  pin.innerHTML = '<b style="color:#f6a350;">💼 ' + a.nome + ' — Financeiro</b>'
+  pin.innerHTML = '<b style="color:#f6a350;">' + (a.financeiro ? '💼 ' + a.nome + ' — Financeiro' : '🛡 ' + a.nome + ' — Administrador') + '</b>'
     + (codigo ? '<button class="btn" id="lg-fpedir" style="padding:10px 18px;" onclick="_loginFinPedir()">📲 Receber código no WhatsApp</button><input id="lg-fcod" type="text" inputmode="numeric" maxlength="7" placeholder="código (6 números)" autocomplete="one-time-code" style="' + est + '">' : '')
     + '<input id="lg-fsenha" type="password" placeholder="' + (codigo ? 'crie a sua senha (6+ caracteres)' : 'sua senha') + '" autocomplete="' + (codigo ? 'new-password' : 'current-password') + '" style="' + est + '">'
     + (codigo ? '<input id="lg-fsenha2" type="password" placeholder="repita a senha" autocomplete="new-password" style="' + est + '">' : '')
@@ -21459,11 +21461,13 @@ function _loginFinEntrar() {
   } else if (!senha) return;
   m.textContent = 'Conferindo…';
   gasPedir(pl, function(d) {
-    if (!d || !d.success || !d.token || d.papel !== 'financeiro') { m.textContent = '❌ ' + ((d && d.error) || (d && d.success ? 'esse acesso não é do financeiro' : 'o robô não respondeu')); return; }
+    var esp = (ACESSOS.filter(function(x){ return x.nome === window._lgEscolhido; })[0] || {}).financeiro ? 'financeiro' : 'admin';
+    if (!d || !d.success || !d.token || d.papel !== esp) { m.textContent = '❌ ' + ((d && d.error) || (d && d.success ? 'esse acesso não é deste nome' : 'o robô não respondeu')); return; }
     try { localStorage.setItem('v2Login', window._lgEscolhido); localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
     var ov = document.getElementById('tela-login'); if (ov) ov.remove();
     try { mostrarAcessoAtual(); } catch (eAc) {}
     try { cmMostrarMenu(); _cmPapelNav(); } catch (eF) {}
+    if (esp === 'admin') location.reload();   // admin: abre o dash inteiro do zero, já com o acesso dele
   }, 40000);
 }
 function loginConferir() {
@@ -30495,6 +30499,7 @@ var CM_GRUPO_COR = { closers: '#3ddc97', sdr: '#6ea8ff', ss: '#b084ff' };
 function _cmTok() { try { return localStorage.getItem('comPainelTok') || ''; } catch (e) { return ''; } }
 function _cmPode() {
   var login = null; try { login = localStorage.getItem('v2Login'); } catch (e) {}
+  if (login && typeof ACESSOS !== 'undefined' && ACESSOS.some(function(a){ return a.nome === login && a.gestao; })) return true;
   return login === 'Bruno Pardim' || (!login && typeof _dashNaInternet === 'function' && !_dashNaInternet());
 }
 function cmMostrarMenu() { var it = document.querySelector('.nav-item[data-s="comissoes"]'); if (it) it.style.display = _cmPode() ? '' : 'none'; }
@@ -30775,7 +30780,7 @@ function _cmRosca(grupos, total) {
 function renderComissoes() {
   var el = document.getElementById('cm-corpo'); if (!el) return;
   if (!_cmPode()) { el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Esta tela não está liberada para o seu acesso.</div>'; return; }
-  if (!_cmTok() && _cmPapelLogin() !== 'admin') { _cmEntradaPessoa(el); return; }   // v226: cada pessoa entra com a senha dela
+  if (!_cmTok() && (_cmPapelLogin() !== 'admin' || _cmSenhaPropria())) { _cmEntradaPessoa(el); return; }   // o Gabriel entra com a senha dele, não com a do Bruno   // v226: cada pessoa entra com a senha dela
   if (!_cmTok()) {
     // senha das comissões (Bruno 02/10/2026: "coloque uma senha") — criada aqui na 1ª vez; o robô guarda só a impressão digital
     if (CM.temSenha == null) {
@@ -31714,10 +31719,12 @@ function _cmPapelLogin() {
   var a = (typeof ACESSOS !== 'undefined' ? ACESSOS : []).filter(function(x){ return x.nome === login; })[0];
   if (!a) return '';
   if (a.financeiro) return 'financeiro';
+  if (a.gestao) return 'admin';   // 05/10/2026: outro admin com senha própria (Gabriel)
   if (a.adm || a.soOlha || a.executivo || a.contratos) return '';
   return 'dono';
 }
 function _cmPode() { return !!_cmPapelLogin(); }
+function _cmSenhaPropria() { var login = null; try { login = localStorage.getItem('v2Login'); } catch (e) {} return typeof ACESSOS !== 'undefined' && ACESSOS.some(function(a){ return a.nome === login && a.senhaRobo; }); }
 function _cmPapel() { return (CM.dados && CM.dados.papel) || (_cmPapelLogin() === 'admin' ? 'admin' : ''); }
 function _cmGest() { var p = _cmPapel(); return p === 'admin' || p === 'financeiro'; }
 function _cmLoginNome() { try { return localStorage.getItem('v2Login') || ''; } catch (e) { return ''; } }
