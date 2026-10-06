@@ -2892,7 +2892,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-06-1020';
+var VERSAO_DASH = '2026-10-06-1309';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -31679,6 +31679,21 @@ button.cmp-chip { cursor:pointer; } button.cmp-chip:hover { filter:brightness(1.
 .cmp-barra { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 0 14px; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); font-size:.8rem; }
 .cmp-barra b { font-weight:800; } .cmp-barra .btn { padding:8px 14px; font-size:.78rem; margin-left:auto; }
 .cmp-card-rev { margin:10px 0 0; display:flex; flex-wrap:wrap; gap:6px; }
+/* v233: 100% validada · lista de alterações do financeiro */
+.cmp-chip.cem { background:rgba(61,220,151,.2); color:#3ddc97; border-color:rgba(61,220,151,.55); }
+.cmp-prog { display:inline-block; width:64px; height:6px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; vertical-align:middle; margin-right:6px; }
+.cmp-prog i { display:block; height:100%; border-radius:99px; background:#ffd166; } .cmp-prog.cem i { background:#3ddc97; }
+.cmp-alt { margin:-6px 0 14px; border-radius:14px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.08); font-size:.78rem; }
+.cmp-alt > summary { cursor:pointer; padding:10px 14px; list-style:none; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; }
+.cmp-alt > summary::-webkit-details-marker { display:none; }
+.cmp-alt > summary::after { content:'▾'; margin-left:auto; opacity:.6; } .cmp-alt[open] > summary::after { content:'▴'; }
+.cmp-alt > summary small { color:var(--muted); font-weight:600; }
+.cmp-alt > summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:14px; }
+.cmp-alt-lista { display:grid; gap:6px; padding:0 14px 12px; }
+.cmp-alt-it { display:grid; grid-template-columns:minmax(120px,1.2fr) minmax(110px,.9fr) minmax(140px,1.4fr) auto; gap:4px 12px; align-items:baseline; padding:8px 10px; border-radius:10px; background:rgba(255,255,255,.03); }
+.cmp-alt-it .n { font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .cmp-alt-it .c { color:#8fbaff; font-weight:700; }
+.cmp-alt-it .v { font-variant-numeric:tabular-nums; min-width:0; overflow-wrap:anywhere; } .cmp-alt-it small { color:var(--muted); white-space:nowrap; }
+@media (max-width:640px) { .cmp-alt-it { grid-template-columns:1fr 1fr; } .cmp-alt-it .v, .cmp-alt-it small { grid-column:1 / -1; } }
 .cmp-secao { margin:0 0 18px; }
 .cmp-secao > .cm-h { margin-top:0; }
 .cmp-avisos { display:flex; flex-direction:column; gap:8px; }
@@ -31833,9 +31848,11 @@ function _cmRevCard(g, p) {
   if (!CM.dados || !CM.dados.papel) return '';
   var r = _cmRevResumo(g, p), v = _cmApr(g, p), dono = _cmPapel() === 'dono';
   var h = '<div class="cmp-card-rev">';
-  if (v.sit === 'Aprovada pelos dois') h += '<span class="cmp-chip ok">✍️ fechado pelos dois</span>';
-  else if (v.sit === 'Aprovada pelo prazo') h += '<span class="cmp-chip ok">✅ aprovado pelo prazo</span>';
-  else if (v.sit === 'Aguardando aprovação') h += '<span class="cmp-chip mao">📨 ' + (dono ? 'esperando a sua aprovação' : 'aguardando aprovação') + '</span>';
+  // v233 (Bruno 06/10/2026: "quando a pessoa aprovar, finalizar, mostre que está 100% validada")
+  if (v.sit === 'Aprovada pelos dois') h += '<span class="cmp-chip cem">✅ 100% validada</span>';
+  else if (v.sit === 'Aprovada pelo prazo') h += '<span class="cmp-chip cem">✅ 100% validada · pelo prazo</span>';
+  else if (v.sit === 'Aguardando aprovação') h += '<span class="cmp-chip mao">🟡 50% · ' + (dono ? 'falta você aprovar' : 'falta ' + dspEsc(String(p.nome || '').split(' ')[0]) + ' aprovar') + (v.ate ? ' até ' + _cmDm(v.ate) : '') + '</span>';
+  var nAlt = _cmAlteracoes(p).length; if (nAlt) h += '<span class="cmp-chip mao">✏️ ' + nAlt + ' alteraç' + (nAlt === 1 ? 'ão' : 'ões') + ' do financeiro</span>';
   else if (v.sit === 'Contestada') h += '<span class="cmp-chip mudou">📝 contestada</span>';
   if (!_cmAprFechado(v) && r.n) {
     if (r.falta) h += '<span class="cmp-chip ' + (r.mud ? 'mudou' : 'auto') + '">' + (r.mud ? '⚠️ ' + r.mud + ' mudaram depois da revisão' : '🤖 ' + r.falta + ' de ' + r.n + ' ainda não revisadas') + '</span>';
@@ -31843,8 +31860,54 @@ function _cmRevCard(g, p) {
   }
   return h === '<div class="cmp-card-rev">' ? '' : h + '</div>';
 }
+// ---------- v233: alterações do financeiro (Bruno 06/10/2026: "mostre no dash com a lista de alterações do financeiro") ----------
+// Vem do registro do robô (p.ed: cada mudança feita pelo dash, com antes/depois, quem e quando). A mesma venda e o mesmo campo
+// mudados várias vezes viram UMA linha (de onde saiu → onde ficou); o que voltou ao que era (ou só foi salvo igual) não aparece.
+var CM_ALT_ROT = { ajuste: 'Ajuste (R$)', entra: 'Entra no mês?', correcao: 'Correção do financeiro', obs: 'Observação', extra: 'Extra lançado', conta: 'Conta na comissão?' };
+function _cmAltNorm(c, v) {
+  if (v === '' || v == null) return '';
+  if (c === 'ajuste' || c === 'extra') { var n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? String(v).trim() : String(Math.round(n * 100) / 100); }
+  return String(v).trim();
+}
+// o "depois" é o valor de AGORA na linha da venda (o registro antigo trocou alguns números por datas: 6,01 virou 06/01)
+function _cmAltAtual(p, x) {
+  var nz = function(t){ return String(t || '').toLowerCase().trim(); }, n = nz(x.n);
+  var L = (p.linhas || []).filter(function(l){ return x.k ? l.k === x.k : nz(l.n) === n; });
+  if (L.length === 1) { var l = L[0]; if (x.c === 'ajuste') return l.aj; if (x.c === 'entra') return l.e; if (x.c === 'correcao') return l.cf; if (x.c === 'obs') return l.uf; }
+  var R = (p.reunioes || []).filter(function(r){ return x.k ? r.k === x.k : nz(r.n) === n; });
+  if (R.length === 1 && x.c === 'conta') return R[0].conta ? 'Sim' : 'Não';
+  return undefined;
+}
+function _cmAlteracoes(p) {
+  var by = {}, ord = [];
+  (p && p.ed || []).forEach(function(e) {
+    var k = String(e.n || '').toLowerCase().trim() + '|' + e.c + (e.c === 'extra' ? '|' + e.em : '');
+    if (!by[k]) { by[k] = { n: e.n, c: e.c, a: e.a, d: e.d, q: e.q, em: e.em, k: e.k, x: 0, dt: 0 }; ord.push(k); }
+    else { by[k].d = e.d; by[k].q = e.q; by[k].em = e.em; by[k].k = e.k || by[k].k; }
+    by[k].x++; if (e.dt) by[k].dt = 1;
+  });
+  ord.forEach(function(k){ var x = by[k]; if (x.c === 'extra') return; var at = _cmAltAtual(p, x); if (at !== undefined) x.d = at; else if (x.dt) x.aprox = 1; });
+  return ord.map(function(k){ return by[k]; }).filter(function(x){ return _cmAltNorm(x.c, x.a) !== _cmAltNorm(x.c, x.d); });
+}
+function _cmAltConta(L) { var o = {}; (L || []).forEach(function(x){ o[x.c] = (o[x.c] || 0) + 1; }); return o; }
+function _cmAltVal(c, v) {
+  if (v === '' || v == null) return '<i style="opacity:.55;">vazio</i>';
+  if (c === 'ajuste' || c === 'extra') return cmR(parseFloat(String(v).replace(',', '.')) || 0);
+  var t = String(v); return '<span title="' + dspEsc(t) + '">' + dspEsc(t.length > 140 ? t.slice(0, 140) + '…' : t) + '</span>';
+}
+function _cmAltHtml(g, p, aberto) {
+  var L = _cmAlteracoes(p); if (!L.length) return '';
+  var C = _cmAltConta(L), tipos = Object.keys(C).map(function(k){ return C[k] + ' ' + (CM_ALT_ROT[k] || k).replace(/ \(R\$\)|\?/g, '').toLowerCase(); }).join(' · ');
+  return '<details class="cmp-alt"' + (aberto ? ' open' : '') + '><summary>✏️ <b>' + L.length + ' alteraç' + (L.length === 1 ? 'ão' : 'ões') + ' do financeiro</b> neste mês <small>' + dspEsc(tipos) + '</small></summary><div class="cmp-alt-lista">'
+    + L.map(function(x) {
+        return '<div class="cmp-alt-it"><span class="n" title="' + dspEsc(x.n || '') + '">' + dspEsc(x.n || '—') + '</span><span class="c">' + dspEsc(CM_ALT_ROT[x.c] || x.c) + '</span>'
+          + '<span class="v">' + (x.c === 'extra' ? '+ ' + _cmAltVal(x.c, x.d) : _cmAltVal(x.c, x.a) + ' → <b>' + (x.aprox ? '≈ ' : '') + _cmAltVal(x.c, x.d) + '</b>') + '</span>'
+          + '<small>' + dspEsc(String(x.q || '').replace(' (financeiro)', '')) + ' · ' + _cmData(x.em) + (x.x > 1 ? ' · ' + x.x + ' mudanças' : '') + '</small></div>';
+      }).join('') + '</div></details>';
+}
+function _cmDm(ms) { return ms ? new Date(ms).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : ''; }
 // situação da assinatura de um card: Em revisão → Aguardando aprovação (o financeiro enviou) → Aprovada pelos dois (fechado)
-// · Contestada (volta para o financeiro) · Aprovada pelo prazo (sem resposta até o dia 5)
+// · Contestada (volta para o financeiro) · Aprovada pelo prazo (sem resposta até o dia 5 do mês seguinte)
 function _cmApr(g, p) { var v = ((CM.dados || {}).val || {})[g.k + '|' + p.aba]; return v && v.sit ? v : { sit: 'Em revisão' }; }
 function _cmAprFechado(v) { return /^Aprovada/.test(v.sit || ''); }
 function _cmValidaBarra(g, p, todos) {
@@ -31852,10 +31915,11 @@ function _cmValidaBarra(g, p, todos) {
   var r = _cmRevResumo(g, p), v = _cmApr(g, p), gest = _cmGest(), dono = _cmPapel() === 'dono', nm = dspEsc(p.nome.split(' ')[0]), mesN = dspEsc(_cmMesNome(CM.dados.mes));
   var arg = '\'' + g.k + '\',\'' + dspEsc(p.aba) + '\'', txt = '', bts = '';
   var rev = r.n ? '🤖 <b>' + r.falta + ' de ' + r.n + '</b> linhas puxadas automaticamente ainda não revisadas pelo financeiro' + (r.mud ? ' (' + r.mud + ' mudaram depois da revisão)' : '') + '.' : '';
-  if (v.sit === 'Aprovada pelos dois') txt = '✍️ <b>Fechado pelos dois</b> — ' + (dono ? 'você aprovou' : nm + ' aprovou') + ' em ' + _cmData(v.pesEm) + ' e o financeiro em ' + _cmData(v.finEm) + '.';
-  else if (v.sit === 'Aprovada pelo prazo') txt = '✅ <b>Aprovado pelo prazo</b> — o financeiro enviou em ' + _cmData(v.finEm) + ' e não houve contestação até o dia 5.';
-  else if (v.sit === 'Aguardando aprovação') txt = dono ? '📨 <b>O financeiro revisou e enviou suas comissões de ' + mesN + '</b> em ' + _cmData(v.finEm) + '. Confira os números e aprove — ou conteste se algo estiver errado.'
-    : '📨 Enviado para ' + nm + ' em ' + _cmData(v.finEm) + ' — <b>aguardando a aprovação</b>.';
+  var prog = function(pc) { return '<span class="cmp-prog' + (pc === 100 ? ' cem' : '') + '" aria-hidden="true"><i style="width:' + pc + '%;"></i></span>'; }, ate = v.ate ? '<b>' + _cmDm(v.ate) + '</b>' : '';
+  if (v.sit === 'Aprovada pelos dois') txt = prog(100) + '✅ <b>100% validada</b> — o financeiro enviou em ' + _cmData(v.finEm) + ' e ' + (dono ? 'você aprovou' : nm + ' aprovou') + ' em ' + _cmData(v.pesEm) + '. Está fechado.';
+  else if (v.sit === 'Aprovada pelo prazo') txt = prog(100) + '✅ <b>100% validada (pelo prazo)</b> — o financeiro enviou em ' + _cmData(v.finEm) + (v.ate && v.finEm > v.ate ? ', depois do prazo para contestar (' + ate + '), então conta como aprovado.' : ' e não houve resposta' + (ate ? ' até ' + ate : '') + '.');
+  else if (v.sit === 'Aguardando aprovação') txt = dono ? prog(50) + '🟡 <b>50% validada · o financeiro revisou e enviou suas comissões de ' + mesN + '</b> em ' + _cmData(v.finEm) + '. Confira e aprove — ou conteste' + (ate ? ' — até ' + ate : '') + '. Sem resposta até lá, conta como aprovado.'
+    : prog(50) + '🟡 <b>50% validada</b> — enviado para ' + nm + ' em ' + _cmData(v.finEm) + '. Falta ' + nm + ' aprovar' + (ate ? ' (até ' + ate + ')' : '') + '.';
   else if (v.sit === 'Contestada') txt = dono ? '📝 <b>Você contestou</b> — o financeiro está vendo. Depois do ajuste, chega de novo para você aprovar.' : '📝 <b>' + nm + ' contestou</b> — veja a contestação, ajuste e envie de novo para aprovação.';
   else txt = rev ? rev + (dono ? ' Quando o financeiro terminar, chega aqui para você aprovar.' : '') : (dono ? 'O financeiro ainda vai revisar e enviar para você aprovar.' : 'Sem linhas neste mês.');
   if (dono) {
@@ -31865,15 +31929,16 @@ function _cmValidaBarra(g, p, todos) {
     if (_cmAprFechado(v)) bts += '<button class="btn" onclick="cmReabrir(' + arg + ',this)">🔓 Reabrir</button>';
     else if (r.n || v.sit !== 'Em revisão') bts += '<button class="btn primary" onclick="cmValidarMes(' + arg + ',this)">✅ ' + (v.sit === 'Aguardando aprovação' ? 'Enviar de novo' : 'Validar e enviar para ' + nm + ' aprovar') + '</button>';
   }
-  return '<div class="cmp-barra"><span>' + txt + '</span>' + (bts ? '<span style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;">' + bts + '</span>' : '') + '</div>';
+  return '<div class="cmp-barra"><span>' + txt + '</span>' + (bts ? '<span style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;">' + bts + '</span>' : '') + '</div>' + _cmAltHtml(g, p, dono && v.sit === 'Aguardando aprovação');   // quem vai aprovar já vê a lista aberta
 }
 function cmAprovar(grupo, aba, bt) {
   var d = CM.dados; if (!d) return;
-  if (!confirm('Aprovar as suas comissões de ' + _cmMesNome(d.mes) + '?\n\nDepois de aprovar, fica fechado (você e o financeiro assinaram) e não dá mais para contestar este mês.')) return;
+  if (!confirm('Aprovar as suas comissões de ' + _cmMesNome(d.mes) + '?\n\nDepois de aprovar, fica 100% validado (você e o financeiro assinaram) e não dá mais para contestar este mês.')) return;
   if (bt) { bt.disabled = true; bt.textContent = 'Aprovando…'; }
   _cmGet({ action: 'comissoesAprovar', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba }).then(function(r) {
     if (!r || !r.success) { alert('Não consegui aprovar: ' + ((r && r.error) || 'o robô não respondeu')); if (bt) { bt.disabled = false; bt.textContent = '✍️ Aprovar'; } return; }
     d.val = d.val || {}; d.val[grupo + '|' + aba] = Object.assign({}, d.val[grupo + '|' + aba] || {}, { sit: 'Aprovada pelos dois', pesEm: Date.now() });
+    try { avisoRapido('✅ 100% validada — obrigado!'); } catch (e) {}
     CM.avisos = null; renderComissoes(); try { if (document.getElementById('cm-det-fundo')) cmDetRender(); } catch (e) {}
   });
 }
@@ -31891,16 +31956,22 @@ function cmReabrir(grupo, aba, bt) {
 function cmValidarMes(grupo, aba, bt) {
   var d = CM.dados, g = (d.grupos || []).filter(function(x){ return x.k === grupo; })[0], p = g && g.pessoas.filter(function(x){ return x.aba === aba; })[0];
   if (!p) return;
-  if (!confirm('Marcar todas as linhas de ' + p.nome + ' em ' + _cmMesNome(d.mes) + ' como revisadas e ENVIAR para ' + p.nome.split(' ')[0] + ' aprovar?\n\n' + p.nome.split(' ')[0] + ' recebe o aviso na aba Comissões e aprova (fecha pelos dois) ou contesta.')) return;
+  var Lalt = _cmAlteracoes(p), y5 = +d.mes.slice(0, 4), m5 = +d.mes.slice(5, 7) + 1; if (m5 > 12) { m5 = 1; y5++; }
+  var prazo5 = new Date(y5 + '-' + ('0' + m5).slice(-2) + '-05T23:59:59-03:00').getTime(), venceu = Date.now() > prazo5, nm1 = p.nome.split(' ')[0];
+  if (!confirm('Marcar todas as linhas de ' + p.nome + ' em ' + _cmMesNome(d.mes) + ' como revisadas e ENVIAR para ' + nm1 + '?\n\n' + nm1 + ' recebe o aviso no WhatsApp e na aba Comissões, com a lista das ' + Lalt.length + ' alteraç' + (Lalt.length === 1 ? 'ão' : 'ões') + ' do financeiro. O Bruno também recebe.\n\n'
+    + (venceu ? 'O prazo para contestar ' + _cmMesNome(d.mes) + ' já terminou (dia 5): vai como 100% validada pelo prazo.' : nm1 + ' aprova (100% validada) ou contesta até ' + _cmDm(prazo5) + '.'))) return;
   var itens = _cmLinhasDaPessoa(g, p).map(function(x){ return { chave: _cmRevChave(grupo, aba, x.l), v: [+x.v || 0] }; });
+  var resumo = { nome: p.nome, total: Math.round((+p.total || 0) * 100) / 100, alt: _cmAltConta(Lalt) };   // v233: só números (o WhatsApp não leva nome de cliente)
   if (bt) { bt.disabled = true; bt.textContent = 'Validando…'; }
-  _cmPost({ action: 'comissoesValidarMes', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba, itens: itens }).then(function(r) {
+  _cmPost({ action: 'comissoesValidarMes', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba, itens: itens, resumo: resumo }).then(function(r) {
     if (!r || !r.success) {   // o POST não passou (rede): tenta pelo caminho de sempre
-      return _cmGet({ action: 'comissoesValidarMes', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba, itens: JSON.stringify(itens) });
+      return _cmGet({ action: 'comissoesValidarMes', token: _cmTok(), mes: d.mes, grupo: grupo, aba: aba, itens: JSON.stringify(itens), resumo: JSON.stringify(resumo) });
     }
     return r;
   }).then(function(r) {
-    if (r && r.success) { d.rev = d.rev || {}; itens.forEach(function(it){ d.rev[it.chave] = { v: it.v, q: 'financeiro', em: Date.now() }; }); d.val = d.val || {}; d.val[grupo + '|' + aba] = { sit: 'Aguardando aprovação', finEm: Date.now() }; }
+    if (r && r.success) { d.rev = d.rev || {}; itens.forEach(function(it){ d.rev[it.chave] = { v: it.v, q: 'financeiro', em: Date.now() }; }); d.val = d.val || {}; d.val[grupo + '|' + aba] = { sit: 'Aguardando aprovação', finEm: Date.now(), ate: r.ate || 0 };
+      if (r.vencido) d.val[grupo + '|' + aba].sit = 'Aprovada pelo prazo';
+      try { avisoRapido(r.zap ? '📲 Enviado — aviso no WhatsApp (' + r.zap + ')' : '✅ Enviado'); } catch (e) {} }
     else alert('Não consegui validar: ' + ((r && r.error) || 'o robô não respondeu'));
     cmDetRender(); renderComissoes();
   });
@@ -32013,7 +32084,7 @@ function cmContNova(gk, aba) {
   var d = CM.dados; if (!d || d.papel !== 'dono') return;
   var g = d.grupos.filter(function(x){ return !gk || x.k === gk; })[0] || d.grupos[0], p = g && (g.pessoas.filter(function(x){ return !aba || x.aba === aba; })[0] || g.pessoas[0]);
   if (!p) { alert('Seu card deste mês ainda não apareceu — não dá para contestar este mês.'); return; }
-  if (!d.podeContestar) { alert('O prazo para contestar ' + _cmMesNome(d.mes) + ' acabou (vai até o dia 5 do mês seguinte).'); return; }
+  if (!d.podeContestar) { alert('O prazo para contestar ' + _cmMesNome(d.mes) + ' acabou.'); return; }
   var cand = _cmCandidatos(g, p, d.mes);
   var lanc = g.k === 'closers' ? (p.linhas || []).filter(function(l){ return l.t !== 'extra'; }).map(function(l){ return { k: l.k, ln: l.ln, n: l.n, d: l.pg || l.fe || '', p: l.p || '', v: l.c, rot: 'comissão ' + cmR(l.c) + (l.r ? ' de ' + cmR(l.r, false) + ' recebido' : '') }; })
     : (p.reunioes || []).map(function(r){ return { k: r.k, ln: r.ln, n: r.n, d: r.d, p: r.p || '', v: r.v, rot: (r.re && r.conta ? 'paga ' + cmR(r.v || 0) : r.re ? 'tirada da conta' : 'lead não apareceu') }; });
