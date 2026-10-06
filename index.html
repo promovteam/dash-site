@@ -1728,6 +1728,9 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
         <div class="gx-selects">
           <select class="edit-in" id="grav-origem" onchange="gravDesenhar()" aria-label="Origem"><option value="">Todas as origens</option></select>
           <select class="edit-in" id="grav-produto" onchange="gravDesenhar()" aria-label="Produto"><option value="">Todos os produtos</option></select>
+          <select class="edit-in" id="grav-nota" onchange="gravDesenhar()" aria-label="Closer Score" hidden><option value="">🎯 Toda nota do closer</option></select>
+          <select class="edit-in" id="grav-notasdr" onchange="gravDesenhar()" aria-label="SDR Score" hidden><option value="">📞 Toda nota do SDR</option></select>
+          <select class="edit-in" id="grav-ordem" onchange="gravDesenhar()" aria-label="Ordem" hidden><option value="">Mais recentes primeiro</option><option value="mais">Maior Closer Score</option><option value="menos">Menor Closer Score</option></select>
           <select class="edit-in" id="grav-dias" onchange="gravCarregar()" aria-label="Período">
             <option value="30">Últimos 30 dias</option><option value="60" selected>Últimos 60 dias</option><option value="120">Últimos 4 meses</option><option value="450">Tudo (desde 2025)</option>
           </select>
@@ -2892,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-06-1309';
+var VERSAO_DASH = '2026-10-06-1703';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -17026,9 +17029,19 @@ function gravDesenhar() {
     var optsP = '<option value="">Todos os produtos</option>' + ordemP.map(function(o) { return '<option value="' + gravEsc(o) + '"' + (o === pF ? ' selected' : '') + '>' + gravEsc(o) + ' · ' + contP[o] + '</option>'; }).join('');
     if (selP.innerHTML !== optsP) { selP.innerHTML = optsP; if (ordemP.indexOf(pF) === -1) pF = ''; }
   }
+  // v234 (Bruno 06/10/2026: "tenha filtros e notas"): filtro pela nota do closer e do SDR (faixas da régua) e ordem pela nota.
+  // Só aparece com o Score carregado; cada um filtra pelas notas que pode ver (gestão: todas · closer: as dele).
+  var NF = [['a', '8 ou mais', 8, 99], ['b', '6,5 a 7,9', 6.5, 8], ['c', '5 a 6,4', 5, 6.5], ['d', 'abaixo de 5', -1, 5], ['sem', 'sem nota']];
+  var notaDe = function(x) { var k = (typeof scDaGravacao === 'function') ? scDaGravacao(x) : null; return { c: k && k.c ? k.c.fin : null, s: k && k.s ? k.s.nota : null }; };
+  var faixaDe = function(v) { if (v == null) return 'sem'; for (var i = 0; i < 4; i++) if (v >= NF[i][2] && v < NF[i][3]) return NF[i][0]; return 'sem'; };
+  var selN = document.getElementById('grav-nota'), selNs = document.getElementById('grav-notasdr'), selOr = document.getElementById('grav-ordem');
+  var temSc = typeof SCORE !== 'undefined' && SCORE.carregado;
+  [selN, selNs, selOr].forEach(function(el) { if (el) el.hidden = !temSc; });
+  var nF = temSc && selN ? selN.value : '', nsF = temSc && selNs ? selNs.value : '', ordF = temSc && selOr ? selOr.value : '';
   var _vistas = gravVistas();
   // tudo menos o resultado: serve para contar cada atalho
   var base = GRAV.itens.filter(function(x) {
+    if (nF || nsF) { var nt = notaDe(x); if (nF && faixaDe(nt.c) !== nF) return false; if (nsF && faixaDe(nt.s) !== nsF) return false; }
     if (GRAV.closer !== 'todos' && x.k !== GRAV.closer) return false;
     if (SOMEU.on && !(_smEle(GRAV.closers[x.k] || x.k) || _smEle(gravPartes(x.t).sdr))) return false;   // 👤 só o meu
     if (oF && (gravOrigem(x) || '— sem origem') !== oF) return false;
@@ -17037,6 +17050,19 @@ function gravDesenhar() {
     var p = gravPartes(x.t), dia = x.d ? x.d.slice(8, 10) + '/' + x.d.slice(5, 7) : '';
     return _buscaBate([p.nome, p.lid, p.sdr, p.tipo, GRAV.closers[x.k] || '', dia, x.t, gravOrigem(x), gravProduto(x)].join(' '), q, p.nome);
   });
+  if (temSc) {   // as opções com a contagem (sem o próprio filtro, como os outros)
+    var cnt = { c: {}, s: {} };
+    GRAV.itens.forEach(function(x) {
+      if (GRAV.closer !== 'todos' && x.k !== GRAV.closer) return;
+      if (oF && (gravOrigem(x) || '— sem origem') !== oF) return;
+      if (pF && (gravProduto(x) || '— sem produto') !== pF) return;
+      var nt = notaDe(x), fc = faixaDe(nt.c), fs = faixaDe(nt.s);
+      if (!nsF || fs === nsF) cnt.c[fc] = (cnt.c[fc] || 0) + 1;
+      if (!nF || fc === nF) cnt.s[fs] = (cnt.s[fs] || 0) + 1;
+    });
+    var opN = function(el, rot0, cc, atual) { if (!el) return; var o = '<option value="">' + rot0 + '</option>' + NF.map(function(f) { var n = cc[f[0]] || 0; return (n || atual === f[0]) ? '<option value="' + f[0] + '"' + (atual === f[0] ? ' selected' : '') + '>' + (f[0] === 'sem' ? 'Sem nota' : f[1]) + ' · ' + n + '</option>' : ''; }).join(''); if (el.innerHTML !== o) el.innerHTML = o; };
+    opN(selN, '🎯 Toda nota do closer', cnt.c, nF); opN(selNs, '📞 Toda nota do SDR', cnt.s, nsF);
+  }
   var pills = document.getElementById('grav-pills');
   if (pills) pills.innerHTML = GRAV_PILLS.map(function(pl) {
     var n = pl[0] ? base.filter(function(x) { return gravStBate(x, pl[0], _vistas); }).length : base.length;
@@ -17044,6 +17070,10 @@ function gravDesenhar() {
     return '<button class="gx-pill' + (stF === pl[0] ? ' on' : '') + '" role="tab" aria-selected="' + (stF === pl[0]) + '" onclick="gravSt(\'' + pl[0] + '\')">' + pl[1] + '<b>' + n + '</b></button>';
   }).join('');
   var lista = stF ? base.filter(function(x) { return gravStBate(x, stF, _vistas); }) : base;
+  if (ordF) {   // ordem pela nota do closer: sem nota vai para o fim
+    var vN = function(x) { var c = notaDe(x).c; return c == null ? (ordF === 'mais' ? -99 : 99) : c; };
+    lista = lista.slice().sort(function(a, b) { return ordF === 'mais' ? vN(b) - vN(a) : vN(a) - vN(b); });
+  }
   var res = document.getElementById('grav-resumo');
   var rotDias = GRAV.dias >= 450 ? 'desde 2025' : 'últimos ' + GRAV.dias + ' dias';
   var nVd = lista.filter(function(x) { return gravStatus(x) === 'vendido'; }).length;
@@ -17055,7 +17085,7 @@ function gravDesenhar() {
   var prat = document.getElementById('grav-prateleiras');
   if (prat) {
     var hp = '';
-    if (!q && !stF && !oF && !pF && lista.length > 6) {
+    if (!q && !stF && !oF && !pF && !nF && !nsF && !ordF && lista.length > 6) {
       var ab = gravAbertas();
       var cont = lista.filter(function(x) { return ab[gravChave(x)] && !_vistas[gravChave(x)]; })
         .sort(function(a, b) { return ab[gravChave(b)] - ab[gravChave(a)]; }).slice(0, 10);
@@ -17065,12 +17095,14 @@ function gravDesenhar() {
     }
     prat.innerHTML = hp;
   }
-  if (!lista.length) { box.innerHTML = '<div class="grav-vazio">Nenhuma gravação com esse filtro.' + ((q || stF || oF || pF) ? ' <button class="btn" onclick="gravLimpar()">Limpar filtros</button>' : '') + '</div>'; return; }
+  if (!lista.length) { box.innerHTML = '<div class="grav-vazio">Nenhuma gravação com esse filtro.' + ((q || stF || oF || pF || nF || nsF) ? ' <button class="btn" onclick="gravLimpar()">Limpar filtros</button>' : '') + '</div>'; return; }
   var porDia = {};
   lista.forEach(function(x) { var k = (x.d || '').slice(0, 10), o = porDia[k] || (porDia[k] = { n: 0, vd: 0, nv: 0 }); o.n++; if (gravStatus(x) === 'vendido') o.vd++; if (!_vistas[gravChave(x)]) o.nv++; });
   var h = '', diaAtual = null;
+  if (ordF) h += '<div class="grav-dia"><b style="text-transform:none;">' + (ordF === 'mais' ? '🎯 Da maior para a menor nota do closer' : '🎯 Da menor para a maior nota do closer') + '</b><small>' + lista.length + (lista.length === 1 ? ' reunião' : ' reuniões') + '</small></div><div class="grav-grade">';
   lista.slice(0, GRAV.mostrar).forEach(function(x, iV) {
-    var k = (x.d || '').slice(0, 10);
+    var k = ordF ? 'ordem' : (x.d || '').slice(0, 10);
+    if (ordF) diaAtual = 'ordem';
     if (k !== diaAtual) {
       if (diaAtual !== null) h += '</div>';
       diaAtual = k;
@@ -17090,6 +17122,7 @@ function gravLimpar() {
   GRAV.st = ''; var b = document.getElementById('grav-busca'); if (b) b.value = '';
   var o = document.getElementById('grav-origem'); if (o) o.value = '';
   var pS = document.getElementById('grav-produto'); if (pS) pS.value = '';
+  ['grav-nota', 'grav-notasdr', 'grav-ordem'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   gravDesenhar();
 }
 // ----- 🎬 SALA DA GRAVAÇÃO: vídeo + resumo do Gemini + conversa (Bruno 24/09/2026: "coloca em um formato incrível
@@ -32431,11 +32464,12 @@ function scIndexar() {
   SCORE.idx = {};
   SCORE.d.closer.reun.forEach(function(r, i) { var k = scT8(r.tel) + '|' + r.data; (SCORE.idx[k] = SCORE.idx[k] || {}).c = i; });
   SCORE.d.sdr.leads.forEach(function(l, i) { var k = scT8(l.tel) + '|' + l.data; (SCORE.idx[k] = SCORE.idx[k] || {}).s = i; });
+  scHistIndexar();
 }
 function scChamar() { var c = SCORE.cbs; SCORE.cbs = []; c.forEach(function(f) { try { f(); } catch (e) {} }); }
 function scCarregar(cb) {
   if (SC_FONTE === 'robo') {
-    if (SCORE.carregado && SCORE.tokUsado !== scTok()) { SCORE.carregado = false; SCORE.d = null; SCORE.srv = null; SCORE.idx = {}; }   // trocou quem entrou
+    if (SCORE.carregado && SCORE.tokUsado !== scTok()) { SCORE.carregado = false; SCORE.d = null; SCORE.srv = null; SCORE.idx = {}; SCORE.hist = null; }   // trocou quem entrou
     if (!SCORE.carregado && scTravado()) { if (cb) { try { cb(); } catch (e) {} } return; }
     if (cb) SCORE.cbs.push(cb);
     if (SCORE.carregado) { scChamar(); return; }
@@ -32444,7 +32478,7 @@ function scCarregar(cb) {
     var tok = scTok();
     gasPedir({ action: 'scoreDados', token: tok }, function(d) {
       SCORE.carregando = false;
-      if (d && d.success && d.closer) { SCORE.d = d; SCORE.srv = d.eu || null; SCORE.tokUsado = tok; SCORE.carregado = true; SCORE.trava = ''; scIndexar(); }
+      if (d && d.success && d.closer) { SCORE.d = d; SCORE.srv = d.eu || null; SCORE.tokUsado = tok; SCORE.carregado = true; SCORE.trava = ''; scIndexar(); setTimeout(scHistCarregar, 50); }
       else if (d && d.precisaCodigo) { SCORE.trava = 'senha'; SCORE.tokRuim = tok; }
       else if (d && d.fechado) { SCORE.trava = 'fechado'; SCORE.tokRuim = tok; }
       else { SCORE.trava = 'erro'; SCORE.erroEm = Date.now(); }
@@ -32814,9 +32848,9 @@ function renderScoreTela() {
   var el = document.getElementById('score-corpo'); if (!el) return;
   var tv = scTravado(); if (tv) { el.innerHTML = scTravaHtml(tv); return; }
   if (!SCORE.carregado) { el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;"><span class="mv-brilho-txt">Carregando o Score…</span></div>'; scCarregar(function() { if (SCORE.carregado || scTravado()) renderScoreTela(); }); return; }
-  if (scEu().adm && SCORE.aba && SCORE.aba !== 'score') { rxRender(el); return; }   // 🔬 Raio-X (só gestão)
+  if (SCORE.aba && SCORE.aba !== 'score') { rxRender(el); return; }   // 🔬 Raio-X (v234: para todos que entraram com a senha)
   var eu = scEu(), B = scBase(), P = scPessoas(B.RE, B.LE);
-  var h = (eu.adm ? rxAbasHtml() : '') + '<div class="pl-topo"><h2 class="pl-h2">🎯 Score <span style="color:#ffd166;">' + (eu.adm ? 'do time' : 'seu') + '</span><small>meta e atingimento · da conversa na Clint até o fechamento</small></h2>' + scFiltros('tela') + '</div>'
+  var h = rxAbasHtml() + '<div class="pl-topo"><h2 class="pl-h2">🎯 Score <span style="color:#ffd166;">' + (eu.adm ? 'do time' : 'seu') + '</span><small>meta e atingimento · da conversa na Clint até o fechamento</small></h2>' + scFiltros('tela') + '</div>'
     + scAviso(eu);
   if (eu.adm) h += scJornada(B);
   // Bruno 04/10/2026: "redesenhe o visual do score focado em ver cada reunião e o que resultado deu e pontos a melhorar, erros cometidos"
@@ -32827,7 +32861,8 @@ function renderScoreTela() {
   el.innerHTML = h;
 }
 // ===== 🔬 RAIO-X DENTRO DO SCORE (Bruno 05–06/10/2026: "esses dois possam abrir como uma aba dentro da aba score, atualizado a cada reunião"
-// · "coloque tudo isso no dash na aba de score de maneira separada"). SÓ GESTÃO. O robô (raioxDados, com a senha) entrega o histórico
+// · "coloque tudo isso no dash na aba de score de maneira separada"). v234 (06/10: "coloque para todos" · "tudo para todos"): todo mundo
+// que entrou com a senha das Comissões vê as 4 abas inteiras. O robô (raioxDados, com a senha) entrega o histórico
 // das reuniões + o conteúdo das abas; o Raio-X do Closer é calculado aqui, na hora — cada reunião nova que o robô lê entra sozinha.
 // Nada do conteúdo fica no código do site: chega do robô só para quem entrou com a senha de gestão.
 var RX = { d: null, carregando: false, erro: '' };
@@ -32847,7 +32882,10 @@ function rxPagina(aba) {
   return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + cfg[0] + '</title>'
     + '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">'
     + '<style>' + A.css + '</style></head><body><div class="wrap"><aside class="idx"><div class="idx-brand"><div class="idx-logo">P</div><div><b>' + cfg[0] + '</b><small>Promov · uso interno</small></div></div><div class="idx-prog"><i></i></div><nav id="nav" aria-label="Capítulos"></nav><div class="idx-nota"><b>Documento interno.</b> ' + cfg[1] + '</div></aside><main id="main"></main></div>'
-    + dados + '<script>' + A.kit + '<\/script><script>' + A[aba] + '<\/script></body></html>';
+    + dados
+    // v234: dentro do srcdoc, o link "#capitulo" virava o endereço do dash e abria o dash inteiro dentro da janelinha — agora só rola
+    + '<script>document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href^=\'#\']");if(!a)return;e.preventDefault();var el=document.getElementById(a.getAttribute("href").slice(1));if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},true);<\/script>'
+    + '<script>' + A.kit + '<\/script><script>' + A[aba] + '<\/script></body></html>';
 }
 function rxRender(el) {
   var aba = SCORE.aba;
@@ -32867,7 +32905,7 @@ function rxRender(el) {
   var sub = aba === 'closer' ? X.reun.length + ' reuniões: ' + est + ' do estudo + ' + (X.novas || 0) + ' que o robô leu depois. Cada reunião nova entra sozinha.'
     : aba === 'pre' ? 'Conversas da Clint de agosto a outubro (versão de ' + dspEsc(X.v) + '). Atualizo quando o robô terminar de ouvir os áudios.'
     : 'Avatar e Manual do Lead: ' + ((X.manual && X.manual.persona && X.manual.persona.n) || '') + ' reuniões lidas a fundo + formulários + conversas da Clint (versão de ' + dspEsc(X.v) + ').';
-  el.innerHTML = rxAbasHtml() + '<div class="hint" style="margin:-6px 0 10px;font-size:.78rem;">🔒 Só a gestão vê. ' + sub + '</div>'
+  el.innerHTML = rxAbasHtml() + '<div class="hint" style="margin:-6px 0 10px;font-size:.78rem;">🔒 Só o time vê (quem entrou com a senha). ' + sub + '</div>'
     + '<iframe id="rx-frame" title="' + dspEsc(RX_ABAS.filter(function(x) { return x[0] === aba; })[0][1]) + '" style="width:100%;height:calc(100vh - 170px);min-height:560px;border:0;border-radius:16px;background:#0a0c10;display:block;"></iframe>';
   var f = document.getElementById('rx-frame'); if (f) f.srcdoc = rxPagina(aba);
 }
@@ -32897,11 +32935,40 @@ function scDaGravacao(x, cru) {
   var k = SCORE.idx[t8 + '|' + d];
   if (!k) { var dd = new Date(d + 'T12:00:00'); [-1, 1].some(function(o) { var z = new Date(dd.getTime() + o * 864e5).toISOString().slice(0, 10); k = SCORE.idx[t8 + '|' + z]; return !!k; }); }
   if (!k) return null;
-  var c = k.c != null ? SCORE.d.closer.reun[k.c] : null, s = k.s != null ? SCORE.d.sdr.leads[k.s] : null;
+  var c = k.c != null ? SCORE.d.closer.reun[k.c] : (k.h != null && SCORE.hist ? SCORE.hist[k.h] : null), s = k.s != null ? SCORE.d.sdr.leads[k.s] : null;
   if (cru) return { c: c, s: s };
   if (c && !scPodeC(c)) c = null;
   if (s && !scPodeS(s)) s = null;
   return c || s ? { c: c, s: s } : null;
+}
+// ---------- v234: o Closer Score das reuniões ANTIGAS (Bruno 06/10/2026: "cada reunião tem o Closer Score e cada conversa o SDR Score")
+// O robô (scoreHist) devolve um índice pequeno das reuniões lidas no estudo que ele ainda não tem (mesma conta do Score, 80/20); a nota
+// inteira só vem quando alguém abre a reunião (scoreHistUm). Não entra nas médias da aba Score: só o selo, os filtros e a janela.
+SCORE.hist = null;
+function scHistIndexar() {
+  (SCORE.hist || []).forEach(function(r, i) { var k = scT8(r.tel) + '|' + r.data, z = SCORE.idx[k] || (SCORE.idx[k] = {}); if (z.c == null) z.h = i; });
+}
+function scHistCarregar() {
+  if (SC_FONTE !== 'robo' || SCORE.hist || SCORE.histPedindo || !SCORE.carregado) return;
+  SCORE.histPedindo = true;
+  gasPedir({ action: 'scoreHist', token: scTok() }, function(d) {
+    SCORE.histPedindo = false;
+    if (!d || !d.success) return;
+    SCORE.hist = (d.idx || []).map(function(x) { return { tel: x[0], data: x[1], ck: x[2], tipo: x[3] === 'e' ? 'entrevista' : 'diagnostico', g: x[4], fin: x[5], cond: x[6], h: 1 }; });
+    scHistIndexar();
+    try { scSlotsPreencher(); } catch (e) {}
+    try { if (GRAV.carregado) gravDesenhar(); } catch (e) {}
+  }, 60000);
+}
+function scHistCompleta(c, cb, falhou) {   // busca a nota inteira de uma reunião antiga (uma vez; fica guardada no próprio registro)
+  gasPedir({ action: 'scoreHistUm', token: scTok(), tel: c.tel, data: c.data }, function(d) {
+    if (d && d.success && d.reun) { Object.assign(c, d.reun, { h: 1, bl: d.reun.bl || {} }); cb(); }
+    else if (falhou) falhou((d && d.error) || 'o robô não respondeu');
+  }, 60000);
+}
+function scHistAbrir(c, s) {
+  try { avisoRapido('🎯 Abrindo a nota da reunião…'); } catch (e) {}
+  scHistCompleta(c, function() { scJanela(c, s); }, function(er) { alert('Não consegui abrir a nota dessa reunião agora: ' + er + '.'); });
 }
 function scSelo(x) {
   // Bruno: "que o SDR Score esteja dentro das gravações" — o cartão mostra as duas notas: a do SDR (conversa até a reunião) e a do closer
@@ -32924,6 +32991,7 @@ function scAbrirGravacao(x) { var k = scDaGravacao(x); if (k) scJanela(k.c, k.s)
 // janela com a nota inteira de uma reunião: do SDR ao closer
 function scJanela(c, s) {
   var D = SCORE.d; if (!D || (!c && !s)) return;
+  if (c && c.h && !c.bl) { scHistAbrir(c, s); return; }   // v234: reunião antiga — a nota inteira vem do robô na hora
   var m = document.getElementById('modal-score');
   if (!m) { m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'modal-score'; m.style.zIndex = 10060; m.onclick = function(e) { if (e.target === m) m.classList.remove('open'); }; document.body.appendChild(m); }
   var tipo = (c && c.tipo) || (s && s.tipo) || 'diagnostico', nome = (c && c.lead) || (s && s.lead) || '', data = (c && c.data) || (s && s.data) || '';
@@ -32965,7 +33033,7 @@ function scJanela(c, s) {
       + (c.virada ? '<div class="hint" style="margin-top:6px;">A virada: ' + scEsc(c.virada) + '</div>' : '') + '</div>';
     if (c.erros && c.erros.length) h += '<div class="sc-sec"><h4>🛠 O QUE TREINAR</h4>' + c.erros.map(function(e) { return '<div class="sc-ex"><div class="a"><small style="color:#ff6b6b;">O QUE ACONTECEU</small>' + scEsc(e.f) + '</div><div class="b"><small style="color:#3ddc97;">COMO SERIA</small>' + scEsc(e.s) + '</div></div>'; }).join('') + '</div>';
   }
-  h += '<div class="hint" style="margin-top:14px;">Prévia: notas calculadas a partir da transcrição e da conversa na Clint. Só treino — não entra na comissão nos primeiros 60 dias.</div></div>';
+  h += '<div class="hint" style="margin-top:14px;">' + (c && c.h ? '📚 Nota do estudo das reuniões (o robô ainda não tinha lido esta), com a mesma régua do Score. ' : '') + 'Prévia: notas calculadas a partir da transcrição e da conversa na Clint. Só treino — não entra na comissão nos primeiros 60 dias.</div></div>';
   m.innerHTML = h; m.classList.add('open');
 }
 
@@ -33030,6 +33098,11 @@ function scFichaReuniao(r) {
     if (futura || !minha) return;
     box.innerHTML = '<div class="dtl-card sc-fi vazio"><div class="g-label" style="margin-bottom:4px;">🎯 Score desta reunião</div><div class="hint" style="margin:0;">'
       + (sn === 'no show' ? 'O lead não apareceu e a conversa dele na Clint ainda não foi lida.' : 'Ainda sem nota: a gravação desta reunião ainda não foi lida.') + ' No ar, o robô vai dar a nota sozinho.</div></div>';
+    return;
+  }
+  if (k.c && k.c.h && !k.c.bl) {   // v234: reunião antiga — busca a nota inteira e desenha de novo
+    box.innerHTML = '<div class="dtl-card sc-fi vazio"><div class="g-label" style="margin-bottom:4px;">🎯 Score desta reunião</div><div class="hint" style="margin:0;"><span class="mv-brilho-txt">Carregando a nota…</span></div></div>';
+    scHistCompleta(k.c, function() { scFichaReuniao(r); }, function() { box.innerHTML = ''; });
     return;
   }
   var kc = scDaGravacao({ tel: r.telefone, d: scYmd(r.date) }, true) || {};
