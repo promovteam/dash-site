@@ -2892,7 +2892,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-06-0907';
+var VERSAO_DASH = '2026-10-06-1020';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -32743,8 +32743,9 @@ function renderScoreTela() {
   var el = document.getElementById('score-corpo'); if (!el) return;
   var tv = scTravado(); if (tv) { el.innerHTML = scTravaHtml(tv); return; }
   if (!SCORE.carregado) { el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;"><span class="mv-brilho-txt">Carregando o Score…</span></div>'; scCarregar(function() { if (SCORE.carregado || scTravado()) renderScoreTela(); }); return; }
+  if (scEu().adm && SCORE.aba && SCORE.aba !== 'score') { rxRender(el); return; }   // 🔬 Raio-X (só gestão)
   var eu = scEu(), B = scBase(), P = scPessoas(B.RE, B.LE);
-  var h = '<div class="pl-topo"><h2 class="pl-h2">🎯 Score <span style="color:#ffd166;">' + (eu.adm ? 'do time' : 'seu') + '</span><small>meta e atingimento · da conversa na Clint até o fechamento</small></h2>' + scFiltros('tela') + '</div>'
+  var h = (eu.adm ? rxAbasHtml() : '') + '<div class="pl-topo"><h2 class="pl-h2">🎯 Score <span style="color:#ffd166;">' + (eu.adm ? 'do time' : 'seu') + '</span><small>meta e atingimento · da conversa na Clint até o fechamento</small></h2>' + scFiltros('tela') + '</div>'
     + scAviso(eu);
   if (eu.adm) h += scJornada(B);
   // Bruno 04/10/2026: "redesenhe o visual do score focado em ver cada reunião e o que resultado deu e pontos a melhorar, erros cometidos"
@@ -32753,6 +32754,51 @@ function renderScoreTela() {
     + scDobra('📊 Metas e atingimento · cartão de cada um', scColunasMeta(P, eu), 'met')
     + scDobra('🔑 Palavras que decidem', scPalavras(), 'pal') + (eu.adm ? scRegua() : '');
   el.innerHTML = h;
+}
+// ===== 🔬 RAIO-X DENTRO DO SCORE (Bruno 05–06/10/2026: "esses dois possam abrir como uma aba dentro da aba score, atualizado a cada reunião"
+// · "coloque tudo isso no dash na aba de score de maneira separada"). SÓ GESTÃO. O robô (raioxDados, com a senha) entrega o histórico
+// das reuniões + o conteúdo das abas; o Raio-X do Closer é calculado aqui, na hora — cada reunião nova que o robô lê entra sozinha.
+// Nada do conteúdo fica no código do site: chega do robô só para quem entrou com a senha de gestão.
+var RX = { d: null, carregando: false, erro: '' };
+var RX_ABAS = [['score', '🎯 Score'], ['closer', '🔬 Raio-X do Closer'], ['pre', '📞 Raio-X da Pré-venda'], ['manual', '📘 Avatar e Manual do Lead']];
+function rxAbasHtml() {
+  var a = SCORE.aba || 'score';
+  return '<div class="gx-pills sc-abas" role="tablist" aria-label="Score e Raio-X" style="margin:0 0 14px;">' + RX_ABAS.map(function(x) { return '<button class="gx-pill' + (a === x[0] ? ' on' : '') + '" role="tab" aria-selected="' + (a === x[0]) + '" onclick="scAba(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>';
+}
+function scAba(a) { SCORE.aba = a; renderScoreTela(); try { window.scrollTo({ top: 0 }); } catch (e) {} }
+function rxFotos() { var o = {}; [['bruno', 'Bruno Pardim'], ['tony', 'Tony Londe'], ['wesllene', 'Wesllene'], ['sarah', 'Sarah Promov'], ['selina', 'Selina Promov'], ['ismael', 'Ismael']].forEach(function(x) { var f = rlFoto(x[1]); if (f) o[x[0]] = f; }); return o; }
+function rxPagina(aba) {
+  var X = RX.d, A = X.apps, j = function(o) { return JSON.stringify(o).replace(/<\//g, '<\\/'); };
+  var cfg = { closer: ['Raio-X do Closer', 'Tem trechos de reuniões e o primeiro nome de leads: não mandar para fora do time.'], pre: ['Raio-X da Pré-venda', 'Tem trechos de conversas (sem nomes de leads): não mandar para fora do time.'], manual: ['Avatar Profundo do Lead', 'Frases reais de leads, sem nomes: não mandar para fora do time.'] }[aba];
+  var dados = aba === 'closer'
+    ? '<script>window.RX_REUN=' + j(X.reun) + ';window.RX_CTX=' + j(Object.assign({ hoje: new Date().toISOString().slice(0, 10) }, X.ctx)) + ';window.FOTOS=' + j(rxFotos()) + ';<\/script><script>' + A.calc + '<\/script><script>window.D=raioxCloser(window.RX_REUN,window.RX_CTX);<\/script>'
+    : '<script>window.D=' + j(aba === 'pre' ? X.pre : X.manual) + ';window.FOTOS=' + j(rxFotos()) + ';<\/script>';
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + cfg[0] + '</title>'
+    + '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">'
+    + '<style>' + A.css + '</style></head><body><div class="wrap"><aside class="idx"><div class="idx-brand"><div class="idx-logo">P</div><div><b>' + cfg[0] + '</b><small>Promov · uso interno</small></div></div><div class="idx-prog"><i></i></div><nav id="nav" aria-label="Capítulos"></nav><div class="idx-nota"><b>Documento interno.</b> ' + cfg[1] + '</div></aside><main id="main"></main></div>'
+    + dados + '<script>' + A.kit + '<\/script><script>' + A[aba] + '<\/script></body></html>';
+}
+function rxRender(el) {
+  var aba = SCORE.aba;
+  if (!RX.d) {
+    el.innerHTML = rxAbasHtml() + '<div class="hint" style="padding:40px;text-align:center;">' + (RX.erro ? '❌ ' + dspEsc(RX.erro) + ' <button class="btn" onclick="RX.erro=\'\';renderScoreTela()">Tentar de novo</button>' : '<span class="mv-brilho-txt">Carregando o Raio-X — todas as reuniões lidas…</span>') + '</div>';
+    if (!RX.carregando && !RX.erro) {
+      RX.carregando = true;
+      gasPedir({ action: 'raioxDados', token: scTok() }, function(d) {
+        RX.carregando = false;
+        if (d && d.success && d.reun) RX.d = d; else RX.erro = (d && d.error) || 'o robô não respondeu — tente de novo em instantes';
+        if (SCORE.aba && SCORE.aba !== 'score') renderScoreTela();
+      }, 120000);
+    }
+    return;
+  }
+  var X = RX.d, est = X.reun.length - (X.novas || 0);
+  var sub = aba === 'closer' ? X.reun.length + ' reuniões: ' + est + ' do estudo + ' + (X.novas || 0) + ' que o robô leu depois. Cada reunião nova entra sozinha.'
+    : aba === 'pre' ? 'Conversas da Clint de agosto a outubro (versão de ' + dspEsc(X.v) + '). Atualizo quando o robô terminar de ouvir os áudios.'
+    : 'Avatar e Manual do Lead: ' + ((X.manual && X.manual.persona && X.manual.persona.n) || '') + ' reuniões lidas a fundo + formulários + conversas da Clint (versão de ' + dspEsc(X.v) + ').';
+  el.innerHTML = rxAbasHtml() + '<div class="hint" style="margin:-6px 0 10px;font-size:.78rem;">🔒 Só a gestão vê. ' + sub + '</div>'
+    + '<iframe id="rx-frame" title="' + dspEsc(RX_ABAS.filter(function(x) { return x[0] === aba; })[0][1]) + '" style="width:100%;height:calc(100vh - 170px);min-height:560px;border:0;border-radius:16px;background:#0a0c10;display:block;"></iframe>';
+  var f = document.getElementById('rx-frame'); if (f) f.srcdoc = rxPagina(aba);
 }
 // ---------- dentro de Gravações: a meta e as reuniões (cada um vê o seu) ----------
 function gxAba(a) {
