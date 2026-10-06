@@ -2895,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-06-1703';
+var VERSAO_DASH = '2026-10-06-1735';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -32023,7 +32023,7 @@ function cmAvisosCarregar() {
 function _cmAvisosHtml() {
   if (!CM.dados || !CM.dados.papel) return '';
   var A = CM.avisos;
-  if (!A || Date.now() - (CM.avisosEm || 0) > 120000) { CM.avisosEm = Date.now(); setTimeout(cmAvisosCarregar, 30); }
+  if (Date.now() - (CM.avisosEm || 0) > (A ? 120000 : 15000)) { CM.avisosEm = Date.now(); setTimeout(cmAvisosCarregar, 30); }   // v235: não pede 2x enquanto o 1º ainda vem
   if (!A) return '<div id="cmp-avisos"></div>';
   if (!A.length) return '<div id="cmp-avisos"></div>';
   var novos = A.filter(function(a){ return !a.lido; });
@@ -32052,7 +32052,7 @@ function _cmSitClasse(s) { return /an[aá]lise/i.test(s) ? 'analise' : /respondi
 function _cmContListaHtml() {
   if (!CM.dados || !CM.dados.papel) return '';
   var L = CM.conts, gest = _cmGest();
-  if (!L || Date.now() - (CM.contsEm || 0) > 120000) { CM.contsEm = Date.now(); setTimeout(function(){ cmContCarregar(); }, 40); }
+  if (Date.now() - (CM.contsEm || 0) > (L ? 120000 : 15000)) { CM.contsEm = Date.now(); setTimeout(function(){ cmContCarregar(); }, 40); }   // v235: idem
   if (!L) return '<div id="cmp-conts"></div>';
   if (!L.length && gest) return '<div id="cmp-conts"></div>';
   var abertas = L.filter(function(c){ return !/respondida/i.test(c.situacao); }).length;
@@ -32478,7 +32478,7 @@ function scCarregar(cb) {
     var tok = scTok();
     gasPedir({ action: 'scoreDados', token: tok }, function(d) {
       SCORE.carregando = false;
-      if (d && d.success && d.closer) { SCORE.d = d; SCORE.srv = d.eu || null; SCORE.tokUsado = tok; SCORE.carregado = true; SCORE.trava = ''; scIndexar(); setTimeout(scHistCarregar, 50); }
+      if (d && d.success && d.closer) { SCORE.d = d; SCORE.srv = d.eu || null; SCORE.tokUsado = tok; SCORE.carregado = true; SCORE.trava = ''; scIndexar(); setTimeout(scHistCarregar, 8000); }   // v235: as notas antigas vêm depois que o dash abriu
       else if (d && d.precisaCodigo) { SCORE.trava = 'senha'; SCORE.tokRuim = tok; }
       else if (d && d.fechado) { SCORE.trava = 'fechado'; SCORE.tokRuim = tok; }
       else { SCORE.trava = 'erro'; SCORE.erroEm = Date.now(); }
