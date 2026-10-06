@@ -2892,7 +2892,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-05-1757';
+var VERSAO_DASH = '2026-10-06-0800';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -5632,6 +5632,17 @@ function pagPeriodo() {
 // ===== METAS DO TIME e DIA ÚTIL — uma fonte só para o dash inteiro (Bruno 04/10/2026) =====
 // "se a meta P for 500…" → "650 e 800": P 500 mil · M 650 mil · G 800 mil · GG 1 milhão. A meta pessoal de cada um começa na M.
 var METAS_TIME = { P: 500000, M: 650000, G: 800000, GG: 1000000 };
+// 06/10/2026 (Bruno: "a meta no mês anterior era 800 G — não calcule ela no relatório com base na mudança de meta"):
+// cada mês usa a escada que valia nele. Até setembro/2026: P 450 · M 600 · G 800 (o bônus de setembro foi pela meta de 800 mil).
+var METAS_TIME_MES = [
+  { de: '2026-10', P: 500000, M: 650000, G: 800000, GG: 1000000 },
+  { de: '0000-00', P: 450000, M: 600000, G: 800000 }
+];
+function metasDoMes(d) {
+  var ym = d instanceof Date ? d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) : String(d || '').slice(0, 7);
+  for (var i = 0; i < METAS_TIME_MES.length; i++) if (ym >= METAS_TIME_MES[i].de) return METAS_TIME_MES[i];
+  return METAS_TIME;
+}
 var METAS_ESCADA = { P: 0.5, M: 0.65, G: 0.8, GG: 1 };   // cada degrau como parte do milhão (serve para dividir a meta de cada pessoa)
 // "dias úteis não contam sábado, domingo e feriados" — feriados nacionais + os de Goiânia ("somos de Goiânia": 24/05 Nossa Senhora
 // Auxiliadora e 24/10 aniversário da cidade). Carnaval e Corpus Christi são ponto facultativo: contam como dia útil.
@@ -27578,7 +27589,8 @@ function rlHero(p, A, B) {
     for (var d = new Date(mes); d < fimMes; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) { if (ehDiaUtil(d)) { du++; if (d <= h) dp++; } }
     pr = dp ? A.fat / dp * du : 0;
   }
-  var metaG = METAS_TIME.G, metaM = METAS_TIME.M, metaP = METAS_TIME.P, metaGG = METAS_TIME.GG;   // 04/10/2026: a escada do time (uma fonte só)
+  var MT = metasDoMes(new Date(p.ini)), topo = MT.GG ? 'GG' : 'G';   // 06/10/2026: a escada que valia no mês do relatório
+  var metaG = MT.G, metaM = MT.M, metaP = MT.P, metaGG = MT[topo];
   var alvo = p.mes ? metaGG : 0, frac = alvo ? Math.min(1, A.fat / alvo) : 0;
   var R = 110, C = 2 * Math.PI * R;
   var mk = function(v, rot) { var a = v / metaGG * 2 * Math.PI - Math.PI / 2, x1 = 140 + (R - 14) * Math.cos(a), y1 = 140 + (R - 14) * Math.sin(a), x2 = 140 + (R + 14) * Math.cos(a), y2 = 140 + (R + 14) * Math.sin(a), xt = 140 + (R + 30) * Math.cos(a), yt = 140 + (R + 30) * Math.sin(a);
@@ -27592,9 +27604,9 @@ function rlHero(p, A, B) {
   var anel = p.mes
     ? '<div class="rl-anel rl-st" style="--i:2"' + rlL('Vendas do mês', vdL) + '><svg viewBox="-10 -10 300 300" aria-label="Meta do mês"><defs><linearGradient id="rlGradAnel" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#f6a350"/><stop offset=".6" stop-color="#ffd166"/><stop offset="1" stop-color="#3ddc97"/></linearGradient></defs>'
       + '<circle class="trilho" cx="140" cy="140" r="' + R + '"/><circle class="arco" cx="140" cy="140" r="' + R + '" stroke="url(#rlGradAnel)" transform="rotate(-90 140 140)" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '" data-rl-arco="' + (C * (1 - frac)).toFixed(1) + '"/>'
-      + mk(metaP, 'P') + mk(metaM, 'M') + mk(metaG, 'G') + '<text class="rot-m" x="140" y="16" text-anchor="middle">GG</text>'
-      + '<foreignObject x="40" y="80" width="200" height="120"><div xmlns="http://www.w3.org/1999/xhtml" class="rl-anel-c" style="text-align:center;">' + rlNumAnim(frac * 100, 'pct') + '<div style="font-size:.66rem;font-weight:800;color:var(--text2);letter-spacing:1px;">DA META GG (R$ 1 MILHÃO)</div></div></foreignObject></svg>'
-      + '<div class="rl-anel-l">' + [['P', metaP], ['M', metaM], ['G', metaG], ['GG', metaGG]].map(function(m) { return '<span class="' + (A.fat >= m[1] ? 'ok' : '') + '">' + (A.fat >= m[1] ? '✓ ' : '') + 'Meta ' + m[0] + ' ' + rlMil(m[1]) + '</span>'; }).join('') + '</div>'
+      + mk(metaP, 'P') + mk(metaM, 'M') + (topo === 'GG' ? mk(metaG, 'G') : '') + '<text class="rot-m" x="140" y="16" text-anchor="middle">' + topo + '</text>'
+      + '<foreignObject x="40" y="80" width="200" height="120"><div xmlns="http://www.w3.org/1999/xhtml" class="rl-anel-c" style="text-align:center;">' + rlNumAnim((alvo ? A.fat / alvo : 0) * 100, 'pct') + '<div style="font-size:.66rem;font-weight:800;color:var(--text2);letter-spacing:1px;">DA META ' + topo + ' (' + (metaGG >= 1000000 ? 'R$ ' + String(metaGG / 1000000).replace('.', ',') + ' MILHÃO' : 'R$ ' + Math.round(metaGG / 1000) + ' MIL') + ')</div></div></foreignObject></svg>'
+      + '<div class="rl-anel-l">' + [['P', metaP], ['M', metaM], ['G', metaG]].concat(topo === 'GG' ? [['GG', metaGG]] : []).map(function(m) { return '<span class="' + (A.fat >= m[1] ? 'ok' : '') + '">' + (A.fat >= m[1] ? '✓ ' : '') + 'Meta ' + m[0] + ' ' + rlMil(m[1]) + '</span>'; }).join('') + '</div>'
       + (pr ? '<div style="font-size:.78rem;color:var(--text2);font-weight:700;">Projeção do mês: <b style="color:var(--text);">' + rlMil(pr) + '</b></div>' : '') + '</div>'
     : '<div class="rl-anel rl-st" style="--i:2"><div class="rl-kpi" style="width:100%;max-width:320px;"' + rlL('Lead apareceu na reunião', rlOrdemStatus(A.t.l.re)) + '><small>Vendido por reunião realizada</small>' + rlNumAnim(A.porReuniao, 'moeda') + rlDelta(A.porReuniao, B.porReuniao) + '</div></div>';
   return '<section class="rl-sec rl-hero" id="rl-capa" data-rl="capa"><div>'
@@ -27720,7 +27732,8 @@ function rlMeta(p, A) {
   var hoje = new Date(), mes = new Date(p.ini), fimMes = new Date(mes.getFullYear(), mes.getMonth() + 1, 1), restam = 0;
   for (var d = new Date(Math.max(hoje.getTime() + 864e5, mes.getTime())); d < fimMes; d = new Date(d.getTime() + 864e5)) { d.setHours(0, 0, 0, 0); if (ehDiaUtil(d)) restam++; }
   if (p.k === 'mesant') restam = 0;
-  var metas = [['P', METAS_TIME.P, '#ff6b6b', 'linear-gradient(90deg,#ff6b6b,#ff9a8a)'], ['M', METAS_TIME.M, '#f6a350', 'linear-gradient(90deg,#f6a350,#ffd166)'], ['G', METAS_TIME.G, '#3ddc97', 'linear-gradient(90deg,#3ddc97,#8ef0c6)'], ['GG', METAS_TIME.GG, '#b98aff', 'linear-gradient(90deg,#b98aff,#d9c2ff)']];
+  var MTm = metasDoMes(new Date(p.ini));   // 06/10/2026: a escada que valia no mês
+  var metas = [['P', MTm.P, '#ff6b6b', 'linear-gradient(90deg,#ff6b6b,#ff9a8a)'], ['M', MTm.M, '#f6a350', 'linear-gradient(90deg,#f6a350,#ffd166)'], ['G', MTm.G, '#3ddc97', 'linear-gradient(90deg,#3ddc97,#8ef0c6)'], ['GG', MTm.GG, '#b98aff', 'linear-gradient(90deg,#b98aff,#d9c2ff)']].filter(function(m) { return m[1] != null; });
   var h = '<div class="rl-metas">';
   metas.forEach(function(m, i) {
     var falta = Math.max(0, m[1] - A.fat), pct = Math.min(100, A.fat / m[1] * 100), ok = A.fat >= m[1];
