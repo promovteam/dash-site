@@ -2895,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-06-1735';
+var VERSAO_DASH = '2026-10-07-0759';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -3241,6 +3241,19 @@ window.__gvizV2 = function(resp, doGuardado) {
         date: dt
       });
     });
+    if (!doGuardado) {   // v237: chegou bem menos linha que da última vez? fica com a última completa (ver avisarPlanilhaCortada)
+      var ult = null, aceita = false; try { ult = JSON.parse(localStorage.getItem('v2Linhas') || 'null'); aceita = localStorage.getItem('v2LinhasAceita') === '1'; } catch (eU) {}
+      if (!aceita && ult && ult.n >= 200 && rows.length < ult.n * 0.6 && Date.now() - (ult.q || 0) < 7 * 864e5) {
+        avisarPlanilhaCortada(rows.length, ult.n);
+        if (!V2.carregado) _v2LerBoot(function(b) {   // abriu agora: mostra a última versão completa guardada (sem gravar nada automático)
+          var bom = b && b.resp && b.sheet === V2_SHEET && b.gid === V2_GID && Date.now() - (b.quando || 0) < 7 * 864e5;
+          if (bom) { V2.guardadoEm = b.quando; window.__gvizV2(b.resp, true); } else window.__gvizV2(resp, true);
+        });
+        return;   // não troca os números nem guarda esta leitura cortada como a última boa
+      }
+      avisarPlanilhaCortada(0);
+      try { localStorage.setItem('v2Linhas', JSON.stringify({ n: rows.length, q: Date.now() })); localStorage.removeItem('v2LinhasAceita'); } catch (eS) {}
+    }
     V2.rows = rows; // TODOS os leads, mesmo sem data preenchida
     V2.temCarimbo = iCar >= 0;
     if (doGuardado) { V2.doGuardado = true; renderV2(); return; }   // ⚡ só desenha; o resto espera a planilha de verdade
@@ -3260,12 +3273,46 @@ window.__gvizV2 = function(resp, doGuardado) {
     if (l) l.innerHTML = 'Não consegui ler a planilha. <br><span style="font-size:.75rem;">' + e.message + '</span>';
   }
 };
-function carregarV2() {
+// v237 (Bruno 07/10/2026: "por que o dash está zerado?" — um filtro na aba de vendas, até o "só para mim", fez o Google entregar 60 das
+// 1.278 linhas): o dash lê a ABA ESPELHO "Vendas (dash) — não mexer" (uma fórmula copia a aba de vendas inteira; filtro não chega nela;
+// oculta e protegida; o robô recria se apagarem). Se a espelho falhar, lê a aba de vendas como antes.
+var V2_ESPELHO = 'Vendas (dash) — não mexer';
+window.__gvizV2E = function(resp) {
+  var tb = resp && resp.table, n = tb && tb.rows ? tb.rows.length : 0, cab = tb && tb.cols && tb.cols[0] ? String(tb.cols[0].label || '') : '';
+  // se a espelho sumir, o Google devolve a 1ª aba da planilha: só aceita se os títulos forem os da aba de vendas
+  var tit = tb && tb.cols ? tb.cols.map(function(c){ return v2norm(c.label || ''); }).join('|') : '';
+  var ehVendas = /status/.test(tit) && /closer/.test(tit) && /data/.test(tit) && /telefone/.test(tit);
+  if (!resp || resp.status === 'error' || n < 20 || /^#/.test(cab) || !ehVendas) { V2.fonte = 'vendas'; carregarV2(true); return; }
+  V2.fonte = 'espelho'; window.__gvizV2(resp);
+};
+function carregarV2(direto) {
   var old = document.getElementById('v2-gviz'); if (old) old.remove();
   var s = document.createElement('script');
   s.id = 'v2-gviz';
-  s.src = 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/gviz/tq?tqx=out:json;responseHandler:__gvizV2&gid=' + V2_GID + '&headers=1&_t=' + Date.now();
+  s.src = direto
+    ? 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/gviz/tq?tqx=out:json;responseHandler:__gvizV2&gid=' + V2_GID + '&headers=1&_t=' + Date.now()
+    : 'https://docs.google.com/spreadsheets/d/' + V2_SHEET + '/gviz/tq?tqx=out:json;responseHandler:__gvizV2E&sheet=' + encodeURIComponent(V2_ESPELHO) + '&headers=1&_t=' + Date.now();
+  if (!direto) s.onerror = function() { V2.fonte = 'vendas'; carregarV2(true); };
   document.body.appendChild(s);
+}
+// v237: se de repente chegar bem menos linha que da última vez (mais de 40% a menos), o dash fica com a última versão completa
+// e avisa em vermelho — nunca mais aparece zerado. "Foi de propósito" aceita o novo tamanho.
+function avisarPlanilhaCortada(n, antes) {
+  var el = document.getElementById('aviso-planilha-cortada');
+  if (!n) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'aviso-planilha-cortada';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:#c0392b;color:#fff;font-weight:800;font-size:.8rem;padding:9px 16px;text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.5);';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '⚠️ A planilha de vendas chegou com só <b>' + n + '</b> linhas (da última vez eram <b>' + antes + '</b>) — parece filtro ligado ou linhas apagadas. '
+    + 'O dash está mostrando a <u>última versão completa</u> e não grava nada automático até isso voltar. '
+    + '<button type="button" onclick="v2AceitarCortada()" style="margin-left:8px;padding:4px 10px;border-radius:8px;border:1px solid #fff;background:transparent;color:#fff;font-weight:800;cursor:pointer;">Foi de propósito — usar assim</button>';
+}
+function v2AceitarCortada() {
+  if (!confirm('A planilha de vendas ficou menor de propósito (você apagou ou moveu linhas)?\n\nO dash passa a usar o tamanho novo.')) return;
+  try { localStorage.setItem('v2LinhasAceita', '1'); } catch (e) {}
+  avisarPlanilhaCortada(0); carregarV2();
 }
 
 // ---------- cálculos ----------
