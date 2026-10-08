@@ -2895,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-08-1655';
+var VERSAO_DASH = '2026-10-08-1723';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21484,11 +21484,15 @@ function loginPrecisa() {
 }
 // 08/10/2026 (Bruno: "melhore a forma de entrada, está muitas informações" · "ou uma forma de seletor"):
 // um SELETOR com os nomes (lembra o último deste aparelho) e embaixo só o campo da senha
-var LG_EST = 'font-size:1rem;text-align:center;width:100%;box-sizing:border-box;padding:11px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;';
+var LG_EST = 'font-size:1rem;text-align:center;width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);color:#fff;transition:border-color .15s,box-shadow .15s;';
 function montarLogin() {
   var ov = document.createElement('div');
   ov.id = 'tela-login';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0d0d1e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:20px;';
+  // 08/10/2026 (Bruno: "melhore essa página inicial, deixe ela mais top e bonita"): fundo com o brilho das cores do logo, cartão de vidro,
+  // logo P, as fotos do time e o botão em degradê (laranja → rosa, igual ao logo do menu)
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;overflow-y:auto;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:28px 16px;'
+    + 'background:radial-gradient(900px 520px at 12% -8%,rgba(246,163,80,.20),transparent 60%),radial-gradient(800px 560px at 108% 112%,rgba(226,100,122,.18),transparent 60%),'
+    + 'radial-gradient(rgba(255,255,255,.045) 1px,transparent 1.2px) 0 0/22px 22px,#0b0c16;';
   var SOCIOS = { 'PV': 1, 'João': 1 };   // Bruno 08/10/2026: "crie um dos sócios"
   var grupos = [['Sócios', function(a){ return !!SOCIOS[a.nome]; }], ['Gestão', function(a){ return a.adm && !a.soOlha && !SOCIOS[a.nome]; }],
                 ['Time comercial', function(a){ return !a.adm && !a.financeiro && !a.executivo && !a.soOlha; }],
@@ -21500,17 +21504,39 @@ function montarLogin() {
     lista += '<div style="font-size:.64rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#8b8ba7;padding:8px 10px 4px;">' + g[0] + '</div>'
       + ns.map(function(a){ return '<div class="lg-op" data-nome="' + dspEsc(a.nome) + '" role="option" tabindex="0">' + _lgAv(a.nome, 34) + '<span>' + dspEsc(a.nome) + '</span></div>'; }).join('');
   });
-  ov.innerHTML = '<style>#tela-login .lg-op{display:flex;align-items:center;gap:11px;padding:7px 10px;border-radius:12px;cursor:pointer;color:#fff;font-size:.92rem;font-weight:600;}'
-    + '#tela-login .lg-op:hover,#tela-login .lg-op:focus-visible{background:rgba(255,255,255,.08);outline:none;}</style>'
-    + '<div style="font-size:2rem;">📊</div>'
-    + '<b style="font-size:1.05rem;color:#fff;">Dashboard Comercial — Promov</b>'
-    + '<div id="lg-nomes" style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:300px;position:relative;">'
-    +   '<span style="color:#8b8ba7;font-size:.8rem;text-align:center;">Quem é você?</span>'
-    +   '<button type="button" id="lg-selbtn" aria-haspopup="listbox" onclick="_lgAbrirLista()" style="' + LG_EST + 'display:flex;align-items:center;gap:11px;text-align:left;cursor:pointer;padding:9px 12px;">'
-    +     '<span id="lg-selav">' + _lgAv('', 34) + '</span><span id="lg-selnome" style="flex:1;color:#b8b8cc;">Escolha o seu nome</span><span style="color:#8b8ba7;">▾</span></button>'
-    +   '<div id="lg-lista" role="listbox" style="display:none;max-height:56vh;overflow-y:auto;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:#16162a;padding:4px 4px 8px;box-shadow:0 18px 40px rgba(0,0,0,.5);">' + lista + '</div>'
+  var fotos = [], vistos = {};
+  ACESSOS.forEach(function(a){ var f = ''; try { f = timeFoto(a.nome); } catch (e) {} if (f && !vistos[f]) { vistos[f] = 1; fotos.push(f); } });
+  var pilha = fotos.slice(0, 9).map(function(f, i){ return '<i style="width:30px;height:30px;border-radius:50%;border:2px solid #17172b;margin-left:' + (i ? -9 : 0) + 'px;background:#222 center/cover no-repeat url(' + f + ');box-shadow:0 2px 6px rgba(0,0,0,.35);"></i>'; }).join('');
+  ov.innerHTML = '<style>'
+    + '#tela-login .lg-op{display:flex;align-items:center;gap:11px;padding:7px 10px;border-radius:12px;cursor:pointer;color:#fff;font-size:.92rem;font-weight:600;transition:background .15s;}'
+    + '#tela-login .lg-op:hover,#tela-login .lg-op:focus-visible{background:rgba(246,163,80,.12);outline:none;}'
+    + '#tela-login input:focus,#tela-login #lg-selbtn:focus-visible,#tela-login #lg-selbtn:hover{outline:none;border-color:rgba(246,163,80,.75)!important;box-shadow:0 0 0 3px rgba(246,163,80,.18);}'
+    + '#tela-login .btn.primary{background:linear-gradient(135deg,#f6a350,#e2647a)!important;border:0!important;color:#fff!important;font-weight:800;letter-spacing:.01em;border-radius:12px!important;box-shadow:0 12px 26px -10px rgba(246,120,100,.75);transition:transform .15s,filter .15s;}'
+    + '#tela-login .btn.primary:hover{transform:translateY(-1px);filter:brightness(1.06);}'
+    + '#tela-login .hint{color:#f0a868;}'
+    + '#tela-login .lg-card{animation:lgEntra .5s cubic-bezier(.2,.8,.2,1) both;}'
+    + '@keyframes lgEntra{from{opacity:0;transform:translateY(14px) scale(.985);}to{opacity:1;transform:none;}}'
+    + '@media (prefers-reduced-motion:reduce){#tela-login .lg-card{animation:none;}}'
+    + '</style>'
+    + '<div class="lg-card" style="width:100%;max-width:372px;box-sizing:border-box;padding:28px 24px 24px;border-radius:24px;background:rgba(23,23,43,.78);border:1px solid rgba(255,255,255,.08);'
+    +   'box-shadow:0 30px 80px -20px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;flex-direction:column;align-items:center;gap:16px;">'
+    +   '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;">'
+    +     '<div style="width:56px;height:56px;border-radius:17px;background:linear-gradient(135deg,#f6a350,#e2647a);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.55rem;color:#fff;box-shadow:0 14px 34px -10px rgba(246,120,100,.8);">P</div>'
+    +     '<div style="font-size:.66rem;font-weight:800;letter-spacing:.32em;color:#f0a868;text-transform:uppercase;margin-top:2px;">Promov</div>'
+    +     '<b style="font-size:1.38rem;color:#fff;letter-spacing:-.01em;line-height:1.1;text-align:center;">Dashboard Comercial</b>'
+    +     '<span style="color:#9d9db8;font-size:.82rem;text-align:center;">Os números do time, em tempo real</span>'
+    +     (pilha ? '<div style="display:flex;align-items:center;gap:9px;margin-top:4px;"><span style="display:flex;">' + pilha + '</span><span style="color:#8b8ba7;font-size:.72rem;font-weight:600;">time Promov</span></div>' : '')
+    +   '</div>'
+    +   '<div style="width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);"></div>'
+    +   '<div id="lg-nomes" style="display:flex;flex-direction:column;gap:7px;width:100%;position:relative;">'
+    +     '<span style="color:#9d9db8;font-size:.68rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;">Quem é você?</span>'
+    +     '<button type="button" id="lg-selbtn" aria-haspopup="listbox" onclick="_lgAbrirLista()" style="' + LG_EST + 'display:flex;align-items:center;gap:11px;text-align:left;cursor:pointer;padding:9px 12px;transition:border-color .15s,box-shadow .15s;">'
+    +       '<span id="lg-selav">' + _lgAv('', 34) + '</span><span id="lg-selnome" style="flex:1;color:#b8b8cc;">Escolha o seu nome</span><span style="color:#8b8ba7;">▾</span></button>'
+    +     '<div id="lg-lista" role="listbox" style="display:none;max-height:52vh;overflow-y:auto;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:#17172b;padding:4px 4px 8px;box-shadow:0 18px 40px rgba(0,0,0,.5);">' + lista + '</div>'
+    +   '</div>'
+    +   '<div id="lg-pin" style="display:none;flex-direction:column;gap:10px;width:100%;align-items:center;"></div>'
     + '</div>'
-    + '<div id="lg-pin" style="display:none;flex-direction:column;gap:10px;width:100%;max-width:300px;align-items:center;"></div>';
+    + '<span style="color:#6f6f8c;font-size:.7rem;text-align:center;">🔒 Acesso protegido · cada pessoa entra com a sua senha</span>';
   document.body.appendChild(ov);
   Array.prototype.forEach.call(ov.querySelectorAll('.lg-op'), function(op) {
     op.onclick = function() { _lgPegar(op.getAttribute('data-nome')); };
