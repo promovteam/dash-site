@@ -2895,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-08-1641';
+var VERSAO_DASH = '2026-10-08-1646';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21486,7 +21486,8 @@ function montarLogin() {
   var ov = document.createElement('div');
   ov.id = 'tela-login';
   ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0d0d1e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:20px;';
-  var grupos = [['Gestão', function(a){ return a.adm && !a.soOlha; }], ['Time comercial', function(a){ return !a.adm && !a.financeiro && !a.executivo && !a.soOlha; }],
+  var SOCIOS = { 'PV': 1, 'João': 1 };   // Bruno 08/10/2026: "crie um dos sócios"
+  var grupos = [['Sócios', function(a){ return !!SOCIOS[a.nome]; }], ['Gestão', function(a){ return a.adm && !a.soOlha && !SOCIOS[a.nome]; }], ['Time comercial', function(a){ return !a.adm && !a.financeiro && !a.executivo && !a.soOlha; }],
                 ['Financeiro e CS', function(a){ return a.financeiro || a.executivo; }], ['Só olhar', function(a){ return a.soOlha; }]];
   var opts = '<option value="" disabled selected>Escolha o seu nome</option>';
   grupos.forEach(function(g) {
@@ -21525,7 +21526,7 @@ function _loginFinMostrar(ov, a, codigo) {
   window._lgEscolhido = a.nome; window._lgFin = true; window._lgFinCod = !!codigo;
   var sel = ov.querySelector('#lg-sel'); if (sel && sel.value !== a.nome) sel.value = a.nome;
   var pin = ov.querySelector('#lg-pin'); pin.style.display = 'flex';
-  if (codigo) { window._lgEtapa = 1; window._lgFinal = ''; window._lgCodigo = ''; _lgCriarRender(); return; }
+  if (codigo) { window._lgEtapa = 1; window._lgFinal = ''; window._lgCodigo = ''; window._lgCodManual = false; _lgCriarRender(); return; }
   pin.innerHTML = '<input id="lg-fsenha" type="password" placeholder="sua senha" autocomplete="current-password" style="' + LG_EST + '">'
     + '<button class="btn primary" style="padding:11px 26px;width:100%;" onclick="_loginFinEntrar()">Entrar</button>'
     + '<span id="lg-fmsg" class="hint" style="text-align:center;"></span>'
@@ -21537,8 +21538,9 @@ function _lgCriarRender(msg) {
   var pin = document.getElementById('lg-pin'); if (!pin) return;
   var e = window._lgEtapa || 1, ok = function(t){ return '<div style="align-self:stretch;font-size:.8rem;color:#3ddc97;font-weight:700;">✅ ' + t + '</div>'; }, h = '';
   if (e === 1) h += '<span class="hint" style="text-align:center;">Para criar a sua senha, mandamos um código no seu WhatsApp.</span>'
-    + '<button class="btn primary" id="lg-fpedir" style="padding:11px 20px;width:100%;" onclick="_loginFinPedir()">📲 Receber código no WhatsApp</button>';
-  if (e >= 2) h += ok('Código enviado' + (window._lgFinal ? ' para o WhatsApp final ' + window._lgFinal : ''));
+    + '<button class="btn primary" id="lg-fpedir" style="padding:11px 20px;width:100%;" onclick="_loginFinPedir()">📲 Receber código no WhatsApp</button>'
+    + '<span class="hint" style="cursor:pointer;" onclick="window._lgCodManual=true;window._lgEtapa=2;_lgCriarRender()">Já tenho um código</span>';   // 08/10: código passado pelo Bruno (quando o WhatsApp do robô falha)
+  if (e >= 2 && !window._lgCodManual) h += ok('Código enviado' + (window._lgFinal ? ' para o WhatsApp final ' + window._lgFinal : ''));
   if (e === 2) h += '<input id="lg-fcod" type="text" inputmode="numeric" maxlength="7" placeholder="digite o código (6 números)" autocomplete="one-time-code" oninput="_lgCod(this)" style="' + LG_EST + '">'
     + '<span class="hint" style="cursor:pointer;" onclick="_loginFinPedir()">Não chegou? Mandar de novo</span>';
   if (e === 3) h += ok('Código digitado')
@@ -21563,7 +21565,7 @@ function _lgSenhas() {
 function _loginFinPedir() {
   var b = document.getElementById('lg-fpedir'); if (b) { b.disabled = true; b.textContent = '⏳ Mandando…'; }
   gasPedir({ action: 'comissoesPessoaCodigo', login: window._lgEscolhido }, function(d) {
-    if (d && d.success) { window._lgFinal = d.final || ''; window._lgEtapa = 2; _lgCriarRender(); return; }
+    if (d && d.success) { window._lgFinal = d.final || ''; window._lgCodManual = false; window._lgEtapa = 2; _lgCriarRender(); return; }
     if (b) { b.disabled = false; b.textContent = '📲 Receber código no WhatsApp'; }
     var m = document.getElementById('lg-fmsg'); if (m) m.textContent = '❌ ' + ((d && d.error) || 'o robô não respondeu — tente de novo');
   }, 40000);
