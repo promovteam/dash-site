@@ -2895,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-08-1633';
+var VERSAO_DASH = '2026-10-08-1641';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21439,7 +21439,7 @@ function verPendencias() {
 // (abrindo no computador do Bruno ou como arquivo, entra direto).
 // Não é cofre de banco: é uma porta com chave simples para a equipe.
 var ACESSOS = [
-  { nome: 'Bruno Pardim',  pin: '7391', adm: true },   // Bruno e admin: troca o Você livremente
+  { nome: 'Bruno Pardim',  adm: true, gestao: true, senhaRobo: true },   // Bruno e admin: troca o Você livremente · 08/10/2026: senha própria ("manda um para mim criar uma senha também") — o PIN saiu do código público
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
   { nome: 'Gabriel',       adm: true, gestao: true, senhaRobo: true },   // 05/10/2026 (Bruno: "cria um deste para o gabriel com todos acessos · igual ao meu"): admin; a senha é dele, criada com o código no WhatsApp e conferida no robô — não fica no código
@@ -21479,135 +21479,111 @@ function loginPrecisa() {
   }
   return lg === null;
 }
+// 08/10/2026 (Bruno: "melhore a forma de entrada, está muitas informações" · "ou uma forma de seletor"):
+// um SELETOR com os nomes (lembra o último deste aparelho) e embaixo só o campo da senha
+var LG_EST = 'font-size:1rem;text-align:center;width:100%;box-sizing:border-box;padding:11px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;';
 function montarLogin() {
   var ov = document.createElement('div');
   ov.id = 'tela-login';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0d0d1e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;padding:20px;';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0d0d1e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:20px;';
+  var grupos = [['Gestão', function(a){ return a.adm && !a.soOlha; }], ['Time comercial', function(a){ return !a.adm && !a.financeiro && !a.executivo && !a.soOlha; }],
+                ['Financeiro e CS', function(a){ return a.financeiro || a.executivo; }], ['Só olhar', function(a){ return a.soOlha; }]];
+  var opts = '<option value="" disabled selected>Escolha o seu nome</option>';
+  grupos.forEach(function(g) {
+    var ns = ACESSOS.filter(g[1]); if (!ns.length) return;
+    opts += '<optgroup label="' + g[0] + '">' + ns.map(function(a){ return '<option value="' + dspEsc(a.nome) + '">' + dspEsc(a.nome) + '</option>'; }).join('') + '</optgroup>';
+  });
   ov.innerHTML = '<div style="font-size:2rem;">📊</div>'
     + '<b style="font-size:1.05rem;color:#fff;">Dashboard Comercial — Promov</b>'
-    + '<span style="color:#8b8ba7;font-size:.8rem;">Quem é você? Toque no seu nome e digite sua senha.</span>'
-    + '<div id="lg-nomes" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px;"></div>'
-    + '<div id="lg-pin" style="display:none;flex-direction:column;gap:10px;width:100%;max-width:300px;align-items:center;">'
-    +   '<b id="lg-quem" style="color:#f6a350;"></b>'
-    +   '<input id="lg-senha" type="password" inputmode="numeric" maxlength="4" placeholder="••••" '
-    +     'style="font-size:1.6rem;text-align:center;letter-spacing:12px;width:180px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;">'
-    +   '<button class="btn primary" style="padding:10px 26px;" onclick="loginConferir()">Entrar</button>'
-    +   '<span class="hint" style="cursor:pointer;" onclick="loginVoltar()">← escolher outro nome</span>'
-    + '</div>';
+    + '<div id="lg-nomes" style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:300px;">'
+    +   '<label for="lg-sel" style="color:#8b8ba7;font-size:.8rem;text-align:center;">Quem é você?</label>'
+    +   '<select id="lg-sel" style="' + LG_EST + 'text-align:left;cursor:pointer;">' + opts + '</select>'
+    + '</div>'
+    + '<div id="lg-pin" style="display:none;flex-direction:column;gap:10px;width:100%;max-width:300px;align-items:center;"></div>';
   document.body.appendChild(ov);
-  var caixa = ov.querySelector('#lg-nomes');
-  ACESSOS.forEach(function(a) {
-    var b = document.createElement('button');
-    b.className = 'btn';
-    b.style.cssText = 'padding:13px;font-size:.85rem;width:100%;';
-    b.textContent = (a.soOlha ? '👁 ' : a.adm ? '🛡 ' : a.executivo ? '🤝 ' : a.financeiro ? '💼 ' : '👤 ') + a.nome + (a.soOlha ? ' — só olhar' : a.executivo ? ' — Executiva (CS)' : a.financeiro ? ' — Financeiro' : '');
-    b.onclick = function() {
-      if (a.financeiro || a.senhaRobo) { _loginFinMostrar(ov, a, false); return; }
-      window._lgEscolhido = a.nome;
-      ov.querySelector('#lg-quem').textContent = a.nome;
-      caixa.style.display = 'none';
-      ov.querySelector('#lg-pin').style.display = 'flex';
-      setTimeout(function(){ ov.querySelector('#lg-senha').focus(); }, 50);
-    };
-    caixa.appendChild(b);
-  });
+  var sel = ov.querySelector('#lg-sel');
+  sel.onchange = function() { _lgEscolher(this.value); };
+  var ult = ''; try { ult = localStorage.getItem('lgUltimo') || ''; } catch (e) {}
+  if (ult && ACESSOS.some(function(a){ return a.nome === ult; })) { sel.value = ult; _lgEscolher(ult); }
   ov.addEventListener('keydown', function(e){ if (e.key === 'Enter') loginConferir(); });
 }
-function loginVoltar() {
-  var ov = document.getElementById('tela-login');
-  ov.querySelector('#lg-pin').style.display = 'none';
-  ov.querySelector('#lg-nomes').style.display = 'flex';
-  ov.querySelector('#lg-senha').value = '';
+function _lgEscolher(nome) {
+  var ov = document.getElementById('tela-login'), a = ACESSOS.filter(function(x){ return x.nome === nome; })[0]; if (!ov || !a) return;
+  try { localStorage.setItem('lgUltimo', nome); } catch (e) {}
+  if (a.financeiro || a.senhaRobo) { _loginFinMostrar(ov, a, false); return; }
+  window._lgEscolhido = a.nome; window._lgFin = false; window._lgFinCod = false;
+  var pin = ov.querySelector('#lg-pin'); pin.style.display = 'flex';
+  pin.innerHTML = '<input id="lg-senha" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="current-password" '
+    + 'style="font-size:1.6rem;text-align:center;letter-spacing:12px;width:180px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;">'
+    + '<button class="btn primary" style="padding:11px 26px;width:100%;" onclick="loginConferir()">Entrar</button>';
+  setTimeout(function(){ var i = document.getElementById('lg-senha'); if (i) i.focus(); }, 50);
 }
-// 💼 entrada do financeiro (Suellen): a senha é a das comissões, conferida no robô (v226); na 1ª vez, o código que o Bruno gera
+function loginVoltar() { var s = document.getElementById('lg-sel'); if (s) { s.value = ''; s.focus(); } var p = document.getElementById('lg-pin'); if (p) p.style.display = 'none'; }
+// 💼🛡 entrada com senha própria (financeiro e administradores): a senha é conferida no robô; na 1ª vez, código no WhatsApp
 function _loginFinMostrar(ov, a, codigo) {
-  a = ACESSOS.filter(function(x){ return x.nome === a.nome; })[0] || a;   // o link "já tenho senha" manda só o nome
-  window._lgEscolhido = a.nome; window._lgFin = true; window._lgFinCod = !!codigo; window._lgCodEnviado = false;
-  var caixa = ov.querySelector('#lg-nomes'), pin = ov.querySelector('#lg-pin');
-  caixa.style.display = 'none'; pin.style.display = 'flex';
-  var est = 'font-size:1rem;text-align:center;width:240px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;';
-  var titulo = '<b style="color:#f6a350;">' + (a.financeiro ? '💼 ' + a.nome + ' — Financeiro' : '🛡 ' + a.nome + ' — Administrador') + '</b>';
-  var trocar = '<span class="hint" style="cursor:pointer;" onclick="_loginFinMostrar(document.getElementById(\'tela-login\'),{nome:\'' + a.nome + '\'},' + !codigo + ')">' + (codigo ? '← já tenho senha' : 'Primeira vez ou esqueceu a senha? Criar senha com código no WhatsApp') + '</span>'
-    + '<span class="hint" style="cursor:pointer;" onclick="location.reload()">← escolher outro nome</span>';
-  if (!codigo) {
-    pin.innerHTML = titulo + '<input id="lg-fsenha" type="password" placeholder="sua senha" autocomplete="current-password" style="' + est + '">'
-      + '<button class="btn primary" style="padding:10px 26px;" onclick="_loginFinEntrar()">Entrar</button><span id="lg-fmsg" class="hint"></span>' + trocar;
-    setTimeout(function(){ var i = document.getElementById('lg-fsenha'); if (i) i.focus(); }, 50);
-    return;
-  }
-  // 08/10/2026 (Bruno: "crie algo mais claro mostrando que está confirmando essas etapas do cadastro de senha"):
-  // 3 passos numerados; cada um fica ✅ verde quando está certo, laranja quando é a vez dele, vermelho se deu erro
-  var passo = function(n, tit, corpo) {
-    return '<div id="lgp' + n + '" style="width:300px;max-width:88vw;text-align:left;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .2s,background .2s;">'
-      + '<div style="display:flex;align-items:center;gap:9px;align-self:stretch;"><span class="lgp-n" style="flex:none;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:.8rem;background:rgba(255,255,255,.1);color:#fff;">' + n + '</span><b style="font-size:.88rem;">' + tit + '</b></div>'
-      + corpo + '<span class="lgp-ok" style="font-size:.76rem;align-self:stretch;line-height:1.4;"></span></div>';
-  };
-  var est2 = est.replace('width:240px', 'width:100%;box-sizing:border-box');
-  pin.innerHTML = titulo + '<span class="hint" style="margin-top:-4px;">Criar a sua senha — 3 passos</span>'
-    + passo(1, '📲 Receber o código no WhatsApp', '<button class="btn" id="lg-fpedir" style="padding:9px 18px;" onclick="_loginFinPedir()">📲 Receber código</button>')
-    + passo(2, '🔢 Digitar o código', '<input id="lg-fcod" type="text" inputmode="numeric" maxlength="7" placeholder="código (6 números)" autocomplete="one-time-code" oninput="_lgConferir()" style="' + est2 + '">')
-    + passo(3, '🔒 Criar a sua senha', '<input id="lg-fsenha" type="password" placeholder="crie a sua senha (6+ caracteres)" autocomplete="new-password" oninput="_lgConferir()" style="' + est2 + '">'
-      + '<input id="lg-fsenha2" type="password" placeholder="repita a senha" autocomplete="new-password" oninput="_lgConferir()" style="' + est2 + '">')
-    + '<button class="btn primary" id="lg-fcriar" style="padding:10px 26px;opacity:.5;" onclick="_loginFinEntrar()">Criar senha e entrar</button>'
-    + '<span id="lg-fmsg" class="hint" style="text-align:center;max-width:300px;"></span>' + trocar;
-  _lgConferir();
+  a = ACESSOS.filter(function(x){ return x.nome === a.nome; })[0] || a;
+  window._lgEscolhido = a.nome; window._lgFin = true; window._lgFinCod = !!codigo;
+  var sel = ov.querySelector('#lg-sel'); if (sel && sel.value !== a.nome) sel.value = a.nome;
+  var pin = ov.querySelector('#lg-pin'); pin.style.display = 'flex';
+  if (codigo) { window._lgEtapa = 1; window._lgFinal = ''; window._lgCodigo = ''; _lgCriarRender(); return; }
+  pin.innerHTML = '<input id="lg-fsenha" type="password" placeholder="sua senha" autocomplete="current-password" style="' + LG_EST + '">'
+    + '<button class="btn primary" style="padding:11px 26px;width:100%;" onclick="_loginFinEntrar()">Entrar</button>'
+    + '<span id="lg-fmsg" class="hint" style="text-align:center;"></span>'
+    + '<span class="hint" style="cursor:pointer;" onclick="_loginFinMostrar(document.getElementById(\'tela-login\'),{nome:window._lgEscolhido},true)">Primeira vez ou esqueceu a senha?</span>';
+  setTimeout(function(){ var i = document.getElementById('lg-fsenha'); if (i) i.focus(); }, 50);
 }
-function _lgPasso(n, estado, txt) {   // estado: 'ok' (✅ verde) · 'vez' (laranja) · 'erro' (vermelho) · '' (esperando)
-  var el = document.getElementById('lgp' + n); if (!el) return;
-  var cor = estado === 'ok' ? '#3ddc97' : estado === 'erro' ? '#ff6b6b' : estado === 'vez' ? '#f6a350' : 'rgba(255,255,255,.14)';
-  el.style.borderColor = cor;
-  el.style.background = estado === 'ok' ? 'rgba(61,220,151,.08)' : estado === 'erro' ? 'rgba(255,107,107,.08)' : estado === 'vez' ? 'rgba(246,163,80,.06)' : 'rgba(255,255,255,.04)';
-  var nn = el.querySelector('.lgp-n'); nn.textContent = estado === 'ok' ? '✓' : n;
-  nn.style.background = estado === 'ok' ? '#3ddc97' : estado === 'erro' ? '#ff6b6b' : estado === 'vez' ? '#f6a350' : 'rgba(255,255,255,.1)';
-  nn.style.color = estado ? '#12151c' : '#fff';
-  var o = el.querySelector('.lgp-ok'); o.textContent = txt || '';
-  o.style.color = estado === 'ok' ? '#3ddc97' : estado === 'erro' ? '#ff6b6b' : estado === 'vez' ? '#f6c08a' : '#8b93a5';
+// criar a senha: UMA etapa por vez; o que já foi feito vira uma linha curta com ✅
+function _lgCriarRender(msg) {
+  var pin = document.getElementById('lg-pin'); if (!pin) return;
+  var e = window._lgEtapa || 1, ok = function(t){ return '<div style="align-self:stretch;font-size:.8rem;color:#3ddc97;font-weight:700;">✅ ' + t + '</div>'; }, h = '';
+  if (e === 1) h += '<span class="hint" style="text-align:center;">Para criar a sua senha, mandamos um código no seu WhatsApp.</span>'
+    + '<button class="btn primary" id="lg-fpedir" style="padding:11px 20px;width:100%;" onclick="_loginFinPedir()">📲 Receber código no WhatsApp</button>';
+  if (e >= 2) h += ok('Código enviado' + (window._lgFinal ? ' para o WhatsApp final ' + window._lgFinal : ''));
+  if (e === 2) h += '<input id="lg-fcod" type="text" inputmode="numeric" maxlength="7" placeholder="digite o código (6 números)" autocomplete="one-time-code" oninput="_lgCod(this)" style="' + LG_EST + '">'
+    + '<span class="hint" style="cursor:pointer;" onclick="_loginFinPedir()">Não chegou? Mandar de novo</span>';
+  if (e === 3) h += ok('Código digitado')
+    + '<input id="lg-fsenha" type="password" placeholder="crie a sua senha (6+ caracteres)" autocomplete="new-password" oninput="_lgSenhas()" style="' + LG_EST + '">'
+    + '<input id="lg-fsenha2" type="password" placeholder="repita a senha" autocomplete="new-password" oninput="_lgSenhas()" style="' + LG_EST + '">'
+    + '<span id="lg-fchk" style="align-self:stretch;font-size:.76rem;color:#8b93a5;min-height:1em;"></span>'
+    + '<button class="btn primary" id="lg-fcriar" style="padding:11px 20px;width:100%;opacity:.5;" onclick="_loginFinEntrar()">Criar senha e entrar</button>';
+  h += '<span id="lg-fmsg" class="hint" style="text-align:center;">' + (msg || '') + '</span>'
+    + '<span class="hint" style="cursor:pointer;" onclick="_loginFinMostrar(document.getElementById(\'tela-login\'),{nome:window._lgEscolhido},false)">← já tenho senha</span>';
+  pin.innerHTML = h;
+  setTimeout(function(){ var i = document.getElementById(e === 2 ? 'lg-fcod' : e === 3 ? 'lg-fsenha' : 'lg-fpedir'); if (i) i.focus(); }, 50);
 }
-function _lgConferir() {   // confere cada passo enquanto a pessoa digita
-  var enviado = !!window._lgCodEnviado;
-  var cod = ((document.getElementById('lg-fcod') || {}).value || '').replace(/\D/g, '');
+function _lgCod(inp) { var c = String(inp.value || '').replace(/\D/g, ''); if (c.length === 6) { window._lgCodigo = c; window._lgEtapa = 3; _lgCriarRender(); } }
+function _lgSenhas() {
   var s1 = (document.getElementById('lg-fsenha') || {}).value || '', s2 = (document.getElementById('lg-fsenha2') || {}).value || '';
-  if (window._lgErro1) _lgPasso(1, 'erro', window._lgErro1);
-  else _lgPasso(1, enviado ? 'ok' : 'vez', enviado ? window._lgCodTxt : 'Toque no botão: o código chega no seu WhatsApp');
-  var c2 = cod.length === 6;
-  if (window._lgErro2 && window._lgErroCod === cod) _lgPasso(2, 'erro', window._lgErro2);
-  else _lgPasso(2, c2 ? 'ok' : (enviado ? 'vez' : ''), c2 ? '✅ Código com 6 números' : (cod ? 'Faltam ' + (6 - cod.length) + ' números' : (enviado ? 'Digite os 6 números que chegaram no WhatsApp' : 'Primeiro receba o código (passo 1)')));
-  var t3 = s1.length >= 6, ig = !!s1 && s1 === s2, c3 = t3 && ig;
-  var tx3 = !s1 ? 'Pelo menos 6 caracteres, e repita embaixo' : (t3 ? '✅ 6 ou mais caracteres' : '✗ Faltam ' + (6 - s1.length) + ' caracteres');
-  if (s2) tx3 += ig ? ' · ✅ as duas senhas iguais' : ' · ✗ as duas senhas não estão iguais';
-  _lgPasso(3, c3 ? 'ok' : ((s2 && !ig) ? 'erro' : (c2 ? 'vez' : '')), tx3);
-  var b = document.getElementById('lg-fcriar'); if (b) b.style.opacity = (enviado && c2 && c3) ? '1' : '.5';
-  return c2 && c3;
+  var k = document.getElementById('lg-fchk'), b = document.getElementById('lg-fcriar'), t = s1.length >= 6, ig = !!s1 && s1 === s2;
+  if (k) k.innerHTML = !s1 ? '' : !t ? 'Faltam ' + (6 - s1.length) + ' caracteres' : !s2 ? '✅ Tamanho certo — agora repita a senha'
+    : ig ? '<span style="color:#3ddc97;">✅ As duas senhas estão iguais</span>' : '<span style="color:#ff6b6b;">As duas senhas não estão iguais</span>';
+  if (b) b.style.opacity = (t && ig) ? '1' : '.5';
+  return t && ig;
 }
 function _loginFinPedir() {
-  var b = document.getElementById('lg-fpedir'), m = document.getElementById('lg-fmsg'); if (b) { b.disabled = true; b.textContent = '⏳ Mandando…'; }
-  window._lgErro1 = '';
+  var b = document.getElementById('lg-fpedir'); if (b) { b.disabled = true; b.textContent = '⏳ Mandando…'; }
   gasPedir({ action: 'comissoesPessoaCodigo', login: window._lgEscolhido }, function(d) {
-    if (b) { b.disabled = false; b.textContent = '📲 Receber outro código'; }
-    if (d && d.success) {
-      window._lgCodEnviado = true; window._lgErro1 = '';
-      window._lgCodTxt = '✅ Código enviado para o seu WhatsApp' + (d.final ? ' (final ' + d.final + ')' : '') + ' · vale 10 minutos';
-      if (m) m.textContent = '';
-      _lgConferir();
-      var i = document.getElementById('lg-fcod'); if (i) i.focus();
-    } else { window._lgErro1 = '❌ ' + ((d && d.error) || 'o robô não respondeu — toque de novo'); _lgConferir(); }
+    if (d && d.success) { window._lgFinal = d.final || ''; window._lgEtapa = 2; _lgCriarRender(); return; }
+    if (b) { b.disabled = false; b.textContent = '📲 Receber código no WhatsApp'; }
+    var m = document.getElementById('lg-fmsg'); if (m) m.textContent = '❌ ' + ((d && d.error) || 'o robô não respondeu — tente de novo');
   }, 40000);
 }
 function _loginFinEntrar() {
   var cod = window._lgFinCod, m = document.getElementById('lg-fmsg'), senha = (document.getElementById('lg-fsenha') || {}).value || '';
   var pl = { action: cod ? 'comissoesPessoaCriar' : 'comissoesPessoaEntrar', login: window._lgEscolhido, senha: senha };
   if (cod) {
-    pl.codigo = ((document.getElementById('lg-fcod') || {}).value || '').replace(/\D/g, '');
-    if (!window._lgCodEnviado && !pl.codigo) { m.textContent = 'Comece pelo passo 1: receba o código no WhatsApp.'; return; }
-    if (!_lgConferir()) { m.textContent = 'Falta completar o passo marcado em laranja ou vermelho.'; return; }
+    if ((window._lgEtapa || 1) < 3) return;
+    pl.codigo = window._lgCodigo || '';
+    if (!_lgSenhas()) { if (m) m.textContent = 'Crie a senha (6+ caracteres) e repita igual embaixo.'; return; }
   } else if (!senha) return;
-  m.textContent = cod ? '⏳ Conferindo o código e criando a sua senha…' : 'Conferindo…';
+  if (m) m.textContent = cod ? '⏳ Criando a sua senha…' : 'Conferindo…';
   gasPedir(pl, function(d) {
     var esp = (ACESSOS.filter(function(x){ return x.nome === window._lgEscolhido; })[0] || {}).financeiro ? 'financeiro' : 'admin';
+    var m2 = document.getElementById('lg-fmsg');
     if (!d || !d.success || !d.token || d.papel !== esp) {
       var er = (d && d.error) || (d && d.success ? 'esse acesso não é deste nome' : 'o robô não respondeu');
-      if (cod && /c[oó]digo/i.test(er)) { window._lgErro2 = '❌ ' + er; window._lgErroCod = pl.codigo; _lgConferir(); m.textContent = ''; return; }
-      m.textContent = '❌ ' + er; return;
+      if (cod && /c[oó]digo/i.test(er)) { window._lgEtapa = 2; _lgCriarRender('❌ ' + er + ' — confira o código ou peça outro'); return; }
+      if (m2) m2.textContent = '❌ ' + er; return;
     }
     try { localStorage.setItem('v2Login', window._lgEscolhido); localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
     var seguir = function() {
@@ -21616,7 +21592,7 @@ function _loginFinEntrar() {
       try { cmMostrarMenu(); _cmPapelNav(); } catch (eF) {}
       if (esp === 'admin') location.reload();   // admin: abre o dash inteiro do zero, já com o acesso dele
     };
-    if (cod) { m.innerHTML = '<b style="color:#3ddc97;font-size:.95rem;">✅ Senha criada! Entrando no dash…</b><br><span style="color:#8b93a5;">Da próxima vez é só tocar no seu nome e digitar a senha.</span>'; setTimeout(seguir, 1800); }
+    if (cod) { var p = document.getElementById('lg-pin'); if (p) p.innerHTML = '<b style="color:#3ddc97;font-size:1rem;text-align:center;">✅ Senha criada! Entrando…</b><span class="hint" style="text-align:center;">Da próxima vez: escolha o seu nome e digite a senha.</span>'; setTimeout(seguir, 1600); }
     else seguir();
   }, 40000);
 }
