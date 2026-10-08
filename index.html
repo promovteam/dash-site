@@ -2895,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-07-0759';
+var VERSAO_DASH = '2026-10-08-1633';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21443,6 +21443,8 @@ var ACESSOS = [
   { nome: 'Tony Londe',    pin: '9264' },
   { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
   { nome: 'Gabriel',       adm: true, gestao: true, senhaRobo: true },   // 05/10/2026 (Bruno: "cria um deste para o gabriel com todos acessos · igual ao meu"): admin; a senha é dele, criada com o código no WhatsApp e conferida no robô — não fica no código
+  { nome: 'PV',            adm: true, gestao: true, senhaRobo: true },   // 08/10/2026 (Bruno: "acesso ao dash p/ PV/João… inclusive comissões… senha própria"): admin igual ao Gabriel; senha criada por ele com o código no WhatsApp
+  { nome: 'João',          adm: true, gestao: true, senhaRobo: true },   // 08/10/2026: idem (João Stecca)
   { nome: 'Suellen',       financeiro: true },   // Financeiro: vê o dash inteiro (05/10/2026: "libere tudo"; antes só Comissões); a senha é conferida no robô — não fica no código
   { nome: 'Juliane Promov', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm
   { nome: 'Selina Promov', pin: '2846' },
@@ -21520,25 +21522,75 @@ function loginVoltar() {
 // 💼 entrada do financeiro (Suellen): a senha é a das comissões, conferida no robô (v226); na 1ª vez, o código que o Bruno gera
 function _loginFinMostrar(ov, a, codigo) {
   a = ACESSOS.filter(function(x){ return x.nome === a.nome; })[0] || a;   // o link "já tenho senha" manda só o nome
-  window._lgEscolhido = a.nome; window._lgFin = true; window._lgFinCod = !!codigo;
+  window._lgEscolhido = a.nome; window._lgFin = true; window._lgFinCod = !!codigo; window._lgCodEnviado = false;
   var caixa = ov.querySelector('#lg-nomes'), pin = ov.querySelector('#lg-pin');
   caixa.style.display = 'none'; pin.style.display = 'flex';
   var est = 'font-size:1rem;text-align:center;width:240px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;';
-  pin.innerHTML = '<b style="color:#f6a350;">' + (a.financeiro ? '💼 ' + a.nome + ' — Financeiro' : '🛡 ' + a.nome + ' — Administrador') + '</b>'
-    + (codigo ? '<button class="btn" id="lg-fpedir" style="padding:10px 18px;" onclick="_loginFinPedir()">📲 Receber código no WhatsApp</button><input id="lg-fcod" type="text" inputmode="numeric" maxlength="7" placeholder="código (6 números)" autocomplete="one-time-code" style="' + est + '">' : '')
-    + '<input id="lg-fsenha" type="password" placeholder="' + (codigo ? 'crie a sua senha (6+ caracteres)' : 'sua senha') + '" autocomplete="' + (codigo ? 'new-password' : 'current-password') + '" style="' + est + '">'
-    + (codigo ? '<input id="lg-fsenha2" type="password" placeholder="repita a senha" autocomplete="new-password" style="' + est + '">' : '')
-    + '<button class="btn primary" style="padding:10px 26px;" onclick="_loginFinEntrar()">' + (codigo ? 'Criar senha e entrar' : 'Entrar') + '</button>'
-    + '<span id="lg-fmsg" class="hint"></span>'
-    + '<span class="hint" style="cursor:pointer;" onclick="_loginFinMostrar(document.getElementById(\'tela-login\'),{nome:\'' + a.nome + '\'},' + !codigo + ')">' + (codigo ? '← já tenho senha' : 'Primeira vez ou esqueceu a senha? Receber código no WhatsApp') + '</span>'
+  var titulo = '<b style="color:#f6a350;">' + (a.financeiro ? '💼 ' + a.nome + ' — Financeiro' : '🛡 ' + a.nome + ' — Administrador') + '</b>';
+  var trocar = '<span class="hint" style="cursor:pointer;" onclick="_loginFinMostrar(document.getElementById(\'tela-login\'),{nome:\'' + a.nome + '\'},' + !codigo + ')">' + (codigo ? '← já tenho senha' : 'Primeira vez ou esqueceu a senha? Criar senha com código no WhatsApp') + '</span>'
     + '<span class="hint" style="cursor:pointer;" onclick="location.reload()">← escolher outro nome</span>';
-  setTimeout(function(){ var i = document.getElementById(codigo ? 'lg-fcod' : 'lg-fsenha'); if (i) i.focus(); }, 50);
+  if (!codigo) {
+    pin.innerHTML = titulo + '<input id="lg-fsenha" type="password" placeholder="sua senha" autocomplete="current-password" style="' + est + '">'
+      + '<button class="btn primary" style="padding:10px 26px;" onclick="_loginFinEntrar()">Entrar</button><span id="lg-fmsg" class="hint"></span>' + trocar;
+    setTimeout(function(){ var i = document.getElementById('lg-fsenha'); if (i) i.focus(); }, 50);
+    return;
+  }
+  // 08/10/2026 (Bruno: "crie algo mais claro mostrando que está confirmando essas etapas do cadastro de senha"):
+  // 3 passos numerados; cada um fica ✅ verde quando está certo, laranja quando é a vez dele, vermelho se deu erro
+  var passo = function(n, tit, corpo) {
+    return '<div id="lgp' + n + '" style="width:300px;max-width:88vw;text-align:left;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .2s,background .2s;">'
+      + '<div style="display:flex;align-items:center;gap:9px;align-self:stretch;"><span class="lgp-n" style="flex:none;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:.8rem;background:rgba(255,255,255,.1);color:#fff;">' + n + '</span><b style="font-size:.88rem;">' + tit + '</b></div>'
+      + corpo + '<span class="lgp-ok" style="font-size:.76rem;align-self:stretch;line-height:1.4;"></span></div>';
+  };
+  var est2 = est.replace('width:240px', 'width:100%;box-sizing:border-box');
+  pin.innerHTML = titulo + '<span class="hint" style="margin-top:-4px;">Criar a sua senha — 3 passos</span>'
+    + passo(1, '📲 Receber o código no WhatsApp', '<button class="btn" id="lg-fpedir" style="padding:9px 18px;" onclick="_loginFinPedir()">📲 Receber código</button>')
+    + passo(2, '🔢 Digitar o código', '<input id="lg-fcod" type="text" inputmode="numeric" maxlength="7" placeholder="código (6 números)" autocomplete="one-time-code" oninput="_lgConferir()" style="' + est2 + '">')
+    + passo(3, '🔒 Criar a sua senha', '<input id="lg-fsenha" type="password" placeholder="crie a sua senha (6+ caracteres)" autocomplete="new-password" oninput="_lgConferir()" style="' + est2 + '">'
+      + '<input id="lg-fsenha2" type="password" placeholder="repita a senha" autocomplete="new-password" oninput="_lgConferir()" style="' + est2 + '">')
+    + '<button class="btn primary" id="lg-fcriar" style="padding:10px 26px;opacity:.5;" onclick="_loginFinEntrar()">Criar senha e entrar</button>'
+    + '<span id="lg-fmsg" class="hint" style="text-align:center;max-width:300px;"></span>' + trocar;
+  _lgConferir();
+}
+function _lgPasso(n, estado, txt) {   // estado: 'ok' (✅ verde) · 'vez' (laranja) · 'erro' (vermelho) · '' (esperando)
+  var el = document.getElementById('lgp' + n); if (!el) return;
+  var cor = estado === 'ok' ? '#3ddc97' : estado === 'erro' ? '#ff6b6b' : estado === 'vez' ? '#f6a350' : 'rgba(255,255,255,.14)';
+  el.style.borderColor = cor;
+  el.style.background = estado === 'ok' ? 'rgba(61,220,151,.08)' : estado === 'erro' ? 'rgba(255,107,107,.08)' : estado === 'vez' ? 'rgba(246,163,80,.06)' : 'rgba(255,255,255,.04)';
+  var nn = el.querySelector('.lgp-n'); nn.textContent = estado === 'ok' ? '✓' : n;
+  nn.style.background = estado === 'ok' ? '#3ddc97' : estado === 'erro' ? '#ff6b6b' : estado === 'vez' ? '#f6a350' : 'rgba(255,255,255,.1)';
+  nn.style.color = estado ? '#12151c' : '#fff';
+  var o = el.querySelector('.lgp-ok'); o.textContent = txt || '';
+  o.style.color = estado === 'ok' ? '#3ddc97' : estado === 'erro' ? '#ff6b6b' : estado === 'vez' ? '#f6c08a' : '#8b93a5';
+}
+function _lgConferir() {   // confere cada passo enquanto a pessoa digita
+  var enviado = !!window._lgCodEnviado;
+  var cod = ((document.getElementById('lg-fcod') || {}).value || '').replace(/\D/g, '');
+  var s1 = (document.getElementById('lg-fsenha') || {}).value || '', s2 = (document.getElementById('lg-fsenha2') || {}).value || '';
+  if (window._lgErro1) _lgPasso(1, 'erro', window._lgErro1);
+  else _lgPasso(1, enviado ? 'ok' : 'vez', enviado ? window._lgCodTxt : 'Toque no botão: o código chega no seu WhatsApp');
+  var c2 = cod.length === 6;
+  if (window._lgErro2 && window._lgErroCod === cod) _lgPasso(2, 'erro', window._lgErro2);
+  else _lgPasso(2, c2 ? 'ok' : (enviado ? 'vez' : ''), c2 ? '✅ Código com 6 números' : (cod ? 'Faltam ' + (6 - cod.length) + ' números' : (enviado ? 'Digite os 6 números que chegaram no WhatsApp' : 'Primeiro receba o código (passo 1)')));
+  var t3 = s1.length >= 6, ig = !!s1 && s1 === s2, c3 = t3 && ig;
+  var tx3 = !s1 ? 'Pelo menos 6 caracteres, e repita embaixo' : (t3 ? '✅ 6 ou mais caracteres' : '✗ Faltam ' + (6 - s1.length) + ' caracteres');
+  if (s2) tx3 += ig ? ' · ✅ as duas senhas iguais' : ' · ✗ as duas senhas não estão iguais';
+  _lgPasso(3, c3 ? 'ok' : ((s2 && !ig) ? 'erro' : (c2 ? 'vez' : '')), tx3);
+  var b = document.getElementById('lg-fcriar'); if (b) b.style.opacity = (enviado && c2 && c3) ? '1' : '.5';
+  return c2 && c3;
 }
 function _loginFinPedir() {
-  var b = document.getElementById('lg-fpedir'), m = document.getElementById('lg-fmsg'); if (b) { b.disabled = true; b.textContent = 'Mandando…'; }
+  var b = document.getElementById('lg-fpedir'), m = document.getElementById('lg-fmsg'); if (b) { b.disabled = true; b.textContent = '⏳ Mandando…'; }
+  window._lgErro1 = '';
   gasPedir({ action: 'comissoesPessoaCodigo', login: window._lgEscolhido }, function(d) {
     if (b) { b.disabled = false; b.textContent = '📲 Receber outro código'; }
-    m.textContent = d && d.success ? '📲 Mandamos o código no seu WhatsApp' + (d.final ? ' (final ' + d.final + ')' : '') + '. Vale 10 minutos.' : '❌ ' + ((d && d.error) || 'o robô não respondeu');
+    if (d && d.success) {
+      window._lgCodEnviado = true; window._lgErro1 = '';
+      window._lgCodTxt = '✅ Código enviado para o seu WhatsApp' + (d.final ? ' (final ' + d.final + ')' : '') + ' · vale 10 minutos';
+      if (m) m.textContent = '';
+      _lgConferir();
+      var i = document.getElementById('lg-fcod'); if (i) i.focus();
+    } else { window._lgErro1 = '❌ ' + ((d && d.error) || 'o robô não respondeu — toque de novo'); _lgConferir(); }
   }, 40000);
 }
 function _loginFinEntrar() {
@@ -21546,19 +21598,26 @@ function _loginFinEntrar() {
   var pl = { action: cod ? 'comissoesPessoaCriar' : 'comissoesPessoaEntrar', login: window._lgEscolhido, senha: senha };
   if (cod) {
     pl.codigo = ((document.getElementById('lg-fcod') || {}).value || '').replace(/\D/g, '');
-    if (pl.codigo.length !== 6) { m.textContent = 'O código tem 6 números.'; return; }
-    if (senha.length < 6) { m.textContent = 'A senha precisa ter pelo menos 6 caracteres.'; return; }
-    if (senha !== ((document.getElementById('lg-fsenha2') || {}).value || '')) { m.textContent = 'As duas senhas não são iguais.'; return; }
+    if (!window._lgCodEnviado && !pl.codigo) { m.textContent = 'Comece pelo passo 1: receba o código no WhatsApp.'; return; }
+    if (!_lgConferir()) { m.textContent = 'Falta completar o passo marcado em laranja ou vermelho.'; return; }
   } else if (!senha) return;
-  m.textContent = 'Conferindo…';
+  m.textContent = cod ? '⏳ Conferindo o código e criando a sua senha…' : 'Conferindo…';
   gasPedir(pl, function(d) {
     var esp = (ACESSOS.filter(function(x){ return x.nome === window._lgEscolhido; })[0] || {}).financeiro ? 'financeiro' : 'admin';
-    if (!d || !d.success || !d.token || d.papel !== esp) { m.textContent = '❌ ' + ((d && d.error) || (d && d.success ? 'esse acesso não é deste nome' : 'o robô não respondeu')); return; }
+    if (!d || !d.success || !d.token || d.papel !== esp) {
+      var er = (d && d.error) || (d && d.success ? 'esse acesso não é deste nome' : 'o robô não respondeu');
+      if (cod && /c[oó]digo/i.test(er)) { window._lgErro2 = '❌ ' + er; window._lgErroCod = pl.codigo; _lgConferir(); m.textContent = ''; return; }
+      m.textContent = '❌ ' + er; return;
+    }
     try { localStorage.setItem('v2Login', window._lgEscolhido); localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
-    var ov = document.getElementById('tela-login'); if (ov) ov.remove();
-    try { mostrarAcessoAtual(); } catch (eAc) {}
-    try { cmMostrarMenu(); _cmPapelNav(); } catch (eF) {}
-    if (esp === 'admin') location.reload();   // admin: abre o dash inteiro do zero, já com o acesso dele
+    var seguir = function() {
+      var ov = document.getElementById('tela-login'); if (ov) ov.remove();
+      try { mostrarAcessoAtual(); } catch (eAc) {}
+      try { cmMostrarMenu(); _cmPapelNav(); } catch (eF) {}
+      if (esp === 'admin') location.reload();   // admin: abre o dash inteiro do zero, já com o acesso dele
+    };
+    if (cod) { m.innerHTML = '<b style="color:#3ddc97;font-size:.95rem;">✅ Senha criada! Entrando no dash…</b><br><span style="color:#8b93a5;">Da próxima vez é só tocar no seu nome e digitar a senha.</span>'; setTimeout(seguir, 1800); }
+    else seguir();
   }, 40000);
 }
 function loginConferir() {
@@ -26984,11 +27043,21 @@ html.rl-show .rl-ctrl { display:flex; position:fixed; left:36px; right:36px; bot
 }
 /* ---------- PDF ---------- */
 @media print {
+  /* 08/10/2026 (Bruno: o PDF saía com a gaveta de filtros por cima e tudo apagado): sem margem do navegador (sem data/endereço no topo),
+     fundo escuro igual à tela (a letra é branca), e nada que flutua por cima (gaveta, avisos, botões) */
+  @page { size:A4; margin:0; }
+  body.rl-imprimindo { background:#0c0e12 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html body.rl-imprimindo .main { background:#0c0e12 !important; margin:0 !important; width:auto !important; padding:9mm 8mm !important; }
+  body.rl-imprimindo .drawer, body.rl-imprimindo .drawer-overlay, body.rl-imprimindo #vsf-btn, body.rl-imprimindo .modal-bg, body.rl-imprimindo .modal,
+  body.rl-imprimindo .toast, body.rl-imprimindo #aviso-rapido, body.rl-imprimindo #tela-login { display:none !important; }
   body.rl-imprimindo .sidebar, body.rl-imprimindo .topbar, body.rl-imprimindo .tb, body.rl-imprimindo .screen:not(#s-relatorio),
   body.rl-imprimindo .rl-barra, body.rl-imprimindo #mv-barra, body.rl-imprimindo #agt-fila, body.rl-imprimindo .rl-ctrl { display:none !important; }
   body.rl-imprimindo #s-relatorio { display:block !important; }
   body.rl-imprimindo .rl-sec { break-inside:avoid; page-break-inside:avoid; opacity:1 !important; animation:none !important; }
   body.rl-imprimindo * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body.rl-imprimindo #rl-corpo *, body.rl-imprimindo #rl-corpo *::before, body.rl-imprimindo #rl-corpo *::after { animation:none !important; transition:none !important; }
+  body.rl-imprimindo .rl-sec .rl-st { opacity:1 !important; transform:none !important; }
+  body.rl-imprimindo .rl-h-corre, body.rl-imprimindo #aviso-rapido { display:none !important; }
 }
 html.visitante .nav-item[data-s="relatorio"], html.visitante #s-relatorio { display:none !important; }
 @media (prefers-reduced-motion:reduce) {
@@ -28390,7 +28459,7 @@ function rlContar(el) {
   var alvo = +el.getAttribute('data-rl-v') || 0, fmt = el.getAttribute('data-rl-f'), t0 = null, dur = 1400;
   if (el._rlFeito) return; el._rlFeito = true;
   if (!document.getElementById('rl-corpo').classList.contains('rl-anim')) { el.textContent = rlFmt(alvo, fmt); return; }
-  var passo = function(ts) { if (!t0) t0 = ts; var k = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = rlFmt(alvo * e, fmt); if (k < 1) requestAnimationFrame(passo); };
+  var passo = function(ts) { if (el._rlParar) { el.textContent = rlFmt(alvo, fmt); return; } if (!t0) t0 = ts; var k = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = rlFmt(alvo * e, fmt); if (k < 1) requestAnimationFrame(passo); };
   requestAnimationFrame(passo);
 }
 function rlRevelar(sec) {
@@ -28452,9 +28521,32 @@ document.addEventListener('keydown', function(ev) {
 });
 document.addEventListener('fullscreenchange', function() { if (!document.fullscreenElement && document.documentElement.classList.contains('rl-show')) rlSair(); });
 function rlImprimir() {
+  // 08/10/2026 (Bruno: o PDF saía com a gaveta de filtros por cima, cartões apagados e números ainda subindo):
+  // fecha a gaveta (isso redesenha o relatório), espera, desliga a animação e põe tudo no valor final antes de imprimir
+  var aberta = !!document.querySelector('.drawer.open');
+  if (aberta) { try { fecharFiltros(); } catch (eF) {} }
+  try { avisoRapido('📄 Preparando o PDF…'); } catch (eA) {}
+  setTimeout(_rlPrepararPdf, aberta ? 700 : 50);
+}
+function _rlFinalizarRelatorio() {   // números no valor final, anéis/linhas completos, sem animação
+  var box = document.getElementById('rl-corpo'); if (box) box.classList.remove('rl-anim');
   rlSecs().forEach(rlRevelar);
+  try {
+    document.querySelectorAll('#rl-corpo [data-rl-v]').forEach(function(el) { el._rlFeito = true; el._rlParar = true; el.textContent = rlFmt(+el.getAttribute('data-rl-v') || 0, el.getAttribute('data-rl-f')); });
+    document.querySelectorAll('#rl-corpo [data-rl-arco]').forEach(function(c) { c.style.strokeDashoffset = c.getAttribute('data-rl-arco'); });
+    document.querySelectorAll('#rl-corpo [data-rl-seg]').forEach(function(c) { c.style.strokeDashoffset = c.getAttribute('data-rl-seg'); });
+    document.querySelectorAll('#rl-corpo [data-rl-lin]').forEach(function(pth) { pth.style.strokeDashoffset = 0; });
+  } catch (eP) {}
+}
+function _rlPrepararPdf() {
+  var box = document.getElementById('rl-corpo'), tinhaAnim = !!(box && box.classList.contains('rl-anim'));
   document.body.classList.add('rl-imprimindo');
-  setTimeout(function() { window.print(); setTimeout(function() { document.body.classList.remove('rl-imprimindo'); }, 600); }, 400);
+  _rlFinalizarRelatorio();
+  setTimeout(function() {
+    _rlFinalizarRelatorio();   // de novo: se algo redesenhou no meio, volta ao valor final
+    window.print();
+    setTimeout(function() { document.body.classList.remove('rl-imprimindo'); var b2 = document.getElementById('rl-corpo'); if (b2 && tinhaAnim) b2.classList.add('rl-anim'); }, 600);
+  }, 900);
 }
 </script>
 <style id="rl-pessoa-estilo">
