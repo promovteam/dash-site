@@ -2895,7 +2895,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-08-1723';
+var VERSAO_DASH = '2026-10-08-1750';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -31372,7 +31372,7 @@ function cmDetRender() {
     document.body.appendChild(f); document.addEventListener('keydown', _cmEsc);
   }
   var bt = function(k, rot, n) { return '<button class="' + (CMD.filtro === k ? 'on' : '') + '" onclick="cmDetFiltro(\'' + k + '\')">' + rot + (n != null ? ' · ' + n : '') + '</button>'; };
-  var h = '<div class="cm-det"' + (jaAberta ? ' style="animation:none"' : '') + ' role="dialog" aria-modal="true" aria-label="Detalhe de ' + dspEsc(p.nome) + '"><div class="cm-det-topo">'
+  var h = '<div class="cm-det' + (!todos && _cmAprFechado(_cmApr(g, p)) ? ' cm-fechado' : '') + '"' + (jaAberta ? ' style="animation:none"' : '') + ' role="dialog" aria-modal="true" aria-label="Detalhe de ' + dspEsc(p.nome) + '"><div class="cm-det-topo">'
     + (todos ? '<div class="avatar" style="background:linear-gradient(135deg,#b084ff,#6ea8ff);">📋</div>' : _cmAvatar(p.nome, (window._cmCorAba || {})[g.k + '|' + p.aba] || '#b084ff', 52, ''))
     + '<div class="cm-nome"><b style="font-size:1.08rem;">' + dspEsc(p.nome) + '</b><small>' + dspEsc((d.mesTxt || d.mes)) + ' · ' + dspEsc(g.nome)
     + (!todos ? ' · ' + (function(){ var E = _cmExtrasDe(p); return [['fixo', p.fixo], [g.k === 'closers' ? 'comissão' : 'variável', (g.k === 'closers' ? p.comissao : p.variavel) - E.extra - E.bonus], ['extras', E.extra + E.bonus], ['prêmio', p.premio]]; })().filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') : '') + '</small></div>'
@@ -31882,6 +31882,9 @@ function cmExtraSalvar() {
 <style>
 html.cm-so-ler .cm-lapis, html.cm-so-ler .cm-edita, html.cm-so-ler .cm-extra-bt, html.cm-so-ler #cm-extra-form, html.cm-so-ler .cm-todas, html.cm-so-ler .cm-pe a { display:none !important; }
 html.cm-so-ler .cm-conta { pointer-events:none; }
+/* 08/10/2026: mês fechado (aprovado ou passou do prazo) — sem lápis, sem extra, sem marcar revisão */
+.cm-det.cm-fechado .cm-lapis, .cm-det.cm-fechado .cm-edita, .cm-det.cm-fechado .cm-extra-bt, .cm-det.cm-fechado #cm-extra-form { display:none !important; }
+.cm-det.cm-fechado .cm-conta, .cm-det.cm-fechado [onclick*="cmRevisar"] { pointer-events:none; }
 /* Bruno 05/10/2026 ("libere tudo"): o financeiro (Suellen) vê o dash inteiro — antes só a aba Comissões */
 .cmp-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:.64rem; font-weight:800; white-space:nowrap; border:1px solid transparent; font-family:inherit; line-height:1.5; }
 .cmp-chip.auto { background:rgba(255,209,102,.12); color:#ffd166; border-color:rgba(255,209,102,.3); }
@@ -32122,24 +32125,33 @@ function _cmDm(ms) { return ms ? new Date(ms).toLocaleDateString('pt-BR', { day:
 // situação da assinatura de um card: Em revisão → Aguardando aprovação (o financeiro enviou) → Aprovada pelos dois (fechado)
 // · Contestada (volta para o financeiro) · Aprovada pelo prazo (sem resposta até o dia 5 do mês seguinte)
 function _cmApr(g, p) { var v = ((CM.dados || {}).val || {})[g.k + '|' + p.aba]; return v && v.sit ? v : { sit: 'Em revisão' }; }
-function _cmAprFechado(v) { return /^Aprovada/.test(v.sit || ''); }
+// 08/10/2026 (Bruno: "prazo de 48 horas, mas que feche o que passou, não dê para alterar"): fechado = aprovado, ou passou do prazo
+// (48 h depois que o financeiro enviou; mês que nem foi enviado fecha no fim do dia 5 do mês seguinte). Quem decide é o robô (v.fechado).
+function _cmAprFechado(v) {
+  if (v && typeof v.fechado === 'boolean') return v.fechado;
+  if (/^Aprovada/.test((v && v.sit) || '')) return true;
+  var d = CM.dados || {}, sit = (v && v.sit) || '';
+  return !!d.passouPrazo && sit !== 'Contestada' && sit !== 'Aguardando aprovação' && !(v && v.reab);
+}
+function _cmDmH(ms) { if (!ms) return ''; var d = new Date(ms); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' às ' + ('0' + d.getHours()).slice(-2) + 'h' + ('0' + d.getMinutes()).slice(-2); }
 function _cmValidaBarra(g, p, todos) {
   if (todos || !CM.dados || !CM.dados.papel) return '';
   var r = _cmRevResumo(g, p), v = _cmApr(g, p), gest = _cmGest(), dono = _cmPapel() === 'dono', nm = dspEsc(p.nome.split(' ')[0]), mesN = dspEsc(_cmMesNome(CM.dados.mes));
   var arg = '\'' + g.k + '\',\'' + dspEsc(p.aba) + '\'', txt = '', bts = '';
   var rev = r.n ? '🤖 <b>' + r.falta + ' de ' + r.n + '</b> linhas puxadas automaticamente ainda não revisadas pelo financeiro' + (r.mud ? ' (' + r.mud + ' mudaram depois da revisão)' : '') + '.' : '';
-  var prog = function(pc) { return '<span class="cmp-prog' + (pc === 100 ? ' cem' : '') + '" aria-hidden="true"><i style="width:' + pc + '%;"></i></span>'; }, ate = v.ate ? '<b>' + _cmDm(v.ate) + '</b>' : '';
+  var prog = function(pc) { return '<span class="cmp-prog' + (pc === 100 ? ' cem' : '') + '" aria-hidden="true"><i style="width:' + pc + '%;"></i></span>'; }, ate = v.ate ? '<b>' + _cmDmH(v.ate) + '</b>' : '';
   if (v.sit === 'Aprovada pelos dois') txt = prog(100) + '✅ <b>100% validada</b> — o financeiro enviou em ' + _cmData(v.finEm) + ' e ' + (dono ? 'você aprovou' : nm + ' aprovou') + ' em ' + _cmData(v.pesEm) + '. Está fechado.';
   else if (v.sit === 'Aprovada pelo prazo') txt = prog(100) + '✅ <b>100% validada (pelo prazo)</b> — o financeiro enviou em ' + _cmData(v.finEm) + (v.ate && v.finEm > v.ate ? ', depois do prazo para contestar (' + ate + '), então conta como aprovado.' : ' e não houve resposta' + (ate ? ' até ' + ate : '') + '.');
   else if (v.sit === 'Aguardando aprovação') txt = dono ? prog(50) + '🟡 <b>50% validada · o financeiro revisou e enviou suas comissões de ' + mesN + '</b> em ' + _cmData(v.finEm) + '. Confira e aprove — ou conteste' + (ate ? ' — até ' + ate : '') + '. Sem resposta até lá, conta como aprovado.'
     : prog(50) + '🟡 <b>50% validada</b> — enviado para ' + nm + ' em ' + _cmData(v.finEm) + '. Falta ' + nm + ' aprovar' + (ate ? ' (até ' + ate + ')' : '') + '.';
   else if (v.sit === 'Contestada') txt = dono ? '📝 <b>Você contestou</b> — o financeiro está vendo. Depois do ajuste, chega de novo para você aprovar.' : '📝 <b>' + nm + ' contestou</b> — veja a contestação, ajuste e envie de novo para aprovação.';
+  else if (_cmAprFechado(v)) txt = '🔒 <b>Fechado</b> — ' + (dono ? 'o prazo deste mês terminou' : 'passou do prazo sem ser enviado') + ((CM.dados || {}).prazoAte ? ' (' + _cmDm(CM.dados.prazoAte) + ')' : '') + '. Não dá mais para alterar.';
   else txt = rev ? rev + (dono ? ' Quando o financeiro terminar, chega aqui para você aprovar.' : '') : (dono ? 'O financeiro ainda vai revisar e enviar para você aprovar.' : 'Sem linhas neste mês.');
   if (dono) {
     if (v.sit === 'Aguardando aprovação') bts += '<button class="btn primary" onclick="cmAprovar(' + arg + ',this)">✍️ Aprovar</button>';
     if (!_cmAprFechado(v) && CM.dados.podeContestar) bts += '<button class="btn" onclick="cmContNova(' + arg + ')">📝 ' + (v.sit === 'Contestada' ? 'Contestar mais' : 'Contestar') + '</button>';
   } else if (gest) {
-    if (_cmAprFechado(v)) bts += '<button class="btn" onclick="cmReabrir(' + arg + ',this)">🔓 Reabrir</button>';
+    if (_cmAprFechado(v)) { if (_cmPapel() === 'admin') bts += '<button class="btn" onclick="cmReabrir(' + arg + ',this)" title="Só administrador: reabre para corrigir">🔓 Reabrir</button>'; }   // 08/10/2026: fechado não se altera; só admin reabre
     else if (r.n || v.sit !== 'Em revisão') bts += '<button class="btn primary" onclick="cmValidarMes(' + arg + ',this)">✅ ' + (v.sit === 'Aguardando aprovação' ? 'Enviar de novo' : 'Validar e enviar para ' + nm + ' aprovar') + '</button>';
   }
   return '<div class="cmp-barra"><span>' + txt + '</span>' + (bts ? '<span style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;">' + bts + '</span>' : '') + '</div>' + _cmAltHtml(g, p, dono && v.sit === 'Aguardando aprovação');   // quem vai aprovar já vê a lista aberta
