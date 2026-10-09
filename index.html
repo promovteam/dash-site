@@ -1717,6 +1717,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
       <div class="gx-pills sc-abas" role="tablist" aria-label="Gravações ou Score">
         <button class="gx-pill on" id="gx-ab-grav" role="tab" aria-selected="true" onclick="gxAba('grav')">🎬 Gravações</button>
         <button class="gx-pill" id="gx-ab-score" role="tab" aria-selected="false" onclick="gxAba('score')">🎯 Score<b>prévia</b></button>
+        <button class="gx-pill" id="gx-ab-curso" role="tab" aria-selected="false" onclick="gxAba('curso')">📚 Formação</button>
       </div>
       <div id="grav-aovivo" class="av-box" aria-live="polite"></div>
       <div class="gx-busca">
@@ -1738,6 +1739,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
       </div>
       <div id="grav-prateleiras"></div>
       <div id="sc-corpo"></div>
+      <div id="fc-corpo"></div>
       <div id="grav-lista"><div class="grav-vazio">As gravações aparecem aqui.</div></div>
     </div>
   </section>
@@ -2897,7 +2899,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-09-1403';
+var VERSAO_DASH = '2026-10-09-1508';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25083,6 +25085,21 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .gx.modo-score > .gx-busca, .gx.modo-score > #grav-pills, .gx.modo-score > .gx-linha, .gx.modo-score > #grav-prateleiras, .gx.modo-score > #grav-lista, .gx.modo-score > #grav-aovivo { display:none !important; }
 #sc-corpo { display:none; margin-top:14px; }
 .gx.modo-score #sc-corpo { display:block; }
+/* 📚 FORMAÇÃO dentro de Gravações (Bruno 09/10/2026: "consegue colocar no dash na aba de gravação em uma aba separada" — Formação Closer Águia) */
+.gx.modo-curso > .gx-busca, .gx.modo-curso > #grav-pills, .gx.modo-curso > .gx-linha, .gx.modo-curso > #grav-prateleiras, .gx.modo-curso > #grav-lista, .gx.modo-curso > #grav-aovivo, .gx.modo-curso > #sc-corpo { display:none !important; }
+#fc-corpo { display:none; margin-top:14px; }
+.gx.modo-curso #fc-corpo { display:block; }
+.fc-topo { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.fc-topo h3 { margin:0; font-size:1.15rem; } .fc-sub { font-size:.76rem; color:var(--text2); margin-top:4px; max-width:62ch; line-height:1.5; }
+.fc-abrir { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:12px; font-weight:800; font-size:.84rem; text-decoration:none; color:#0c0e12; background:var(--accent); }
+.fc-abrir:focus-visible, .fc-mod:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.fc-grade { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+.fc-mod { display:flex; align-items:center; gap:12px; padding:13px 14px; border-radius:14px; background:var(--panel2); border:1px solid var(--border); color:var(--text); text-decoration:none; transition:border-color .2s, transform .15s; }
+.fc-mod:hover { border-color:rgba(246,163,80,.55); transform:translateY(-1px); }
+.fc-n { flex:none; width:38px; height:38px; border-radius:11px; display:grid; place-items:center; font-weight:900; font-size:.95rem; background:rgba(246,163,80,.14); color:var(--accent); font-variant-numeric:tabular-nums; }
+.fc-mod b { display:block; font-size:.84rem; line-height:1.3; } .fc-mod small { display:block; font-size:.68rem; color:var(--text2); margin-top:2px; }
+.fc-aviso { margin-top:12px; font-size:.74rem; color:var(--text2); line-height:1.55; padding:10px 12px; border-radius:12px; border:1px dashed var(--border); }
+@media (prefers-reduced-motion: reduce) { .fc-mod { transition:none; } .fc-mod:hover { transform:none; } }
 .sc-nota-topo { font-size:.72rem; color:var(--muted); font-weight:600; margin:2px 0 14px; line-height:1.5; }
 .sc-nota-topo b { color:var(--text2); }
 .sc-jornada { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
@@ -33611,12 +33628,31 @@ function rxRender(el) {
   var f = document.getElementById('rx-frame'); if (f) f.srcdoc = rxPagina(aba);
 }
 // ---------- dentro de Gravações: a meta e as reuniões (cada um vê o seu) ----------
+// 📚 Formação Closer Águia (Bruno 09/10/2026): a pasta está na comercial3 (acesso de curso, não dá para repassar), então cada
+// módulo abre no Drive com o e-mail de quem clicou — funciona para quem tem acesso ao curso. Quando a equipe@ for liberada pelo
+// vendedor, dá para tocar os vídeos aqui dentro (como as gravações).
+var FC_PASTA = 'https://drive.google.com/drive/folders/1epzlsWQ2a1q_0q91ay5kxre5594BcFtB';
+var FC_MODULOS = ['Closer A.G.U.I.A', 'Hunter 10X', 'Persuasão Pro', 'EAD Time de Closers', 'Master Sales Script', 'Raio X da Personalidade', 'Como traçar metas',
+  'Como construir times', 'Prospecção Infinita', 'Call de Fechamento', 'Desbloqueio', 'Desafio Close in Call', 'Análises de Call', 'A riqueza', 'Liderança Financeira', 'Eleve-se'];
+function renderFormacao() {
+  var el = document.getElementById('fc-corpo'); if (!el || el.dataset.pronto) return;
+  var h = '<div class="fc-topo"><div><h3>👑 Formação Closer Águia</h3><div class="fc-sub">16 módulos · acesso OURO 2026. Abre no Google Drive com o seu e-mail.</div></div>'
+    + '<a class="fc-abrir" href="' + FC_PASTA + '" target="_blank" rel="noopener">▶ Abrir a Formação no Drive</a></div><div class="fc-grade">';
+  FC_MODULOS.forEach(function(m, i) {
+    h += '<a class="fc-mod" href="' + FC_PASTA + '" target="_blank" rel="noopener" title="Abre a pasta do curso: entre no módulo ' + (i + 1) + '"><span class="fc-n">' + (i + 1) + '</span><span><b>' + m + '</b><small>abrir no Drive ↗</small></span></a>';
+  });
+  h += '</div><div class="fc-aviso">Se o Google mostrar <b>"Você precisa de acesso"</b>, o seu e-mail ainda não está liberado no curso: fale com o Bruno. Quem tem acesso entra com o e-mail liberado (troque a conta no canto de cima do Drive, se precisar).</div>';
+  el.innerHTML = h; el.dataset.pronto = '1';
+}
 function gxAba(a) {
   var p = document.getElementById('grav-painel'); if (!p) return;
   p.classList.toggle('modo-score', a === 'score');
-  var b1 = document.getElementById('gx-ab-grav'), b2 = document.getElementById('gx-ab-score');
-  if (b1) { b1.classList.toggle('on', a !== 'score'); b1.setAttribute('aria-selected', a !== 'score'); }
+  p.classList.toggle('modo-curso', a === 'curso');
+  var b1 = document.getElementById('gx-ab-grav'), b2 = document.getElementById('gx-ab-score'), b3 = document.getElementById('gx-ab-curso');
+  if (b1) { b1.classList.toggle('on', a === 'grav'); b1.setAttribute('aria-selected', a === 'grav'); }
   if (b2) { b2.classList.toggle('on', a === 'score'); b2.setAttribute('aria-selected', a === 'score'); }
+  if (b3) { b3.classList.toggle('on', a === 'curso'); b3.setAttribute('aria-selected', a === 'curso'); }
+  if (a === 'curso') { renderFormacao(); return; }
   if (a === 'score') { var el = document.getElementById('sc-corpo'); if (el && !SCORE.carregado) el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;"><span class="mv-brilho-txt">Carregando o Score…</span></div>'; scCarregar(renderScore); }
 }
 function renderScore() {
