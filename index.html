@@ -1915,6 +1915,8 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
 
     <div id="pag-bloqueios"></div>
     <div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;" id="pag-kpis"></div>
+    <div id="pag-formas"></div>
+    <div id="pag-alinha"></div>
 
     <!-- VISTA CARDS (igual à Pesquisa) -->
     <div class="pesq-cards" id="pag-cards"></div>
@@ -2895,7 +2897,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-08-2153';
+var VERSAO_DASH = '2026-10-09-1221';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -16091,6 +16093,477 @@ function montarPagamentos(forcar) {
   window._pagOrdenado = rows;
   aplicarFiltroPag();
 }
+// ---------- 💳 COMO OS CLIENTES PAGAM ----------
+// Bruno 09/10/2026: "um relatório de forma de pagamento, bem simples, só pra sabermos % que foi em cartão e etc" + "analise
+// profundamente, não só pela planilha de metas, mas pela planilha de pagamentos". Base = vendas com status Vendido (aba Vendas).
+// Quando o formulário de venda (Pagamentos) da mesma pessoa diz mais, vale ele: a aba Vendas usa "À vista" também para cartão
+// com o valor total (o financeiro lançou como cartão 7 de 11 "à vista" de set–out) e "Cartão" para entrada + cartão.
+// Segue os filtros de Mês e Vendedor da tela e o 👤 Só o meu.
+var FP_CATS = [
+  { k: 'cartao', nome: 'Cartão parcelado', cor: '#6ea8ff', cartao: true },
+  { k: 'entrada', nome: 'Entrada + cartão', cor: '#8b93ff', cartao: true },
+  { k: 'rec', nome: 'Cartão recorrente', cor: '#c08bff', cartao: true },
+  { k: 'vista', nome: 'Pix / à vista', cor: '#3ddc97' },
+  { k: 'boleto', nome: 'Boleto', cor: '#ffd166' },
+  { k: 'outro', nome: 'Outro / misto', cor: '#f6a350' },
+  { k: 'nada', nome: 'Não informado', cor: '#5c6470' }
+];
+var _fpModo = 'n', _fpEspera = null;
+function _fpDaVendas(f) {
+  f = v2norm(f); if (!f) return '';
+  var cart = /cart|credito/.test(f);
+  if (/entrada/.test(f) && cart) return 'entrada';
+  if (/boleto/.test(f) && cart) return 'outro';
+  if (/recorr/.test(f)) return 'rec';
+  if (/boleto/.test(f)) return 'boleto';
+  if (/vista|pix/.test(f)) return 'vista';
+  return cart ? 'cartao' : 'outro';
+}
+function _fpDoForm(f, obs) {
+  f = v2norm(f); var o = v2norm(obs);
+  if (!f || f === 'nao' || /^[\d.,\s]+$/.test(f)) {   // forma vazia ou com o valor por engano: o dash anota "Pagamento: ..." na observação
+    if (/pagamento: ?pix/.test(o)) return 'vista';
+    if (/pagamento: ?boleto/.test(o)) return 'boleto';
+    if (/pagamento: ?cartao recorrente/.test(o)) return 'rec';
+    if (/pagamento: ?cartao/.test(o)) return /entrada/.test(o) ? 'entrada' : 'cartao';
+    return '';
+  }
+  if (/permuta|cheque/.test(f) || (/boleto/.test(f) && /cart/.test(f))) return 'outro';
+  if (/recorr/.test(f)) return 'rec';
+  if (/boleto/.test(f)) return 'boleto';
+  var cart = /cart|credito|parcel|\d+ ?x|12k/.test(f);
+  if (/entrada|pix|bloqueio/.test(f) && cart) return 'entrada';
+  if (/vista|pix/.test(f)) return 'vista';
+  if (cart) return 'cartao';
+  return /bloqueio|entrada/.test(f) ? 'entrada' : 'outro';
+}
+function _fpChaveNome(n) { var w = v2nomeChave(n).split(' ').filter(function(x){ return x && !/^(de|da|do|dos|das|e)$/.test(x); }); return w.length >= 2 ? w[0] + ' ' + w[w.length - 1] : ''; }
+function _fpIndiceForm() {
+  var por = {};
+  (PAG.rows || []).forEach(function(p) {
+    var c = _fpDoForm(p.forma, p.obs); if (!c || !p.date) return;
+    var ks = [], t = ldTel8(p.celular || ''), n = _fpChaveNome(p.nome || '');
+    if (t) ks.push('t' + t);
+    if (n.length > 6) ks.push('n' + n);
+    var tx = (p.forma || '') + ' · ' + (p.obs || '');
+    ks.forEach(function(k) { (por[k] = por[k] || []).push({ c: c, d: p.date.getTime(), tx: tx, en: p.entrada || '' }); });
+  });
+  return por;
+}
+function _fpDoFormDe(r, idx) {
+  if (!r.date) return null;
+  var dr = r.date.getTime(), melhor = null;
+  ['t' + ldTel8(r.telefone || ''), 'n' + _fpChaveNome(r.nome || '')].forEach(function(k) {
+    if (k.length < 7) return;
+    (idx[k] || []).forEach(function(x) { var dd = Math.abs(x.d - dr) / 864e5; if (dd <= 60 && (!melhor || dd < melhor.dd)) melhor = { dd: dd, c: x.c, tx: x.tx, en: x.en }; });
+  });
+  return melhor;
+}
+// 💰 EM CAIXA (Bruno 09/10/2026: "consegue colocar valor em caixa também e quanto representa do vendido"). Regra do Cash Collect
+// (Bruno 29/08/2026): Pix, à vista e cartão (parcelado com o valor total, entrada + cartão) = o valor inteiro; boleto e cartão
+// recorrente = a entrada + a 1ª parcela anotadas, que é o que dá para provar. Sem nada anotado, conta R$ 0 (o quadro avisa quantas).
+// Entrada = total − parcelas ("R$ 4.000 de entrada + 8x R$ 2.097" → 4.000); valor bruto, sem tirar taxas.
+function _fpNum(s, mil) {
+  s = String(s || '').replace(/[^\d.,]/g, ''); if (!s) return 0;
+  if (s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  var v = parseFloat(s) || 0; return mil ? v * 1000 : v;
+}
+function _fpParcela(total, t) {   // "10x de R$ 500", "8x2.797,50", "10 x no boleto de R$ 500", "10x de R$ 3 mil"
+  var re = /(\d{1,2})\s*x[^0-9]{0,25}?([\d][\d.,]*)\s*(mil)?/gi, m;
+  while ((m = re.exec(String(t || '')))) {
+    var n = +m[1], v = _fpNum(m[2], m[3]);
+    if (n >= 2 && v >= 100 && (!total || n * v <= total * 1.3)) return { n: n, v: v };
+    re.lastIndex = m.index + 1;
+  }
+  return null;
+}
+// 🎟 ENTRADA (Bruno 09/10/2026: "qual valor médio de entrada?" · "coloque por mês"): 1º no recorrente/boleto/entrada + cartão,
+// o total menos as parcelas; 2º o texto ("entrada de R$ 6.500", "R$ 95 de entrada", "bloqueio de oferta de 299,7"); 3º a coluna
+// "Teve entrada?" do formulário ("1.000,00", "R$ 10.000 em 12x"). No cartão parcelado, "12x de R$ X" é a parcela, não entrada.
+function _fpEntrada(total, cat, colEnt, txt) {
+  var t = String(txt || ''), ok = function(e) { return e >= 50 && (!total || e < total); };
+  if (cat === 'rec' || cat === 'boleto' || cat === 'entrada') {   // "R$ 4.000 de entrada + 8x R$ 2.097" → total − parcelas
+    var par = _fpParcela(total, t);
+    if (par && total && ok(total - par.n * par.v)) return total - par.n * par.v;
+  }
+  var m = t.match(/entrada\s*(?:de\s*|:\s*|-\s*)?(?:r\$\s*)?(\d[\d.,]*)\s*(mil)?/i)    // "entrada de R$ 6.500", "entrada 500,00"
+    || t.match(/(\d[\d.,]*)\s*(mil)?\s*(?:de\s*)?(?:entrada|sinal|bloqueio)/i)        // "R$ 95,25 de entrada", "1.000 de bloqueio"
+    || t.match(/(?:bloqueio de oferta|sinal)\s*(?:de\s*)?(?:r\$\s*)?(\d[\d.,]*)/i);   // "Bloqueio de oferta de 299.7 já pago"
+  if (m) { var e = _fpNum(m[1], m[2]); if (ok(e)) return e; }
+  var ce = String(colEnt || '').trim();   // por último a coluna "Teve entrada?" (às vezes vem a parcela digitada no lugar)
+  if (/\d/.test(ce) && !/^97$/.test(ce)) { var e0 = _fpNum(ce.split(/\s+em\s+/i)[0]); if (ok(e0)) return e0; }
+  return 0;
+}
+function _fpCaixa(total, cat, txt, ent) {
+  if (cat !== 'rec' && cat !== 'boleto') return { c: total, sabe: true };
+  var par = _fpParcela(total, txt), c = (ent || 0) + (par ? par.v : 0);
+  return { c: total ? Math.min(total, c) : c, sabe: !!(par || ent) };
+}
+function _fpCss() {
+  if (document.getElementById('fp-css')) return;
+  var s = document.createElement('style'); s.id = 'fp-css';
+  s.textContent = '.fp-box{margin-bottom:16px}'
+    + '.fp-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}'
+    + '.fp-top h3{margin:0}.fp-top .chart-chips{margin:0}'
+    + '.fp-sub{font-size:.74rem;color:var(--text2);margin-top:2px}'
+    + '.fp-dest{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:4px 0 12px}'
+    + '.fp-dest b{font-size:2.3rem;line-height:1;color:#6ea8ff;font-variant-numeric:tabular-nums}'
+    + '.fp-dest span{font-size:.92rem;font-weight:700}.fp-dest small{color:var(--text2);font-size:.74rem}'
+    + '.fp-barra{display:flex;height:30px;border-radius:10px;overflow:hidden;background:var(--panel2);gap:2px}'
+    + '.fp-barra i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:.72rem;font-weight:800;color:#0c0e12;min-width:0;white-space:nowrap;overflow:hidden}'
+    + '.fp-leg{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px}'
+    + '.fp-it{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border-radius:12px;background:var(--panel2);border:1px solid var(--border)}'
+    + '.fp-it em{width:10px;height:10px;border-radius:3px;margin-top:4px;flex:none}'
+    + '.fp-it div{display:flex;flex-direction:column;gap:1px;min-width:0}'
+    + '.fp-it b{font-size:1.05rem;font-variant-numeric:tabular-nums}.fp-it span{font-size:.76rem;font-weight:700}.fp-it small{font-size:.68rem;color:var(--text2)}'
+    + '.fp-meses{display:flex;flex-direction:column;gap:6px;margin-top:14px}'
+    + '.fp-mes{display:grid;grid-template-columns:52px 1fr 64px;gap:8px;align-items:center;font-size:.72rem;color:var(--text2)}'
+    + '.fp-mes .fp-barra{height:12px;border-radius:6px;gap:1px}.fp-mes b{color:var(--text);font-weight:700}'
+    + '.fp-nota{margin-top:12px;font-size:.7rem;color:var(--text2);line-height:1.5}'
+    + '.fp-caixa{display:flex;flex-direction:column;gap:7px;margin:0 0 14px;padding:12px 14px;border-radius:14px;background:rgba(61,220,151,.07);border:1px solid rgba(61,220,151,.3)}'
+    + '.fp-cx-l{display:flex;align-items:baseline;gap:6px 10px;flex-wrap:wrap}.fp-cx-l span{font-size:.8rem;font-weight:800}'
+    + '.fp-cx-l b{font-size:1.5rem;color:#3ddc97;font-variant-numeric:tabular-nums}.fp-cx-l em{font-style:normal;font-weight:800;font-size:.95rem}'
+    + '.fp-cx-l small,.fp-cx-aviso{font-size:.72rem;color:var(--text2)}'
+    + '.fp-cx-bar{height:8px;border-radius:5px;background:var(--panel2);overflow:hidden}.fp-cx-bar i{display:block;height:100%;background:#3ddc97;border-radius:5px}'
+    + '.fp-it small.fp-cx-it{color:#3ddc97;font-weight:700}'
+    + '.fp-cx-ent{font-size:.8rem}.fp-cx-ent b{font-size:1rem;font-variant-numeric:tabular-nums}.fp-cx-ent small{color:var(--text2);font-size:.72rem}'
+    + '.fp-tab-sc{overflow-x:auto}.fp-tab table{width:100%;border-collapse:collapse;font-size:.78rem;font-variant-numeric:tabular-nums;min-width:520px}'
+    + '.fp-tab th{text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);font-weight:800;padding:6px 8px;border-bottom:1px solid var(--border)}'
+    + '.fp-tab td{padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap}.fp-tab td small{color:var(--text2)}.fp-tab td.fp-g{color:#3ddc97;font-weight:700}'
+    + '.fp-pc{display:inline-block;width:46px;height:6px;border-radius:4px;background:var(--panel2);margin-right:7px;vertical-align:middle;overflow:hidden}.fp-pc i{display:block;height:100%;background:#3ddc97}';
+  document.head.appendChild(s);
+}
+function fpModo(m, btn) {
+  _fpModo = m;
+  if (btn) { btn.parentNode.querySelectorAll('.chart-chip').forEach(function(c){ c.classList.remove('on'); }); btn.classList.add('on'); }
+  renderFormasPag();
+}
+function _fpBarra(cont, tot, rotulo) {
+  var h = '';
+  FP_CATS.forEach(function(c) {
+    var v = cont[c.k] || 0; if (!v || !tot) return;
+    var p = v / tot * 100;
+    h += '<i style="width:' + p.toFixed(2) + '%;background:' + c.cor + ';" title="' + c.nome + ': ' + Math.round(p) + '%">' + (rotulo && p >= 7 ? Math.round(p) + '%' : '') + '</i>';
+  });
+  return '<div class="fp-barra">' + h + '</div>';
+}
+function renderFormasPag() {
+  var box = document.getElementById('pag-formas'); if (!box) return;
+  _fpCss();
+  if (typeof V2 === 'undefined' || !V2.rows || !V2.rows.length) {
+    box.innerHTML = '<div class="panel fp-box"><div class="hint">💳 Carregando as vendas…</div></div>';
+    if (!_fpEspera) _fpEspera = setTimeout(function(){ _fpEspera = null; if (telaVisivel('s-pagamentos')) renderFormasPag(); }, 2000);
+    return;
+  }
+  var idx = _fpIndiceForm(), vendP = _fg.vend === 'todos' ? '' : v2norm(_fg.vend).split(' ')[0];
+  var lista = [];
+  V2.rows.forEach(function(r) {
+    if (r.sn !== 'vendido' || !r.date) return;
+    var mk = r.date.getFullYear() + '-' + String(r.date.getMonth() + 1).padStart(2, '0');
+    if (_fg.mes !== 'todos' ? mk !== _fg.mes : mk < '2026-01') return;   // antes de 2026 a forma quase nunca era anotada
+    if (vendP && v2norm(r.closer).split(' ')[0] !== vendP) return;
+    if (!soMeuLinha(r)) return;
+    var fo = _fpDoFormDe(r, idx), cat = (fo && fo.c) || _fpDaVendas(r.forma) || 'nada';
+    var txt = (fo ? fo.tx : '') + ' · ' + (r.forma || '') + ' · ' + (r.obs || ''), en = _fpEntrada(r.valor || 0, cat, fo ? fo.en : '', txt);
+    var cx = _fpCaixa(r.valor || 0, cat, txt, en);
+    lista.push({ c: cat, v: r.valor || 0, cx: cx.c, sabe: cx.sabe, e: en, mk: mk });
+  });
+  var mesesN = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  function mesNome(k) { return mesesN[parseInt(k.split('-')[1], 10) - 1] + '/' + k.split('-')[0].slice(2); }
+  var periodo = (_fg.mes === 'todos' ? 'Desde jan/2026' : mesNome(_fg.mes)) + (vendP ? ' · ' + _fg.vend.split(' ')[0] : '') + (SOMEU && SOMEU.on ? ' · só o meu' : '');
+  var topo = '<div class="fp-top"><div><h3>💳 Como os clientes pagam</h3><div class="fp-sub">' + periodo + ' · ' + lista.length + ' venda' + (lista.length === 1 ? '' : 's') + '</div></div>'
+    + '<div class="chart-chips"><button class="chart-chip sm' + (_fpModo === 'n' ? ' on' : '') + '" onclick="fpModo(\'n\',this)">Nº de vendas</button>'
+    + '<button class="chart-chip sm' + (_fpModo === 'r' ? ' on' : '') + '" onclick="fpModo(\'r\',this)">Valor (R$)</button></div></div>';
+  if (!lista.length) { box.innerHTML = '<div class="panel fp-box">' + topo + '<div class="hint">Nenhuma venda (status Vendido) neste filtro.</div></div>'; return; }
+  var n = {}, r$ = {}, cx = {}, tN = 0, tR = 0, tCx = 0, semDet = 0, nE = 0, sE = 0;
+  lista.forEach(function(x) { n[x.c] = (n[x.c] || 0) + 1; r$[x.c] = (r$[x.c] || 0) + x.v; cx[x.c] = (cx[x.c] || 0) + x.cx; tN++; tR += x.v; tCx += x.cx; if (!x.sabe) semDet++; if (x.e > 0) { nE++; sE += x.e; } });
+  var cont = _fpModo === 'r' ? r$ : n, tot = _fpModo === 'r' ? tR : tN;
+  var cart = 0; FP_CATS.forEach(function(c) { if (c.cartao) cart += cont[c.k] || 0; });
+  var h = topo
+    + '<div class="fp-dest"><b>' + (tot ? Math.round(cart / tot * 100) : 0) + '%</b><span>' + (_fpModo === 'r' ? 'do valor vendido' : 'das vendas') + ' no cartão</span>'
+    + '<small>(cartão parcelado + entrada com cartão + cartão recorrente)</small></div>'
+    + '<div class="fp-caixa"><div class="fp-cx-l"><span>💰 Em caixa</span><b>' + v2mil(tCx) + '</b><em>' + (tR ? Math.round(tCx / tR * 100) : 0) + '% do vendido</em>'
+    + '<small>vendido ' + v2mil(tR) + (tR - tCx > 0 ? ' · ⏳ a receber nas parcelas ' + v2mil(tR - tCx) : '') + '</small></div>'
+    + (nE ? '<div class="fp-cx-ent">🎟 Entrada média <b>' + v2moeda0(sE / nE) + '</b> <small>(' + nE + ' de ' + tN + ' vendas com entrada anotada)</small></div>' : '')
+    + '<div class="fp-cx-bar"><i style="width:' + (tR ? (tCx / tR * 100).toFixed(1) : 0) + '%;"></i></div>'
+    + (semDet ? '<small class="fp-cx-aviso">' + semDet + ' venda' + (semDet === 1 ? '' : 's') + ' no boleto ou recorrente sem a entrada e a parcela anotadas: conta' + (semDet === 1 ? '' : 'm') + ' R$ 0 até alguém anotar</small>' : '') + '</div>'
+    + _fpBarra(cont, tot, true) + '<div class="fp-leg">';
+  FP_CATS.forEach(function(c) {
+    if (!n[c.k]) return;
+    var p = tot ? (cont[c.k] || 0) / tot * 100 : 0;
+    h += '<div class="fp-it"><em style="background:' + c.cor + ';"></em><div><b>' + (p < 1 && p > 0 ? '<1' : Math.round(p)) + '%</b><span>' + c.nome + '</span>'
+      + '<small>' + n[c.k] + ' venda' + (n[c.k] === 1 ? '' : 's') + ' · ' + v2mil(r$[c.k] || 0) + '</small>'
+      + ((cx[c.k] || 0) < (r$[c.k] || 0) - 1 ? '<small class="fp-cx-it">💰 em caixa ' + v2mil(cx[c.k] || 0) + ' (' + Math.round((cx[c.k] || 0) / (r$[c.k] || 1) * 100) + '%)</small>' : '') + '</div></div>';
+  });
+  h += '</div>';
+  if (_fg.mes === 'todos') {   // mês a mês: os 6 últimos meses com venda
+    var ms = {}; lista.forEach(function(x) { (ms[x.mk] = ms[x.mk] || []).push(x); });
+    var ks = Object.keys(ms).sort().slice(-6);
+    if (ks.length > 1) {
+      h += '<div class="fp-meses"><div class="fp-sub" style="margin:0 0 2px;">Mês a mês (' + (_fpModo === 'r' ? 'valor' : 'nº de vendas') + ')</div>';
+      ks.forEach(function(k) {
+        var c2 = {}, t2 = 0;
+        ms[k].forEach(function(x) { var q = _fpModo === 'r' ? x.v : 1; c2[x.c] = (c2[x.c] || 0) + q; t2 += q; });
+        var cc = 0; FP_CATS.forEach(function(c) { if (c.cartao) cc += c2[c.k] || 0; });
+        h += '<div class="fp-mes"><b>' + mesNome(k) + '</b>' + _fpBarra(c2, t2, false) + '<span>' + (t2 ? Math.round(cc / t2 * 100) : 0) + '% cartão</span></div>';
+      });
+      h += '</div>';
+    }
+  }
+  if (_fg.mes === 'todos') {   // Bruno 09/10/2026: "coloque por mês" — vendido, em caixa e entrada média de cada mês
+    var mm = {}; lista.forEach(function(x) { var o = mm[x.mk] = mm[x.mk] || { n: 0, v: 0, cx: 0, nE: 0, sE: 0 }; o.n++; o.v += x.v; o.cx += x.cx; if (x.e > 0) { o.nE++; o.sE += x.e; } });
+    var mks = Object.keys(mm).sort().reverse();
+    if (mks.length > 1) {
+      h += '<div class="fp-tab"><div class="fp-sub" style="margin:14px 0 6px;">Mês a mês: vendido, em caixa e entrada</div><div class="fp-tab-sc"><table><thead><tr><th>Mês</th><th>Vendas</th><th>Vendido</th><th>Em caixa</th><th>% do vendido em caixa</th><th>Entrada média</th></tr></thead><tbody>';
+      mks.forEach(function(k) {
+        var o = mm[k], pc = o.v ? Math.round(o.cx / o.v * 100) : 0;
+        h += '<tr><td><b>' + mesNome(k) + '</b></td><td>' + o.n + '</td><td>' + v2mil(o.v) + '</td><td class="fp-g">' + v2mil(o.cx) + '</td>'
+          + '<td><span class="fp-pc"><i style="width:' + pc + '%;"></i></span>' + pc + '%</td>'
+          + '<td>' + (o.nE ? v2moeda0(o.sE / o.nE) + ' <small>(' + o.nE + ')</small>' : '<small>sem anotação</small>') + '</td></tr>';
+      });
+      h += '</tbody></table></div><div class="fp-sub" style="margin-top:4px;">Entrada média: entre parênteses, quantas vendas do mês têm a entrada anotada — mês com poucas oscila muito.</div></div>';
+    }
+  }
+  h += '<div class="fp-nota">Conta as vendas com status <b>Vendido</b> da aba Vendas, pela data da reunião. Quando o formulário de venda da mesma pessoa detalha mais'
+    + ' (entrada + cartão, cartão com o valor total), vale o formulário. "Pix / à vista" = pago de uma vez; boleto começou em agosto/2026. '
+    + '<b>Em caixa</b> (regra do Cash Collect): Pix, à vista e cartão contam o valor inteiro; boleto e cartão recorrente contam a entrada + a 1ª parcela anotadas. Valor bruto, sem tirar taxas.</div>';
+  box.innerHTML = '<div class="panel fp-box">' + h + '</div>';
+}
+
+// ---------- 🔗 ALINHAMENTO VENDAS × PAGAMENTO × FINANCEIRO ----------
+// Bruno 09/10/2026: "que não tenha diferença entre o dado de pagamento do dado do lead e do pagamento · que tudo esteja alinhado
+// automaticamente · além de deixar alinhado esses dados do financeiro" · "quero algo bem completo". O robô liga cada venda (aba
+// Vendas) ao formulário de venda, à linha da Comissões e aos comprovantes; aqui o gestor vê o que está alinhado, aplica o que é
+// certo (ou o que aprovar), confere o resto e desfaz se precisar. Só admin e financeiro (com a senha das Comissões).
+var ALN = { d: null, carregando: false, aba: 'alinhar', marcadas: {}, marcCom: {}, msg: '', ocupado: '' };
+var ALN_TIPOS = { sem_formulario: { ico: '📝', nome: 'Venda sem formulário de venda' }, formulario_sem_venda: { ico: '📄', nome: 'Formulário sem a venda marcada' },
+  pagamento_incompleto: { ico: '💳', nome: 'Pagamento incompleto no formulário' }, ligacao_duvidosa: { ico: '🔗', nome: 'Ligação para conferir' } };
+function _alnPode() { var p = typeof _cmPapelLogin === 'function' ? _cmPapelLogin() : ''; return p === 'admin' || p === 'financeiro'; }
+function _alnEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function _alnRs(v) { var n = typeof v === 'number' ? v : (typeof v2valor === 'function' ? v2valor(v) : parseFloat(v) || 0); return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }); }
+function alnCarregar(forcar) {
+  if (!_alnPode()) return;
+  if (ALN.carregando) return;
+  if (ALN.d && !forcar) { renderAlinhamento(); return; }
+  var tok = _cmTok(); if (!tok) { renderAlinhamento(); return; }
+  ALN.carregando = true; renderAlinhamento();
+  gasPedir({ action: 'alinhamentoSimular', token: tok }, function(r) {
+    ALN.carregando = false; ALN.semSenha = !!(r && r.precisaSenha);
+    if (r && r.success) { ALN.d = r; ALN.marcadas = {}; ALN.marcCom = {}; }
+    else ALN.msg = (r && r.error) || 'o robô não respondeu: tente de novo em 1 minuto';
+    renderAlinhamento();
+  }, 150000);
+}
+function _alnCss() {
+  if (document.getElementById('aln-css')) return;
+  var s = document.createElement('style'); s.id = 'aln-css';
+  s.textContent = '.aln-box{margin-bottom:16px}'
+    + '.aln-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px}.aln-top h3{margin:0}'
+    + '.aln-sub{font-size:.74rem;color:var(--text2);margin-top:3px;max-width:62ch}'
+    + '.aln-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}'
+    + '.aln-btn{font:inherit;font-size:.78rem;font-weight:800;padding:8px 13px;border-radius:11px;border:1px solid var(--border);background:var(--panel2);color:var(--text);cursor:pointer}'
+    + '.aln-btn:hover{border-color:rgba(246,163,80,.5)}.aln-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}'
+    + '.aln-btn.ok{background:rgba(61,220,151,.14);border-color:rgba(61,220,151,.5);color:#3ddc97}.aln-btn.lar{background:rgba(246,163,80,.14);border-color:rgba(246,163,80,.5);color:#f6a350}'
+    + '.aln-btn[disabled]{opacity:.5;cursor:default}'
+    + '.aln-auto{display:flex;align-items:center;gap:8px;font-size:.76rem;padding:7px 11px;border-radius:11px;border:1px solid var(--border);background:var(--panel2)}'
+    + '.aln-auto b.on{color:#3ddc97}.aln-auto b.off{color:var(--text2)}'
+    + '.aln-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}'
+    + '.aln-t{padding:13px 14px;border-radius:14px;background:var(--panel2);border:1px solid var(--border);display:flex;flex-direction:column;gap:4px;min-width:0}'
+    + '.aln-t .k{font-size:.66rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text2)}'
+    + '.aln-t .v{font-size:1.9rem;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}.aln-t .s{font-size:.72rem;color:var(--text2)}'
+    + '.aln-t.ring{flex-direction:row;align-items:center;gap:12px}'
+    + '.aln-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}'
+    + '.aln-list{display:flex;flex-direction:column;gap:7px}'
+    + '.aln-it{display:grid;grid-template-columns:22px minmax(150px,1.1fr) minmax(180px,2fr) auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--border)}'
+    + '.aln-it.conf{border-left:3px solid #ffd166}.aln-it.cert{border-left:3px solid #3ddc97}'
+    + '.aln-it input{width:16px;height:16px;accent-color:#3ddc97}'
+    + '.aln-q b{display:block;font-size:.82rem}.aln-q small{display:block;font-size:.7rem;color:var(--text2)}'
+    + '.aln-m{display:flex;flex-direction:column;gap:3px;font-size:.76rem}.aln-m s{color:var(--text2)}.aln-m b{color:#3ddc97}'
+    + '.aln-m .mot{color:#ffd166;font-size:.72rem}.aln-m .cp{color:var(--text2);font-size:.7rem}'
+    + '.aln-tag{font-size:.66rem;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap}'
+    + '.aln-tag.c{background:rgba(61,220,151,.14);color:#3ddc97}.aln-tag.f{background:rgba(255,209,102,.14);color:#ffd166}.aln-tag.r{background:rgba(255,107,107,.14);color:#ff8a8a}'
+    + '.aln-av{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(180px,2fr) auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--border)}'
+    + '.aln-grp{font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text2);margin:10px 2px 2px}'
+    + '.aln-pe{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}'
+    + '.aln-msg{font-size:.78rem;padding:9px 12px;border-radius:10px;background:rgba(246,163,80,.1);border:1px solid rgba(246,163,80,.35);margin-bottom:10px}'
+    + '.aln-vazio{font-size:.8rem;color:var(--text2);padding:14px;text-align:center}'
+    + '@media (max-width:700px){.aln-it{grid-template-columns:22px 1fr}.aln-it .aln-m,.aln-it .aln-tag{grid-column:2}.aln-av{grid-template-columns:1fr}}';
+  document.head.appendChild(s);
+}
+function _alnRing(p, cor) {
+  var r = 22, c = 2 * Math.PI * r, l = Math.max(0, Math.min(100, p)) / 100 * c;
+  return '<svg viewBox="0 0 56 56" width="56" height="56" aria-hidden="true" style="flex:none"><circle cx="28" cy="28" r="' + r + '" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="7"/>'
+    + '<circle cx="28" cy="28" r="' + r + '" fill="none" stroke="' + cor + '" stroke-width="7" stroke-linecap="round" stroke-dasharray="' + l + ' ' + (c - l) + '" transform="rotate(-90 28 28)"/>'
+    + '<text x="28" y="33" text-anchor="middle" fill="currentColor" style="font:900 14px Inter,sans-serif">' + Math.round(p) + '%</text></svg>';
+}
+function _alnCpDe(chave) {   // o que os comprovantes da venda dizem (lidos pelo robô)
+  var cp = ALN.d && ALN.d.comprovantes && ALN.d.comprovantes.porChave ? ALN.d.comprovantes.porChave[chave] : null;
+  if (!cp) return '';
+  return '<span class="cp">🧾 ' + cp.n + ' comprovante' + (cp.n > 1 ? 's' : '') + (cp.tipos ? ' · ' + _alnEsc(cp.tipos) : '') + (cp.valor ? ' · ' + _alnRs(cp.valor) : '') + (cp.ok ? ' · ✓ efetivado' : ' · ⚠️ conferir') + '</span>';
+}
+function alnAba(a) { ALN.aba = a; renderAlinhamento(); }
+function alnMarcar(linha, on) { if (on) ALN.marcadas[linha] = 1; else delete ALN.marcadas[linha]; renderAlinhamento(true); }
+function alnMarcarCom(chave, on) { if (on) ALN.marcCom[chave] = 1; else delete ALN.marcCom[chave]; renderAlinhamento(true); }
+function alnFicha(t8) { if (t8 && typeof abrirFichaDoTelefone === 'function') abrirFichaDoTelefone(t8); }
+function alnAplicar(modo) {
+  var d = ALN.d; if (!d || ALN.ocupado) return;
+  var linhas = Object.keys(ALN.marcadas).map(Number), chaves = Object.keys(ALN.marcCom), certas = modo === 'certas';
+  var n = certas ? d.itens.filter(function(i){ return i.certeza === 'certa'; }).reduce(function(s, i){ return s + i.mudancas.length; }, 0)
+    : d.itens.filter(function(i){ return ALN.marcadas[i.linha]; }).reduce(function(s, i){ return s + i.mudancas.length; }, 0) + chaves.length;
+  if (!n) { alert('Marque pelo menos uma venda.'); return; }
+  if (!confirm('Vai gravar ' + n + ' mudança' + (n > 1 ? 's' : '') + (chaves.length && !certas ? ' (aba Vendas e Comissões)' : ' na aba Vendas') + '.\nO robô confere de novo antes de gravar e guarda o valor antigo: dá para desfazer pelo Histórico.\n\nContinuar?')) return;
+  ALN.ocupado = 'aplicando'; renderAlinhamento();
+  var pedido = { action: 'alinhamentoAplicar', token: _cmTok() };
+  if (certas) pedido.certas = true; else { pedido.linhas = linhas; if (chaves.length) pedido.comissoes = chaves; }
+  gasPedir(pedido, function(r) {
+    ALN.ocupado = '';
+    if (r && r.success) { ALN.msg = '✅ Gravado: ' + r.aplicadas + ' mudança' + (r.aplicadas === 1 ? '' : 's') + ' na aba Vendas' + (r.comissoes && r.comissoes.atualizadas ? ' e ' + r.comissoes.atualizadas + ' na Comissões' : '') + (r.puladas && r.puladas.length ? ' · ' + r.puladas.length + ' pulada(s): alguém mexeu antes' : '') + '. Lote ' + r.lote + ' (dá para desfazer no Histórico).';
+      try { if (typeof carregarV2 === 'function') carregarV2(); } catch (e) {}
+      ALN.d = null; alnCarregar(true);
+    } else { ALN.msg = '⚠️ ' + ((r && r.error) || 'o robô não respondeu: nada foi confirmado. Recarregue a lista antes de tentar de novo.'); renderAlinhamento(); }
+  }, 150000);
+}
+function alnDesfazer(lote) {
+  if (ALN.ocupado || !confirm('Desfazer o lote ' + lote + '? Volta o valor antigo onde a célula ainda está como o robô deixou.')) return;
+  ALN.ocupado = 'desfazendo'; renderAlinhamento();
+  gasPedir({ action: 'alinhamentoDesfazer', token: _cmTok(), lote: lote }, function(r) {
+    ALN.ocupado = '';
+    ALN.msg = r && r.success ? '↩ Desfeito: ' + r.voltaram + ' voltaram' + (r.naoVoltaram ? ' · ' + r.naoVoltaram + ' ficaram (alguém mexeu depois)' : '') : '⚠️ ' + ((r && r.error) || 'o robô não respondeu');
+    ALN.d = null; alnCarregar(true);
+  }, 150000);
+}
+function alnAuto() {
+  var d = ALN.d; if (!d || ALN.ocupado) return;
+  var ligar = !d.auto;
+  if (ligar && !confirm('Ligar o alinhamento sozinho?\nA cada venda nova (e todo dia às 7h), o robô grava na aba Vendas só as mudanças CERTAS (telefone + data + produto + valor batendo). O resto continua vindo para cá.')) return;
+  ALN.ocupado = 'auto'; renderAlinhamento();
+  gasPedir({ action: 'alinhamentoAuto', token: _cmTok(), ligar: ligar }, function(r) {
+    ALN.ocupado = ''; if (r && r.success) { d.auto = r.ligado; ALN.msg = r.ligado ? '🤖 Ligado: as vendas novas vão sendo alinhadas sozinhas.' : 'Desligado: nada é gravado sem alguém aplicar.'; } else ALN.msg = '⚠️ ' + ((r && r.error) || 'o robô não respondeu');
+    renderAlinhamento();
+  }, 60000);
+}
+function alnLerComprovantes() {
+  if (ALN.ocupado) return;
+  var hj = new Date(), mes = hj.getFullYear() + '-' + String(hj.getMonth() + 1).padStart(2, '0'), ant = new Date(hj.getFullYear(), hj.getMonth() - 1, 1);
+  var mesA = ant.getFullYear() + '-' + String(ant.getMonth() + 1).padStart(2, '0');
+  var esc = prompt('Ler os comprovantes de qual mês? (até 20 por vez — leva uns 2 minutos)\nDigite ' + mes + ' ou ' + mesA, mesA); if (!esc) return;
+  if (!/^\d{4}-\d{2}$/.test(esc.trim())) { alert('Use o formato aaaa-mm, ex.: ' + mesA); return; }
+  ALN.ocupado = 'lendo comprovantes'; renderAlinhamento();
+  gasPedir({ action: 'comprovantesLer', token: _cmTok(), mes: esc.trim(), max: 20 }, function(r) {
+    ALN.ocupado = '';
+    ALN.msg = r && r.success ? '🧾 Lidos agora: ' + r.lidos + (r.faltam ? ' · faltam ' + r.faltam + ' (clique de novo para continuar)' : ' · mês completo') : '⚠️ ' + ((r && r.error) || 'o robô não respondeu (pode ter continuado: recarregue em 1 minuto)');
+    if (r && r.resumo && ALN.d) ALN.d.comprovantes = r.resumo;
+    renderAlinhamento();
+  }, 240000);
+}
+function renderAlinhamento(soLista) {
+  var box = document.getElementById('pag-alinha'); if (!box) return;
+  if (!_alnPode()) { box.innerHTML = ''; return; }
+  _alnCss();
+  var d = ALN.d, top = '<div class="aln-top"><div><h3>🔗 Vendas × pagamento × financeiro</h3><div class="aln-sub">O formulário de venda manda no pagamento (forma e valor do contrato), a aba Vendas manda no lead e a Comissões acompanha o formulário. O robô liga tudo pelo telefone e pela data, e só grava o que tem certeza.</div></div>'
+    + '<div class="aln-acoes">' + (d ? '<span class="aln-auto">🤖 Vendas novas: <b class="' + (d.auto ? 'on">alinhando sozinho' : 'off">desligado') + '</b> <button class="aln-btn" onclick="alnAuto()"' + (ALN.ocupado ? ' disabled' : '') + '>' + (d.auto ? 'Desligar' : 'Ligar') + '</button></span>' : '')
+    + '<button class="aln-btn" onclick="ALN.msg=\'\';ALN.d=null;alnCarregar(true)"' + (ALN.carregando || ALN.ocupado ? ' disabled' : '') + '>↻ Conferir agora</button></div></div>';
+  if (!_cmTok() || ALN.semSenha) {
+    box.innerHTML = '<div class="panel aln-box">' + top + '<div class="aln-vazio">🔐 Para ver o alinhamento, entre uma vez na aba <b>Comissões</b> com a sua senha. '
+      + '<button class="aln-btn lar" onclick="var e=document.querySelector(\'.nav-item[data-s=&quot;comissoes&quot;]\');if(e)e.click()">Ir para Comissões</button></div></div>';
+    return;
+  }
+  if (!d) { box.innerHTML = '<div class="panel aln-box">' + top + (ALN.msg ? '<div class="aln-msg">' + _alnEsc(ALN.msg) + '</div>' : '') + '<div class="aln-vazio">' + (ALN.carregando ? '<span class="mv-brilho-txt">O robô está ligando cada venda ao formulário, à Comissões e aos comprovantes…</span>' : '<button class="aln-btn lar" onclick="alnCarregar(true)">Conferir o alinhamento</button>') + '</div></div>'; return; }
+  var R = d.resumo, C = d.comissoes || {}, P = d.comprovantes || {};
+  var pAl = R.comFormulario ? (R.alinhadas / R.comFormulario * 100) : 0;
+  var nAv = (d.conferir || []).length, nCert = R.mudarCertas, nConf = R.mudarConferir;
+  var h = top + (ALN.msg ? '<div class="aln-msg">' + _alnEsc(ALN.msg) + '</div>' : '') + (ALN.ocupado ? '<div class="aln-msg"><span class="mv-brilho-txt">⏳ ' + _alnEsc(ALN.ocupado) + '…</span></div>' : '')
+    + '<div class="aln-tiles">'
+    + '<div class="aln-t ring">' + _alnRing(pAl, '#3ddc97') + '<div><div class="k">Alinhadas</div><div class="v" style="font-size:1.5rem">' + R.alinhadas + '</div><div class="s">de ' + R.comFormulario + ' vendas com formulário (' + R.vendas + ' em 2026)</div></div></div>'
+    + '<div class="aln-t"><div class="k">🛠 Para alinhar</div><div class="v" style="color:#3ddc97">' + nCert + '</div><div class="s">certas: o robô pode gravar' + (nConf ? ' · <b style="color:#ffd166">' + nConf + ' para conferir</b>' : '') + '</div></div>'
+    + '<div class="aln-t"><div class="k">⚠️ Avisos</div><div class="v" style="color:#ffd166">' + nAv + '</div><div class="s">' + (R.semFormulario || 0) + ' sem formulário · ' + (R.formularioSemVenda || 0) + ' formulário sem venda · ' + (R.pagamentoIncompleto || 0) + ' pagamento incompleto</div></div>'
+    + '<div class="aln-t"><div class="k">💼 Comissões</div><div class="v">' + (C.linhas ? Math.round((C.iguais || 0) / C.linhas * 100) + '%' : '—') + '</div><div class="s">' + (C.linhas ? (C.iguais || 0) + ' de ' + C.linhas + ' linhas com o mesmo valor do formulário' + (C.diferentes ? ' · ' + C.diferentes + ' diferentes' : '') : (C.erro ? _alnEsc(C.erro) : 'sem dados')) + '</div></div>'
+    + '<div class="aln-t"><div class="k">🧾 Comprovantes</div><div class="v">' + (P.lidos || 0) + '</div><div class="s">' + (P.lidos ? 'lidos pelo robô' + ((P.alertas || []).length ? ' · <b style="color:#ff8a8a">' + P.alertas.length + ' alerta(s)</b>' : ' · nenhum alerta') : 'ainda não lidos: use a aba Comprovantes') + '</div></div>'
+    + '</div>';
+  var tabs = [['alinhar', '🛠 Para alinhar (' + (nCert + nConf) + ')'], ['avisos', '⚠️ Avisos (' + nAv + ')'], ['comissoes', '💼 Comissões'], ['comprovantes', '🧾 Comprovantes'], ['historico', '🕘 Histórico']];
+  h += '<div class="chart-chips aln-tabs">' + tabs.map(function(t){ return '<button class="chart-chip sm' + (ALN.aba === t[0] ? ' on' : '') + '" onclick="alnAba(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('') + '</div>';
+  h += _alnCorpo(d);
+  box.innerHTML = '<div class="panel aln-box">' + h + '</div>';
+}
+function _alnMud(m) {
+  var de = m.campo === 'valor' ? _alnRs(m.deN != null ? m.deN : m.de) : (m.de || '(vazio)'), para = m.campo === 'valor' ? _alnRs(m.para) : m.para;
+  return '<span>' + (m.campo === 'valor' ? '💰 Valor' : '💳 Forma') + ': <s>' + _alnEsc(de) + '</s> → <b>' + _alnEsc(para) + '</b></span>';
+}
+function _alnCorpo(d) {
+  var h = '';
+  if (ALN.aba === 'alinhar') {
+    var its = d.itens.slice().sort(function(a, b){ return (a.certeza === 'certa' ? 0 : 1) - (b.certeza === 'certa' ? 0 : 1) || String(b.mes).localeCompare(String(a.mes)); });
+    if (!its.length) return '<div class="aln-vazio">✅ Nada para alinhar: a aba Vendas está igual ao formulário de venda.</div>';
+    h += '<div class="aln-list">';
+    var grp = '';
+    its.forEach(function(i) {
+      var g = i.certeza === 'certa' ? '✓ Certas: telefone, data, produto e valor batem' : '👀 Para conferir antes de gravar';
+      if (g !== grp) { grp = g; h += '<div class="aln-grp">' + g + '</div>'; }
+      h += '<label class="aln-it ' + (i.certeza === 'certa' ? 'cert' : 'conf') + '"><input type="checkbox"' + (ALN.marcadas[i.linha] ? ' checked' : '') + ' onchange="alnMarcar(' + i.linha + ',this.checked)">'
+        + '<div class="aln-q"><b>' + _alnEsc((i.id ? i.id + ' · ' : '') + i.nome) + '</b><small>' + _alnEsc([i.closer, i.data, i.produto].filter(Boolean).join(' · ')) + '</small></div>'
+        + '<div class="aln-m">' + i.mudancas.map(_alnMud).join('') + (i.motivos && i.motivos.length ? '<span class="mot">⚠️ ' + _alnEsc(i.motivos.join(' · ')) + '</span>' : '') + (i.form ? _alnCpDe(i.form.chave) : '') + '</div>'
+        + '<span class="aln-tag ' + (i.certeza === 'certa' ? 'c">✓ certa' : 'f">conferir') + '</span></label>';
+    });
+    var nm = Object.keys(ALN.marcadas).length, nc = d.itens.filter(function(i){ return i.certeza === 'certa'; }).length;
+    h += '</div><div class="aln-pe"><span class="aln-sub">Grava só em "Forma de pagamento" e "Valor" da aba Vendas, com os nomes que a planilha já usa. Antes de gravar o robô confere de novo; tudo vai para o Histórico.</span>'
+      + '<span class="aln-acoes"><button class="aln-btn ok" onclick="alnAplicar(\'certas\')"' + (!nc || ALN.ocupado ? ' disabled' : '') + '>✅ Aplicar as ' + nc + ' certas</button>'
+      + '<button class="aln-btn lar" onclick="alnAplicar(\'marcadas\')"' + (!nm || ALN.ocupado ? ' disabled' : '') + '>Aplicar marcadas (' + nm + ')</button></span></div>';
+    return h;
+  }
+  if (ALN.aba === 'avisos') {
+    var cf = d.conferir || []; if (!cf.length) return '<div class="aln-vazio">✅ Nenhum aviso.</div>';
+    var ordem = ['formulario_sem_venda', 'sem_formulario', 'pagamento_incompleto', 'ligacao_duvidosa'];
+    h += '<div class="aln-list">';
+    ordem.forEach(function(t) {
+      var xs = cf.filter(function(c){ return c.tipo === t; }); if (!xs.length) return;
+      var T = ALN_TIPOS[t] || { ico: '•', nome: t };
+      h += '<div class="aln-grp">' + T.ico + ' ' + T.nome + ' (' + xs.length + ')</div>';
+      xs.forEach(function(c) {
+        h += '<div class="aln-av"><div class="aln-q"><b>' + _alnEsc((c.id ? c.id + ' · ' : '') + c.nome) + '</b><small>' + _alnEsc([c.closer, c.data, c.produto, c.status].filter(Boolean).join(' · ')) + '</small></div>'
+          + '<div class="aln-m"><span>' + _alnEsc(c.texto) + '</span>' + (c.form ? '<span class="cp">Formulário de ' + _alnEsc(c.form.data) + ' · ' + _alnEsc(c.form.programa || '') + (c.form.valor ? ' · ' + _alnRs(c.form.valor) : '') + (c.form.forma ? ' · ' + _alnEsc(String(c.form.forma).slice(0, 50)) : '') + '</span>' + _alnCpDe(c.form.chave) : '') + '</div>'
+          + (c.t8 ? '<button class="aln-btn" onclick="alnFicha(\'' + _alnEsc(c.t8) + '\')">Abrir ficha</button>' : '<span></span>') + '</div>';
+      });
+    });
+    return h + '</div>';
+  }
+  if (ALN.aba === 'comissoes') {
+    var C = d.comissoes || {}; if (C.erro) return '<div class="aln-vazio">' + _alnEsc(C.erro) + '</div>';
+    h += '<div class="aln-tiles"><div class="aln-t"><div class="k">Linhas de venda</div><div class="v">' + (C.linhas || 0) + '</div><div class="s">meses abertos e fechados</div></div>'
+      + '<div class="aln-t"><div class="k">Valor igual ao formulário</div><div class="v" style="color:#3ddc97">' + (C.iguais || 0) + '</div><div class="s">o valor cheio (o da meta) bate</div></div>'
+      + '<div class="aln-t"><div class="k">Divisão do pagamento</div><div class="v">' + (C.divisaoDiferente || 0) + '</div><div class="s">diferente da leitura do formulário: normalmente é o bloqueio/entrada no Pix que o robô ou o financeiro já lançaram. Fica como está.</div></div></div>';
+    var L = (C.lista || []).filter(function(x){ return x.mudancas.some(function(m){ return m.campo === 'valor cheio'; }); });
+    if (!L.length) return h + '<div class="aln-vazio">✅ O valor cheio de todas as linhas é o mesmo do formulário de venda.</div>';
+    h += '<div class="aln-list">';
+    L.forEach(function(x) {
+      var m = x.mudancas.filter(function(y){ return y.campo === 'valor cheio'; })[0], trava = x.corrigida ? 'o financeiro corrigiu esta linha' : (x.fechado ? 'mês fechado' : '');
+      h += '<label class="aln-it ' + (trava ? 'conf' : 'cert') + '"><input type="checkbox"' + (trava ? ' disabled' : '') + (ALN.marcCom[x.chave] ? ' checked' : '') + ' onchange="alnMarcarCom(\'' + _alnEsc(x.chave) + '\',this.checked)">'
+        + '<div class="aln-q"><b>' + _alnEsc(x.aba + ' · ' + x.mes) + '</b><small>linha ' + x.linha + ' · ' + _alnEsc(x.chave) + '</small></div>'
+        + '<div class="aln-m"><span>💰 Valor cheio: <s>' + _alnRs(m.de) + '</s> → <b>' + _alnRs(m.para) + '</b></span>' + (trava ? '<span class="mot">🔒 ' + trava + ': não mexe</span>' : '') + '</div>'
+        + '<span class="aln-tag ' + (trava ? 'r">travada' : 'c">pode') + '</span></label>';
+    });
+    var nmc = Object.keys(ALN.marcCom).length;
+    return h + '</div><div class="aln-pe"><span class="aln-sub">Na Comissões só o valor cheio acompanha o formulário, e só com aprovação. Nunca onde o financeiro corrigiu nem em mês fechado.</span>'
+      + '<button class="aln-btn lar" onclick="alnAplicar(\'marcadas\')"' + (!nmc || ALN.ocupado ? ' disabled' : '') + '>Aplicar marcadas (' + nmc + ')</button></div>';
+  }
+  if (ALN.aba === 'comprovantes') {
+    var P = d.comprovantes || {};
+    h += '<div class="aln-tiles"><div class="aln-t"><div class="k">Lidos</div><div class="v">' + (P.lidos || 0) + '</div><div class="s">' + (P.comErro ? P.comErro + ' sem leitura · ' : '') + Object.keys(P.porTipo || {}).map(function(k){ return k + ' ' + P.porTipo[k]; }).join(' · ') + '</div></div>'
+      + '<div class="aln-t"><div class="k">Pago para outra conta</div><div class="v" style="color:' + (P.naoPromov ? '#ff8a8a' : '#3ddc97') + '">' + (P.naoPromov || 0) + '</div><div class="s">não aparece a Promov como recebedora</div></div>'
+      + '<div class="aln-t"><div class="k">Repetidos</div><div class="v" style="color:' + (P.repetidos ? '#ff8a8a' : '#3ddc97') + '">' + (P.repetidos || 0) + '</div><div class="s">o mesmo comprovante em mais de uma venda</div></div>'
+      + '<div class="aln-t"><div class="k">Pendente / cancelado</div><div class="v" style="color:' + (P.pendentes ? '#ffd166' : '#3ddc97') + '">' + (P.pendentes || 0) + '</div><div class="s">comprovante que não diz "efetivado/aprovado"</div></div></div>';
+    var A = P.alertas || [];
+    h += A.length ? '<div class="aln-list">' + A.map(function(a){ return '<div class="aln-av"><div class="aln-q"><b>' + _alnEsc(a.chave) + '</b><small>' + _alnEsc(a.mes || '') + '</small></div><div class="aln-m"><span>' + _alnEsc(a.texto) + (a.valor ? ' · ' + _alnRs(a.valor) : '') + '</span></div><span class="aln-tag ' + (a.tipo === 'situacao' ? 'f">conferir' : 'r">alerta') + '</span></div>'; }).join('') + '</div>' : '<div class="aln-vazio">' + (P.lidos ? '✅ Nenhum alerta nos comprovantes lidos.' : 'Nenhum comprovante lido ainda.') + '</div>';
+    return h + '<div class="aln-pe"><span class="aln-sub">O robô lê o texto do comprovante pelo Google Drive e guarda só tipo, valor, data, situação, se a Promov recebeu e o ID da transação (na planilha fechada). Os novos são lidos todo dia às 7h.</span>'
+      + '<button class="aln-btn lar" onclick="alnLerComprovantes()"' + (ALN.ocupado ? ' disabled' : '') + '>📥 Ler comprovantes de um mês</button></div>';
+  }
+  var Ls = d.lotes || [];
+  if (!Ls.length) return '<div class="aln-vazio">Nada gravado ainda. Cada vez que alguém aplica (ou o robô alinha sozinho), o lote aparece aqui com o botão de desfazer.</div>';
+  return '<div class="aln-list">' + Ls.map(function(l){ var todo = l.desfeitas >= l.mudancas;
+    return '<div class="aln-av"><div class="aln-q"><b>' + _alnEsc(l.quando) + '</b><small>' + _alnEsc(l.quem) + ' · lote ' + _alnEsc(l.lote) + '</small></div><div class="aln-m"><span>' + l.mudancas + ' mudança' + (l.mudancas > 1 ? 's' : '') + (l.desfeitas ? ' · ' + l.desfeitas + ' desfeita' + (l.desfeitas > 1 ? 's' : '') : '') + '</span></div>'
+      + (todo ? '<span class="aln-tag f">desfeito</span>' : '<button class="aln-btn" onclick="alnDesfazer(\'' + _alnEsc(l.lote) + '\')"' + (ALN.ocupado ? ' disabled' : '') + '>↩ Desfazer</button>') + '</div>'; }).join('') + '</div>';
+}
+
 function vistaPag(v) {
   document.getElementById('pag-cards').style.display = v === 'cards' ? '' : 'none';
   document.getElementById('pag-lista').style.display = v === 'lista' ? '' : 'none';
@@ -16120,6 +16593,8 @@ function aplicarFiltroPag() {
     if (pcards[i]) pcards[i].style.display = ok ? '' : 'none';
     if (ok) { vis++; soma += (window._pagOrdenado[i] || {}).valor || 0; }
   });
+  try { renderFormasPag(); } catch (eFp) { console.warn('formas:', eFp); }
+  try { alnCarregar(false); } catch (eAl) { console.warn('alinhamento:', eAl); }
   var ct = document.getElementById('pag-count');
   if (ct) ct.textContent = vis + ' registros';
   var kp = document.getElementById('pag-kpis');
