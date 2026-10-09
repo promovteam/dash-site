@@ -2897,7 +2897,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-09-1347';
+var VERSAO_DASH = '2026-10-09-1351';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -21928,7 +21928,7 @@ var ACESSOS = [
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
   { nome: 'Ismael',        pin: '6180' },
-  { nome: 'Adm',           adm: true, gestao: true, senhaRobo: true },   // 09/10/2026 (Bruno: "preciso que ele tenha acesso total" · "não quero essa barreira no admin"): igual ao Gabriel — UMA senha na entrada (no lugar do PIN, que saiu do código público) e tudo abre direto; o código para criar a senha vai para o WhatsApp do Bruno     // acesso geral; não vira "Você" sozinho · 09/10/2026 (Bruno: "libera todas as abas no adm"): Comissões, Score e o alinhamento aparecem — os dados só abrem com a senha conferida no robô
+  { nome: 'Adm',           adm: true, gestao: true, pinRobo: true },   // 09/10/2026 (Bruno: "preciso que ele tenha acesso total" · "não quero essa barreira no admin"): igual ao Gabriel — UMA senha na entrada (no lugar do PIN, que saiu do código público) e tudo abre direto; o código para criar a senha vai para o WhatsApp do Bruno     // acesso geral; não vira "Você" sozinho · 09/10/2026 (Bruno: "libera todas as abas no adm"): Comissões, Score e o alinhamento aparecem — os dados só abrem com a senha conferida no robô
   { nome: 'Visitante',     pin: '0000', soOlha: true }   // vê tudo, não mexe em nada
 ];
 // 👤 só o meu: já sabe quem é (e se começa ligado) antes do 1º desenho
@@ -22139,6 +22139,19 @@ function _loginFinEntrar() {
 function loginConferir() {
   if (window._lgFin) { _loginFinEntrar(); return; }
   var senha = (document.getElementById('lg-senha') || {}).value || '';
+  // 🛡 Adm (09/10/2026 — Bruno: "não quero essa barreira no admin" · "vai ser momentâneo"): o PIN é conferido no ROBÔ (não fica
+  // no código público) e já devolve a sessão de admin — Comissões, Score e alinhamento abrem direto, sem a segunda senha
+  var escPr = ACESSOS.filter(function(a){ return a.nome === window._lgEscolhido; })[0];
+  if (escPr && escPr.pinRobo) {
+    if (!senha) return;
+    var btPr = document.querySelector('#lg-pin .btn.primary'); if (btPr) { btPr.disabled = true; btPr.textContent = 'Conferindo…'; }
+    gasPedir({ action: 'admPinEntrar', pin: senha }, function(d) {
+      if (!d || !d.success || !d.token) { if (btPr) { btPr.disabled = false; btPr.textContent = 'Entrar'; } alert((d && d.error) || 'O robô não respondeu: tente de novo.'); return; }
+      try { localStorage.setItem('v2Login', escPr.nome); localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
+      location.reload();
+    }, 40000);
+    return;
+  }
   var quem = null;
   ACESSOS.forEach(function(a){ if (a.nome === window._lgEscolhido && a.pin === senha) quem = a; });
   if (!quem) { alert('Senha errada. Tente de novo (ou peça a sua senha para o Bruno).'); return; }
@@ -22154,6 +22167,8 @@ function loginConferir() {
   renderLeads();
   if (quem.executivo) setTimeout(function() { var nv = document.querySelector('.nav-item[data-s="contratos"]'); if (nv) nv.click(); }, 300);   // o CS trabalha em Contratos
 }
+// Adm que já estava logado sem a sessão do robô: volta para a tela do PIN uma vez (aí já entra com tudo)
+try { if (loginPrecisa() && localStorage.getItem('v2Login') === 'Adm' && !localStorage.getItem('comPainelTok')) localStorage.removeItem('v2Login'); } catch (eAdm) {}
 if (loginPrecisa()) montarLogin();
 // 🔁 sair e entrar com outro acesso (Bruno 08/09/2026: "que tenha opção de mudar de acesso")
 function trocarAcesso() {
