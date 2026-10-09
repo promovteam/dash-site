@@ -2897,7 +2897,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-09-1351';
+var VERSAO_DASH = '2026-10-09-1403';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -33150,6 +33150,10 @@ function scIndexar() {
   scHistIndexar();
 }
 function scChamar() { var c = SCORE.cbs; SCORE.cbs = []; c.forEach(function(f) { try { f(); } catch (e) {} }); }
+function _scUnzip(b64) {   // gzip + base64 do robô → objeto (DecompressionStream: Chrome 80+, Safari 16.4+)
+  var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text().then(function(t) { return JSON.parse(t); });
+}
 function scCarregar(cb) {
   if (SC_FONTE === 'robo') {
     if (SCORE.carregado && SCORE.tokUsado !== scTok()) { SCORE.carregado = false; SCORE.d = null; SCORE.srv = null; SCORE.idx = {}; SCORE.hist = null; }   // trocou quem entrou
@@ -33159,11 +33163,25 @@ function scCarregar(cb) {
     if (SCORE.carregando) return;
     SCORE.carregando = true;
     var tok = scTok();
-    gasPedir({ action: 'scoreDados', token: tok }, function(d) {
+    // 09/10/2026 (Bruno: "que demore menos abrir closer score"): o robô manda comprimido (z=1, ~3× menor) e o dash guarda a última
+    // versão neste computador — o Score abre NA HORA com ela e se atualiza por trás quando chega a nova
+    var podeZ = typeof DecompressionStream === 'function', guard = null;
+    try { guard = podeZ ? JSON.parse(localStorage.getItem('scCacheZ') || 'null') : null; if (guard && guard.t !== String(tok).slice(0, 16)) guard = null; } catch (eG) { guard = null; }
+    var aplicarSc = function(dd) { var tinha = SCORE.carregado; SCORE.d = dd; SCORE.srv = dd.eu || null; SCORE.tokUsado = tok; SCORE.carregado = true; SCORE.trava = ''; scIndexar();
+      if (!tinha) { setTimeout(scHistCarregar, 8000); scChamar(); } else { try { scRedesenhar(); } catch (eR) {} } };
+    if (guard && guard.z) _scUnzip(guard.z).then(function(dd) { dd.eu = guard.eu || dd.eu; if (!SCORE.carregado) aplicarSc(dd); }).catch(function() {});
+    gasPedir({ action: 'scoreDados', token: tok, z: podeZ ? 1 : '' }, function(d) {
       SCORE.carregando = false;
-      if (d && d.success && d.closer) { SCORE.d = d; SCORE.srv = d.eu || null; SCORE.tokUsado = tok; SCORE.carregado = true; SCORE.trava = ''; scIndexar(); setTimeout(scHistCarregar, 8000); }   // v235: as notas antigas vêm depois que o dash abriu
-      else if (d && d.precisaCodigo) { SCORE.trava = 'senha'; SCORE.tokRuim = tok; }
-      else if (d && d.fechado) { SCORE.trava = 'fechado'; SCORE.tokRuim = tok; }
+      if (d && d.success && d.z) {
+        if (guard && guard.z === d.z && SCORE.carregado) return;   // nada mudou: não redesenha
+        try { localStorage.setItem('scCacheZ', JSON.stringify({ t: String(tok).slice(0, 16), z: d.z, eu: d.eu, em: Date.now() })); } catch (eS) { try { localStorage.removeItem('scCacheZ'); } catch (eS2) {} }
+        _scUnzip(d.z).then(function(dd) { dd.eu = d.eu || dd.eu; aplicarSc(dd); }).catch(function() { if (!SCORE.carregado) { SCORE.trava = 'erro'; SCORE.erroEm = Date.now(); scChamar(); } });
+        return;
+      }
+      if (d && d.success && d.closer) { aplicarSc(d); return; }   // robô antigo (sem compressão)
+      if (SCORE.carregado && !(d && (d.precisaCodigo || d.fechado))) return;   // ficou com a versão guardada
+      if (d && d.precisaCodigo) { SCORE.trava = 'senha'; SCORE.tokRuim = tok; SCORE.carregado = false; try { localStorage.removeItem('scCacheZ'); } catch (eC) {} }
+      else if (d && d.fechado) { SCORE.trava = 'fechado'; SCORE.tokRuim = tok; SCORE.carregado = false; }
       else { SCORE.trava = 'erro'; SCORE.erroEm = Date.now(); }
       scChamar();
     }, 90000);
