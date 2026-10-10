@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0131';
+var VERSAO_DASH = '2026-10-10-0132';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -34154,7 +34154,8 @@ function trnVerAtualizar() {   // tudo da tela de assistir menos o vídeo
       if (ps.s > 10) h += '<div class="tr-dica">Começa de ' + trnRelogio(ps.s) + ', onde você parou.</div>';
     }
     if (c.descricao) h += '<p class="tr-desc">' + _trnE(c.descricao) + '</p>';
-    if (c.tipo === 'video' && c.arquivo && Date.now() - trnMs(c.em) < 3 * 3600000) h += '<div class="tr-dica">Vídeo novo: se aparecer "processando", o Google ainda está preparando. Volte em alguns minutos.</div>';
+    // só quando o vídeo caiu no player do Drive (o player do dash toca o arquivo na hora, sem esperar o Google)
+    if (c.tipo === 'video' && c.arquivo && !trnVideoProprio(c) && Date.now() - trnMs(c.em) < 3 * 3600000) h += '<div class="tr-dica">Vídeo novo: se aparecer "processando", o Google ainda está preparando este formato. Costuma levar de alguns minutos a meia hora.</div>';
     h += '<div class="tr-botoes">';
     if (t) {
       var i = t.itens.indexOf(c.id);
@@ -34588,7 +34589,7 @@ function trnSalvo(r) {
   var br = document.getElementById('trn-env-barra'); if (br) br.style.width = '100%';
   var tx = document.getElementById('trn-env-txt'); if (tx) tx.textContent = '';
   var video = e.modo === 'arquivo' && e.arq && /^video\//.test(e.arq.type || '');
-  trnMsg('✅ Pronto!' + (video ? ' O Google leva alguns minutos para preparar o vídeo: se aparecer "processando", é só esperar.' : '') + (r.aviso ? ' Atenção: ' + r.aviso + '.' : ''), r.aviso ? 'erro' : 'ok');
+  trnMsg('✅ Pronto!' + (video ? ' Já dá para assistir.' : '') + (r.aviso ? ' Atenção: ' + r.aviso + '.' : ''), r.aviso ? 'erro' : 'ok');
   var tri = trnVal('trn-tri'), rod = document.getElementById('trn-rodape');
   if (rod) rod.innerHTML = '<span><button class="btn" onclick="trnSubirAbrir()">⬆ Subir outro</button><button class="btn primary" onclick="trnFechar();trnVer(\'' + _trnId(tri) + '\',\'' + _trnId(r.id) + '\')">Ver agora</button></span>';
   Array.prototype.forEach.call(document.querySelectorAll('#trn-fundo input, #trn-fundo textarea, #trn-fundo select, #trn-fundo .tr-modo button'), function(x) { x.disabled = true; });
