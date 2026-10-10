@@ -1753,7 +1753,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
         <button class="chart-chip" data-p="ontem" onclick="mudarPeriodoLeads('ontem', this)">Ontem</button>
         <button class="chart-chip" data-p="sem" onclick="mudarPeriodoLeads('sem', this)">Semana</button>
         <button class="chart-chip" data-p="mes" onclick="mudarPeriodoLeads('mes', this)">Mês</button>
-        <button class="chart-chip" data-p="tri" onclick="mudarPeriodoLeads('tri', this)">Trimestre</button>
+        <button class="chart-chip" data-p="tri" onclick="mudarPeriodoLeads('tri', this)" title="Este mês e os dois anteriores">Últimos 3 meses</button>
         <button class="chart-chip" data-p="ano" onclick="mudarPeriodoLeads('ano', this)">Ano</button>
         <button class="chart-chip" data-p="tudo" onclick="mudarPeriodoLeads('tudo', this)">Tudo</button>
         <button class="chart-chip" id="ld-chip-datas" onclick="abrirDatasLeads()" title="Escolher um período de datas">📅 Datas…</button>
@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0138';
+var VERSAO_DASH = '2026-10-10-0156';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -9785,7 +9785,7 @@ function anPeriodoDe(chave, de, ate) {
   else if (chave === 'mes') { ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(); }
   else if (chave === 'mesant') { ini = new Date(hoje.getFullYear(), hoje.getMonth()-1, 1); fim = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[(hoje.getMonth()+11)%12] + ' de ' + (hoje.getMonth()===0?hoje.getFullYear()-1:hoje.getFullYear()); }
   else if (chave === 'sem') { ini = ldIniSemana(hoje); label = 'Esta semana'; }
-  else if (chave === 'tri') { ini = ldIniTri(hoje); label = 'Trimestre'; }
+  else if (chave === 'tri') { ini = ldIni3Meses(hoje); label = ld3MesesRotulo(hoje); }   // 10/10/2026: "Trimestre" = este mês e os dois anteriores (o do calendário, no começo do trimestre, repetia "Este mês")
   else if (chave === 'ano') { ini = new Date(hoje.getFullYear(), 0, 1); label = 'Ano de ' + hoje.getFullYear(); }
   else { ini = null; label = 'Tudo'; }
   return { ini: ini ? ini.getTime() : null, fim: fim ? fim.getTime() : null, label: label };
@@ -10506,7 +10506,7 @@ function renderAnuncios() {
   // chips de período
   var chips = document.getElementById('an-chips');
   if (chips) {
-    var ops = [['sem','Esta semana'],['mes','Este mês'],['mesant','Mês passado'],['tri','Trimestre'],['ano','Ano'],['tudo','Tudo']];
+    var ops = [['sem','Esta semana'],['mes','Este mês'],['mesant','Mês passado'],['tri','Últimos 3 meses'],['ano','Ano'],['tudo','Tudo']];
     chips.innerHTML = ops.map(function(o){
       return '<span class="chart-chip' + (AN_PER === o[0] ? ' on' : '') + '" style="cursor:pointer;" onclick="AN_PER=\'' + o[0] + '\';AN_DE=AN_ATE=null;renderAnuncios();">' + o[1] + '</span>';
     }).join('')
@@ -10611,7 +10611,8 @@ function renderAnuncios() {
   // gasto/imagem do Facebook, se conectado — só pede ao robô com a aba Criativos na tela
   if (telaVisivel('s-anuncios')) carregarMetaAds(per);
   var metaPor = {};
-  if (META.dados) metaPor = metaPorAnuncio();   // 03/10/2026: soma o gasto do anúncio em todos os conjuntos
+  var _metaDoPer = !!(META.dados && META.dados._chave === metaChaveDe(per));   // 10/10/2026: o gasto na tela tem de ser do período escolhido
+  if (_metaDoPer) metaPor = metaPorAnuncio();   // 03/10/2026: soma o gasto do anúncio em todos os conjuntos
 
   // as postagens que a equipe cadastrou entram na lista junto com os anúncios,
   // mesmo as que ainda não trouxeram lead (Bruno 19/08/2026)
@@ -10687,7 +10688,12 @@ function renderAnuncios() {
         return '<span class="chart-chip' + (AN_SO===o[0]?' on':'') + '" style="cursor:pointer;" onclick="AN_SO=\'' + o[0] + '\';AN_QUANTOS=40;renderAnuncios();">' + o[1] + '</span>'; }).join('')
     + '</span></div>';
   // 03/10/2026 (Bruno: "sobre o valor do tráfego, consegue separar o que é diagnóstico do que é workshop?")
-  if (META.dados && (META.dados.anuncios || []).length) {
+  if (META.dados && !_metaDoPer) {
+    var _mk = metaChaveDe(per), _falhouPer = META._falhou && Date.now() - (META._falhou[_mk] || 0) < 120000, _and = META._andamento && META._andamento.chave === _mk ? META._andamento : null;
+    h += '<div class="hint" style="margin-top:10px;' + (_falhouPer ? 'color:#f6a350;' : '') + '">' + (_falhouPer ? '💸 O Facebook não devolveu o investimento de ' + per.label + ' agora. Tento de novo em 2 minutos; os leads, reuniões e vendas abaixo já são do período.'
+      : '⏳ Buscando no Facebook o investimento de ' + per.label + '<span id="an-inv-n">' + (_and && _and.total > 1 ? ' (' + _and.feitos + ' de ' + _and.total + ' meses)' : '') + '</span>… Os leads, reuniões e vendas abaixo já são do período.') + '</div>';
+  }
+  if (_metaDoPer && (META.dados.anuncios || []).length) {
     var _gt = metaGastoPorTipo(META.dados.anuncios), _gtot = _gt.diagnostico + _gt.workshop + _gt.imersao;
     var _rs = function(v){ return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); };
     if (_gtot > 0) h += '<div class="an-gasto-tipos" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.09);">'
@@ -12012,53 +12018,95 @@ function metaChaveDe(per) {
   var fmt = function(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); };
   return fmt(ini) + '_' + fmt(fim);
 }
+// 10/10/2026 (Bruno: "esses filtros não estão puxando os criativos do período"): período longo (3 meses, ano) levava 1 a 3 minutos
+// no robô e o dash desistia em 60 s — a tela ficava com o investimento do período ANTERIOR, sem avisar. Agora o período é buscado
+// MÊS A MÊS (cada mês leva poucos segundos e fica guardado no navegador: mês fechado por 7 dias, mês corrente por 3 horas) e
+// somado aqui. Trocar de período não espera mais o anterior terminar: o pedido novo passa na frente.
+function _metaFmt(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
+function _metaPedacos(ini, fim) {
+  var out = [], a = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate()), ult = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate());
+  while (a <= ult && out.length < 40) {
+    var fimMes = new Date(a.getFullYear(), a.getMonth() + 1, 0), ate = fimMes < ult ? fimMes : ult;
+    out.push({ desde: _metaFmt(a), ate: _metaFmt(ate) });
+    a = new Date(a.getFullYear(), a.getMonth() + 1, 1);
+  }
+  return out;
+}
+var META_PED = {};        // pedaços (meses) já buscados nesta visita: 'desde_ate' → resposta do robô
+var _metaEmVoo = 0, _metaFilaPed = [];
+function _metaPedacoLer(p) {
+  var k = p.desde + '_' + p.ate, hoje = _metaFmt(new Date());
+  if (META_PED[k]) return META_PED[k];
+  try {
+    var g = JSON.parse(localStorage.getItem('v2MetaGasto_' + k) || 'null');
+    var vale = p.ate < hoje ? 7 * 86400000 : 3 * 3600000;   // mês que já fechou não muda mais
+    if (g && g.quando && Date.now() - g.quando < vale && g.dados) { META_PED[k] = g.dados; return g.dados; }
+  } catch (e) {}
+  return null;
+}
+function _metaPedacoBuscar(p, cb) {
+  var k = p.desde + '_' + p.ate, ja = _metaPedacoLer(p);
+  if (ja) { cb(ja); return; }
+  _metaFilaPed.push({ p: p, cb: cb }); _metaPedacoAndar();
+}
+function _metaPedacoAndar() {
+  while (_metaEmVoo < 3 && _metaFilaPed.length) {
+    (function(it) {
+      var p = it.p, k = p.desde + '_' + p.ate;
+      if (META_PED[k]) { it.cb(META_PED[k]); return; }
+      _metaEmVoo++;
+      var nome = 'metaCb' + Math.random().toString(36).slice(2, 8), sc = document.createElement('script'), pronto = false;
+      var fim = function(d) {
+        if (pronto) return; pronto = true; _metaEmVoo--;
+        try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+        if (d && d.success) { META_PED[k] = d; try { localStorage.setItem('v2MetaGasto_' + k, JSON.stringify({ quando: Date.now(), dados: d })); } catch (e) {} }
+        it.cb(d && d.success ? d : null, d);
+        _metaPedacoAndar();
+      };
+      window[nome] = fim; sc.onerror = function(){ fim(null); };
+      sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'metaAnuncios', desde: p.desde, ate: p.ate }));
+      document.body.appendChild(sc);
+      setTimeout(function(){ fim(null); }, 90000);
+    })(_metaFilaPed.shift());
+  }
+}
 function carregarMetaAds(per) {
-  // 03/10/2026 (varredura): com outro período sendo buscado (ex.: Criativos no mês e Relatório no mês anterior), o pedido
-  // era descartado e o Relatório ficava sem o investimento — agora fica na fila e é buscado em seguida
-  if (META.buscando) { META._fila = per || null; META._temFila = true; return; }
   var ini = per && per.ini ? new Date(per.ini) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   var fim = per && per.fim ? new Date(per.fim - 1) : new Date();
-  function fmt(d){ return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
-  var chave = fmt(ini) + '_' + fmt(fim);
+  var chave = _metaFmt(ini) + '_' + _metaFmt(fim);
   if (META.dados && META.dados._chave === chave) return;
+  if (META._pedindo === chave) return;                                                        // este período já está sendo buscado
   if (META._falhou && Date.now() - (META._falhou[chave] || 0) < 120000) return;   // falhou há pouco: não insiste (evita pedir sem parar)
-  // o gasto de cada anúncio também fica guardado no navegador por 3 horas:
-  // a aba abre com os números na hora e só depois confere com o Facebook
-  try {
-    var g = JSON.parse(localStorage.getItem('v2MetaGasto_' + chave) || 'null');
-    if (g && g.quando && Date.now() - g.quando < 3 * 3600 * 1000 && g.dados) {
-      META.dados = g.dados;
-      META.dados._chave = chave;
-      renderAnuncios();
-    }
-  } catch (e) {}
-  META.buscando = true;
-  var nome = 'metaCb' + Math.random().toString(36).slice(2, 8);
-  var sc = document.createElement('script');
-  var pronto = false;
-  var fim2 = function(d) {
-    if (pronto) return;
-    pronto = true; META.buscando = false;
-    try { sc.remove(); } catch (e) {}
-    try { delete window[nome]; } catch (e) {}
-    if (d && d.success) {
-      d._chave = chave; META.dados = d; META.erro = '';
+  var ped = _metaPedacos(ini, fim), partes = [], faltam = ped.length, ruins = 0, erro = '';
+  META._pedindo = chave; META.buscando = true;
+  var fechar = function() {
+    if (META._pedindo !== chave) return;   // o Bruno já trocou de período: este resultado fica só guardado (os meses), não vai para a tela
+    META._pedindo = ''; META.buscando = false;
+    if (ruins) {
+      META._falhou = META._falhou || {}; META._falhou[chave] = Date.now();
+      if (!META.dados) { META.erro = erro || 'sem resposta'; }
+    } else {
+      var an = [], total = 0, atual = '', conta = '';
+      partes.forEach(function(d) { an = an.concat(d.anuncios || []); total += +d.gastoTotal || 0; if (d.atualizado) atual = d.atualizado; if (d.conta) conta = d.conta; });
+      META.dados = { success: true, desde: _metaFmt(ini), ate: _metaFmt(fim), conta: conta, gastoTotal: Math.round(total * 100) / 100, anuncios: an, atualizado: atual, _chave: chave, _meses: ped.length };
+      META.erro = '';
       setTimeout(function(){ try { pedirCriativosQueFaltam(); } catch (eF) {} }, 1500);
-      try { localStorage.setItem('v2MetaGasto_' + chave, JSON.stringify({ quando: Date.now(), dados: d })); } catch (e) {}
     }
-    else if (!META.dados) { META.erro = (d && (d.detalhe || d.error)) || 'sem resposta'; META.dados = null; }
-    if (!(d && d.success)) { META._falhou = META._falhou || {}; META._falhou[chave] = Date.now(); }
-    renderLeads();
-    try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e) {}
-    try { if (telaVisivel('s-relatorio') && typeof rlRender === 'function') rlRender(); } catch (eRl) {}   // o Relatório também mostra o investimento
-    if (META._temFila) { var fila = META._fila; META._temFila = false; META._fila = null; setTimeout(function() { try { carregarMetaAds(fila); } catch (eF2) {} }, 50); }
+    setTimeout(function() {   // desenha depois: quando os meses já estavam guardados isto roda no meio de um desenho
+      try { renderLeads(); } catch (eL) {}
+      try { if (telaVisivel('s-anuncios')) renderAnuncios(); } catch (e) {}
+      try { if (telaVisivel('s-relatorio') && typeof rlRender === 'function') rlRender(); } catch (eRl) {}   // o Relatório também mostra o investimento
+    }, 0);
   };
-  window[nome] = fim2;
-  sc.onerror = function(){ fim2(null); };
-  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload='
-    + encodeURIComponent(JSON.stringify({ action: 'metaAnuncios', desde: fmt(ini), ate: fmt(fim) }));
-  document.body.appendChild(sc);
-  setTimeout(function(){ fim2(null); }, 60000);
+  if (!ped.length) { META._pedindo = ''; META.buscando = false; return; }
+  ped.forEach(function(p, i) {
+    _metaPedacoBuscar(p, function(d, bruto) {
+      if (d) partes[i] = d; else { ruins++; erro = (bruto && (bruto.detalhe || bruto.error)) || erro; }
+      META._andamento = { chave: chave, feitos: ped.length - (faltam - 1), total: ped.length };
+      if (META._pedindo === chave && ped.length > 1) { var _en = document.getElementById('an-inv-n'); if (_en) _en.textContent = ' (' + META._andamento.feitos + ' de ' + ped.length + ' meses)'; }   // o contador anda na tela
+      if (--faltam === 0) fechar();
+    });
+  });
 }
 // junta o nome do anúncio do Facebook com o utm_content da planilha
 function _chaveAnuncio(n) {
@@ -13274,7 +13322,11 @@ function limparDatasLeads() {
 var LD_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 function ldDia(d){ var x = new Date(d); x.setHours(0,0,0,0); return x; }
 function ldIniSemana(d){ var x = ldDia(d); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; } // semana começa na segunda
-function ldIniTri(d){ return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1); }
+function ldIniTri(d){ return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1); }   // trimestre do calendário (só o quadro "Por trimestre" usa)
+// 10/10/2026 (Bruno: "esses filtros não estão puxando os criativos do período"): o filtro "Trimestre" virou "Últimos 3 meses" =
+// o mês de agora e os dois anteriores. Antes era o trimestre do calendário: em 10/10 ele começava em 01/10 e mostrava o mesmo que "Este mês".
+function ldIni3Meses(d){ return new Date(d.getFullYear(), d.getMonth() - 2, 1); }
+function ld3MesesRotulo(d){ var i = ldIni3Meses(d), c = function(m){ return String(LD_MESES[m] || '').slice(0, 3).toLowerCase(); }; return 'Últimos 3 meses · ' + c(i.getMonth()) + ' a ' + c(d.getMonth()); }
 // filtra pelo período escolhido; se o período atual não tiver lead, mostra o último que teve
 function ldPeriodo() {
   function filtra(ini, fim) {
@@ -13287,15 +13339,15 @@ function ldPeriodo() {
   else if (LD_PER === 'ontem') { ini = new Date(hoje.getTime() - 864e5); fim = hoje; label = 'Ontem · ' + ini.toLocaleDateString('pt-BR'); }
   else if (LD_PER === 'sem') { ini = ldIniSemana(hoje); label = 'Esta semana (desde ' + ini.toLocaleDateString('pt-BR').slice(0,5) + ')'; }
   else if (LD_PER === 'mes') { ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1); label = LD_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(); }
-  else if (LD_PER === 'tri') { ini = ldIniTri(hoje); label = (Math.floor(hoje.getMonth()/3)+1) + 'º trimestre de ' + hoje.getFullYear(); }
+  else if (LD_PER === 'tri') { ini = ldIni3Meses(hoje); label = ld3MesesRotulo(hoje); }
   else if (LD_PER === 'ano') { ini = new Date(hoje.getFullYear(), 0, 1); label = 'Ano de ' + hoje.getFullYear(); }
   var rows = filtra(ini, fim);
   if (!rows.length && LD.rows.length && LD_PER !== 'tudo') {
     var ult = LD.rows[0].date;
-    var nomes = { hoje:'hoje', ontem:'ontem', sem:'nesta semana', mes:'neste mês', tri:'neste trimestre', ano:'neste ano' };
+    var nomes = { hoje:'hoje', ontem:'ontem', sem:'nesta semana', mes:'neste mês', tri:'nos últimos 3 meses', ano:'neste ano' };
     if (LD_PER === 'sem') { ini = ldIniSemana(ult); fim = new Date(ini.getTime() + 7*864e5); label = 'Semana de ' + ini.toLocaleDateString('pt-BR').slice(0,5); }
     else if (LD_PER === 'mes') { ini = new Date(ult.getFullYear(), ult.getMonth(), 1); fim = new Date(ult.getFullYear(), ult.getMonth()+1, 1); label = LD_MESES[ult.getMonth()] + ' de ' + ult.getFullYear(); }
-    else if (LD_PER === 'tri') { ini = ldIniTri(ult); fim = new Date(ini.getFullYear(), ini.getMonth()+3, 1); label = (Math.floor(ult.getMonth()/3)+1) + 'º trimestre de ' + ult.getFullYear(); }
+    else if (LD_PER === 'tri') { ini = ldIni3Meses(ult); fim = new Date(ini.getFullYear(), ini.getMonth()+3, 1); label = ld3MesesRotulo(ult).replace('Últimos 3 meses · ', '') + ' de ' + ult.getFullYear(); }
     else if (LD_PER === 'ano') { ini = new Date(ult.getFullYear(), 0, 1); fim = new Date(ult.getFullYear()+1, 0, 1); label = 'Ano de ' + ult.getFullYear(); }
     else { ini = ldDia(ult); fim = new Date(ini.getTime() + 864e5); label = ini.toLocaleDateString('pt-BR'); }
     rows = filtra(ini, fim);
