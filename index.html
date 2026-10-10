@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0245';
+var VERSAO_DASH = '2026-10-10-0300';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25453,6 +25453,22 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .tr-prox-mod { display:flex; flex-direction:column; gap:3px; width:100%; margin-top:8px; padding:12px; border-radius:12px; text-align:left; font:inherit; color:var(--text); cursor:pointer; background:rgba(246,163,80,.08); border:1px solid rgba(246,163,80,.28); }
 .tr-prox-mod:hover { background:rgba(246,163,80,.14); } .tr-prox-mod b { font-size:.84rem; } .tr-prox-mod.travado { opacity:.6; cursor:not-allowed; }
 .tr-quem-larga { margin-top:22px; max-width:560px; }
+/* 📖 leitor de PDF do dash */
+.tr-player.leitor { aspect-ratio:auto; height:80vh; min-height:480px; background:#15171c; display:flex; flex-direction:column; }
+.tr-lt-barra { flex:none; display:flex; align-items:center; gap:6px; padding:8px 12px; background:rgba(10,11,14,.9); border-bottom:1px solid rgba(255,255,255,.08); }
+.tr-lt-barra button { min-width:34px; height:32px; padding:0 10px; border:1px solid rgba(255,255,255,.1); border-radius:9px; background:rgba(255,255,255,.05); color:#fff; font:inherit; font-size:.9rem; font-weight:800; cursor:pointer; }
+.tr-lt-barra button:hover { background:rgba(255,255,255,.12); }
+.tr-lt-barra button:focus-visible, .tr-lt-rolo:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.tr-lt-pag { min-width:118px; text-align:center; font-size:.78rem; font-weight:800; color:#fff; font-variant-numeric:tabular-nums; }
+.tr-lt-zoom { min-width:44px; text-align:center; font-size:.72rem; font-weight:700; color:var(--text2); font-variant-numeric:tabular-nums; }
+.tr-lt-prog { flex:3; max-width:320px; height:5px; border-radius:5px; background:rgba(255,255,255,.1); overflow:hidden; }
+.tr-lt-prog i { display:block; height:100%; width:0; border-radius:5px; background:linear-gradient(90deg, #f6a350, #ffc27a); transition:width .3s; }
+.tr-lt-rolo { flex:1; min-height:0; overflow:auto; padding:14px; display:flex; flex-direction:column; align-items:center; gap:12px; outline:none; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.25) transparent; }
+.tr-lt-pg { flex:none; max-width:none; display:grid; place-items:center; background:#fff; border-radius:4px; box-shadow:0 8px 26px rgba(0,0,0,.45); color:#b6bac4; font-size:1.4rem; font-weight:800; overflow:hidden; }
+.tr-lt-pg canvas { display:block; width:100%; height:100%; }
+.tr-player.leitor .tr-sobre { inset:auto 14px 18px 14px; }
+.tr-player.leitor:fullscreen { height:100vh; } .tr-player.leitor:-webkit-full-screen { height:100vh; }
+@media (max-width:640px) { .tr-lt-prog { display:none; } .tr-lt-pag { min-width:96px; } .tr-player.leitor { height:74vh; } }
 .sc-nota-topo { font-size:.72rem; color:var(--muted); font-weight:600; margin:2px 0 14px; line-height:1.5; }
 .sc-nota-topo b { color:var(--text2); }
 .sc-jornada { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
@@ -34226,7 +34242,7 @@ function trnHeroHtml() {
   var x = trnContinuar(); if (!x) return '';
   var c = x.c, t = x.t, i = t ? t.itens.indexOf(c.id) : -1, pct = trnPct(c.id);
   var onde = t ? _trnE(t.nome) + ' · aula ' + (i + 1) + ' de ' + t.itens.length : (TRN_TIPO[c.tipo] || '');
-  var parou = !x.novo && x.p.s ? 'Parou em ' + trnRelogio(x.p.s) + (x.p.d ? ' de ' + trnRelogio(x.p.d) : '') : (c.min ? trnMin(c.min) : '');
+  var parou = !x.novo && x.p.s ? (c.tipo === 'pdf' ? 'Parou na página ' + x.p.s + (x.p.d ? ' de ' + x.p.d : '') : 'Parou em ' + trnRelogio(x.p.s) + (x.p.d ? ' de ' + trnRelogio(x.p.d) : '')) : (c.min ? trnMin(c.min) : '');
   return '<button class="glass click tr-hero" onclick="trnVer(\'' + _trnId(t ? t.id : '') + '\',\'' + _trnId(c.id) + '\')">'
     + trnCapa(c, '<span class="tr-play" aria-hidden="true">▶</span>')
     + '<span class="tr-hero-txt"><span class="tr-eyebrow">' + (x.novo ? 'Comece por aqui' : 'Continue de onde parou') + '</span><b>' + _trnE(c.titulo) + '</b><span class="tr-meta">' + onde + '</span>'
@@ -34364,6 +34380,149 @@ function trnEmbed(c, seg) {
 function trnVideoProprio(c) { return c.tipo === 'video' && c.arquivo && typeof GV_CHAVE !== 'undefined' && GV_CHAVE && !TRN['semPlayer_' + c.id]; }
 function trnVideoSrc(c) { return 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(c.arquivo) + '?alt=media&key=' + encodeURIComponent(GV_CHAVE); }
 function trnDur(v) { return v && isFinite(v.duration) ? v.duration : 0; }
+// 📖 LEITOR DE PDF DO PRÓPRIO DASH (Bruno 10/10/2026: "quero um lugar também onde ele possa ler de dentro do dash, fique salvo
+// avanço e etc"): o PDF enviado pelo dash abre aqui (biblioteca pdf.js), página por página, e o dash guarda a página em que a
+// pessoa está (no aparelho na hora; no robô a cada minuto e ao sair, pelo mesmo treinoPosicao do vídeo: seg = página, dur = total).
+// Volta na página em que parou, conta o tempo de leitura no "tempo estudado" e conclui sozinho com 80% das páginas lidas.
+// Sem a chave do Google, ou se a biblioteca não carregar, cai no leitor do Drive (sem guardar a página).
+var TRN_PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+function trnArqSrc(c) { return 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(c.arquivo) + '?alt=media&key=' + encodeURIComponent(GV_CHAVE); }
+function trnLeitorProprio(c) { return c.tipo === 'pdf' && !!c.arquivo && typeof GV_CHAVE !== 'undefined' && !!GV_CHAVE && !TRN['semLeitor_' + c.id]; }
+function trnPdfLib(cb) {
+  if (window.pdfjsLib) { cb(window.pdfjsLib); return; }
+  if (TRN._pdfEsp) { TRN._pdfEsp.push(cb); return; }
+  TRN._pdfEsp = [cb];
+  var fim = function(ok) { var L = ok ? window.pdfjsLib : null; if (L) { try { L.GlobalWorkerOptions.workerSrc = TRN_PDFJS + 'pdf.worker.min.js'; } catch (e) {} } var f = TRN._pdfEsp || []; TRN._pdfEsp = null; f.forEach(function(x) { x(L || null); }); };
+  var sc = document.createElement('script'); sc.src = TRN_PDFJS + 'pdf.min.js'; sc.onload = function() { fim(true); }; sc.onerror = function() { fim(false); };
+  document.head.appendChild(sc);
+}
+function trnLeitorLigar(c) {
+  var rolo = document.getElementById('trn-lt-rolo'), palco = document.getElementById('trn-palco'); if (!rolo || !palco) return;
+  var L = TRN.l = { id: c.id, pag: 1, total: 0, lido: 0, zoom: 1, doc: null, feitas: {}, mexeu: Date.now(), aberto: Date.now(), enviadoEm: Date.now(), ultEnv: 0 };
+  var falhou = function() {   // cai no leitor do Drive
+    if (TRN.l !== L) return;
+    TRN['semLeitor_' + c.id] = true; trnLeitorSoltar(true);
+    var pc = document.getElementById('trn-palco'); if (pc) pc.removeAttribute('data-id');
+    trnRender();
+  };
+  trnAbriu();   // o dia já conta como dia de estudo
+  trnPdfLib(function(lib) {
+    if (TRN.l !== L) return; if (!lib) { falhou(); return; }
+    var tarefa; try { tarefa = lib.getDocument({ url: trnArqSrc(c), disableRange: true, disableStream: true, disableAutoFetch: true }); } catch (e) { falhou(); return; }
+    tarefa.promise.then(function(doc) {
+      if (TRN.l !== L) { try { doc.destroy(); } catch (e) {} return; }
+      L.doc = doc; L.total = doc.numPages;
+      return doc.getPage(1).then(function(p1) {
+        if (TRN.l !== L) return;
+        var vp = p1.getViewport({ scale: 1 }); L.prop = vp.height / vp.width;
+        var h = ''; for (var i = 1; i <= L.total; i++) h += '<div class="tr-lt-pg" data-p="' + i + '"><span>' + i + '</span></div>';
+        rolo.innerHTML = h; trnLeitorMedir();
+        L.obs = new IntersectionObserver(function(es) { es.forEach(function(e) { if (e.isIntersecting) trnLeitorPagina(+e.target.getAttribute('data-p')); }); }, { root: rolo, rootMargin: '700px 0px' });
+        Array.prototype.forEach.call(rolo.children, function(x) { L.obs.observe(x); });
+        var ini = trnPosDe(c.id), pg = Math.min(L.total, Math.max(1, Math.round(ini.s || 1)));
+        if (ini.d && ini.d !== L.total) pg = 1;   // o que estava guardado era de outro arquivo
+        L.pag = pg;
+        if (pg > 1) { trnLeitorIr(pg); trnSobre('<div class="tr-retoma"><span>📖 Continuando da <b>página ' + pg + '</b></span><button type="button" onclick="trnLeitorIr(1);document.getElementById(\'trn-sobre\').classList.remove(\'on\')">Voltar ao início</button></div>', 6000); }
+        trnLeitorPinta();
+        rolo.addEventListener('scroll', function() { L.mexeu = Date.now(); if (L._t) return; L._t = setTimeout(function() { L._t = 0; trnLeitorOnde(); }, 150); }, { passive: true });
+        ['mousemove', 'keydown', 'pointerdown', 'wheel', 'touchstart'].forEach(function(n) { palco.addEventListener(n, function() { L.mexeu = Date.now(); }, { passive: true }); });
+        L._red = function() { clearTimeout(L._tr); L._tr = setTimeout(function() { if (TRN.l === L) trnLeitorZoom(0); }, 250); };
+        window.addEventListener('resize', L._red); document.addEventListener('fullscreenchange', L._red);
+        // tempo de leitura: conta enquanto a aba está na frente e a pessoa mexeu no último minuto e meio
+        L.rel = setInterval(function() {
+          if (TRN.l !== L) return;
+          var sec = document.getElementById('s-treinos');
+          if (document.visibilityState === 'visible' && sec && sec.classList.contains('active') && Date.now() - L.mexeu < 90000) L.lido += 5;
+          if (Date.now() - L.enviadoEm > 60000) trnLeitorEnviar();
+        }, 5000);
+      });
+    }).catch(falhou);
+  });
+  var q = function(a) { return palco.querySelector('[data-l="' + a + '"]'); };
+  q('ant').onclick = function() { trnLeitorIr(Math.max(1, L.pag - 1)); };
+  q('prox').onclick = function() { trnLeitorIr(Math.min(L.total || 1, L.pag + 1)); };
+  q('menos').onclick = function() { trnLeitorZoom(-.2); };
+  q('mais').onclick = function() { trnLeitorZoom(.2); };
+  q('tela').onclick = function() { var fs = document.fullscreenElement || document.webkitFullscreenElement; try { if (fs) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else (palco.requestFullscreen || palco.webkitRequestFullscreen).call(palco); } catch (e) {} };
+}
+// largura das páginas: a largura do leitor (até 1.000 px) × o zoom
+function trnLeitorMedir() {
+  var L = TRN.l, rolo = document.getElementById('trn-lt-rolo'); if (!L || !rolo || !L.prop) return;
+  var w = Math.round(Math.min(1000, rolo.clientWidth - 28) * L.zoom);
+  Array.prototype.forEach.call(rolo.children, function(x) { x.style.width = w + 'px'; x.style.height = Math.round(w * L.prop) + 'px'; });
+}
+function trnLeitorPagina(n) {   // desenha a página quando ela chega perto da tela
+  var L = TRN.l, rolo = document.getElementById('trn-lt-rolo'); if (!L || !L.doc || !rolo || L.feitas[n] === L.zoom) return;
+  var box = rolo.querySelector('[data-p="' + n + '"]'); if (!box) return;
+  L.feitas[n] = L.zoom; var z = L.zoom;
+  L.doc.getPage(n).then(function(pg) {
+    if (TRN.l !== L || L.zoom !== z) return;
+    var dpr = Math.min(2, window.devicePixelRatio || 1), larg = box.clientWidth || 600, vp = pg.getViewport({ scale: larg / pg.getViewport({ scale: 1 }).width * dpr });
+    var cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+    return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function() {
+      if (TRN.l !== L || L.zoom !== z) return;
+      box.style.height = Math.round(vp.height / dpr) + 'px'; box.innerHTML = ''; box.appendChild(cv); box.classList.add('ok');
+    });
+  }).catch(function() { L.feitas[n] = null; });
+}
+function trnLeitorOnde() {   // em que página a pessoa está (a que cruza o meio da tela; no fim da rolagem, a última)
+  var L = TRN.l, rolo = document.getElementById('trn-lt-rolo'); if (!L || !rolo || !L.total) return;
+  var meio = rolo.scrollTop + rolo.clientHeight * .45, pg = L.total, fs = rolo.children;
+  if (rolo.scrollTop + rolo.clientHeight < rolo.scrollHeight - 6) { for (var i = 0; i < fs.length; i++) { if (fs[i].offsetTop + fs[i].offsetHeight > meio) { pg = i + 1; break; } } }
+  if (pg === L.pag) return;
+  L.pag = pg; trnPosGuardar(L.id, pg, L.total); trnLeitorPinta();
+  // solta da memória as páginas longe da atual (PDF grande)
+  Object.keys(L.feitas).forEach(function(k) { if (L.feitas[k] && Math.abs(+k - pg) > 8) { var b = rolo.querySelector('[data-p="' + k + '"]'); if (b) { b.innerHTML = '<span>' + k + '</span>'; b.classList.remove('ok'); } L.feitas[k] = null; } });
+  if (pg / L.total >= TRN_VISTO && !trnFeito(L.id) && !L.avisou && Date.now() - L.aberto > 10000) { L.avisou = true; trnLeitorEnviar(); }
+}
+function trnLeitorPinta() {
+  var L = TRN.l; if (!L) return;
+  var a = document.getElementById('trn-lt-pag'), b = document.getElementById('trn-lt-prog'), z = document.getElementById('trn-lt-zoom');
+  if (a) a.textContent = L.total ? 'Página ' + L.pag + ' de ' + L.total : 'Abrindo o PDF…';
+  if (b) b.style.width = (L.total ? Math.round(L.pag / L.total * 100) : 0) + '%';
+  if (z) z.textContent = Math.round(L.zoom * 100) + '%';
+}
+function trnLeitorIr(pg) {
+  var L = TRN.l, rolo = document.getElementById('trn-lt-rolo'); if (!L || !rolo) return;
+  var al = rolo.querySelector('[data-p="' + pg + '"]'); if (!al) return;
+  rolo.scrollTop = Math.max(0, al.offsetTop - 10); L.mexeu = Date.now();
+  if (pg !== L.pag) { L.pag = pg; trnPosGuardar(L.id, pg, L.total); trnLeitorPinta(); }
+  trnLeitorPagina(pg);
+}
+function trnLeitorZoom(d) {   // d = 0 só redesenha (mudou o tamanho da tela)
+  var L = TRN.l, rolo = document.getElementById('trn-lt-rolo'); if (!L || !rolo) return;
+  var pg = L.pag; L.zoom = Math.max(.6, Math.min(2.4, Math.round((L.zoom + d) * 10) / 10));
+  L.feitas = {}; Array.prototype.forEach.call(rolo.children, function(x) { x.classList.remove('ok'); x.innerHTML = '<span>' + x.getAttribute('data-p') + '</span>'; });
+  trnLeitorMedir(); trnLeitorPinta();
+  var al = rolo.querySelector('[data-p="' + pg + '"]'); if (al) rolo.scrollTop = Math.max(0, al.offsetTop - 10);
+  for (var i = Math.max(1, pg - 1); i <= Math.min(L.total, pg + 2); i++) trnLeitorPagina(i);
+}
+function trnLeitorEnviar(beacon) {
+  var L = TRN.l; if (!L || !L.total || !TRN.d) return;
+  if (Date.now() - L.aberto < 10000) return;   // abriu e já saiu: o dia já foi contado no trnAbriu; página só depois de 10 s lendo
+  var viu = Math.floor(L.lido); if (L.pag === L.ultEnv && !viu) return;
+  L.ultEnv = L.pag; L.lido -= viu; L.enviadoEm = Date.now();
+  trnPosGuardar(L.id, L.pag, L.total);
+  if (TRN.d.soVer) return;
+  var id = L.id, p = { action: 'treinoPosicao', conteudo: id, seg: L.pag, dur: L.total, assistiu: viu, token: trnTok(), quem: trnLogin() };
+  if (TRN.d.pos) TRN.d.pos[id] = { s: L.pag, d: L.total, v: trnAgoraTxt() };
+  if (viu && TRN.d.minha) { var hj = trnDia(new Date()); TRN.d.minha[hj] = (TRN.d.minha[hj] || 0) + viu; }
+  if (beacon && navigator.sendBeacon) { try { navigator.sendBeacon(APPS_SCRIPT_URL, new Blob([JSON.stringify(p)], { type: 'text/plain' })); return; } catch (e) {} }
+  gasPedir(p, function(r) {
+    if (r && r.success && r.feito && TRN.d && !TRN.d.meu[id]) {
+      TRN.d.meu[id] = r.em || trnAgoraTxt(); trnToast('✓ Leitura concluída');
+      if (TRN.trilha && (trnT(TRN.trilha) || {}).seq) trnCarregar(); else if (TRN.vista === 'ver') trnVerAtualizar();
+    }
+  }, 30000);
+}
+function trnLeitorSoltar(semEnviar) {
+  var L = TRN.l; if (!L) return;
+  if (!semEnviar) trnLeitorEnviar();
+  TRN.l = null; clearInterval(L.rel); clearTimeout(L._t); clearTimeout(L._tr);
+  try { if (L.obs) L.obs.disconnect(); } catch (e) {}
+  try { if (L._red) { window.removeEventListener('resize', L._red); document.removeEventListener('fullscreenchange', L._red); } } catch (e) {}
+  try { if (L.doc) L.doc.destroy(); } catch (e) {}
+}
 function trnPalcoHtml(c) {
   var abre = '<div class="tr-player', id = '" id="trn-palco" data-id="' + _trnE(c.id) + '"';
   if (c.travado) return abre + id + '><div class="tr-player-link"><span style="font-size:2rem" aria-hidden="true">🔒</span><b>Esta aula ainda não abriu</b><span>Conclua a aula anterior da trilha para liberar.</span></div></div>';
@@ -34389,6 +34548,14 @@ function trnPalcoHtml(c) {
       +     '<button type="button" data-a="pip" aria-label="Janela flutuante" title="Janela flutuante: o vídeo fica por cima enquanto você mexe no dash">⧉</button>'
       +     '<button type="button" data-a="tela" aria-label="Tela cheia" title="Tela cheia (F)">⛶</button>'
       +   '</div></div></div>';
+  }
+  if (trnLeitorProprio(c)) {
+    return abre + ' doc leitor' + id + '>'
+      + '<div class="tr-lt-barra"><button type="button" data-l="ant" aria-label="Página anterior" title="Página anterior">‹</button><span class="tr-lt-pag" id="trn-lt-pag" aria-live="polite">Abrindo o PDF…</span><button type="button" data-l="prox" aria-label="Próxima página" title="Próxima página">›</button>'
+      + '<span class="tr-pl-esp"></span><span class="tr-lt-prog"><i id="trn-lt-prog"></i></span><span class="tr-pl-esp"></span>'
+      + '<button type="button" data-l="menos" aria-label="Diminuir" title="Diminuir">−</button><span class="tr-lt-zoom" id="trn-lt-zoom">100%</span><button type="button" data-l="mais" aria-label="Aumentar" title="Aumentar">+</button>'
+      + '<button type="button" data-l="tela" aria-label="Tela cheia" title="Tela cheia">⛶</button></div>'
+      + '<div class="tr-lt-rolo" id="trn-lt-rolo" tabindex="0" aria-label="Páginas de ' + _trnE(c.titulo) + '"></div><div class="tr-sobre" id="trn-sobre"></div></div>';
   }
   var src2 = trnEmbed(c, trnPosDe(c.id).s), doc = c.tipo === 'pdf' || c.tipo === 'arquivo' || /docs\.google\.com/.test(c.link || '');
   if (!src2) return abre + id + '><div class="tr-player-link"><span style="font-size:2rem" aria-hidden="true">🔗</span><span>Este conteúdo abre no site dele.</span><a class="btn primary" href="' + _trnE(c.link) + '" target="_blank" rel="noopener" onclick="trnAbriu()">Abrir ↗</a></div></div>';
@@ -34423,6 +34590,7 @@ function trnVerAtualizar() {   // tudo da tela de assistir menos o vídeo
     if (trnFeito(c.id)) h += '<button class="btn tr-ok" onclick="trnConcluir(\'' + _trnId(c.id) + '\', false)" title="Clique para desmarcar">✓ Concluído em ' + trnData(d.meu[c.id]) + '</button>';
     else if (c.travado) h += '';
     else if (emOrdem && proprio) h += '<span class="tr-para fechada">▶ Assista pelo menos 80% para concluir e abrir a próxima</span>';   // em ordem, vídeo se conclui assistindo
+    else if (emOrdem && trnLeitorProprio(c)) h += '<span class="tr-para fechada">📖 Leia pelo menos 80% das páginas para concluir e abrir a próxima</span>';
     else h += '<button class="btn primary" onclick="trnConcluir(\'' + _trnId(c.id) + '\', true)">✓ Marcar como concluído</button>';
     h += '</div>';
     if (!proprio && !c.travado && (c.tipo === 'video' || c.tipo === 'youtube')) {
@@ -34464,7 +34632,7 @@ function trnPassosHtml(t) {
     var pc = trnPct(id), trav = !!x.travado;
     l += '<button class="tr-passo' + (id === TRN.atual ? ' on' : '') + (trnFeito(id) ? ' feito' : '') + (trav ? ' travado' : '') + '" onclick="' + (trav ? 'trnTravadoMsg()' : 'trnVer(\'' + _trnId(t.id) + '\',\'' + _trnId(id) + '\')') + '"' + (id === TRN.atual ? ' aria-current="true"' : '') + (trav ? ' aria-disabled="true"' : '') + '>'
       + '<span class="tr-n">' + (trav ? '🔒' : trnFeito(id) ? '✓' : id === TRN.atual ? '▶' : i - ini + 1) + '</span><span class="tr-passo-t">' + _trnE(x.titulo)
-      + '<small>' + (TRN_ICO[x.tipo] || '') + ' ' + _trnE(trnMin(x.min) || TRN_TIPO[x.tipo] || '') + (trav ? ' · abre depois da anterior' : pc > 0 && pc < 1 ? ' · ' + Math.round(pc * 100) + '% visto' : '') + '</small>'
+      + '<small>' + (TRN_ICO[x.tipo] || '') + ' ' + _trnE(trnMin(x.min) || TRN_TIPO[x.tipo] || '') + (trav ? ' · abre depois da anterior' : pc > 0 && pc < 1 ? ' · ' + Math.round(pc * 100) + (x.tipo === 'pdf' ? '% lido' : '% visto') : '') + '</small>'
       + (pc > 0 && pc < 1 ? '<span class="tr-mini"><i style="width:' + Math.round(pc * 100) + '%"></i></span>' : '') + '</span></button>';
   }
   if (fora) l += '<div class="tr-mais">🔒 Mais ' + fora + ' aula' + (fora === 1 ? '' : 's') + ' aparece' + (fora === 1 ? '' : 'm') + ' conforme você avança</div>';
@@ -34482,8 +34650,9 @@ function trnPassosHtml(t) {
 // ---------- o player do dash: retoma, guarda onde parou, conta o tempo estudado ----------
 function trnPlayerLigar() {
   var c = trnC(TRN.atual); if (!c || c.travado) return;
+  if (document.getElementById('trn-lt-rolo')) { trnLeitorLigar(c); return; }   // PDF no leitor do dash
   var v = document.getElementById('trn-video');
-  if (!v) { trnAbriu(); return; }   // PDF, link ou player do Drive: conta o dia de estudo
+  if (!v) { trnAbriu(); return; }   // link ou player do Drive: conta o dia de estudo
   var P = TRN.p = { id: c.id, v: v, ultT: null, tocado: 0, enviadoEm: Date.now(), comecou: false, avisouFim: false };
   var ini = trnPosDe(c.id);
   v.playbackRate = trnVel();
@@ -34593,6 +34762,7 @@ function trnCtlLigar(P) {
   pinta();
 }
 function trnPlayerSoltar() {
+  trnLeitorSoltar();
   var P = TRN.p; if (!P) return;
   clearTimeout(P.tDemora); trnPosEnviar(); TRN.p = null;
   try { if (P._tecla) document.removeEventListener('keydown', P._tecla); if (P._fechaMenu) document.removeEventListener('click', P._fechaMenu); } catch (e) {}
@@ -34611,6 +34781,7 @@ function trnVelMudar(x) {
   var m = document.getElementById('trn-pl-menu'); if (m) m.hidden = true;
 }
 function trnPosEnviar(beacon) {
+  if (TRN.l) trnLeitorEnviar(beacon);
   var P = TRN.p; if (!P || !P.v || !TRN.d) return;
   if (TRN.d.soVer) { trnPosGuardar(P.id, P.v.currentTime || 0, trnDur(P.v)); return; }   // só assiste: guarda só neste aparelho
   var v = P.v, seg = Math.floor(v.currentTime || 0), dur = Math.floor(trnDur(v)), viu = Math.floor(P.tocado);
