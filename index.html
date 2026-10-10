@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0237';
+var VERSAO_DASH = '2026-10-10-0245';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25449,6 +25449,10 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 @container (max-width: 130px) { .tr-capa-txt small, .tr-capa-fio { display:none; } }
 .tr-botoes a.btn, #s-treinos a.btn { text-decoration:none; }
 .tr-mais { padding:12px 10px 4px; margin-top:6px; border-top:1px dashed var(--border); font-size:.72rem; color:var(--muted); font-weight:700; }
+.tr-card.travado { cursor:not-allowed; } .tr-card.travado:hover { transform:none; border-color:rgba(255,255,255,.12); }
+.tr-prox-mod { display:flex; flex-direction:column; gap:3px; width:100%; margin-top:8px; padding:12px; border-radius:12px; text-align:left; font:inherit; color:var(--text); cursor:pointer; background:rgba(246,163,80,.08); border:1px solid rgba(246,163,80,.28); }
+.tr-prox-mod:hover { background:rgba(246,163,80,.14); } .tr-prox-mod b { font-size:.84rem; } .tr-prox-mod.travado { opacity:.6; cursor:not-allowed; }
+.tr-quem-larga { margin-top:22px; max-width:560px; }
 .sc-nota-topo { font-size:.72rem; color:var(--muted); font-weight:600; margin:2px 0 14px; line-height:1.5; }
 .sc-nota-topo b { color:var(--text2); }
 .sc-jornada { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
@@ -34096,6 +34100,7 @@ function trnRender() {
   }
   if (TRN.vista === 'ver' && ((TRN.trilha && !trnT(TRN.trilha)) || (!TRN.trilha && !trnC(TRN.atual)))) TRN.vista = 'inicio';
   if (TRN.vista === 'pessoa' && !TRN.d.admin) TRN.vista = 'inicio';
+  if (TRN.vista === 'trilha') { var tm = trnT(TRN.trilha); if (!tm) TRN.vista = 'inicio'; else if (!trnMods(tm).length) TRN.vista = 'ver'; }
   if (TRN.vista === 'ver' && TRN.trilha && !trnC(TRN.atual)) { var tt = trnT(TRN.trilha); TRN.atual = tt ? (tt.itens.filter(function(x) { return !trnFeito(x); })[0] || tt.itens[0] || '') : ''; }   // trilha aberta sem aula escolhida: vai para a próxima
   if (TRN.vista === 'ver') {
     var palco = document.getElementById('trn-palco');
@@ -34105,7 +34110,7 @@ function trnRender() {
     return;
   }
   trnPlayerSoltar();
-  el.innerHTML = TRN.vista === 'pessoa' ? trnPessoaHtml(TRN.pessoa) : (TRN.d.admin && TRN.aba === 'time' ? trnTimeHtml() : trnInicioHtml());
+  el.innerHTML = TRN.vista === 'pessoa' ? trnPessoaHtml(TRN.pessoa) : TRN.vista === 'trilha' ? trnTrilhaHtml() : (TRN.d.admin && TRN.aba === 'time' ? trnTimeHtml() : trnInicioHtml());
 }
 function trnTravaHtml() {
   var it = document.querySelector('.nav-item[data-s="comissoes"]'), temCom = !!(it && it.style.display !== 'none');
@@ -34163,6 +34168,23 @@ function trnAteOnde(t) {
 function trnEscondida(id) {   // aula que ainda não aparece em nenhuma trilha da pessoa
   var c = trnC(id); if (!c || !c.travado) return false;
   return !((TRN.d && TRN.d.trilhas) || []).some(function(t) { var i = t.itens.indexOf(id); return i >= 0 && i <= trnAteOnde(t); });
+}
+// os módulos como faixas da trilha: [{ t: nome, n: número (0 = aulas antes do 1º módulo), ini, fim, ids }]
+function trnFaixas(t) {
+  var mods = trnMods(t), out = [], n = t ? t.itens.length : 0;
+  if (!mods.length) return out;
+  if (mods[0].i > 0) out.push({ t: 'Para começar', n: 0, ini: 0, fim: Math.min(mods[0].i, n) });
+  mods.forEach(function(m, k) { out.push({ t: m.t, n: k + 1, ini: Math.min(m.i, n), fim: k + 1 < mods.length ? Math.min(mods[k + 1].i, n) : n }); });
+  out.forEach(function(x) { x.ids = t.itens.slice(x.ini, Math.max(x.ini, x.fim)); });
+  return out;
+}
+function trnFaixaDe(t, id) { var i = t.itens.indexOf(id), fx = trnFaixas(t); for (var k = 0; k < fx.length; k++) if (i >= fx[k].ini && i < fx[k].fim) return fx[k]; return null; }
+// abrir a trilha: com módulos mostra os módulos; sem módulo vai direto às aulas
+function trnAbrirTrilha(tid) {
+  var t = trnT(tid);
+  if (!t || !trnMods(t).length) { trnVer(tid); return; }
+  trnPosEnviar(); TRN.vista = 'trilha'; TRN.trilha = tid; TRN.atual = ''; trnRender();
+  var el = document.getElementById('trn-corpo'); if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start' });
 }
 function trnTravadoMsg() { trnToast('🔒 Conclua a aula anterior para abrir esta'); }
 
@@ -34250,7 +34272,7 @@ function trnKpisHtml() {
 }
 function trnCardHtml(t) {
   var n = t.itens.length, f = t.itens.filter(trnFeito).length, min = trnMinT(t), pct = n ? Math.round(f / n * 100) : 0, cheia = n && f === n, nm = trnMods(t).length;
-  var h = '<button class="glass click tr-card" style="--halo:' + (cheia ? 'rgba(61,220,151,.16)' : 'rgba(246,163,80,.15)') + ';" onclick="trnVer(\'' + _trnId(t.id) + '\')">'
+  var h = '<button class="glass click tr-card" style="--halo:' + (cheia ? 'rgba(61,220,151,.16)' : 'rgba(246,163,80,.15)') + ';" onclick="trnAbrirTrilha(\'' + _trnId(t.id) + '\')">'
     + '<span class="tr-card-capa">' + trnCapaHtml(t.nome, 'Trilha' + (nm ? ' · ' + nm + ' módulo' + (nm === 1 ? '' : 's') : ''),
         '<span class="tr-dur">' + n + ' aula' + (n === 1 ? '' : 's') + (min ? ' · ' + trnMin(min) : '') + '</span>' + (cheia ? '<span class="tr-ok-sel" title="Concluída">✓</span>' : '')) + '</span>'
     + '<span class="tr-card-c">' + (t.descricao ? '<p>' + _trnE(t.descricao) + '</p>' : '')
@@ -34293,7 +34315,43 @@ function trnVer(tid, cid) {
   trnRender();
   var el = document.getElementById('trn-corpo'); if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start' });
 }
-function trnVoltar() { trnPosEnviar(); TRN.vista = 'inicio'; TRN.trilha = ''; TRN.atual = ''; trnRender(); }
+function trnVoltar() {   // da aula volta para os módulos da trilha (se ela tem módulos); dos módulos, para o início
+  trnPosEnviar();
+  var t = TRN.trilha ? trnT(TRN.trilha) : null;
+  if (TRN.vista === 'ver' && t && trnMods(t).length) { TRN.vista = 'trilha'; TRN.atual = ''; }
+  else { TRN.vista = 'inicio'; TRN.trilha = ''; TRN.atual = ''; }
+  trnRender();
+}
+// cabeçalho da trilha (na tela dos módulos)
+function trnTrilhaHtml() {
+  var d = TRN.d, t = trnT(TRN.trilha), fx = trnFaixas(t), n = t.itens.length, f = t.itens.filter(trnFeito).length, pct = n ? Math.round(f / n * 100) : 0;
+  var h = trnAbas() + '<button class="tr-voltar" onclick="trnVoltar()">← Todos os treinamentos</button>';
+  h += '<div class="tr-topo tr-topo-t"><div><span class="tr-eyebrow">Trilha · ' + trnMods(t).length + ' módulo' + (trnMods(t).length === 1 ? '' : 's') + ' · ' + n + ' aula' + (n === 1 ? '' : 's') + (trnMinT(t) ? ' · ' + trnMin(trnMinT(t)) : '') + '</span><h2>' + _trnE(t.nome) + '</h2>' + (t.descricao ? '<p>' + _trnE(t.descricao) + '</p>' : '') + '</div>'
+    + '<div class="tr-acoes">' + (t.seq ? '<span class="tr-para">🔒 Em ordem</span>' : '')
+    + (d.admin ? trnParaChip(t.para) + '<button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">✏️ Editar trilha e módulos</button><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir aula</button>' : '<span class="tr-anel" style="--p:' + pct + '"><b>' + pct + '%</b></span>') + '</div></div>';
+  h += '<div class="tr-sec"><h3>Módulos</h3><span>' + fx.length + '</span></div><div class="tr-trilhas">';
+  fx.forEach(function(m) {
+    var ids = m.ids, nm = ids.length, fm = ids.filter(trnFeito).length, pm = nm ? Math.round(fm / nm * 100) : 0, cheio = nm && fm === nm;
+    var min = ids.reduce(function(a, id) { return a + ((trnC(id) || {}).min || 0); }, 0);
+    var trav = !d.admin && nm && !!(trnC(ids[0]) || {}).travado;
+    var vez = ids.filter(function(x) { return !trnFeito(x) && !(trnC(x) || {}).travado; })[0] || ids[0];
+    var clique = trav ? 'trnToast(\'🔒 Conclua o módulo anterior para abrir este\')' : !nm ? (d.admin ? 'trnSubirAbrir()' : 'trnToast(\'Este módulo ainda não tem aula\')') : 'trnVer(\'' + _trnId(t.id) + '\',\'' + _trnId(vez) + '\')';
+    h += '<button class="glass click tr-card' + (trav ? ' travado' : '') + '" style="--halo:' + (cheio ? 'rgba(61,220,151,.16)' : 'rgba(246,163,80,.15)') + ';" onclick="' + clique + '"' + (trav ? ' aria-disabled="true"' : '') + '>'
+      + '<span class="tr-card-capa">' + trnCapaHtml(m.t, m.n ? 'Módulo ' + m.n : 'Antes dos módulos',
+          '<span class="tr-dur">' + nm + ' aula' + (nm === 1 ? '' : 's') + (min ? ' · ' + trnMin(min) : '') + '</span>' + (cheio ? '<span class="tr-ok-sel" title="Concluído">✓</span>' : '') + (trav ? '<span class="tr-cadeado" title="Abre depois do módulo anterior">🔒</span>' : '')) + '</span>'
+      + '<span class="tr-card-c">';
+    if (d.admin) {
+      h += '<span class="tr-prog"><span>' + nm + ' aula' + (nm === 1 ? '' : 's') + '</span><span class="tr-cta">' + (nm ? 'Abrir →' : '⬆ Subir a primeira') + '</span></span>';
+    } else {
+      h += '<span class="tr-barra' + (cheio ? ' cheia' : '') + '"><i style="width:' + pm + '%"></i></span>'
+        + '<span class="tr-prog"><span>' + (trav ? 'abre depois do módulo anterior' : cheio ? '<span class="ok">✓ Concluído</span>' : fm + ' de ' + nm + ' aulas') + '</span><span class="tr-cta">' + (trav ? '' : cheio ? 'Rever →' : fm ? 'Continuar →' : nm ? 'Começar →' : '') + '</span></span>';
+    }
+    h += '</span></button>';
+  });
+  h += '</div>';
+  if (d.admin) h += '<div class="tr-quem-larga">' + trnQuemHtml(t) + '</div>';
+  return h;
+}
 function trnEmbed(c, seg) {
   seg = Math.floor(seg || 0);
   if (c.arquivo) return 'https://drive.google.com/file/d/' + encodeURIComponent(c.arquivo) + '/preview' + (seg > 10 ? '?t=' + seg : '');
@@ -34338,7 +34396,7 @@ function trnPalcoHtml(c) {
 }
 function trnVerHtml() {
   var t = TRN.trilha ? trnT(TRN.trilha) : null, c = trnC(TRN.atual);
-  var h = trnAbas() + '<button class="tr-voltar" onclick="trnVoltar()">← Todos os treinamentos</button><div id="trn-ver-topo"></div>';
+  var h = trnAbas() + '<button class="tr-voltar" onclick="trnVoltar()">← ' + (t && trnMods(t).length ? _trnE(t.nome) + ' · todos os módulos' : 'Todos os treinamentos') + '</button><div id="trn-ver-topo"></div>';
   h += '<div class="tr-ver' + (t ? '' : ' so') + '"><div class="tr-ver-esq">';
   h += c ? trnPalcoHtml(c) + '<div id="trn-ver-info"></div>' : '<div class="panel tr-vazio">' + (t && !t.itens.length ? 'Esta trilha ainda não tem aula.' + (TRN.d.admin ? '<div class="tr-vazio-b"><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir a primeira aula</button><button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">＋ Usar um conteúdo que já subi</button></div>' : ' Quando o Bruno subir, ela aparece aqui.') : 'Escolha um conteúdo.') + '</div>';
   h += '</div>' + (t ? '<div class="tr-lado" id="trn-ver-lado"></div>' : '') + '</div>';
@@ -34349,10 +34407,12 @@ function trnVerAtualizar() {   // tudo da tela de assistir menos o vídeo
   var topo = document.getElementById('trn-ver-topo');
   if (topo) {
     if (t) {
-      var nn = t.itens.length, ff = t.itens.filter(trnFeito).length, nm = trnMods(t).length;
-      topo.innerHTML = '<div class="tr-topo tr-topo-t"><div><span class="tr-eyebrow">Trilha · ' + (nm ? nm + ' módulo' + (nm === 1 ? '' : 's') + ' · ' : '') + nn + ' aula' + (nn === 1 ? '' : 's') + (trnMinT(t) ? ' · ' + trnMin(trnMinT(t)) : '') + '</span><h2>' + _trnE(t.nome) + '</h2>' + (t.descricao ? '<p>' + _trnE(t.descricao) + '</p>' : '') + '</div>'
+      var nn = t.itens.length, ff = t.itens.filter(trnFeito).length, nm = trnMods(t).length, fxA = c ? trnFaixaDe(t, c.id) : null;
+      topo.innerHTML = '<div class="tr-topo tr-topo-t"><div>' + (fxA
+          ? '<span class="tr-eyebrow">' + _trnE(t.nome) + ' · ' + (fxA.n ? 'módulo ' + fxA.n + ' de ' + nm : 'antes dos módulos') + ' · ' + fxA.ids.length + ' aula' + (fxA.ids.length === 1 ? '' : 's') + '</span><h2>' + _trnE(fxA.t) + '</h2>'
+          : '<span class="tr-eyebrow">Trilha · ' + nn + ' aula' + (nn === 1 ? '' : 's') + (trnMinT(t) ? ' · ' + trnMin(trnMinT(t)) : '') + '</span><h2>' + _trnE(t.nome) + '</h2>' + (t.descricao ? '<p>' + _trnE(t.descricao) + '</p>' : '')) + '</div>'
         + '<div class="tr-acoes">' + (t.seq ? '<span class="tr-para">🔒 Em ordem</span>' : '')
-        + (d.admin ? trnParaChip(t.para) + '<button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">✏️ Editar trilha</button><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir aula</button>' : '<span class="tr-anel" style="--p:' + (nn ? Math.round(ff / nn * 100) : 0) + '"><b>' + (nn ? Math.round(ff / nn * 100) : 0) + '%</b></span>') + '</div></div>';
+        + (d.admin ? trnParaChip(t.para) + '<button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">✏️ Editar trilha e módulos</button><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir aula</button>' : '<span class="tr-anel" style="--p:' + (nn ? Math.round(ff / nn * 100) : 0) + '"><b>' + (nn ? Math.round(ff / nn * 100) : 0) + '%</b></span>') + '</div></div>';
     } else topo.innerHTML = '';
   }
   var info = document.getElementById('trn-ver-info');
@@ -34385,8 +34445,8 @@ function trnVerAtualizar() {   // tudo da tela de assistir menos o vídeo
   }
   var lado = document.getElementById('trn-ver-lado');
   if (lado && t) {
-    var n = t.itens.length, f = t.itens.filter(trnFeito).length;
-    var l = '<div class="panel tr-passos-p"><div class="tr-passos-h"><h3>Aulas</h3><span class="tr-meta">' + f + ' de ' + n + ' concluídas</span></div><span class="tr-barra' + (n && f === n ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(f / n * 100) : 0) + '%"></i></span><div class="tr-passos">'
+    var fxL = c ? trnFaixaDe(t, c.id) : null, idsL = fxL ? fxL.ids : t.itens, n = idsL.length, f = idsL.filter(trnFeito).length;
+    var l = '<div class="panel tr-passos-p"><div class="tr-passos-h"><h3>' + (fxL ? 'Aulas do módulo' : 'Aulas') + '</h3><span class="tr-meta">' + f + ' de ' + n + ' concluídas</span></div><span class="tr-barra' + (n && f === n ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(f / n * 100) : 0) + '%"></i></span><div class="tr-passos">'
       + trnPassosHtml(t) + '</div></div>';
     if (d.admin) l += trnQuemHtml(t);
     lado.innerHTML = l;
@@ -34394,24 +34454,28 @@ function trnVerAtualizar() {   // tudo da tela de assistir menos o vídeo
 }
 // a lista de aulas da trilha, com o cabeçalho de cada módulo e o cadeado das que ainda não abriram
 function trnPassosHtml(t) {
-  var mods = trnMods(t), l = '';
-  var cab = function(m, k) {
-    var fimM = k + 1 < mods.length ? mods[k + 1].i : t.itens.length, ids = t.itens.slice(m.i, Math.max(m.i, fimM)), f = ids.filter(trnFeito).length;
-    return '<div class="tr-mod' + (ids.length && f === ids.length ? ' feito' : '') + '"><span class="tr-eyebrow">Módulo ' + (k + 1) + '</span><b>' + _trnE(m.t) + '</b><small>' + (ids.length ? f + ' de ' + ids.length : 'sem aula ainda') + '</small></div>';
-  };
+  var fx = trnFaixas(t), atualFx = fx.length ? trnFaixaDe(t, TRN.atual) : null, l = '';
   var ate = trnAteOnde(t), fora = 0;
-  t.itens.forEach(function(id, i) {
-    if (i > ate) { fora++; return; }   // só 3 à frente
-    mods.forEach(function(m, k) { if (m.i === i) l += cab(m, k); });
-    var x = trnC(id); if (!x) return;
+  var ini = atualFx ? atualFx.ini : 0, fim = atualFx ? atualFx.fim : t.itens.length;
+  for (var i = ini; i < fim; i++) {
+    var id = t.itens[i];
+    if (i > ate) { fora++; continue; }   // só 3 à frente
+    var x = trnC(id); if (!x) continue;
     var pc = trnPct(id), trav = !!x.travado;
     l += '<button class="tr-passo' + (id === TRN.atual ? ' on' : '') + (trnFeito(id) ? ' feito' : '') + (trav ? ' travado' : '') + '" onclick="' + (trav ? 'trnTravadoMsg()' : 'trnVer(\'' + _trnId(t.id) + '\',\'' + _trnId(id) + '\')') + '"' + (id === TRN.atual ? ' aria-current="true"' : '') + (trav ? ' aria-disabled="true"' : '') + '>'
-      + '<span class="tr-n">' + (trav ? '🔒' : trnFeito(id) ? '✓' : id === TRN.atual ? '▶' : i + 1) + '</span><span class="tr-passo-t">' + _trnE(x.titulo)
+      + '<span class="tr-n">' + (trav ? '🔒' : trnFeito(id) ? '✓' : id === TRN.atual ? '▶' : i - ini + 1) + '</span><span class="tr-passo-t">' + _trnE(x.titulo)
       + '<small>' + (TRN_ICO[x.tipo] || '') + ' ' + _trnE(trnMin(x.min) || TRN_TIPO[x.tipo] || '') + (trav ? ' · abre depois da anterior' : pc > 0 && pc < 1 ? ' · ' + Math.round(pc * 100) + '% visto' : '') + '</small>'
       + (pc > 0 && pc < 1 ? '<span class="tr-mini"><i style="width:' + Math.round(pc * 100) + '%"></i></span>' : '') + '</span></button>';
-  });
+  }
   if (fora) l += '<div class="tr-mais">🔒 Mais ' + fora + ' aula' + (fora === 1 ? '' : 's') + ' aparece' + (fora === 1 ? '' : 'm') + ' conforme você avança</div>';
-  else mods.forEach(function(m, k) { if (m.i >= t.itens.length) l += cab(m, k); });
+  if (atualFx) {   // o próximo módulo, no fim da lista
+    var k = -1; fx.forEach(function(m, j) { if (m.n === atualFx.n && m.ini === atualFx.ini) k = j; });
+    var px = k >= 0 ? fx[k + 1] : null;
+    if (px && px.ids.length) {
+      var pid = px.ids[0], pt = !!(trnC(pid) || {}).travado;
+      l += '<button class="tr-prox-mod' + (pt ? ' travado' : '') + '" onclick="' + (pt ? 'trnToast(\'🔒 Conclua este módulo para abrir o próximo\')' : 'trnVer(\'' + _trnId(t.id) + '\',\'' + _trnId(pid) + '\')') + '"><span class="tr-eyebrow">' + (pt ? '🔒 ' : '') + 'Próximo módulo</span><b>' + _trnE(px.t) + '</b></button>';
+    }
+  }
   return l || '<div class="tr-meta">Sem aulas ainda.</div>';
 }
 
@@ -35013,7 +35077,7 @@ function trnTrilhaSalvar() {
   trnPedir({ action: 'treinoTrilhaSalvar', id: e.id, nome: nome, descricao: trnVal('trn-td'), itens: itens, modulos: mods, seq: !!(sq && sq.checked), para: para }, function(r) {
     if (!r || !r.success) { if (b) { b.disabled = false; b.textContent = 'Salvar trilha'; } trnMsg('Não salvou: ' + ((r && r.error) || 'o robô não respondeu') + '.', 'erro'); return; }
     trnFechar(); trnToast('Trilha salva');
-    trnCarregar(function() { trnVer(r.id); });
+    trnCarregar(function() { trnAbrirTrilha(r.id); });
   });
 }
 function trnTrilhaApagar() {
