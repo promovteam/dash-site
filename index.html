@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0132';
+var VERSAO_DASH = '2026-10-10-0135';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -33908,21 +33908,32 @@ function trnVel() { try { var v = +localStorage.getItem('trnVel'); return TRN_VE
 
 // ---------- abrir / carregar ----------
 // ⚡ abre na hora com a última lista guardada neste computador (o robô leva uns 5 s) e atualiza por trás
-function trnCacheLer() { try { var c = JSON.parse(localStorage.getItem('trnCache') || 'null'); return c && c.t === trnMarca() ? c.d : null; } catch (e) { return null; } }
-function trnCacheGuardar(d) { try { localStorage.setItem('trnCache', JSON.stringify({ t: trnMarca(), d: d })); } catch (e) {} }
+function trnCacheLer() {
+  var ler = function(st) { try { var c = JSON.parse(st.getItem('trnCache') || 'null'); return c && c.t === trnMarca() ? c.d : null; } catch (e) { return null; } };
+  return ler(localStorage) || ler(sessionStorage);
+}
+function trnCacheGuardar(d) {
+  var t = JSON.stringify({ t: trnMarca(), d: d });
+  try { localStorage.setItem('trnCache', t); } catch (e) { try { sessionStorage.setItem('trnCache', t); } catch (e2) {} }   // aparelho cheio: guarda pelo menos enquanto a aba está aberta
+}
 function renderTreinos() {
   if (!trnTok() && !trnQuem()) { TRN.trava = 'senha'; trnRender(); return; }
   if (!TRN.d) { var c = trnCacheLer(); if (c) { TRN.d = c; TRN.trava = ''; } }
-  if (!TRN.carregando) trnCarregar();
+  if (!TRN.carregando && Date.now() - (TRN.em || 0) > 45000) trnCarregar();   // lista de menos de 45 s não busca de novo
   trnRender();
 }
+// ⚡ 10/10/2026 (Bruno: "está demorando abrir a aba de treinamento"): o robô leva uns 5 s por pedido, então o dash já busca a
+// lista sozinho logo depois de abrir. Quando a pessoa clica na aba, ela já está pronta.
+setTimeout(function() {
+  try { if (TRN.d || TRN.carregando || (!trnTok() && !trnQuem())) return; var c = trnCacheLer(); if (c) TRN.d = c; trnCarregar(); } catch (e) {}
+}, 3000);
 function trnCarregar(cb) {
   TRN.carregando = true; TRN.erro = '';
   trnPedir({ action: 'treinoListar' }, function(d) {
     TRN.carregando = false;
     if (d && d.precisaCodigo) { TRN.trava = 'senha'; TRN.d = null; try { localStorage.removeItem('trnCache'); } catch (e) {} }
     else if (!d || !d.success) TRN.erro = (d && d.error) || 'o robô não respondeu agora';
-    else { TRN.d = d; TRN.trava = ''; trnCacheGuardar(d); if (!d.admin && TRN.aba === 'time') TRN.aba = 'conteudos'; }
+    else { TRN.d = d; TRN.em = Date.now(); TRN.trava = ''; trnCacheGuardar(d); if (!d.admin && TRN.aba === 'time') TRN.aba = 'conteudos'; }
     trnRender(); if (cb) cb(d);
   });
 }
