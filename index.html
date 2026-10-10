@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0736';
+var VERSAO_DASH = '2026-10-10-0745';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25560,6 +25560,12 @@ details.tr-atalhos { line-height:2; } details.tr-atalhos summary { cursor:pointe
 .tr-lendo .tr-seguir-t { display:flex; flex-direction:column; gap:4px; } .tr-lendo .tr-barra { max-width:360px; margin-top:4px; }
 @media (max-width:560px) { .tr-estante { grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:18px 12px; } }
 @media (prefers-reduced-motion: reduce) { .tr-capa.livro { transition:none; } .tr-livro:hover .tr-capa.livro { transform:none; } }
+.tr-est-h { flex-wrap:wrap; }
+.tr-est-b { display:flex; gap:4px; margin-left:auto; padding:0 !important; background:none !important; }
+.tr-est-b button { height:28px; min-width:30px; padding:0 9px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text2); font:inherit; font-size:.72rem; font-weight:700; cursor:pointer; }
+.tr-est-b button:hover { color:var(--text); border-color:rgba(246,163,80,.5); } .tr-est-b button:disabled { opacity:.3; cursor:default; }
+.tr-est-vazia { padding:18px; border-radius:14px; border:1px dashed var(--border); color:var(--text2); font-size:.8rem; }
+.tr-modal #trn-estante-n { margin-top:6px; }
 .sc-nota-topo { font-size:.72rem; color:var(--muted); font-weight:600; margin:2px 0 14px; line-height:1.5; }
 .sc-nota-topo b { color:var(--text2); }
 .sc-jornada { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
@@ -34334,10 +34340,10 @@ function trnLivroCard(c) {
     + '<span class="tr-meta' + (l.feito ? ' ok' : '') + '">' + l.txt + (l.lendo ? ' · ' + l.pct + '%' : '') + '</span>' + (trnAdm() ? trnOndeChip(c) : '') + '</span></button>';
 }
 function trnLivrosHtml() {
-  var d = TRN.d, adm = trnAdm(), ls = trnLivros(), h = trnAbas();
-  h += '<div class="tr-topo"><p>' + (adm ? 'Suba os livros em PDF e escolha o tipo de cada um: cada tipo vira uma prateleira. O time lê aqui dentro e o dash guarda a página em que cada um parou.' : 'Leia aqui dentro: o dash guarda a página em que você parou.') + '</p>'
-    + (adm ? '<div class="tr-acoes"><button class="btn primary" onclick="trnSubirAbrir(true)">⬆ Subir livro</button></div>' : '') + '</div>';
-  if (!ls.length) return h + '<div class="tr-nada"><span aria-hidden="true">📚</span><b>Nenhum livro ainda</b><p>' + (adm ? 'Clique em <b>⬆ Subir livro</b>, escolha o PDF e diga o tipo (Vendas, Liderança…). Cada tipo vira uma prateleira.' : 'Quando o Bruno liberar um livro, ele aparece aqui.') + '</p></div>';
+  var d = TRN.d, adm = trnAdm(), ls = trnLivros(), h = trnAbas(), mods = (d.estantes || []).slice();
+  h += '<div class="tr-topo"><p>' + (adm ? 'Crie os módulos (Vendas, Liderança…) e suba os livros em PDF dentro de cada um. O time lê aqui dentro e o dash guarda a página em que cada um parou.' : 'Leia aqui dentro: o dash guarda a página em que você parou.') + '</p>'
+    + (adm ? '<div class="tr-acoes"><button class="btn" onclick="trnEstanteEditar()">＋ Novo módulo</button><button class="btn primary" onclick="trnSubirAbrir(true)">⬆ Subir livro</button></div>' : '') + '</div>';
+  if (!ls.length && !(adm && mods.length)) return h + '<div class="tr-nada"><span aria-hidden="true">📚</span><b>Nenhum livro ainda</b><p>' + (adm ? 'Clique em <b>＋ Novo módulo</b> para criar o primeiro (Vendas, por exemplo) e depois em <b>⬆ Subir livro</b>.' : 'Quando o Bruno liberar um livro, ele aparece aqui.') + '</p></div>';
   // continue lendo: o último livro aberto que ainda não terminou
   var lendo = ls.filter(function(c) { return !trnFeito(c.id) && trnPosDe(c.id).s > 0; }).sort(function(a, b) { return (trnPosDe(b.id).t || 0) - (trnPosDe(a.id).t || 0); })[0];
   if (lendo) {
@@ -34345,23 +34351,64 @@ function trnLivrosHtml() {
     h += '<button class="tr-seguir tr-lendo" onclick="trnVer(\'\',\'' + _trnId(lendo.id) + '\')"><span class="tr-lendo-capa">' + trnLivroCapa(lendo) + '</span><span class="tr-seguir-t"><small>Continue lendo</small><b>' + _trnE(lendo.titulo) + '</b>'
       + '<span class="tr-meta">' + ll.txt + ' · ' + ll.pct + '%</span><span class="tr-barra"><i style="width:' + ll.pct + '%"></i></span></span><span class="btn primary">Continuar</span></button>';
   }
-  // prateleiras por tipo
-  var est = {}, ordem = [];
-  ls.forEach(function(c) { var k = c.estante || ''; if (!est[k]) { est[k] = []; ordem.push(k); } est[k].push(c); });
-  ordem.sort(function(a, b) { return a === '' ? 1 : b === '' ? -1 : a.localeCompare(b); });
-  if (TRN.estante && !est[TRN.estante]) TRN.estante = '';
+  // os módulos, na ordem que o admin deixou; livro sem módulo vai para o fim
+  var est = {}; ls.forEach(function(c) { var k = c.estante || ''; (est[k] = est[k] || []).push(c); });
+  Object.keys(est).forEach(function(k) { if (k && mods.indexOf(k) < 0) mods.push(k); });
+  var ordem = mods.filter(function(k) { return adm || est[k]; }); if (est['']) ordem.push('');
+  TRN._est = ordem;
+  if (TRN.estante != null && TRN.estante !== '' && ordem.indexOf(TRN.estante === '—' ? '' : TRN.estante) < 0) TRN.estante = '';
   if (ordem.length > 1) {
-    h += '<div class="tr-filtros" role="tablist" aria-label="Tipo de livro"><button type="button" class="chart-chip' + (!TRN.estante ? ' on' : '') + '" onclick="TRN.estante=\'\';trnRender()">Todos <b>' + ls.length + '</b></button>'
-      + ordem.map(function(k, i) { return '<button type="button" class="chart-chip' + (TRN.estante === (k || '—') ? ' on' : '') + '" onclick="TRN.estante=TRN._est[' + i + '];trnRender()">' + _trnE(k || 'Outros') + ' <b>' + est[k].length + '</b></button>'; }).join('') + '</div>';
-    TRN._est = ordem.map(function(k) { return k || '—'; });
+    h += '<div class="tr-filtros" role="tablist" aria-label="Módulo">' + '<button type="button" class="chart-chip' + (!TRN.estante ? ' on' : '') + '" onclick="TRN.estante=\'\';trnRender()">Todos <b>' + ls.length + '</b></button>'
+      + ordem.map(function(k, i) { return '<button type="button" class="chart-chip' + (TRN.estante === (k || '—') ? ' on' : '') + '" onclick="TRN.estante=TRN._est[' + i + ']||\'—\';trnRender()">' + _trnE(k || 'Sem módulo') + ' <b>' + (est[k] || []).length + '</b></button>'; }).join('') + '</div>';
   }
-  ordem.forEach(function(k) {
+  ordem.forEach(function(k, i) {
     if (TRN.estante && TRN.estante !== (k || '—')) return;
-    var lidos = est[k].filter(function(c) { return trnFeito(c.id); }).length;
-    h += '<div class="tr-sec"><h3>' + _trnE(k || (ordem.length > 1 ? 'Outros' : 'Livros')) + '</h3><span>' + est[k].length + '</span>' + (!adm && lidos ? '<span class="tr-meta">' + lidos + ' lido' + (lidos === 1 ? '' : 's') + '</span>' : '') + '</div>'
-      + '<div class="tr-estante">' + est[k].map(trnLivroCard).join('') + '</div>';
+    var lv = est[k] || [], lidos = lv.filter(function(c) { return trnFeito(c.id); }).length, im = mods.indexOf(k);
+    h += '<div class="tr-sec tr-est-h"><h3>' + _trnE(k || (ordem.length > 1 ? 'Sem módulo' : 'Livros')) + '</h3><span>' + lv.length + '</span>' + (!adm && lidos ? '<span class="tr-meta">' + lidos + ' lido' + (lidos === 1 ? '' : 's') + '</span>' : '');
+    if (adm && k) h += '<span class="tr-est-b"><button type="button" onclick="trnSubirAbrir(true,TRN._est[' + i + '])" title="Subir um livro neste módulo">⬆ Subir aqui</button>'
+      + '<button type="button" onclick="trnEstanteEditar(TRN._est[' + i + '])" aria-label="Renomear o módulo" title="Renomear">✏️</button>'
+      + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],-1)" aria-label="Subir o módulo" title="Subir"' + (im > 0 ? '' : ' disabled') + '>↑</button>'
+      + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],1)" aria-label="Descer o módulo" title="Descer"' + (im >= 0 && im < mods.length - 1 ? '' : ' disabled') + '>↓</button>'
+      + '<button type="button" onclick="trnEstanteApagar(TRN._est[' + i + '])" aria-label="Apagar o módulo" title="Apagar o módulo (os livros ficam)">🗑</button></span>';
+    h += '</div>' + (lv.length ? '<div class="tr-estante">' + lv.map(trnLivroCard).join('') + '</div>' : '<div class="tr-est-vazia">Módulo vazio. Clique em <b>⬆ Subir aqui</b> para pôr o primeiro livro.</div>');
   });
   return h;
+}
+// módulos dos livros (só admin): criar/renomear, mudar a ordem, apagar
+function trnEstanteEditar(nome) {
+  if (!TRN.d || !TRN.d.admin) return;
+  TRN._estEd = nome || '';
+  trnModal('<div class="tr-modal-h"><h3>' + (nome ? '✏️ Renomear módulo' : '＋ Novo módulo de livros') + '</h3><button type="button" class="tr-x" onclick="trnFechar()" aria-label="Fechar">✕</button></div>'
+    + '<label>Nome do módulo<input type="text" id="trn-est-n" maxlength="40" value="' + _trnE(nome || '') + '" placeholder="Ex.: Vendas" onkeydown="if(event.key===\'Enter\'){event.preventDefault();trnEstanteSalvar();}"></label>'
+    + '<div class="tr-meta">' + (nome ? 'Os livros deste módulo acompanham o nome novo.' : 'Depois de criar, suba os livros dentro dele em ⬆ Subir aqui.') + '</div>'
+    + '<div class="tr-msg" id="trn-msg" aria-live="polite"></div>'
+    + '<div class="tr-rodape"><span><button class="btn" onclick="trnFechar()">Cancelar</button><button class="btn primary" id="trn-est-s" onclick="trnEstanteSalvar()">' + (nome ? 'Salvar' : 'Criar módulo') + '</button></span></div>');
+}
+function trnEstantePedir(p, ok) {
+  p.action = 'treinoEstantesSalvar';
+  trnPedir(p, function(r) {
+    if (!r || !r.success) { var m = (r && r.error) || 'o robô não respondeu'; if (document.getElementById('trn-msg')) trnMsg('Não salvou: ' + m + '.', 'erro'); else alert('Não salvou: ' + m + '.'); var b = document.getElementById('trn-est-s'); if (b) b.disabled = false; return; }
+    TRN.d.estantes = r.estantes; if (ok) ok(r);
+    trnRender(); trnCarregar();
+  });
+}
+function trnEstanteSalvar() {
+  var n = trnVal('trn-est-n'), de = TRN._estEd; if (!n) { trnMsg('Dê um nome ao módulo.', 'erro'); return; }
+  var b = document.getElementById('trn-est-s'); if (b) b.disabled = true;
+  trnEstantePedir(de ? { renomear: { de: de, para: n } } : { novo: n }, function() {
+    if (de) TRN.d.conteudos.forEach(function(c) { if (c.estante === de) c.estante = n; });
+    trnFechar(); trnToast(de ? 'Módulo renomeado' : 'Módulo criado');
+  });
+}
+function trnEstanteMover(nome, dir) {
+  var l = (TRN.d.estantes || []).slice(), i = l.indexOf(nome), j = i + dir; if (i < 0 || j < 0 || j >= l.length) return;
+  var x = l[i]; l[i] = l[j]; l[j] = x; TRN.d.estantes = l; trnRender();
+  trnEstantePedir({ lista: l });
+}
+function trnEstanteApagar(nome) {
+  var n = trnLivros().filter(function(c) { return c.estante === nome; }).length;
+  if (!confirm('Apagar o módulo "' + nome + '"?\n\n' + (n ? 'Os ' + n + ' livro' + (n === 1 ? '' : 's') + ' dele continuam, em "Sem módulo".' : 'Ele está vazio.'))) return;
+  trnEstantePedir({ apagar: nome }, function() { TRN.d.conteudos.forEach(function(c) { if (c.estante === nome) c.estante = ''; }); trnToast('Módulo apagado'); });
 }
 function trnOndeEstou(t) {   // a aula da vez numa trilha (a 1ª não concluída que está aberta)
   var id = t.itens.filter(function(x) { return !trnFeito(x) && !(trnC(x) || {}).travado; })[0];
@@ -35300,21 +35347,23 @@ function trnParaLer() {   // [] = todo o time; null = escolheu pessoas mas não 
 }
 
 // subir conteúdo (arquivo do computador ou link)
-function trnLivroCamposHtml(c) {   // os campos de livro (subir e editar): é livro? autor e tipo (prateleira)
-  var eh = !!(c && c.cat === 'livro'), tipos = {};
-  trnLivros().concat((TRN.d.conteudos || []).filter(function(x) { return x.cat === 'livro'; })).forEach(function(x) { if (x.estante) tipos[x.estante] = 1; });
-  return '<label class="tr-check"><input type="checkbox" id="trn-livro"' + (eh ? ' checked' : '') + ' onchange="trnLivroMudou()"><span><b>📚 É um livro</b><small>Aparece na aba Livros, na prateleira do tipo dele.</small></span></label>'
-    + '<div class="tr-duas" id="trn-c-livro"' + (eh ? '' : ' hidden') + '><label>Autor (opcional)<input type="text" id="trn-autor" maxlength="80" value="' + _trnE(c ? c.autor : '') + '" placeholder="Ex.: Jordan Belfort"></label>'
-    + '<label>Tipo do livro (prateleira)<input type="text" id="trn-estante" maxlength="40" list="trn-estantes" value="' + _trnE(c ? c.estante : '') + '" placeholder="Ex.: Vendas"></label>'
-    + '<datalist id="trn-estantes">' + Object.keys(tipos).sort().map(function(k) { return '<option value="' + _trnE(k) + '">'; }).join('') + '</datalist></div>';
+function trnLivroCamposHtml(c) {   // os campos de livro (subir e editar): é livro? autor e módulo
+  var eh = !!(c && c.cat === 'livro'), mods = ((TRN.d && TRN.d.estantes) || []).slice(), atual = (c && c.estante) || '';
+  if (atual && mods.indexOf(atual) < 0) mods.push(atual);
+  return '<label class="tr-check"><input type="checkbox" id="trn-livro"' + (eh ? ' checked' : '') + ' onchange="trnLivroMudou()"><span><b>📚 É um livro</b><small>Aparece na aba Livros, dentro do módulo que você escolher.</small></span></label>'
+    + '<div class="tr-duas" id="trn-c-livro"' + (eh ? '' : ' hidden') + '><label>Autor (opcional)<input type="text" id="trn-autor" maxlength="80" value="' + _trnE(c ? c.autor : '') + '" placeholder="Ex.: nome de quem escreveu"></label>'
+    + '<label>Módulo<select id="trn-estante" onchange="var n=document.getElementById(\'trn-estante-n\');n.hidden=this.value!==\'__novo\';if(!n.hidden)n.focus();"><option value="">Sem módulo</option>'
+    + mods.map(function(k) { return '<option value="' + _trnE(k) + '"' + (k === atual ? ' selected' : '') + '>' + _trnE(k) + '</option>'; }).join('') + '<option value="__novo">＋ Criar novo módulo…</option></select>'
+    + '<input type="text" id="trn-estante-n" maxlength="40" placeholder="Nome do módulo novo" hidden></label></div>';
 }
 function trnLivroMudou() { var m = document.getElementById('trn-livro'), b = document.getElementById('trn-c-livro'); if (m && b) b.hidden = !m.checked; if (document.getElementById('trn-previa')) trnPrevia('trn-tit', m && m.checked ? 'Livro' : 'Aula', m && m.checked ? 'Nome do livro' : 'Nome da aula'); }
 function trnLivroLer(p) {   // põe no pedido de salvar o que está marcado
   var m = document.getElementById('trn-livro'); if (!m) return p;
-  p.cat = m.checked ? 'livro' : ''; p.autor = m.checked ? trnVal('trn-autor') : ''; p.estante = m.checked ? trnVal('trn-estante') : '';
+  var es = trnVal('trn-estante'); if (es === '__novo') es = trnVal('trn-estante-n');
+  p.cat = m.checked ? 'livro' : ''; p.autor = m.checked ? trnVal('trn-autor') : ''; p.estante = m.checked ? es : '';
   return p;
 }
-function trnSubirAbrir(livro) {
+function trnSubirAbrir(livro, modulo) {
   if (!TRN.d || !TRN.d.admin) return;
   livro = livro === true || (livro == null && TRN.aba === 'livros' && TRN.vista === 'inicio');
   TRN.envio = { modo: 'arquivo', arq: null, ativo: false, idEnviado: '', min: 0 };
@@ -35325,7 +35374,7 @@ function trnSubirAbrir(livro) {
     + '<div class="tr-solta" id="trn-solta" tabindex="0" role="button" onclick="if(!(TRN.envio&&TRN.envio.ativo))document.getElementById(\'trn-arq\').click()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}"><span class="tr-solta-ic" aria-hidden="true">⬆</span><b>Escolha ou arraste o arquivo aqui</b>Vídeo, áudio, PDF, imagem ou apresentação. Pode ser grande: vai direto para o Drive da Promov.</div></div>'
     + '<label id="trn-c-link" hidden>Link<input type="url" id="trn-link" placeholder="https://www.youtube.com/watch?v=…"></label>'
     + '<div class="tr-com-capa"><label>Título<input type="text" id="trn-tit" maxlength="140" placeholder="Ex.: Como conduzir o diagnóstico" oninput="trnPrevia(\'trn-tit\',\'Aula\',\'Nome da aula\')"></label><div class="tr-previa"><span class="tr-meta">Capa (feita na hora)</span><div id="trn-previa"></div></div></div>'
-    + trnLivroCamposHtml(livro ? { cat: 'livro', autor: '', estante: TRN.estante && TRN.estante !== '—' ? TRN.estante : '' } : null)
+    + trnLivroCamposHtml(livro ? { cat: 'livro', autor: '', estante: modulo || (TRN.estante && TRN.estante !== '—' ? TRN.estante : '') } : null)
     + '<label>Descrição (opcional)<textarea id="trn-desc" maxlength="800" placeholder="O que a pessoa vai aprender"></textarea></label>'
     + '<label id="trn-c-min" hidden>Duração em minutos (opcional)<input type="number" id="trn-min" min="0" max="999" inputmode="numeric"></label>'
     + '<label>Colocar na trilha<select id="trn-tri" onchange="trnTriMudou()">' + ops + '</select></label>'
