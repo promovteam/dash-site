@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0120';
+var VERSAO_DASH = '2026-10-10-0131';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25300,6 +25300,8 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 }
 @media (prefers-reduced-motion: reduce) { .tr-modal, .tr-barra i, .tr-vcard .tr-capa, .tr-play, .tr-sobre, .tr-toast { animation:none; transition:none; } }
 .tr-modal [hidden], #s-treinos [hidden] { display:none !important; }
+.tr-aviso-adm { display:block; align-self:auto; margin-bottom:16px; }
+.tr-vazio-b { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
 .sc-nota-topo { font-size:.72rem; color:var(--muted); font-weight:600; margin:2px 0 14px; line-height:1.5; }
 .sc-nota-topo b { color:var(--text2); }
 .sc-jornada { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
@@ -33850,7 +33852,11 @@ function _trnE(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, functi
 function _trnId(s) { return String(s || '').replace(/[^\w:.-]/g, ''); }
 function _trnNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
 function trnTok() { try { return (typeof scTok === 'function' ? scTok() : localStorage.getItem('comPainelTok')) || ''; } catch (e) { return ''; } }
-function trnPedir(p, cb, ms) { p.token = trnTok(); gasPedir(p, cb, ms || 40000); }
+// 🔓 10/10/2026 (Bruno: "tem que ter senha?" · "o do dash já não vale"): assistir não pede mais senha — vale o login do dash.
+// Quem tem a sessão das Comissões manda junto (admin precisa dela para subir, montar trilha e ver o time).
+function trnQuem() { try { return localStorage.getItem('v2Login') || ''; } catch (e) { return ''; } }
+function trnMarca() { var t = trnTok(); return t ? t.slice(-10) : 'q:' + trnQuem(); }
+function trnPedir(p, cb, ms) { p.token = trnTok(); p.quem = trnQuem(); gasPedir(p, cb, ms || 40000); }
 function trnMin(m) { m = Math.round(+m || 0); if (!m) return ''; if (m < 60) return m + ' min'; var h = Math.floor(m / 60), r = m % 60; return h + 'h' + (r ? String(r).padStart(2, '0') : ''); }
 function trnHoras(seg) { seg = +seg || 0; if (seg < 60) return seg ? '<1 min' : '0 min'; return trnMin(seg / 60); }
 function trnRelogio(s) { s = Math.max(0, Math.floor(+s || 0)); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60, z = function(n) { return String(n).padStart(2, '0'); }; return (h ? h + ':' + z(m) : m) + ':' + z(x); }
@@ -33902,10 +33908,10 @@ function trnVel() { try { var v = +localStorage.getItem('trnVel'); return TRN_VE
 
 // ---------- abrir / carregar ----------
 // ⚡ abre na hora com a última lista guardada neste computador (o robô leva uns 5 s) e atualiza por trás
-function trnCacheLer() { try { var c = JSON.parse(localStorage.getItem('trnCache') || 'null'); return c && c.t === trnTok().slice(-10) ? c.d : null; } catch (e) { return null; } }
-function trnCacheGuardar(d) { try { localStorage.setItem('trnCache', JSON.stringify({ t: trnTok().slice(-10), d: d })); } catch (e) {} }
+function trnCacheLer() { try { var c = JSON.parse(localStorage.getItem('trnCache') || 'null'); return c && c.t === trnMarca() ? c.d : null; } catch (e) { return null; } }
+function trnCacheGuardar(d) { try { localStorage.setItem('trnCache', JSON.stringify({ t: trnMarca(), d: d })); } catch (e) {} }
 function renderTreinos() {
-  if (!trnTok()) { TRN.trava = 'senha'; trnRender(); return; }
+  if (!trnTok() && !trnQuem()) { TRN.trava = 'senha'; trnRender(); return; }
   if (!TRN.d) { var c = trnCacheLer(); if (c) { TRN.d = c; TRN.trava = ''; } }
   if (!TRN.carregando) trnCarregar();
   trnRender();
@@ -33922,7 +33928,7 @@ function trnCarregar(cb) {
 }
 function trnRender() {
   var el = document.getElementById('trn-corpo'); if (!el) return;
-  if (TRN.trava === 'senha' || !trnTok()) { trnPlayerSoltar(); el.innerHTML = trnTravaHtml(); return; }
+  if (TRN.trava === 'senha' || (!trnTok() && !trnQuem())) { trnPlayerSoltar(); el.innerHTML = trnTravaHtml(); return; }
   if (!TRN.d) {
     el.innerHTML = TRN.erro ? '<div class="panel tr-vazio">' + _trnE(TRN.erro) + ' · <a href="#" onclick="event.preventDefault();trnCarregar();">Tentar de novo</a></div>'
       : '<div class="panel tr-vazio"><span class="mv-brilho-txt">Carregando os treinamentos…</span></div>';
@@ -33930,6 +33936,7 @@ function trnRender() {
   }
   if (TRN.vista === 'ver' && ((TRN.trilha && !trnT(TRN.trilha)) || (!TRN.trilha && !trnC(TRN.atual)))) TRN.vista = 'inicio';
   if (TRN.vista === 'pessoa' && !TRN.d.admin) TRN.vista = 'inicio';
+  if (TRN.vista === 'ver' && TRN.trilha && !trnC(TRN.atual)) { var tt = trnT(TRN.trilha); TRN.atual = tt ? (tt.itens.filter(function(x) { return !trnFeito(x); })[0] || tt.itens[0] || '') : ''; }   // trilha aberta sem aula escolhida: vai para a próxima
   if (TRN.vista === 'ver') {
     var palco = document.getElementById('trn-palco');
     if (palco && palco.getAttribute('data-id') === TRN.atual && el.contains(palco)) { trnVerAtualizar(); return; }   // não derruba o vídeo que está tocando
@@ -33943,8 +33950,8 @@ function trnRender() {
 function trnTravaHtml() {
   var it = document.querySelector('.nav-item[data-s="comissoes"]'), temCom = !!(it && it.style.display !== 'none');
   var ir = 'var it=document.querySelector(\'.nav-item[data-s=comissoes]\');if(it)it.click();';
-  return '<div class="panel sc-trava"><div class="cm-cadeado">🔐</div><b>Os treinamentos são do time</b><span>Para ver as trilhas e continuar de onde parou, entre com a sua senha, a mesma das Comissões.</span>'
-    + (temCom ? '<button class="btn primary" onclick="' + ir + '">Entrar com a minha senha</button>' : '<span class="hint">Peça ao Bruno o seu acesso.</span>') + '</div>';
+  return '<div class="panel sc-trava"><div class="cm-cadeado">🔐</div><b>Os treinamentos são do time</b><span>Entre no dash com o seu nome para ver as trilhas e continuar de onde parou.</span>'
+    + (temCom ? '<button class="btn primary" onclick="' + ir + '">Entrar com a minha senha</button>' : '') + '</div>';
 }
 function trnAbas() {
   if (!TRN.d.admin) return '';
@@ -33978,7 +33985,11 @@ function trnInicioHtml() {
   h += '<div class="tr-topo"><p>' + (d.admin ? 'Suba vídeos, PDFs ou links, monte trilhas na ordem certa e escolha para quem libera. O time assiste aqui e o dash guarda onde cada um parou.'
     : 'As trilhas liberadas para você. O dash guarda onde você parou: é só voltar e continuar.') + '</p>';
   if (d.admin) h += '<div class="tr-acoes"><button class="btn" onclick="trnTrilhaEditar()">＋ Nova trilha</button><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir conteúdo</button></div>';
-  h += '</div>' + trnHeroHtml() + trnKpisHtml();
+  h += '</div>';
+  if (!d.admin && trnQuem() === 'Bruno Pardim')   // admin dos treinamentos é só o Bruno ("admin só eu", 10/10/2026)
+    h += '<div class="tr-dica tr-aviso-adm">Você está vendo como o time vê. Para subir conteúdo, montar trilhas e acompanhar o time, saia em <b>Trocar de acesso</b> e entre de novo com a sua senha.</div>';
+  if (d.soVer) h += '<div class="tr-dica tr-aviso-adm">Este acesso só assiste: o que você concluir não fica guardado.</div>';
+  h += trnHeroHtml() + trnKpisHtml();
   h += '<div class="tr-sec"><h3>Trilhas</h3><span>' + d.trilhas.length + '</span></div>';
   if (!d.trilhas.length) h += '<div class="panel tr-vazio">' + (d.admin ? 'Nenhuma trilha ainda. Suba os conteúdos e clique em <b>＋ Nova trilha</b> para pôr em ordem e escolher para quem liberar.' : 'Ainda não tem trilha liberada para você.') + '</div>';
   else { h += '<div class="tr-trilhas">'; d.trilhas.forEach(function(t) { h += trnCardHtml(t); }); h += '</div>'; }
@@ -34114,7 +34125,7 @@ function trnVerHtml() {
   var t = TRN.trilha ? trnT(TRN.trilha) : null, c = trnC(TRN.atual);
   var h = trnAbas() + '<button class="tr-voltar" onclick="trnVoltar()">← Todos os treinamentos</button><div id="trn-ver-topo"></div>';
   h += '<div class="tr-ver' + (t ? '' : ' so') + '"><div class="tr-ver-esq">';
-  h += c ? trnPalcoHtml(c) + '<div id="trn-ver-info"></div>' : '<div class="panel tr-vazio">' + (t && !t.itens.length ? 'Esta trilha ainda não tem conteúdo.' + (TRN.d.admin ? ' Clique em <b>✏️ Editar trilha</b> para colocar.' : '') : 'Escolha um conteúdo.') + '</div>';
+  h += c ? trnPalcoHtml(c) + '<div id="trn-ver-info"></div>' : '<div class="panel tr-vazio">' + (t && !t.itens.length ? 'Esta trilha ainda não tem aula.' + (TRN.d.admin ? '<div class="tr-vazio-b"><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir a primeira aula</button><button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">＋ Usar um conteúdo que já subi</button></div>' : ' Quando o Bruno subir, ela aparece aqui.') : 'Escolha um conteúdo.') + '</div>';
   h += '</div>' + (t ? '<div class="tr-lado" id="trn-ver-lado"></div>' : '') + '</div>';
   return h;
 }
@@ -34125,7 +34136,7 @@ function trnVerAtualizar() {   // tudo da tela de assistir menos o vídeo
     if (t) {
       var nn = t.itens.length, ff = t.itens.filter(trnFeito).length;
       topo.innerHTML = '<div class="tr-topo tr-topo-t"><div><span class="tr-eyebrow">Trilha · ' + nn + ' aula' + (nn === 1 ? '' : 's') + (trnMinT(t) ? ' · ' + trnMin(trnMinT(t)) : '') + '</span><h2>' + _trnE(t.nome) + '</h2>' + (t.descricao ? '<p>' + _trnE(t.descricao) + '</p>' : '') + '</div>'
-        + '<div class="tr-acoes">' + (d.admin ? trnParaChip(t.para) + '<button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">✏️ Editar trilha</button>' : '<span class="tr-anel" style="--p:' + (nn ? Math.round(ff / nn * 100) : 0) + '"><b>' + (nn ? Math.round(ff / nn * 100) : 0) + '%</b></span>') + '</div></div>';
+        + '<div class="tr-acoes">' + (d.admin ? trnParaChip(t.para) + '<button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">✏️ Editar trilha</button><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir aula</button>' : '<span class="tr-anel" style="--p:' + (nn ? Math.round(ff / nn * 100) : 0) + '"><b>' + (nn ? Math.round(ff / nn * 100) : 0) + '%</b></span>') + '</div></div>';
     } else topo.innerHTML = '';
   }
   var info = document.getElementById('trn-ver-info');
@@ -34226,12 +34237,13 @@ function trnVelMudar(x) {
 }
 function trnPosEnviar(beacon) {
   var P = TRN.p; if (!P || !P.v || !TRN.d) return;
+  if (TRN.d.soVer) { trnPosGuardar(P.id, P.v.currentTime || 0, trnDur(P.v)); return; }   // só assiste: guarda só neste aparelho
   var v = P.v, seg = Math.floor(v.currentTime || 0), dur = Math.floor(trnDur(v)), viu = Math.floor(P.tocado);
   if ((!seg && !viu) || (!viu && seg === P.ultEnv)) return;   // nada de novo desde o último aviso
   P.ultEnv = seg;
   P.tocado -= viu; P.enviadoEm = Date.now();
   trnPosGuardar(P.id, seg, dur);
-  var p = { action: 'treinoPosicao', conteudo: P.id, seg: seg, dur: dur, assistiu: viu, token: trnTok() }, id = P.id;
+  var p = { action: 'treinoPosicao', conteudo: P.id, seg: seg, dur: dur, assistiu: viu, token: trnTok(), quem: trnQuem() }, id = P.id;
   if (TRN.d.pos) TRN.d.pos[id] = { s: seg, d: dur, v: trnAgoraTxt() };
   if (viu && TRN.d.minha) { var hj = trnDia(new Date()); TRN.d.minha[hj] = (TRN.d.minha[hj] || 0) + viu; }
   if (beacon && navigator.sendBeacon) { try { navigator.sendBeacon(APPS_SCRIPT_URL, new Blob([JSON.stringify(p)], { type: 'text/plain' })); return; } catch (e) {} }
@@ -34240,9 +34252,9 @@ function trnPosEnviar(beacon) {
   }, 30000);
 }
 function trnAbriu() {   // PDF / link / player do Drive: o dia conta como dia de estudo
-  var c = trnC(TRN.atual); if (!c || TRN._abriu === c.id) return; TRN._abriu = c.id;
+  var c = trnC(TRN.atual); if (!c || TRN._abriu === c.id || TRN.d.soVer) return; TRN._abriu = c.id;
   if (TRN.d.minha) { var hj = trnDia(new Date()); if (TRN.d.minha[hj] == null) TRN.d.minha[hj] = 0; }
-  gasPedir({ action: 'treinoPosicao', conteudo: c.id, seg: 0, abriu: true, token: trnTok() }, function() {}, 30000);
+  gasPedir({ action: 'treinoPosicao', conteudo: c.id, seg: 0, abriu: true, token: trnTok(), quem: trnQuem() }, function() {}, 30000);
 }
 function trnSair() { if (TRN.p && TRN.p.v) { try { TRN.p.v.pause(); } catch (e) {} } trnPosEnviar(); }
 document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'hidden') trnPosEnviar(true); });
@@ -34263,6 +34275,7 @@ function trnProximoAuto() {
 function trnConcluir(id, feito) {
   var d = TRN.d; if (!d) return;
   if (typeof soOlhar === 'function' && soOlhar()) return;
+  if (d.soVer) { alert('Este acesso só assiste: o que você concluir não fica guardado.\n\nPara guardar o seu progresso, peça ao Bruno o seu acesso.'); return; }
   var antes = d.meu[id];
   if (feito) d.meu[id] = antes || trnAgoraTxt(); else delete d.meu[id];
   trnRender();
