@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0748';
+var VERSAO_DASH = '2026-10-10-0829';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25564,6 +25564,8 @@ details.tr-atalhos { line-height:2; } details.tr-atalhos summary { cursor:pointe
 .tr-est-b { display:flex; gap:4px; margin-left:auto; padding:0 !important; background:none !important; }
 .tr-est-b button { height:28px; min-width:30px; padding:0 9px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text2); font:inherit; font-size:.72rem; font-weight:700; cursor:pointer; }
 .tr-est-b button:hover { color:var(--text); border-color:rgba(246,163,80,.5); } .tr-est-b button:disabled { opacity:.3; cursor:default; }
+.tr-modw { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.tr-modw .tr-est-b { margin-left:0; justify-content:flex-end; }
 .tr-est-vazia { padding:18px; border-radius:14px; border:1px dashed var(--border); color:var(--text2); font-size:.8rem; }
 .tr-modal #trn-estante-n { margin-top:6px; }
 .tr-previa-livro { width:118px; }
@@ -34246,7 +34248,7 @@ function trnAbas() {
   return '<div class="tr-abas" role="tablist" aria-label="Treinamentos">' + b('conteudos', adm ? '🎓 Trilhas e conteúdos' : '🎓 Trilhas') + b('livros', '📚 Livros')
     + (adm ? b('time', '👥 Acompanhamento do time') : '') + '</div>';
 }
-function trnAba(k) { TRN.aba = k; TRN.vista = 'inicio'; TRN.trilha = ''; TRN.atual = ''; trnRender(); }
+function trnAba(k) { TRN.aba = k; TRN.vista = 'inicio'; TRN.trilha = ''; TRN.atual = ''; TRN.estante = ''; trnRender(); }
 
 // ---------- capa (miniatura do Drive / YouTube; sem miniatura = capa com o ícone) ----------
 function trnYt(u) { var m = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{6,})/.exec(u || ''); return m ? m[1] : ''; }
@@ -34340,9 +34342,21 @@ function trnLivroCard(c) {
     + '<span class="tr-livro-t"><b>' + _trnE(c.titulo) + '</b>' + (c.autor ? '<small>' + _trnE(c.autor) + '</small>' : '')
     + '<span class="tr-meta' + (l.feito ? ' ok' : '') + '">' + l.txt + (l.lendo ? ' · ' + l.pct + '%' : '') + '</span>' + (trnAdm() ? trnOndeChip(c) : '') + '</span></button>';
 }
+// 10/10/2026 (Bruno: "deve ter a aba vendas, ao clicar vejo os livros do tema"): a aba abre nos MÓDULOS — um cartão por tema
+// (Vendas, Liderança…); clicar no cartão abre os livros daquele tema. Só quando não existe módulo nenhum os livros aparecem direto.
+function trnEstanteAbrir(i) { TRN.estante = (TRN._est || [])[i] || '—'; trnRender(); var el = document.getElementById('trn-corpo'); if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start' }); }
+function trnEstanteFechar() { TRN.estante = ''; trnRender(); }
 function trnLivrosHtml() {
   var d = TRN.d, adm = trnAdm(), ls = trnLivros(), h = trnAbas(), mods = (d.estantes || []).slice();
-  h += '<div class="tr-topo"><p>' + (adm ? 'Crie os módulos (Vendas, Liderança…) e suba os livros em PDF dentro de cada um. O time lê aqui dentro e o dash guarda a página em que cada um parou.' : 'Leia aqui dentro: o dash guarda a página em que você parou.') + '</p>'
+  // os módulos, na ordem que o admin deixou; livro sem módulo vai para o fim
+  var est = {}; ls.forEach(function(c) { var k = c.estante || ''; (est[k] = est[k] || []).push(c); });
+  Object.keys(est).forEach(function(k) { if (k && mods.indexOf(k) < 0) mods.push(k); });
+  var ordem = mods.filter(function(k) { return adm || est[k]; }); if (est['']) ordem.push('');
+  TRN._est = ordem;
+  var soltos = !ordem.some(function(k) { return k; });   // nenhum módulo criado: os livros aparecem direto
+  if (TRN.estante && (soltos || ordem.indexOf(TRN.estante === '—' ? '' : TRN.estante) < 0)) TRN.estante = '';
+  if (TRN.estante) return h + trnLivrosTemaHtml(TRN.estante === '—' ? '' : TRN.estante, est);
+  h += '<div class="tr-topo"><p>' + (adm ? 'Crie os módulos (Vendas, Liderança…) e suba os livros em PDF dentro de cada um. O time escolhe o tema, lê aqui dentro e o dash guarda a página em que cada um parou.' : (soltos ? 'Leia aqui dentro: o dash guarda a página em que você parou.' : 'Escolha um tema para ver os livros. Você lê aqui dentro e o dash guarda a página em que parou.')) + '</p>'
     + (adm ? '<div class="tr-acoes"><button class="btn" onclick="trnEstanteEditar()">＋ Novo módulo</button><button class="btn primary" onclick="trnSubirAbrir(true)">⬆ Subir livro</button></div>' : '') + '</div>';
   if (!ls.length && !(adm && mods.length)) return h + '<div class="tr-nada"><span aria-hidden="true">📚</span><b>Nenhum livro ainda</b><p>' + (adm ? 'Clique em <b>＋ Novo módulo</b> para criar o primeiro (Vendas, por exemplo) e depois em <b>⬆ Subir livro</b>.' : 'Quando o Bruno liberar um livro, ele aparece aqui.') + '</p></div>';
   // continue lendo: o último livro aberto que ainda não terminou
@@ -34352,28 +34366,33 @@ function trnLivrosHtml() {
     h += '<button class="tr-seguir tr-lendo" onclick="trnVer(\'\',\'' + _trnId(lendo.id) + '\')"><span class="tr-lendo-capa">' + trnLivroCapa(lendo) + '</span><span class="tr-seguir-t"><small>Continue lendo</small><b>' + _trnE(lendo.titulo) + '</b>'
       + '<span class="tr-meta">' + ll.txt + ' · ' + ll.pct + '%</span><span class="tr-barra"><i style="width:' + ll.pct + '%"></i></span></span><span class="btn primary">Continuar</span></button>';
   }
-  // os módulos, na ordem que o admin deixou; livro sem módulo vai para o fim
-  var est = {}; ls.forEach(function(c) { var k = c.estante || ''; (est[k] = est[k] || []).push(c); });
-  Object.keys(est).forEach(function(k) { if (k && mods.indexOf(k) < 0) mods.push(k); });
-  var ordem = mods.filter(function(k) { return adm || est[k]; }); if (est['']) ordem.push('');
-  TRN._est = ordem;
-  if (TRN.estante != null && TRN.estante !== '' && ordem.indexOf(TRN.estante === '—' ? '' : TRN.estante) < 0) TRN.estante = '';
-  if (ordem.length > 1) {
-    h += '<div class="tr-filtros" role="tablist" aria-label="Módulo">' + '<button type="button" class="chart-chip' + (!TRN.estante ? ' on' : '') + '" onclick="TRN.estante=\'\';trnRender()">Todos <b>' + ls.length + '</b></button>'
-      + ordem.map(function(k, i) { return '<button type="button" class="chart-chip' + (TRN.estante === (k || '—') ? ' on' : '') + '" onclick="TRN.estante=TRN._est[' + i + ']||\'—\';trnRender()">' + _trnE(k || 'Sem módulo') + ' <b>' + (est[k] || []).length + '</b></button>'; }).join('') + '</div>';
-  }
+  if (soltos) return h + '<div class="tr-sec"><h3>Livros</h3><span>' + ls.length + '</span></div><div class="tr-estante">' + ls.map(trnLivroCard).join('') + '</div>';
+  h += '<div class="tr-sec"><h3>Módulos</h3><span>' + ordem.length + '</span></div><div class="tr-trilhas tr-mods">';
   ordem.forEach(function(k, i) {
-    if (TRN.estante && TRN.estante !== (k || '—')) return;
-    var lv = est[k] || [], lidos = lv.filter(function(c) { return trnFeito(c.id); }).length, im = mods.indexOf(k);
-    h += '<div class="tr-sec tr-est-h"><h3>' + _trnE(k || (ordem.length > 1 ? 'Sem módulo' : 'Livros')) + '</h3><span>' + lv.length + '</span>' + (!adm && lidos ? '<span class="tr-meta">' + lidos + ' lido' + (lidos === 1 ? '' : 's') + '</span>' : '');
-    if (adm && k) h += '<span class="tr-est-b"><button type="button" onclick="trnSubirAbrir(true,TRN._est[' + i + '])" title="Subir um livro neste módulo">⬆ Subir aqui</button>'
-      + '<button type="button" onclick="trnEstanteEditar(TRN._est[' + i + '])" aria-label="Renomear o módulo" title="Renomear">✏️</button>'
-      + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],-1)" aria-label="Subir o módulo" title="Subir"' + (im > 0 ? '' : ' disabled') + '>↑</button>'
-      + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],1)" aria-label="Descer o módulo" title="Descer"' + (im >= 0 && im < mods.length - 1 ? '' : ' disabled') + '>↓</button>'
+    var lv = est[k] || [], n = lv.length, lidos = lv.filter(function(c) { return trnFeito(c.id); }).length, cheio = n > 0 && lidos === n, im = mods.indexOf(k);
+    var abertos = lv.filter(function(c) { return !trnFeito(c.id) && trnPosDe(c.id).s > 0; }).length;
+    var qt = n + ' livro' + (n === 1 ? '' : 's');
+    var txt = adm ? (n ? '' : 'Módulo vazio') : cheio ? '<span class="ok">✓ ' + (n === 1 ? 'Lido' : 'Todos lidos') + '</span>' : lidos ? lidos + ' de ' + n + ' lido' + (lidos === 1 ? '' : 's') : abertos ? 'Lendo ' + abertos + ' de ' + n : 'Não começou';
+    h += '<div class="tr-modw"><button class="tr-modc' + (!adm && cheio ? ' feito' : '') + '" onclick="trnEstanteAbrir(' + i + ')">'
+      + trnCapaHtml(k || (adm ? 'Sem módulo' : 'Outros livros'), 'Livros', '<span class="tr-dur">' + qt + '</span>' + (!adm && cheio ? '<span class="tr-ok-sel" title="Todos lidos">✓</span>' : ''))
+      + '<span class="tr-modc-pe">' + (adm ? '' : '<span class="tr-barra' + (cheio ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(lidos / n * 100) : 0) + '%"></i></span>')
+      + '<span class="tr-prog"><span>' + txt + '</span><span class="tr-cta">' + (adm && !n ? '⬆ Subir o primeiro' : 'Ver os livros →') + '</span></span></span></button>';
+    if (adm && k) h += '<span class="tr-est-b"><button type="button" onclick="trnEstanteEditar(TRN._est[' + i + '])" aria-label="Renomear o módulo" title="Renomear">✏️</button>'
+      + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],-1)" aria-label="Mover o módulo para antes" title="Mover para antes"' + (im > 0 ? '' : ' disabled') + '>←</button>'
+      + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],1)" aria-label="Mover o módulo para depois" title="Mover para depois"' + (im >= 0 && im < (d.estantes || []).length - 1 ? '' : ' disabled') + '>→</button>'
       + '<button type="button" onclick="trnEstanteApagar(TRN._est[' + i + '])" aria-label="Apagar o módulo" title="Apagar o módulo (os livros ficam)">🗑</button></span>';
-    h += '</div>' + (lv.length ? '<div class="tr-estante">' + lv.map(trnLivroCard).join('') + '</div>' : '<div class="tr-est-vazia">Módulo vazio. Clique em <b>⬆ Subir aqui</b> para pôr o primeiro livro.</div>');
+    h += '</div>';
   });
-  return h;
+  return h + '</div>';
+}
+function trnLivrosTemaHtml(k, est) {   // dentro de um tema: os livros dele
+  var adm = trnAdm(), lv = est[k] || [], n = lv.length, lidos = lv.filter(function(c) { return trnFeito(c.id); }).length, i = (TRN._est || []).indexOf(k);
+  var h = '<button class="tr-voltar" onclick="trnEstanteFechar()">← Livros · todos os módulos</button>';
+  h += '<div class="tr-topo tr-topo-t"><div><span class="tr-eyebrow">Livros · ' + n + ' livro' + (n === 1 ? '' : 's') + (!adm && lidos ? ' · ' + lidos + ' lido' + (lidos === 1 ? '' : 's') : '') + '</span><h2>' + _trnE(k || (adm ? 'Sem módulo' : 'Outros livros')) + '</h2></div>';
+  if (adm) h += '<div class="tr-acoes">' + (k ? '<button class="btn" onclick="trnEstanteEditar(TRN._est[' + i + '])">✏️ Renomear</button><button class="btn" onclick="trnEstanteApagar(TRN._est[' + i + '])">🗑 Apagar módulo</button>' : '')
+    + '<button class="btn primary" onclick="trnSubirAbrir(true,TRN._est[' + i + '])">⬆ Subir livro aqui</button></div>';
+  h += '</div>';
+  return h + (n ? '<div class="tr-estante">' + lv.map(trnLivroCard).join('') + '</div>' : '<div class="tr-est-vazia">Módulo vazio. Clique em <b>⬆ Subir livro aqui</b> para pôr o primeiro livro.</div>');
 }
 // módulos dos livros (só admin): criar/renomear, mudar a ordem, apagar
 function trnEstanteEditar(nome) {
@@ -34397,7 +34416,7 @@ function trnEstanteSalvar() {
   var n = trnVal('trn-est-n'), de = TRN._estEd; if (!n) { trnMsg('Dê um nome ao módulo.', 'erro'); return; }
   var b = document.getElementById('trn-est-s'); if (b) b.disabled = true;
   trnEstantePedir(de ? { renomear: { de: de, para: n } } : { novo: n }, function() {
-    if (de) TRN.d.conteudos.forEach(function(c) { if (c.estante === de) c.estante = n; });
+    if (de) { TRN.d.conteudos.forEach(function(c) { if (c.estante === de) c.estante = n; }); if (TRN.estante === de) TRN.estante = n; }
     trnFechar(); trnToast(de ? 'Módulo renomeado' : 'Módulo criado');
   });
 }
@@ -34409,7 +34428,7 @@ function trnEstanteMover(nome, dir) {
 function trnEstanteApagar(nome) {
   var n = trnLivros().filter(function(c) { return c.estante === nome; }).length;
   if (!confirm('Apagar o módulo "' + nome + '"?\n\n' + (n ? 'Os ' + n + ' livro' + (n === 1 ? '' : 's') + ' dele continuam, em "Sem módulo".' : 'Ele está vazio.'))) return;
-  trnEstantePedir({ apagar: nome }, function() { TRN.d.conteudos.forEach(function(c) { if (c.estante === nome) c.estante = ''; }); trnToast('Módulo apagado'); });
+  trnEstantePedir({ apagar: nome }, function() { TRN.d.conteudos.forEach(function(c) { if (c.estante === nome) c.estante = ''; }); if (TRN.estante === nome) TRN.estante = ''; trnToast('Módulo apagado'); });
 }
 function trnOndeEstou(t) {   // a aula da vez numa trilha (a 1ª não concluída que está aberta)
   var id = t.itens.filter(function(x) { return !trnFeito(x) && !(trnC(x) || {}).travado; })[0];
@@ -34871,7 +34890,7 @@ function trnPalcoHtml(c) {
 }
 function trnVerHtml() {
   var t = TRN.trilha ? trnT(TRN.trilha) : null, c = trnC(TRN.atual);
-  var h = trnAbas() + '<button class="tr-voltar" onclick="trnVoltar()">← ' + (t && trnMods(t).length ? (trnAdm() ? _trnE(t.nome) + ' · todos os módulos' : 'Módulos da trilha') : (c && c.cat === 'livro' && !t ? 'Livros' : trnAdm() ? 'Todos os treinamentos' : 'Treinamentos')) + '</button><div id="trn-ver-topo"></div>';
+  var h = trnAbas() + '<button class="tr-voltar" onclick="trnVoltar()">← ' + (t && trnMods(t).length ? (trnAdm() ? _trnE(t.nome) + ' · todos os módulos' : 'Módulos da trilha') : (c && c.cat === 'livro' && !t ? (TRN.estante && TRN.estante !== '—' ? 'Livros · ' + _trnE(TRN.estante) : 'Livros') : trnAdm() ? 'Todos os treinamentos' : 'Treinamentos')) + '</button><div id="trn-ver-topo"></div>';
   h += '<div class="tr-ver' + (t ? '' : ' so') + '"><div class="tr-ver-esq">';
   h += c ? trnPalcoHtml(c) + '<div id="trn-ver-info"></div>' : '<div class="panel tr-vazio">' + (t && !t.itens.length ? 'Esta trilha ainda não tem aula.' + (trnAdm() ? '<div class="tr-vazio-b"><button class="btn primary" onclick="trnSubirAbrir()">⬆ Subir a primeira aula</button><button class="btn" onclick="trnTrilhaEditar(\'' + _trnId(t.id) + '\')">＋ Usar um conteúdo que já subi</button></div>' : ' Quando o Bruno subir, ela aparece aqui.') : 'Escolha um conteúdo.') + '</div>';
   h += '</div>' + (t ? '<div class="tr-lado" id="trn-ver-lado"></div>' : '') + '</div>';
