@@ -2902,7 +2902,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-0829';
+var VERSAO_DASH = '2026-10-10-0955';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25565,7 +25565,15 @@ details.tr-atalhos { line-height:2; } details.tr-atalhos summary { cursor:pointe
 .tr-est-b button { height:28px; min-width:30px; padding:0 9px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text2); font:inherit; font-size:.72rem; font-weight:700; cursor:pointer; }
 .tr-est-b button:hover { color:var(--text); border-color:rgba(246,163,80,.5); } .tr-est-b button:disabled { opacity:.3; cursor:default; }
 .tr-modw { display:flex; flex-direction:column; gap:8px; min-width:0; }
-.tr-modw .tr-est-b { margin-left:0; justify-content:flex-end; }
+.tr-modw .tr-est-b { margin-left:0; justify-content:flex-start; }
+/* o módulo dos livros é uma capa em pé com outros livros atrás (pilha) */
+.tr-estante.mods { grid-template-columns:repeat(auto-fill, minmax(186px, 1fr)); gap:26px 30px; padding-right:14px; }
+.tr-livro.mod .tr-capa.livro { box-shadow:inset 0 0 0 1px rgba(255,255,255,.12), inset 7px 0 10px -6px rgba(0,0,0,.9), 7px 0 0 -4px #1b1e25, 8px 0 0 -4px rgba(255,255,255,.16), 14px 0 0 -9px #14161b, 15px 0 0 -9px rgba(255,255,255,.11), 0 16px 32px rgba(0,0,0,.5); }
+.tr-livro.mod:hover .tr-capa.livro { transform:translateY(-5px); box-shadow:inset 0 0 0 1px rgba(246,163,80,.55), inset 7px 0 10px -6px rgba(0,0,0,.9), 7px 0 0 -4px #1b1e25, 8px 0 0 -4px rgba(246,163,80,.4), 14px 0 0 -9px #14161b, 15px 0 0 -9px rgba(246,163,80,.25), 0 24px 42px rgba(0,0,0,.6); }
+.tr-livro.mod .tr-livro-t b { font-size:.9rem; }
+.tr-livro.mod .tr-cta { font-size:.72rem; margin-top:2px; }
+@media (max-width:560px) { .tr-estante.mods { grid-template-columns:repeat(auto-fill, minmax(128px, 1fr)); gap:20px 22px; } }
+@media (prefers-reduced-motion: reduce) { .tr-livro.mod:hover .tr-capa.livro { transform:none; } }
 .tr-est-vazia { padding:18px; border-radius:14px; border:1px dashed var(--border); color:var(--text2); font-size:.8rem; }
 .tr-modal #trn-estante-n { margin-top:6px; }
 .tr-previa-livro { width:118px; }
@@ -34367,16 +34375,18 @@ function trnLivrosHtml() {
       + '<span class="tr-meta">' + ll.txt + ' · ' + ll.pct + '%</span><span class="tr-barra"><i style="width:' + ll.pct + '%"></i></span></span><span class="btn primary">Continuar</span></button>';
   }
   if (soltos) return h + '<div class="tr-sec"><h3>Livros</h3><span>' + ls.length + '</span></div><div class="tr-estante">' + ls.map(trnLivroCard).join('') + '</div>';
-  h += '<div class="tr-sec"><h3>Módulos</h3><span>' + ordem.length + '</span></div><div class="tr-trilhas tr-mods">';
+  // 10/10/2026 (Bruno: "os módulos dos livros devem ser em formato de livro"): o módulo é uma capa em pé, como os livros, com
+  // outros livros aparecendo atrás (uma pilha) para ler como "coleção"; embaixo, o nome, quanto já leu e "Ver os livros".
+  h += '<div class="tr-sec"><h3>Módulos</h3><span>' + ordem.length + '</span></div><div class="tr-estante mods">';
   ordem.forEach(function(k, i) {
     var lv = est[k] || [], n = lv.length, lidos = lv.filter(function(c) { return trnFeito(c.id); }).length, cheio = n > 0 && lidos === n, im = mods.indexOf(k);
     var abertos = lv.filter(function(c) { return !trnFeito(c.id) && trnPosDe(c.id).s > 0; }).length;
-    var qt = n + ' livro' + (n === 1 ? '' : 's');
-    var txt = adm ? (n ? '' : 'Módulo vazio') : cheio ? '<span class="ok">✓ ' + (n === 1 ? 'Lido' : 'Todos lidos') + '</span>' : lidos ? lidos + ' de ' + n + ' lido' + (lidos === 1 ? '' : 's') : abertos ? 'Lendo ' + abertos + ' de ' + n : 'Não começou';
-    h += '<div class="tr-modw"><button class="tr-modc' + (!adm && cheio ? ' feito' : '') + '" onclick="trnEstanteAbrir(' + i + ')">'
-      + trnCapaHtml(k || (adm ? 'Sem módulo' : 'Outros livros'), 'Livros', '<span class="tr-dur">' + qt + '</span>' + (!adm && cheio ? '<span class="tr-ok-sel" title="Todos lidos">✓</span>' : ''))
-      + '<span class="tr-modc-pe">' + (adm ? '' : '<span class="tr-barra' + (cheio ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(lidos / n * 100) : 0) + '%"></i></span>')
-      + '<span class="tr-prog"><span>' + txt + '</span><span class="tr-cta">' + (adm && !n ? '⬆ Subir o primeiro' : 'Ver os livros →') + '</span></span></span></button>';
+    var qt = n + ' livro' + (n === 1 ? '' : 's'), nomeM = k || (adm ? 'Sem módulo' : 'Outros livros');
+    var txt = adm ? (n ? '' : 'Módulo vazio') : cheio ? '✓ ' + (n === 1 ? 'Lido' : 'Todos lidos') : lidos ? lidos + ' de ' + n + ' lido' + (lidos === 1 ? '' : 's') : abertos ? 'Lendo ' + abertos + ' de ' + n : 'Não começou';
+    h += '<div class="tr-modw"><button class="tr-livro mod' + (!adm && cheio ? ' feito' : '') + '" onclick="trnEstanteAbrir(' + i + ')">'
+      + trnLivroCapa({ titulo: nomeM, estante: 'Módulo', autor: qt }, (!adm && cheio ? '<span class="tr-ok-sel" title="Todos lidos">✓</span>' : '') + (!adm && n && lidos && !cheio ? '<span class="tr-capa-barra"><i style="width:' + Math.round(lidos / n * 100) + '%"></i></span>' : ''))
+      + '<span class="tr-livro-t"><b>' + _trnE(nomeM) + '</b>' + (txt ? '<span class="tr-meta' + (!adm && cheio ? ' ok' : '') + '">' + txt + '</span>' : '')
+      + '<span class="tr-cta">' + (adm && !n ? '⬆ Subir o primeiro' : 'Ver os livros →') + '</span></span></button>';
     if (adm && k) h += '<span class="tr-est-b"><button type="button" onclick="trnEstanteEditar(TRN._est[' + i + '])" aria-label="Renomear o módulo" title="Renomear">✏️</button>'
       + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],-1)" aria-label="Mover o módulo para antes" title="Mover para antes"' + (im > 0 ? '' : ' disabled') + '>←</button>'
       + '<button type="button" onclick="trnEstanteMover(TRN._est[' + i + '],1)" aria-label="Mover o módulo para depois" title="Mover para depois"' + (im >= 0 && im < (d.estantes || []).length - 1 ? '' : ' disabled') + '>→</button>'
