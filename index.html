@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-10-1834';
+var VERSAO_DASH = '2026-10-13-1200';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -16171,7 +16171,7 @@ var FP_CATS = [
   { k: 'outro', nome: 'Outro / misto', cor: '#f6a350' },
   { k: 'nada', nome: 'Não informado', cor: '#5c6470' }
 ];
-var _fpModo = 'n', _fpEspera = null;
+var _fpModo = 'n', _fpEspera = null, _fpCloser = 'pagina';   // 'pagina' = segue o filtro Vendedor da tela · 'todos' · ou o primeiro nome do closer
 function _fpDaVendas(f) {
   f = v2norm(f); if (!f) return '';
   var cart = /cart|credito/.test(f);
@@ -16269,6 +16269,7 @@ function _fpCss() {
   s.textContent = '.fp-box{margin-bottom:16px}'
     + '.fp-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}'
     + '.fp-top h3{margin:0}.fp-top .chart-chips{margin:0}'
+    + '.fp-clo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-4px 0 12px}.fp-clo .chart-chips{margin:0}.fp-clo small{opacity:.6;font-weight:400;margin-left:2px}'
     + '.fp-sub{font-size:.74rem;color:var(--text2);margin-top:2px}'
     + '.fp-dest{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:4px 0 12px}'
     + '.fp-dest b{font-size:2.3rem;line-height:1;color:#6ea8ff;font-variant-numeric:tabular-nums}'
@@ -16297,6 +16298,7 @@ function _fpCss() {
     + '.fp-pc{display:inline-block;width:46px;height:6px;border-radius:4px;background:var(--panel2);margin-right:7px;vertical-align:middle;overflow:hidden}.fp-pc i{display:block;height:100%;background:#3ddc97}';
   document.head.appendChild(s);
 }
+function fpCloser(k) { _fpCloser = k; renderFormasPag(); }
 function fpModo(m, btn) {
   _fpModo = m;
   if (btn) { btn.parentNode.querySelectorAll('.chart-chip').forEach(function(c){ c.classList.remove('on'); }); btn.classList.add('on'); }
@@ -16313,6 +16315,7 @@ function _fpBarra(cont, tot, rotulo) {
 }
 function renderFormasPag() {
   var box = document.getElementById('pag-formas'); if (!box) return;
+  if (!ehAdm()) { box.innerHTML = ''; return; }   // Bruno 13/10/2026: "que só apareça para os adm"
   _fpCss();
   if (typeof V2 === 'undefined' || !V2.rows || !V2.rows.length) {
     box.innerHTML = '<div class="panel fp-box"><div class="hint">💳 Carregando as vendas…</div></div>';
@@ -16320,13 +16323,17 @@ function renderFormasPag() {
     return;
   }
   var idx = _fpIndiceForm(), vendP = _fg.vend === 'todos' ? '' : v2norm(_fg.vend).split(' ')[0];
+  // Bruno 13/10/2026: "coloque filtro por closer" — botões no próprio cartão (com quantas vendas cada um tem no período)
+  var closP = _fpCloser === 'pagina' ? vendP : (_fpCloser === 'todos' ? '' : _fpCloser), closers = {};
   var lista = [];
   V2.rows.forEach(function(r) {
     if (r.sn !== 'vendido' || !r.date) return;
     var mk = r.date.getFullYear() + '-' + String(r.date.getMonth() + 1).padStart(2, '0');
     if (_fg.mes !== 'todos' ? mk !== _fg.mes : mk < '2026-01') return;   // antes de 2026 a forma quase nunca era anotada
-    if (vendP && v2norm(r.closer).split(' ')[0] !== vendP) return;
     if (!soMeuLinha(r)) return;
+    var ck = v2norm(r.closer).split(' ')[0].replace(/[^a-z0-9]/g, '');
+    if (ck) { if (!closers[ck]) closers[ck] = { n: 0, nome: String(r.closer || '').trim().split(' ')[0].replace(/[<>&"']/g, '') }; closers[ck].n++; }
+    if (closP && ck !== closP) return;
     var fo = _fpDoFormDe(r, idx), cat = (fo && fo.c) || _fpDaVendas(r.forma) || 'nada';
     var txt = (fo ? fo.tx : '') + ' · ' + (r.forma || '') + ' · ' + (r.obs || ''), en = _fpEntrada(r.valor || 0, cat, fo ? fo.en : '', txt);
     var cx = _fpCaixa(r.valor || 0, cat, txt, en);
@@ -16334,10 +16341,15 @@ function renderFormasPag() {
   });
   var mesesN = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   function mesNome(k) { return mesesN[parseInt(k.split('-')[1], 10) - 1] + '/' + k.split('-')[0].slice(2); }
-  var periodo = (_fg.mes === 'todos' ? 'Desde jan/2026' : mesNome(_fg.mes)) + (vendP ? ' · ' + _fg.vend.split(' ')[0] : '') + (SOMEU && SOMEU.on ? ' · só o meu' : '');
+  var periodo = (_fg.mes === 'todos' ? 'Desde jan/2026' : mesNome(_fg.mes)) + (closP ? ' · ' + ((closers[closP] || {}).nome || closP) : '') + (SOMEU && SOMEU.on ? ' · só o meu' : '');
   var topo = '<div class="fp-top"><div><h3>💳 Como os clientes pagam</h3><div class="fp-sub">' + periodo + ' · ' + lista.length + ' venda' + (lista.length === 1 ? '' : 's') + '</div></div>'
     + '<div class="chart-chips"><button class="chart-chip sm' + (_fpModo === 'n' ? ' on' : '') + '" onclick="fpModo(\'n\',this)">Nº de vendas</button>'
     + '<button class="chart-chip sm' + (_fpModo === 'r' ? ' on' : '') + '" onclick="fpModo(\'r\',this)">Valor (R$)</button></div></div>';
+  var fpCks = Object.keys(closers).sort(function(a, b) { return closers[b].n - closers[a].n; });
+  if (fpCks.length > 1 || closP) topo += '<div class="fp-clo"><span class="fi-label">Closer:</span><div class="chart-chips">'
+    + '<button class="chart-chip sm' + (!closP ? ' on' : '') + '" onclick="fpCloser(\'todos\')">Todos</button>'
+    + fpCks.map(function(k) { return '<button class="chart-chip sm' + (closP === k ? ' on' : '') + '" onclick="fpCloser(\'' + k + '\')">' + closers[k].nome + ' <small>' + closers[k].n + '</small></button>'; }).join('')
+    + '</div></div>';
   if (!lista.length) { box.innerHTML = '<div class="panel fp-box">' + topo + '<div class="hint">Nenhuma venda (status Vendido) neste filtro.</div></div>'; return; }
   var n = {}, r$ = {}, cx = {}, tN = 0, tR = 0, tCx = 0, semDet = 0, nE = 0, sE = 0;
   lista.forEach(function(x) { n[x.c] = (n[x.c] || 0) + 1; r$[x.c] = (r$[x.c] || 0) + x.v; cx[x.c] = (cx[x.c] || 0) + x.cx; tN++; tR += x.v; tCx += x.cx; if (!x.sabe) semDet++; if (x.e > 0) { nE++; sE += x.e; } });
@@ -34680,7 +34692,7 @@ function trnPct(id) {   // quanto já viu (0–1); concluído = 1
   if (trnFeito(id)) return 1;
   var p = trnPosDe(id); return p.d ? Math.min(.99, p.s / p.d) : 0;
 }
-function trnVel() { try { var g = localStorage.getItem('trnVel'), v = +g; return g != null && TRN_VELS.indexOf(v) >= 0 ? v : 1.5; } catch (e) { return 1.5; } }   // 10/10/2026 (Bruno: "já comece com 1.5"): padrão 1,5x; quem trocar fica com a que escolheu
+function trnVel() { try { var g = localStorage.getItem('trnVel'), v = +g; return g != null && TRN_VELS.indexOf(v) >= 0 ? v : 1; } catch (e) { return 1; } }   // 13/10/2026 (Bruno: "quero que comece no 1.0 normal e salve o que a pessoa colocar"): padrão 1x; quem trocar fica com a que escolheu (trnVelMudar guarda neste navegador)
 
 // ---------- abrir / carregar ----------
 // ⚡ abre na hora com a última lista guardada neste computador (o robô leva uns 5 s) e atualiza por trás
