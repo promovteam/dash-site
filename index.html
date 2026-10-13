@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-13-1624';
+var VERSAO_DASH = '2026-10-13-1627';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -20124,7 +20124,7 @@ function _ctrJanelaPreenche(ov, p, url, ehPrevia, resp) {
 // 📑 EDITOR DE CLAUSULAS dentro da janela de visualizacao
 function editarClausulas(ov, iP) {
   if (soOlhar()) return;
-  if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem mexer nos contratos.'); return; }
+  if (!ehContratos()) { alert('Só o Executivo, o Bruno e o Adm podem mexer nos contratos.'); return; }
   var p = (PAG.rows || [])[iP];
   var corpo = ov && ov.querySelector('#ctr-jan-corpo');
   if (!p || !corpo) return;
@@ -20287,7 +20287,7 @@ function editarContratoPag(i) {
 // ⬆️ troca o contrato pelo Word editado (e 🔁 reenvia, se for o caso)
 function usarEditadoPag(i, reenviar) {
   if (soOlhar()) return;
-  if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem mexer nos contratos.'); return; }
+  if (!ehContratos()) { alert('Só o Executivo, o Bruno e o Adm podem mexer nos contratos.'); return; }
   var p = (PAG.rows || [])[i];
   if (!p) return;
   var m = String(p.contrato || '').match(/envelopes\/([0-9a-f\-]{36})/i);
@@ -20346,7 +20346,7 @@ function _gerarContratoPagVai(p, editavel) {
 }
 function enviarContratoPag(i) {
   if (soOlhar()) return;
-  if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem enviar contratos.'); return; }
+  if (!ehContratos()) { alert('Só o Executivo, o Bruno e o Adm podem enviar contratos.'); return; }
   var p = (PAG.rows || [])[i];
   if (!p || !p.contrato) return;
   var m = String(p.contrato).match(/envelopes\/([0-9a-f\-]{36})/i);
@@ -20371,7 +20371,7 @@ function _enviarContratoPagVai(p, envId) {
 // 📨 envia o contrato para assinatura (Juliane/Bruno/Adm): o cliente recebe o e-mail na hora
 function enviarContratoLead(envId, i) {
   if (soOlhar()) return;
-  if (!ehContratos()) { alert('Só a Juliane, o Bruno e o Adm podem enviar contratos.'); return; }
+  if (!ehContratos()) { alert('Só o Executivo, o Bruno e o Adm podem enviar contratos.'); return; }
   var r = _v2reg[i] || {};
   confirmar('Enviar o contrato de ' + (r.nome || 'este cliente') + ' para assinatura AGORA?\n\nO cliente recebe o e-mail na hora. Só envie depois de conferir o contrato.', function() { _enviarContratoVai(envId); }, '📨');
 }
@@ -22056,7 +22056,7 @@ var ACESSOS = [
   { nome: 'PV',            adm: true, gestao: true, senhaRobo: true },   // 08/10/2026 (Bruno: "acesso ao dash p/ PV/João… inclusive comissões… senha própria"): admin igual ao Gabriel; senha criada por ele com o código no WhatsApp
   { nome: 'João',          adm: true, gestao: true, senhaRobo: true },   // 08/10/2026: idem (João Stecca)
   { nome: 'Suellen',       financeiro: true },   // Financeiro: vê o dash inteiro (05/10/2026: "libere tudo"; antes só Comissões); a senha é conferida no robô — não fica no código
-  { nome: 'Juliane Promov', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm
+  { nome: 'Executivo', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm · 13/10/2026 (Bruno: "Juliane quero que se torne executivo"): o acesso mudou de nome, de "Juliane Promov" para "Executivo" (é do time executivo); o resto fica igual
   { nome: 'Selina Promov', pin: '2846' },
   { nome: 'Sarah Promov',  pin: '5137' },
   { nome: 'Ismael',        pin: '6180' },
@@ -22064,6 +22064,7 @@ var ACESSOS = [
   { nome: 'Produção de conteúdo', soOlha: true, conteudo: true, senhaTime: true },   // 10/10/2026 (Bruno: "crie um acesso para o time de Produção de conteúdo" · um acesso só do time): vê o 🏆 Ranking orgânico e os Criativos, não mexe em nada; a senha é criada com um código que vai para o WhatsApp do Bruno e conferida no robô — não fica no código
   { nome: 'Visitante',     pin: '0000', soOlha: true }   // vê tudo, não mexe em nada
 ];
+try { ['v2Login', 'v2LeadEu', 'lgUltimo'].forEach(function(k) { if (localStorage.getItem(k) === 'Juliane Promov') localStorage.setItem(k, 'Executivo'); }); } catch (eEx) {}   // 13/10/2026: o acesso "Juliane Promov" virou "Executivo"
 // quem só olha (Visitante e Produção de conteúdo) e quem é da Produção de conteúdo
 function ehSoOlha() { try { var lg = localStorage.getItem('v2Login'); return !!lg && ACESSOS.some(function(a) { return a.nome === lg && a.soOlha; }); } catch (e) { return false; } }
 function ehConteudo() { try { var lg = localStorage.getItem('v2Login'); return !!lg && ACESSOS.some(function(a) { return a.nome === lg && a.conteudo; }); } catch (e) { return false; } }
@@ -22081,7 +22082,7 @@ try {
 // visitante: pode olhar, não pode mexer (os botões avisam e não fazem nada)
 function soOlhar() {
   if (!ehSoOlha()) return false;
-  if (ehConteudo()) { alert('Este acesso é da Produção de conteúdo: mostra o Ranking orgânico, os Criativos e os Treinamentos do time, mas não dá para mexer.'); return true; }
+  if (ehConteudo()) { alert('Este acesso é da Produção de conteúdo: mostra o Ranking orgânico, os Criativos, os Leads e os Treinamentos do time, mas não dá para mexer.'); return true; }
   alert('Você entrou como Visitante — dá para ver tudo, mas não dá para mexer.\n\nPara mexer, saia e entre com o seu nome.');
   return true;
 }
@@ -25378,9 +25379,14 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
   .rko-mes b { min-width:112px; }
 }
 @media (prefers-reduced-motion: reduce) { .rko-barra i, .rko-regua > i { transition:none; } .rko-p.p1 .rko-p-anel, .rko-fatia-b > span, .rko-pista-f { animation:none; } }
-/* 🎬 Produção de conteúdo: só o Ranking orgânico, os Criativos e (13/10/2026) os Treinamentos liberados para o time */
-html.conteudo .nav-item[data-s]:not([data-s="rankorg"]):not([data-s="anuncios"]):not([data-s="treinos"]), html.conteudo .tb-tile[data-s]:not([data-s="rankorg"]):not([data-s="anuncios"]):not([data-s="treinos"]),
-html.conteudo .tb-it[data-s]:not([data-s="rankorg"]):not([data-s="anuncios"]):not([data-s="treinos"]):not([data-s="mais"]), html.conteudo .screen:not(#s-rankorg):not(#s-anuncios):not(#s-treinos) { display:none !important; }
+/* 🎬 Produção de conteúdo (um time só, com a Estratégia — Bruno 13/10/2026): Ranking orgânico, Criativos, Leads e os Treinamentos
+   liberados para o time. Só para ver. */
+html.conteudo .nav-item[data-s]:not([data-s="rankorg"]):not([data-s="anuncios"]):not([data-s="treinos"]):not([data-s="leads"]),
+html.conteudo .tb-tile[data-s]:not([data-s="rankorg"]):not([data-s="anuncios"]):not([data-s="treinos"]):not([data-s="leads"]),
+html.conteudo .tb-it[data-s]:not([data-s="rankorg"]):not([data-s="anuncios"]):not([data-s="treinos"]):not([data-s="leads"]):not([data-s="mais"]),
+html.conteudo .screen:not(#s-rankorg):not(#s-anuncios):not(#s-treinos):not(#s-leads),
+html.conteudo [onclick^="abrirAgendar"], html.conteudo [onclick*="marcarReuniaoDoLead"], html.conteudo .gm-toast button[data-a="marcar"],
+html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn { display:none !important; }
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
 #s-treinos { --tr-r:16px; }
@@ -27158,7 +27164,7 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
   function papelDe(login) {
     if (login === null) return { k: 'local', t: 'uso local', d: 'Aberto neste computador sem login — entra direto.' };
     if (login === 'Visitante') return { k: 'olha', t: 'só olha', d: 'Vê tudo, mas não mexe em nada.' };
-    try { if (ACESSOS.some(function (a) { return a.nome === login && a.conteudo; })) return { k: 'olha', t: 'produção de conteúdo', d: 'Vê o Ranking orgânico, os Criativos e os Treinamentos liberados para o time. Não mexe em nada.' }; } catch (eCt) {}
+    try { if (ACESSOS.some(function (a) { return a.nome === login && a.conteudo; })) return { k: 'olha', t: 'produção de conteúdo', d: 'Vê o Ranking orgânico, os Criativos, os Leads e os Treinamentos do time. Não mexe em nada.' }; } catch (eCt) {}
     var adm = false, ctr = false; try { adm = ehAdm(); } catch (e) {} try { ctr = ehContratos(); } catch (e) {}
     if (adm) return { k: 'adm', t: 'admin', d: 'Pode tudo, inclusive corrigir e excluir e trocar o “Você” livremente.' };
     if (ctr) return { k: 'ctr', t: 'contratos', d: 'Envia e acompanha contratos (Clicksign).' };
@@ -27207,25 +27213,65 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
   // porque a ficha do lead e a situação das vendas dependem deles)
   var TELAS_FECHADAS = ['pagamentos', 'contratos', 'pesquisa', 'gravacoes', 'leads', 'disparos', 'qualif', 'score'];
   // 10/10/2026: a Produção de conteúdo entra aqui também (as mesmas travas do visitante) e ainda fica só com DUAS telas
-  var TELAS_CONTEUDO = ['rankorg', 'anuncios', 'treinos'];   // 13/10/2026: + os Treinamentos (só o que o gestor marcar para o time)
+  var TELAS_CONTEUDO = ['rankorg', 'anuncios', 'treinos', 'leads'];   // 13/10/2026: + os Treinamentos do time e os Leads (Bruno: "libere o lead, criativo e o ranking e tudo que tem a ver com geração de conteúdo")
   function ehCtd() { try { return typeof ehConteudo === 'function' && ehConteudo(); } catch (e) { return false; } }
-  function ehVisitante() { try { return localStorage.getItem('v2Login') === 'Visitante' || ehCtd(); } catch (e) { return false; } }
+  function ehVisitante() { try { return localStorage.getItem('v2Login') === 'Visitante'; } catch (e) { return false; } }   // 13/10/2026: o conteúdo saiu daqui (vê a ficha do lead); as travas dele são CTD_LER e CTD_FECHA
   function telaFechada(s) { return ehCtd() ? TELAS_CONTEUDO.indexOf(s) === -1 : TELAS_FECHADAS.indexOf(s) !== -1; }
   function aplicarRestricoes() {
     var v = ehVisitante(), ctd = ehCtd();
     doc.documentElement.classList.toggle('visitante', v);
     doc.documentElement.classList.toggle('conteudo', ctd);
-    if (!v) return;
+    if (!v && !ctd) return;
     var at = doc.querySelector('.screen.active');
     if (at && telaFechada(at.id.replace(/^s-/, ''))) { var ini = doc.querySelector('.nav-item[data-s="' + (ctd ? 'rankorg' : 'visao') + '"]'); if (ini) ini.click(); }
   }
   doc.addEventListener('click', function (e) {
-    if (!ehVisitante()) return;
+    if (!ehVisitante() && !ehCtd()) return;
     var it = e.target && e.target.closest ? e.target.closest('.nav-item[data-s], .tb-tile[data-s], .tb-it[data-s]') : null;
     if (!it || it.getAttribute('data-s') === 'mais' || !telaFechada(it.getAttribute('data-s'))) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    try { avisoRapido(ehCtd() ? '🔒 Este acesso abre só o Ranking orgânico, os Criativos e os Treinamentos' : '🔒 Acesso de visitante não abre esta tela'); } catch (x) {}
+    try { avisoRapido(ehCtd() ? '🔒 Este acesso abre só Ranking, Criativos, Leads e Treinamentos' : '🔒 Acesso de visitante não abre esta tela'); } catch (x) {}
   }, true);
+  // 🔒 PRODUÇÃO DE CONTEÚDO = SÓ LEITURA DE VERDADE (13/10/2026). Com os Leads liberados, não basta esconder botão: o pedido nem sai
+  // para o robô se não for uma CONSULTA da lista abaixo (vale para o gasPedir, o fetch direto e o sendToGAS). Assim um clique errado
+  // não muda dono de lead, etapa, status nem planilha. (É uma porta do dash: quem tem o endereço do robô não passa por aqui.)
+  var CTD_LER = {}; ['ping', 'getCalendarEvents', 'listarPostsOrganicos', 'igFotosPosts', 'igFotos', 'buscarFotoPost', 'listarBloqueios', 'clintPainel',
+    'gptmakerPainel', 'tempoContato', 'avisosCloser', 'supabaseDados', 'etiquetasListar', 'metaCriativosTodos', 'metaCriativosMontar', 'metaCriativos',
+    'metaCriativosPorIds', 'metaAnuncios', 'igAtualizar', 'treinoListar', 'treinoPosicao', 'treinoConcluir', 'conteudoCodigo', 'conteudoCriar',
+    'conteudoEntrar'].forEach(function (a) { CTD_LER[a] = 1; });
+  // portas que o conteúdo não abre: exportar, copiar, chamar o lead, formulários, agenda, pagamentos e gravações (a ficha do lead ele vê)
+  var CTD_FECHA = {}; ['baixarQuem', 'abrirGerarLista', 'copiarDadosLead', 'copiarDadosPag', 'abrirZap', 'abrirFormVenda', 'abrirFormVendaLead',
+    'abrirFormVendaReuniao', 'abrirFormBloqueio', 'abrirFormBloqueioLead', 'abrirFormBloqueioReuniao', 'abrirFormVendaGoogle', 'abrirRemarcarEvento',
+    'abrirMenuEvento', 'abrirAtendimentoClint', 'abrirAtendimentoClintPor', 'abrirBuscaLead', 'abrirFichaPag', 'abrirFichaPagDireto', 'verContratoPag',
+    'gravAbrir', 'gravFicha'].forEach(function (a) { CTD_FECHA[a] = 1; });
+  function ctdBarra(acao) { return ehCtd() && !!acao && !CTD_LER[acao]; }
+  function ctdAcaoDe(url, opc) {   // a ação do pedido: no endereço (?action= ou ?payload=) ou no corpo; POST sem ação conta como gravação
+    var m = /[?&]action=([A-Za-z0-9_]+)/.exec(url || ''); if (m) return m[1];
+    var p = /[?&]payload=([^&]+)/.exec(url || ''), corpo = opc && typeof opc.body === 'string' ? opc.body : '';
+    try { if (p) return String((JSON.parse(decodeURIComponent(p[1])) || {}).action || ''); if (corpo) return String((JSON.parse(corpo) || {}).action || 'gravar'); } catch (e) { return 'gravar'; }
+    return opc && /post/i.test(opc.method || '') ? 'gravar' : '';
+  }
+  var CTD_NAO = { success: false, error: 'este acesso é só para ver' };
+  function ctdAviso() { var ev = window.event; if (ev && ev.isTrusted && /click|key|touch|pointer|submit|change/.test(ev.type)) { try { avisoRapido('🔒 Este acesso é só para ver: não dá para mexer'); } catch (x) {} } }
+  if (typeof window.gasPedir === 'function') {
+    var _gpCtd = window.gasPedir;
+    window.gasPedir = function (pl, cb) {
+      if (ctdBarra(pl && pl.action)) { ctdAviso(); if (cb) setTimeout(function () { cb(CTD_NAO); }, 0); return; }
+      return _gpCtd.apply(this, arguments);
+    };
+  }
+  if (window.fetch && typeof Response === 'function') {
+    var _ftCtd = window.fetch;
+    window.fetch = function (a, o) {
+      var u = typeof a === 'string' ? a : (a && a.url) || '';
+      if (/script\.google(usercontent)?\.com\/macros/.test(u) && ctdBarra(ctdAcaoDe(u, o))) { ctdAviso(); return Promise.resolve(new Response(JSON.stringify(CTD_NAO), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
+      return _ftCtd.apply(this, arguments);
+    };
+  }
+  if (typeof window.sendToGAS === 'function') {
+    var _sgCtd = window.sendToGAS;
+    window.sendToGAS = function (d) { if (ctdBarra((d && d.action) || 'gravar')) { ctdAviso(); return Promise.resolve(CTD_NAO); } return _sgCtd.apply(this, arguments); };
+  }
   // portas que levam a dados de pessoas (fichas, listas "quem são", menus da agenda, cópias, exportações, gravações):
   // para o visitante não abrem — o aviso só aparece quando foi um clique dele
   ['abrirA', 'abrirB', 'abrirLead', 'abrirMenu', 'abrirSlotMenu', 'abrirListaOrigem', 'abrirPizzaProduto', 'abrirFunilSdr',
@@ -27238,9 +27284,9 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
    'abrirFormBloqueio', 'abrirFormBloqueioLead', 'abrirFormBloqueioReuniao', 'abrirFormVendaGoogle'].forEach(function (nome) {
     var f = window[nome]; if (typeof f !== 'function') return;
     window[nome] = function () {
-      if (ehVisitante()) {
+      if (ehVisitante() || (ehCtd() && CTD_FECHA[nome])) {
         var ev = window.event;
-        if (ev && ev.isTrusted && /click|key|touch|pointer/.test(ev.type)) { try { avisoRapido(ehCtd() ? '🔒 Este acesso mostra os números, não os dados das pessoas' : '🔒 Acesso de visitante: mostra os números, não os dados das pessoas'); } catch (x) {} }
+        if (ev && ev.isTrusted && /click|key|touch|pointer/.test(ev.type)) { try { avisoRapido(ehCtd() ? '🔒 Este acesso é só para ver' : '🔒 Acesso de visitante: mostra os números, não os dados das pessoas'); } catch (x) {} }
         return;
       }
       return f.apply(this, arguments);
