@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-13-1200';
+var VERSAO_DASH = '2026-10-13-1249';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25819,6 +25819,16 @@ details.tr-atalhos { line-height:2; } details.tr-atalhos summary { cursor:pointe
 .tr-est-vazia { padding:18px; border-radius:14px; border:1px dashed var(--border); color:var(--text2); font-size:.8rem; }
 .tr-modal #trn-estante-n { margin-top:6px; }
 .tr-previa-livro { width:118px; }
+/* 📎 material de apoio da aula (13/10/2026): arquivos para baixar, no topo da coluna da direita */
+.tr-apoio { display:flex; flex-direction:column; gap:10px; padding:16px; border-color:rgba(246,163,80,.28); background:linear-gradient(180deg, rgba(246,163,80,.07), rgba(246,163,80,0) 70%), var(--panel); }
+.tr-apoio .tr-passos-h { margin-bottom:0; } .tr-apoio h3 { margin:0; }
+.tr-apoio-i { display:flex; align-items:center; gap:12px; }
+.btn.tr-apoio-b { flex:1 1 auto; min-width:0; display:block; text-align:left; text-decoration:none; font-weight:800; font-size:.82rem; padding:11px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.btn.primary.tr-apoio-b:hover { color:#191204; filter:brightness(1.08); }
+.tr-apoio-x { flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+.tr-apoio-x a { font-size:.72rem; font-weight:700; color:var(--text2); text-decoration:none; white-space:nowrap; }
+.tr-apoio-x a:hover, .tr-apoio-x a:focus-visible { color:var(--accent); text-decoration:underline; }
+.tr-ver-esq > .tr-apoio { margin-top:16px; max-width:460px; }
 .sc-nota-topo { font-size:.72rem; color:var(--muted); font-weight:600; margin:2px 0 14px; line-height:1.5; }
 .sc-nota-topo b { color:var(--text2); }
 .sc-jornada { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
@@ -35038,12 +35048,12 @@ function trnVerTimeAtualizar() {
     if (c.tipo === 'video' && c.arquivo && !proprio && Date.now() - trnMs(c.em) < 3 * 3600000) h += '<div class="tr-dica">Vídeo novo: se aparecer "processando", o Google ainda está preparando este formato. Costuma levar de alguns minutos a meia hora.</div>';
     if (c.descricao) h += '<p class="tr-desc">' + _trnE(c.descricao) + '</p>';
     if (proprio) h += '<details class="tr-atalhos"><summary>⌨ Atalhos do teclado</summary><kbd>espaço</kbd> tocar · <kbd>←</kbd> <kbd>→</kbd> 10 segundos · <kbd>↑</kbd> <kbd>↓</kbd> som · <kbd>F</kbd> tela cheia · <kbd>M</kbd> mudo</details>';
-    info.innerHTML = h + '</div>';
+    info.innerHTML = h + '</div>' + (t ? '' : trnApoioHtml(c));
   }
   var lado = document.getElementById('trn-ver-lado');
   if (lado && t) {
     var fxL = c ? trnFaixaDe(t, c.id) : null, idsL = fxL ? fxL.ids : t.itens, n = idsL.length, f = idsL.filter(trnFeito).length;
-    lado.innerHTML = '<div class="panel tr-passos-p"><div class="tr-passos-h"><h3>' + (fxL ? 'Neste módulo' : 'Aulas da trilha') + '</h3><span class="tr-meta">' + f + ' de ' + n + '</span></div><span class="tr-barra' + (n && f === n ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(f / n * 100) : 0) + '%"></i></span><div class="tr-passos">' + trnPassosHtml(t) + '</div></div>';
+    lado.innerHTML = trnApoioHtml(c) + '<div class="panel tr-passos-p"><div class="tr-passos-h"><h3>' + (fxL ? 'Neste módulo' : 'Aulas da trilha') + '</h3><span class="tr-meta">' + f + ' de ' + n + '</span></div><span class="tr-barra' + (n && f === n ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(f / n * 100) : 0) + '%"></i></span><div class="tr-passos">' + trnPassosHtml(t) + '</div></div>';
   }
 }
 function trnInicioHtml() {
@@ -35368,6 +35378,20 @@ function trnLeitorSoltar(semEnviar) {
   try { if (L._red) { window.removeEventListener('resize', L._red); document.removeEventListener('fullscreenchange', L._red); } } catch (e) {}
   try { if (L.doc) L.doc.destroy(); } catch (e) {}
 }
+// 📎 MATERIAL DE APOIO (Bruno 13/10/2026: "coloque os PDF como material de apoio para baixar"): os arquivos que acompanham a
+// aula (a apostila e a cola de bolso do vídeo) ficam num quadro ao lado do vídeo, cada um com um botão para BAIXAR e um link
+// discreto para só abrir. Não são aulas: não contam no progresso (concluir o módulo = assistir ao vídeo). Quem manda a lista
+// é o robô (campo `apoio` do conteúdo), só para quem pode ver a aula; aula travada ou sem `apoio` não mostra nada.
+function trnApoioHtml(c) {
+  var l = (c && !c.travado && c.apoio) || [], h = '';
+  for (var i = 0; i < l.length; i++) {
+    var a = l[i] || {}, id = /^[\w-]{15,100}$/.test(a.arquivo || '') ? a.arquivo : ''; if (!id) continue;
+    var mb = +a.mb || 0, nome = _trnE(a.t || 'Arquivo');
+    h += '<div class="tr-apoio-i"><a class="btn primary tr-apoio-b" href="https://drive.google.com/uc?export=download&amp;id=' + id + '" target="_blank" rel="noopener" title="Baixar: ' + nome + '">⬇ ' + nome + ' (PDF)</a>'
+      + '<span class="tr-apoio-x">' + (mb ? '<span class="tr-meta">' + String(mb).replace('.', ',') + ' MB</span>' : '') + '<a href="https://drive.google.com/file/d/' + id + '/view" target="_blank" rel="noopener" title="Abrir sem baixar: ' + nome + '">abrir ↗</a></span></div>';
+  }
+  return h ? '<div class="panel tr-apoio"><div class="tr-passos-h"><h3>📎 Material de apoio</h3><span class="tr-meta">para baixar</span></div>' + h + '</div>' : '';
+}
 function trnPalcoHtml(c) {
   var abre = '<div class="tr-player', id = '" id="trn-palco" data-id="' + _trnE(c.id) + '"';
   if (c.travado) return abre + id + '><div class="tr-player-link"><span style="font-size:2rem" aria-hidden="true">🔒</span><b>Esta aula ainda não abriu</b><span>Conclua a aula anterior da trilha para liberar.</span></div></div>';
@@ -35455,12 +35479,12 @@ function trnVerAtualizar() {   // tudo da tela de assistir menos o vídeo
     if (trnAdm()) h += '<button class="btn" onclick="trnConteudoEditar(\'' + _trnId(c.id) + '\')">✏️ Editar</button>';
     h += '</div>';
     if (proprio) h += '<div class="tr-atalhos">Atalhos: <kbd>espaço</kbd> tocar · <kbd>←</kbd> <kbd>→</kbd> 10 segundos · <kbd>↑</kbd> <kbd>↓</kbd> som · <kbd>F</kbd> tela cheia · <kbd>M</kbd> mudo</div>';
-    info.innerHTML = h + '</div>';
+    info.innerHTML = h + '</div>' + (t ? '' : trnApoioHtml(c));
   }
   var lado = document.getElementById('trn-ver-lado');
   if (lado && t) {
     var fxL = c ? trnFaixaDe(t, c.id) : null, idsL = fxL ? fxL.ids : t.itens, n = idsL.length, f = idsL.filter(trnFeito).length;
-    var l = '<div class="panel tr-passos-p"><div class="tr-passos-h"><h3>' + (fxL ? 'Aulas do módulo' : 'Aulas') + '</h3><span class="tr-meta">' + f + ' de ' + n + ' concluídas</span></div><span class="tr-barra' + (n && f === n ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(f / n * 100) : 0) + '%"></i></span><div class="tr-passos">'
+    var l = trnApoioHtml(c) + '<div class="panel tr-passos-p"><div class="tr-passos-h"><h3>' + (fxL ? 'Aulas do módulo' : 'Aulas') + '</h3><span class="tr-meta">' + f + ' de ' + n + ' concluídas</span></div><span class="tr-barra' + (n && f === n ? ' cheia' : '') + '"><i style="width:' + (n ? Math.round(f / n * 100) : 0) + '%"></i></span><div class="tr-passos">'
       + trnPassosHtml(t) + '</div></div>';
     if (trnAdm()) l += trnQuemHtml(t);
     lado.innerHTML = l;
