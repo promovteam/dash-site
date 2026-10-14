@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-14-0858';
+var VERSAO_DASH = '2026-10-14-0935';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -4159,6 +4159,7 @@ function igPedidoDoLead(l) {
 // 26/09/2026 (Bruno: "que ao clicar vá direto para o criativo"): a etiqueta abre a janela do CRIATIVO dentro do dash
 // (com leads, agendou, vendas) — post orgânico "desde a postagem"; anúncio sem imagem cai na aba Criativos já buscando por ele
 function abrirPostCriativo(link) {
+  if (link === 'story') { try { avisoRapido('Veio de uma resposta aos stories (pelo direct): não tem post para abrir'); } catch (eSt) {} return false; }   // 📱 14/10/2026
   try {
     var cd = _igCodigoDash(link), p = null;
     (IGO.posts || []).forEach(function(x) { if (!p && _igCodigoDash(x.link) === cd) p = x; });
@@ -4198,6 +4199,7 @@ function igSeloLead(l, mini) {
   // na aba Criativos), como o 📣 dos anúncios pagos; sem apelido, fica o "📷 pediu" de antes
   var po = null; try { po = POSTS_ORG.porLink[p.post] || POSTS_ORG.porCodigo[_igCodigoDash(p.post)] || null; } catch (ePo) {}
   var apel = po && po.apelido ? String(po.apelido).trim() : '';
+  if (p.post === 'story') apel = 'resposta ao story';   // 📱 14/10/2026: veio pelo direct (o ManyChat avisa o robô)
   // sem apelido (Bruno 26/09/2026: "que mostre o criativo"): usa o começo da LEGENDA do post; sem legenda, a data do post
   if (!apel) {
     var ip = null;
@@ -25367,7 +25369,14 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .rko-lista p { margin:0 0 10px; font-size:.8rem; line-height:1.55; color:var(--text2); max-width:65ch; } .rko-lista p:last-child { margin:0; } .rko-lista b { color:var(--text); }
 .rko-hist { margin-top:14px; padding:16px 20px; } .rko-hist summary { cursor:pointer; font-size:.8rem; font-weight:700; color:var(--text2); }
 .rko-hist[open] summary { margin-bottom:14px; } .rko-hist .rko-frase { margin-top:12px; }
-/* 14/10/2026: do 4º lugar em diante (entrou a Lilian) uma fila embaixo do pódio */
+/* 14/10/2026 (Bruno: "cria um ranking de 4 pessoas"): com 4 pessoas o palco tem 4 lugares, o líder no meio: 4 · 2 · 1 · 3 */
+.rko-podio3.n4 { grid-template-columns:1fr 1fr 1.14fr 1fr; max-width:1100px; gap:14px; }
+.rko-palco:not(.zerado) .rko-podio3.n4 .rko-p.p4 { order:1; } .rko-palco:not(.zerado) .rko-podio3.n4 .rko-p.p2 { order:2; }
+.rko-palco:not(.zerado) .rko-podio3.n4 .rko-p.p1 { order:3; } .rko-palco:not(.zerado) .rko-podio3.n4 .rko-p.p3 { order:4; }
+.rko-p.p4 .rko-p-foto { --t:104px; } .rko-p.p4 .rko-p-pct b { font-size:2.2rem; }
+.rko-palco:not(.zerado) .rko-p.p4 .rko-p-degrau { height:28px; } .rko-p.p4 .rko-p-degrau b { font-size:1.4rem; }
+.rko-podio3.n4 + .rko-fatia, .rko-podio3.n4 ~ .rko-fatia { max-width:1100px; }
+/* do 5º lugar em diante: uma fila embaixo do palco */
 .rko-demais { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 460px)); justify-content:center; gap:10px; max-width:940px; margin:18px auto; }
 .rko-d { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:18px; background:rgba(255,255,255,.035); border:1px solid color-mix(in srgb, var(--cor) 30%, transparent); min-width:0; }
 .rko-d .rko-av { box-shadow:0 0 0 2px var(--cor); }
@@ -25402,7 +25411,7 @@ body.tb-travado #vsf-btn, body.tb-travado #gm-toasts { display:none !important; 
 .rko-prod-obs { margin:10px 2px 0; }
 @media (max-width:760px) {
   .rko-palco { padding:20px 14px 18px; border-radius:22px; } .rko-palco-h h3 { font-size:1.2rem; }
-  .rko-podio3 { grid-template-columns:1fr; gap:22px; margin-top:34px; } .rko-p.p1, .rko-p.p2, .rko-p.p3 { order:0; }
+  .rko-podio3 { grid-template-columns:1fr; gap:22px; margin-top:34px; } .rko-p.p1, .rko-p.p2, .rko-p.p3, .rko-palco:not(.zerado) .rko-podio3.n4 .rko-p { order:0; } .rko-p.p4 .rko-p-foto { --t:96px; }
   .rko-p-degrau { display:none; } .rko-p.p1 .rko-p-foto { --t:136px; } .rko-p-foto { --t:104px; } .rko-p.p1 .rko-p-pct b { font-size:3rem; }
   .rko-p + .rko-p { padding-top:20px; border-top:1px solid rgba(255,255,255,.07); }
   .rko-demais { grid-template-columns:1fr; margin-top:22px; }
@@ -34654,11 +34663,11 @@ function rkoGeralHtml(D) {
     + '<span class="rko-chips" role="tablist" aria-label="Ordenar o ranking">'
     + '<button type="button" class="chart-chip' + (RKO.ordem === 'pct' ? ' on' : '') + '" onclick="RKO.ordem=\'pct\';renderRankOrg()">por % da meta</button>'
     + '<button type="button" class="chart-chip' + (RKO.ordem === 'leads' ? ' on' : '') + '" onclick="RKO.ordem=\'leads\';renderRankOrg()">por nº de leads</button></span></header>'
-    + '<div class="rko-podio3">';
+    + '<div class="rko-podio3' + (lista.length >= 4 ? ' n4' : '') + '">';   // 14/10/2026 (Bruno: "cria um ranking de 4 pessoas"): os 4 no palco, ordem 4 · 2 · 1 · 3
   lista.forEach(function(x, i) {
     var p = RKO_CFG.pessoas[x.q], pos = i + 1;
-    if (pos === 4) h += '</div><div class="rko-demais">';   // do 4º lugar em diante: uma fila embaixo do pódio
-    if (pos >= 4) {
+    if (pos === 5) h += '</div><div class="rko-demais">';   // do 5º lugar em diante: uma fila embaixo do palco
+    if (pos >= 5) {
       h += '<article class="rko-d" style="--cor:' + p.cor + '"><span class="rko-d-pos">' + (zerado ? '—' : pos + 'º') + '</span>' + rkoAvatar(x.q, 46)
         + '<div class="rko-d-t"><b>' + dspEsc(p.nome) + '</b><small>' + x.partes.map(function(pt) { return pt.f.ico + ' ' + dspEsc(pt.d.palavra) + ' ' + rkoN(pt.r.n); }).join(' · ') + (x.mql ? ' · 🏅 ' + x.mql + ' MQL' : '') + '</small></div>'
         + '<div class="rko-d-n">' + (x.pct != null ? '<b>' + x.pct + '<i>%</i></b><small>' + rkoN(x.n) + ' de ' + rkoN(x.meta) + ' leads</small>' : '<b>' + rkoN(x.n) + '</b><small>lead' + (x.n === 1 ? '' : 's') + ' · meta a definir</small>') + (x.hoje ? '<em>+' + x.hoje + ' hoje</em>' : '') + '</div></article>';
@@ -34670,7 +34679,7 @@ function rkoGeralHtml(D) {
       + '<span class="rko-p-pos">' + (zerado ? '—' : pos + 'º') + '</span></div>'
       + '<b class="rko-p-nome">' + dspEsc(p.nome) + '</b>'
       + (x.pct != null ? '<div class="rko-p-pct"><b>' + x.pct + '<i>%</i></b><span>da meta pessoal</span></div>' : '<div class="rko-p-pct"><b>' + rkoN(x.n) + '</b><span>leads · meta a definir</span></div>')
-      + '<div class="rko-p-leads"><b>' + rkoN(x.n) + '</b>' + (x.meta ? ' de ' + rkoN(x.meta) : '') + ' leads' + (x.hoje ? '<em>+' + x.hoje + ' hoje</em>' : '') + '</div>'
+      + (x.pct != null ? '<div class="rko-p-leads"><b>' + rkoN(x.n) + '</b> de ' + rkoN(x.meta) + ' leads' + (x.hoje ? '<em>+' + x.hoje + ' hoje</em>' : '') + '</div>' : (x.hoje ? '<div class="rko-p-leads"><em>+' + x.hoje + ' hoje</em></div>' : ''))
       + '<div class="rko-p-funis">' + x.partes.map(function(pt) { return '<span title="' + dspEsc(pt.f.nome) + ' · palavra ' + dspEsc(pt.d.palavra) + '"><small>' + pt.f.ico + ' ' + dspEsc(pt.d.palavra) + '</small><b>' + rkoN(pt.r.n) + (pt.d.meta ? '<i>/' + rkoN(pt.d.meta) + '</i>' : '') + '</b></span>'; }).join('')
       + '<span title="Leads que já preencheram o formulário com nota A ou B"><small>🏅 MQL</small><b>' + rkoN(x.mql) + '</b></span></div>'
       + '<div class="rko-p-degrau" aria-hidden="true"><b>' + (zerado ? '' : pos) + '</b></div></article>';
@@ -34689,11 +34698,12 @@ function rkoPostsHtml(D) {
   var h = '<div class="rko-sec"><h3>Posts que mais trouxeram leads</h3><span class="rko-meta">no mês · clique para abrir no Instagram</span></div><div class="panel rko-posts">';
   ps.forEach(function(P, i) {
     var info = (IGO.postDe || {})[P.lk] || {}, leg = String(info.legenda || '').replace(/\s+/g, ' ').trim(), dt = info.date ? ('0' + info.date.getDate()).slice(-2) + '/' + ('0' + (info.date.getMonth() + 1)).slice(-2) : '';
-    var donos = Object.keys(P.q).sort(function(a, b) { return P.q[b] - P.q[a]; });
-    h += '<a class="rko-post" href="' + dspEsc(P.lk) + '" target="_blank" rel="noopener"><span class="rko-pos">' + (i + 1) + 'º</span>'
-      + '<span class="rko-post-t"><b>' + dspEsc(leg ? leg.slice(0, 90) + (leg.length > 90 ? '…' : '') : 'Post sem legenda') + '</b><small>' + [dt, info.tipo === 'VIDEO' ? 'vídeo' : info.tipo === 'CAROUSEL_ALBUM' ? 'carrossel' : info.tipo ? 'foto' : ''].filter(Boolean).join(' · ') + '</small></span>'
+    var donos = Object.keys(P.q).sort(function(a, b) { return P.q[b] - P.q[a]; }), story = P.lk === 'story';   // 📱 respostas aos stories (o ManyChat avisa o robô; 14/10/2026)
+    h += (story ? '<div class="rko-post">' : '<a class="rko-post" href="' + dspEsc(P.lk) + '" target="_blank" rel="noopener">') + '<span class="rko-pos">' + (i + 1) + 'º</span>'
+      + (story ? '<span class="rko-post-t"><b>📱 Respostas aos stories</b><small>no direct, com a palavra</small></span>'
+        : '<span class="rko-post-t"><b>' + dspEsc(leg ? leg.slice(0, 90) + (leg.length > 90 ? '…' : '') : 'Post sem legenda') + '</b><small>' + [dt, info.tipo === 'VIDEO' ? 'vídeo' : info.tipo === 'CAROUSEL_ALBUM' ? 'carrossel' : info.tipo ? 'foto' : ''].filter(Boolean).join(' · ') + '</small></span>')
       + '<span class="rko-post-q">' + donos.map(function(q) { return '<span class="rko-chip" style="--cor:' + RKO_CFG.pessoas[q].cor + '">' + rkoAvatar(q, 20) + dspEsc(RKO_CFG.pessoas[q].nome.split(' ')[0]) + ' <b>' + P.q[q] + '</b></span>'; }).join('') + '</span>'
-      + '<span class="rko-conta"><b>' + rkoN(P.n) + '</b><small>lead' + (P.n === 1 ? '' : 's') + '</small></span></a>';
+      + '<span class="rko-conta"><b>' + rkoN(P.n) + '</b><small>lead' + (P.n === 1 ? '' : 's') + '</small></span>' + (story ? '</div>' : '</a>');
   });
   return h + '</div>';
 }
@@ -34709,6 +34719,7 @@ function rkoRegrasHtml() {
     + '<div class="panel rko-lista"><p><b>Lead</b> é a pessoa que comentou a palavra no post. Cada pessoa conta <b>uma vez por funil no mês</b>, para a palavra que ela comentou primeiro.</p>'
     + '<p><b>MQL</b> é quem comentou e já preencheu o formulário com <b>nota A ou B</b>.</p>'
     + '<p>“Diagnóstico” e “Análise” valem em qualquer lugar do comentário. “Plano”, “Evento”, “Zoom”, “Workshop”, “Estratégia” e “Ingresso” valem em comentário curto (até 4 palavras).</p>'
+    + '<p>A <b>Lilian</b> trabalha com <b>stories</b>: quem responde o story com “Estratégia” ou “Ingresso” manda mensagem no direct, e o ManyChat avisa o robô na hora. Cada resposta com a palavra conta igual a um comentário.</p>'
     + '<p><b>Produção da semana</b> conta os posts publicados no perfil de segunda a domingo. O dono do post é quem tem a palavra que a legenda pede para comentar (“comenta PLANO” = Rafa).</p>'
     + '<p>O robô lê os comentários dos 12 posts mais recentes <b>todo dia às 6h</b>. Para ver o número de agora, clique em <b>↻ Atualizar</b>: ele lê na hora.</p></div></div>';
   return h;
