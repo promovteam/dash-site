@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-15-1159';
+var VERSAO_DASH = '2026-10-15-1321';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -22052,16 +22052,16 @@ function verPendencias() {
 // Não é cofre de banco: é uma porta com chave simples para a equipe.
 var ACESSOS = [
   { nome: 'Bruno Pardim',  adm: true, gestao: true, senhaRobo: true },   // Bruno e admin: troca o Você livremente · 08/10/2026: senha própria ("manda um para mim criar uma senha também") — o PIN saiu do código público
-  { nome: 'Tony Londe',    pin: '9264' },
-  { nome: 'Wesllene',      pin: '5290' },   // closer desde 15/09/2026
+  { nome: 'Tony Londe',    pinRobo: true },
+  { nome: 'Wesllene',      pinRobo: true },   // closer desde 15/09/2026
   { nome: 'Gabriel',       adm: true, gestao: true, senhaRobo: true },   // 05/10/2026 (Bruno: "cria um deste para o gabriel com todos acessos · igual ao meu"): admin; a senha é dele, criada com o código no WhatsApp e conferida no robô — não fica no código
   { nome: 'PV',            adm: true, gestao: true, senhaRobo: true },   // 08/10/2026 (Bruno: "acesso ao dash p/ PV/João… inclusive comissões… senha própria"): admin igual ao Gabriel; senha criada por ele com o código no WhatsApp
   { nome: 'João',          adm: true, gestao: true, senhaRobo: true },   // 08/10/2026: idem (João Stecca)
   { nome: 'Suellen',       financeiro: true },   // Financeiro: vê o dash inteiro (05/10/2026: "libere tudo"; antes só Comissões); a senha é conferida no robô — não fica no código
-  { nome: 'Executivo', pin: '4172', contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm · 13/10/2026 (Bruno: "Juliane quero que se torne executivo"): o acesso mudou de nome, de "Juliane Promov" para "Executivo" (é do time executivo); o resto fica igual
-  { nome: 'Selina Promov', pin: '2846' },
-  { nome: 'Sarah Promov',  pin: '5137' },
-  { nome: 'Ismael',        pin: '6180' },
+  { nome: 'Executivo', pinRobo: true, contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm · 13/10/2026 (Bruno: "Juliane quero que se torne executivo"): o acesso mudou de nome, de "Juliane Promov" para "Executivo" (é do time executivo); o resto fica igual
+  { nome: 'Selina Promov', pinRobo: true },
+  { nome: 'Sarah Promov',  pinRobo: true },
+  { nome: 'Ismael',        pinRobo: true },
   { nome: 'Adm',           adm: true, gestao: true, pinRobo: true, semComissoes: true },   // 13/10/2026 (Bruno: "o admin que tire as comissões · deixe somente o closer score"): sem a aba Comissões; o resto e o Score continuam ·   // 09/10/2026 (Bruno: "preciso que ele tenha acesso total" · "não quero essa barreira no admin"): igual ao Gabriel — UMA senha na entrada (no lugar do PIN, que saiu do código público) e tudo abre direto; o código para criar a senha vai para o WhatsApp do Bruno     // acesso geral; não vira "Você" sozinho · 09/10/2026 (Bruno: "libera todas as abas no adm"): Comissões, Score e o alinhamento aparecem — os dados só abrem com a senha conferida no robô
   { nome: 'Produção de conteúdo', soOlha: true, conteudo: true, senhaTime: true },   // 10/10/2026 (Bruno: "crie um acesso para o time de Produção de conteúdo" · um acesso só do time): vê o 🏆 Ranking orgânico e os Criativos, não mexe em nada; a senha é criada com um código que vai para o WhatsApp do Bruno e conferida no robô — não fica no código
   { nome: 'Visitante',     pin: '0000', soOlha: true }   // vê tudo, não mexe em nada
@@ -22305,9 +22305,14 @@ function loginConferir() {
   if (escPr && escPr.pinRobo) {
     if (!senha) return;
     var btPr = document.querySelector('#lg-pin .btn.primary'); if (btPr) { btPr.disabled = true; btPr.textContent = 'Conferindo…'; }
-    gasPedir({ action: 'admPinEntrar', pin: senha }, function(d) {
+    var ehAdmPin = escPr.nome === 'Adm';   // 15/10/2026: os outros PINs (closers, SDR, SS, Executivo) também são conferidos no robô
+    gasPedir(ehAdmPin ? { action: 'admPinEntrar', pin: senha } : { action: 'dashPinEntrar', nome: escPr.nome, pin: senha }, function(d) {
       if (!d || !d.success || !d.token) { if (btPr) { btPr.disabled = false; btPr.textContent = 'Entrar'; } alert((d && d.error) || 'O robô não respondeu: tente de novo.'); return; }
-      try { localStorage.setItem('v2Login', escPr.nome); localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
+      try {
+        localStorage.setItem('v2Login', escPr.nome);
+        if (ehAdmPin) { localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); }
+        else { localStorage.setItem('scoreTok', d.token); if (!escPr.soOlha) localStorage.setItem('v2LeadEu', escPr.nome); if (escPr.executivo) localStorage.setItem('v2AbrirContratos', '1'); }
+      } catch (e) {}
       location.reload();
     }, 40000);
     return;
@@ -22330,9 +22335,11 @@ function loginConferir() {
 // Adm que já estava logado sem a sessão do robô: volta para a tela do PIN uma vez (aí já entra com tudo)
 try { if (loginPrecisa() && localStorage.getItem('v2Login') === 'Adm' && !localStorage.getItem('comPainelTok')) localStorage.removeItem('v2Login'); } catch (eAdm) {}
 if (loginPrecisa()) montarLogin();
+// 15/10/2026: o Executivo que entrou pelo PIN do robô (a página recarrega) abre direto em Contratos, como antes
+try { if (localStorage.getItem('v2AbrirContratos')) { localStorage.removeItem('v2AbrirContratos'); setTimeout(function() { var nv = document.querySelector('.nav-item[data-s="contratos"]'); if (nv) nv.click(); }, 1200); } } catch (eAbC) {}
 // 🔁 sair e entrar com outro acesso (Bruno 08/09/2026: "que tenha opção de mudar de acesso")
 function trocarAcesso() {
-  try { localStorage.removeItem('v2Login'); localStorage.removeItem('v2LeadEu'); localStorage.removeItem('comPainelTok'); localStorage.removeItem('comPainelCache'); } catch (e) {}   // 💰 comissões: o aparelho esquece a liberação (e o painel guardado)
+  try { localStorage.removeItem('v2Login'); localStorage.removeItem('v2LeadEu'); localStorage.removeItem('comPainelTok'); localStorage.removeItem('comPainelCache'); localStorage.removeItem('scoreTok'); } catch (e) {}   // 💰 comissões: o aparelho esquece a liberação (e o painel guardado)
   location.reload();
 }
 // 👤 com qual acesso a pessoa está (Bruno 08/09/2026: "mostre qual acesso a pessoa está")
@@ -33972,7 +33979,7 @@ function scVerComo(k) { SCORE.verComo = k; SCORE.quem = ''; SCORE.papel = ''; sc
 // no ar (SC_FONTE = 'robo'): as notas vêm do robô, que guarda numa planilha fechada e devolve só as de quem entrou
 // com a senha das Comissões (comPainelTok). No teste (arquivo): score_dados.js ao lado do dash.
 var SC_FONTE = (typeof window !== 'undefined' && window.SC_FONTE) || 'arquivo';
-function scTok() { try { return (typeof _cmTok === 'function' ? _cmTok() : localStorage.getItem('comPainelTok')) || ''; } catch (e) { return ''; } }
+function scTok() { try { return (typeof _cmTok === 'function' ? _cmTok() : localStorage.getItem('comPainelTok')) || localStorage.getItem('scoreTok') || ''; } catch (e) { return ''; } }   // 15/10/2026: ou a sessão do Score (PIN do dash)
 function scTravado() {
   if (SC_FONTE !== 'robo' || SCORE.carregado) return '';
   var t = scTok();
@@ -33986,9 +33993,10 @@ function scPinEntrar() {
   var el = document.getElementById('sc-pin'), bt = document.getElementById('sc-pin-bt'), pin = el ? el.value.trim() : '';
   if (!pin) { if (el) el.focus(); return; }
   if (bt) { bt.disabled = true; bt.textContent = 'Conferindo…'; }
-  gasPedir({ action: 'admPinEntrar', pin: pin }, function(d) {
+  var lgP = ''; try { lgP = localStorage.getItem('v2Login') || ''; } catch (eP) {}
+  gasPedir(lgP === 'Adm' ? { action: 'admPinEntrar', pin: pin } : { action: 'dashPinEntrar', nome: lgP, pin: pin }, function(d) {
     if (!d || !d.success || !d.token) { if (bt) { bt.disabled = false; bt.textContent = 'Entrar'; } alert((d && d.error) || 'O robô não respondeu: tente de novo.'); return; }
-    try { localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
+    try { if (lgP === 'Adm') { localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } else localStorage.setItem('scoreTok', d.token); } catch (e) {}
     SCORE.trava = ''; SCORE.tokRuim = ''; SCORE.erroEm = 0; try { RX.erro = ''; } catch (eRx) {}
     renderScoreTela();
   }, 40000);
@@ -34001,7 +34009,7 @@ function scTravaHtml(tv) {
   // 15/10/2026: acesso que entra com PIN no robô (Adm) não tem a aba Comissões — o PIN abre a sessão aqui mesmo
   var lgPin = ''; try { lgPin = localStorage.getItem('v2Login') || ''; } catch (eLg) {}
   if ((typeof ACESSOS !== 'undefined' ? ACESSOS : []).some(function(a) { return a.nome === lgPin && a.pinRobo; }))
-    return '<div class="panel sc-trava"><div class="cm-cadeado">🔐</div><b>Digite o PIN de novo</b><span>A sessão do ' + dspEsc(lgPin) + ' venceu. Com o PIN, o Score e o Raio-X abrem na hora.</span>'
+    return '<div class="panel sc-trava"><div class="cm-cadeado">🔐</div><b>Digite o seu PIN</b><span>É o mesmo PIN de entrar no dash (' + dspEsc(lgPin) + '). Com ele, o Score e o Raio-X abrem na hora.</span>'
       + '<input id="sc-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" onkeydown="if(event.key===\'Enter\')scPinEntrar()" style="margin:10px auto 0;display:block;max-width:180px;text-align:center;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font:inherit;">'
       + '<button class="btn primary" id="sc-pin-bt" style="margin-top:10px;" onclick="scPinEntrar()">Entrar</button></div>';
   return '<div class="panel sc-trava"><div class="cm-cadeado">🔐</div><b>O Score é de cada um</b><span>Cada pessoa vê só as próprias notas. Para ver as suas, entre com a sua senha, a mesma das Comissões.</span>'
@@ -36595,7 +36603,9 @@ function scFichaReuniao(r) {
 function scMostrarMenu() {
   var it = document.querySelector('.nav-item[data-s="score"]'); if (!it) return;
   var p = ''; try { p = typeof _cmPapelLogin === 'function' ? _cmPapelLogin() : 'admin'; } catch (e) {}
-  it.style.display = (p === 'admin' || p === 'dono' || p === 'financeiro') ? '' : 'none';
+  var lgM = ''; try { lgM = localStorage.getItem('v2Login') || ''; } catch (eM) {}
+  var acM = (typeof ACESSOS !== 'undefined' ? ACESSOS : []).filter(function(a) { return a.nome === lgM; })[0];
+  it.style.display = (p === 'admin' || p === 'dono' || p === 'financeiro' || (acM && acM.executivo)) ? '' : 'none';   // 15/10/2026: o Executivo também
 }
 try { setTimeout(scMostrarMenu, 1200); setInterval(scMostrarMenu, 5000); } catch (eMm) {}
 
