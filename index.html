@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-14-0935';
+var VERSAO_DASH = '2026-10-15-1159';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -33982,11 +33982,28 @@ function scTravado() {
   if (SCORE.trava === 'erro' && Date.now() - (SCORE.erroEm || 0) < 60000) return 'erro';
   return '';
 }
+function scPinEntrar() {
+  var el = document.getElementById('sc-pin'), bt = document.getElementById('sc-pin-bt'), pin = el ? el.value.trim() : '';
+  if (!pin) { if (el) el.focus(); return; }
+  if (bt) { bt.disabled = true; bt.textContent = 'Conferindo…'; }
+  gasPedir({ action: 'admPinEntrar', pin: pin }, function(d) {
+    if (!d || !d.success || !d.token) { if (bt) { bt.disabled = false; bt.textContent = 'Entrar'; } alert((d && d.error) || 'O robô não respondeu: tente de novo.'); return; }
+    try { localStorage.setItem('comPainelTok', d.token); localStorage.removeItem('comPainelCache'); } catch (e) {}
+    SCORE.trava = ''; SCORE.tokRuim = ''; SCORE.erroEm = 0; try { RX.erro = ''; } catch (eRx) {}
+    renderScoreTela();
+  }, 40000);
+}
 function scTravaHtml(tv) {
   var temCom = (function() { var it = document.querySelector('.nav-item[data-s="comissoes"]'); return !!(it && it.style.display !== 'none'); })();
   var ir = 'var it=document.querySelector(\'.nav-item[data-s=comissoes]\');if(it)it.click();';
   if (tv === 'fechado') return '<div class="pl-vazio">🔒 O Score não faz parte do seu acesso.</div>';
   if (tv === 'erro') return '<div class="pl-vazio">O robô não respondeu agora. <a href="#" onclick="event.preventDefault();SCORE.erroEm=0;SCORE.trava=\'\';scRedesenhar();">Tentar de novo</a></div>';
+  // 15/10/2026: acesso que entra com PIN no robô (Adm) não tem a aba Comissões — o PIN abre a sessão aqui mesmo
+  var lgPin = ''; try { lgPin = localStorage.getItem('v2Login') || ''; } catch (eLg) {}
+  if ((typeof ACESSOS !== 'undefined' ? ACESSOS : []).some(function(a) { return a.nome === lgPin && a.pinRobo; }))
+    return '<div class="panel sc-trava"><div class="cm-cadeado">🔐</div><b>Digite o PIN de novo</b><span>A sessão do ' + dspEsc(lgPin) + ' venceu. Com o PIN, o Score e o Raio-X abrem na hora.</span>'
+      + '<input id="sc-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" onkeydown="if(event.key===\'Enter\')scPinEntrar()" style="margin:10px auto 0;display:block;max-width:180px;text-align:center;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font:inherit;">'
+      + '<button class="btn primary" id="sc-pin-bt" style="margin-top:10px;" onclick="scPinEntrar()">Entrar</button></div>';
   return '<div class="panel sc-trava"><div class="cm-cadeado">🔐</div><b>O Score é de cada um</b><span>Cada pessoa vê só as próprias notas. Para ver as suas, entre com a sua senha, a mesma das Comissões.</span>'
     + (temCom ? '<button class="btn primary" onclick="' + ir + '">Entrar com a minha senha</button>' : '<span class="hint">Peça ao Bruno o seu acesso às Comissões.</span>') + '</div>';
 }
