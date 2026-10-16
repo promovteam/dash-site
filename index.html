@@ -2919,7 +2919,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-16-1703';
+var VERSAO_DASH = '2026-10-16-1711';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -34601,18 +34601,42 @@ function rxPagina(aba) {
     + '<script>document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href^=\'#\']");if(!a)return;e.preventDefault();var el=document.getElementById(a.getAttribute("href").slice(1));if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},true);<\/script>'
     + '<script>' + A.kit + '<\/script><script>' + A[aba] + '<\/script></body></html>';
 }
+// ⚡ 16/10/2026 (Bruno: Raio-X "demorando"): o Raio-X fica guardado no aparelho (IndexedDB) — abre na hora com a última cópia e busca
+// a nova por trás, comprimida (o robô deixa pronta para todos até entrar nota nova). Só redesenha se mudou. A cópia vale só para o
+// mesmo acesso (t = começo do token, como o Score).
+function rxBuscar() {
+  RX.carregando = true;
+  var tok = scTok(), t16 = String(tok || '').slice(0, 16), podeZ = typeof DecompressionStream === 'function' && typeof _scUnzip === 'function';
+  var redesenha = function() { if (SCORE.aba && SCORE.aba !== 'score') renderScoreTela(); };
+  var pedir = function() {
+    gasPedir({ action: 'raioxDados', token: tok, z: podeZ ? 1 : '' }, function(d) {
+      var fim = function(dd, z) {
+        RX.carregando = false;
+        if (dd && dd.success && dd.reun) {
+          var mudou = !RX.d || !z || z !== RX.z;
+          RX.d = dd; RX.z = z || ''; RX.erro = '';
+          if (z && typeof _gvtGuardar === 'function') { try { _gvtGuardar('rx:v1', { z: z, t: t16, quando: Date.now() }); } catch (eG) {} }
+          if (mudou) redesenha();
+        } else if (!RX.d) { RX.erro = (d && d.error) || 'o robô não respondeu — tente de novo em instantes'; redesenha(); }
+      };
+      if (d && d.success && d.z) {
+        if (RX.d && RX.z === d.z) { RX.carregando = false; return; }   // nada mudou
+        _scUnzip(d.z).then(function(dd) { dd.success = true; fim(dd, d.z); }).catch(function() { fim(null); });
+      } else fim(d, '');
+    }, 120000);
+  };
+  if (!podeZ || typeof _gvtLer !== 'function') return pedir();
+  _gvtLer('rx:v1', function(g) {
+    if (g && g.z && g.t === t16 && !RX.d) {
+      _scUnzip(g.z).then(function(dd) { if (dd && dd.reun && !RX.d) { dd.success = true; RX.d = dd; RX.z = g.z; redesenha(); } pedir(); }).catch(pedir);
+    } else pedir();
+  });
+}
 function rxRender(el) {
   var aba = SCORE.aba;
   if (!RX.d) {
     el.innerHTML = rxAbasHtml() + '<div class="hint" style="padding:40px;text-align:center;">' + (RX.erro ? '❌ ' + dspEsc(RX.erro) + ' <button class="btn" onclick="RX.erro=\'\';renderScoreTela()">Tentar de novo</button>' : '<span class="mv-brilho-txt">Carregando o Raio-X — todas as reuniões lidas…</span>') + '</div>';
-    if (!RX.carregando && !RX.erro) {
-      RX.carregando = true;
-      gasPedir({ action: 'raioxDados', token: scTok() }, function(d) {
-        RX.carregando = false;
-        if (d && d.success && d.reun) RX.d = d; else RX.erro = (d && d.error) || 'o robô não respondeu — tente de novo em instantes';
-        if (SCORE.aba && SCORE.aba !== 'score') renderScoreTela();
-      }, 120000);
-    }
+    if (!RX.carregando && !RX.erro) rxBuscar();
     return;
   }
   var X = RX.d, est = X.reun.length - (X.novas || 0);
