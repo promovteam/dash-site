@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-15-1321';
+var VERSAO_DASH = '2026-10-16-0836';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -9376,6 +9376,64 @@ function gasPedir(payload, cb, tempoMs) {
   document.body.appendChild(sc);
   setTimeout(function(){ fim(null); }, tempoMs || 30000);
 }
+// 🛟 16/10/2026 (PV: "dá erro num navegador e no anônimo funciona"): plano B para todos os pedidos ao robô por <script>.
+// No navegador normal o pedido vai com a conta Google logada; se ela não pode abrir o robô, o Google barra e o <script> falha.
+// Aí o dash confere UMA vez se este navegador barra o robô (ping pelo mesmo caminho): se barra, refaz o mesmo pedido SEM a conta
+// Google (como o anônimo) e entrega a resposta no mesmo lugar; se não barra, o erro foi do robô e NÃO repete (nada grava duas vezes).
+var GAS_PLANO_B = { barra: null, quando: 0, refeitos: 0 };   // a resposta do teste vale 2 minutos
+(function () {
+  var esperando = null;
+  function testar(cb) {
+    if (GAS_PLANO_B.barra !== null && Date.now() - GAS_PLANO_B.quando < 120000) return cb(GAS_PLANO_B.barra);
+    if (esperando) { esperando.push(cb); return; }
+    esperando = [cb];
+    var n = 'gpb' + Math.random().toString(36).slice(2, 9), s = document.createElement('script'), feito = false;
+    var fim = function (barra) {
+      if (feito) return; feito = true;
+      try { s.remove(); } catch (e) {} try { delete window[n]; } catch (e) {}
+      if (barra !== null) { GAS_PLANO_B.barra = barra; GAS_PLANO_B.quando = Date.now(); }
+      var l = esperando; esperando = null; l.forEach(function (f) { f(!!barra); });
+    };
+    window[n] = function () { fim(false); };
+    s._gasProva = true;
+    s.onerror = function () { fim(true); };
+    s.src = APPS_SCRIPT_URL + '?callback=' + n + '&action=ping&t=' + Date.now();
+    document.body.appendChild(s);
+    setTimeout(function () { fim(null); }, 15000);   // sem resposta: não dá para saber → não repete
+  }
+  function acharCb(nome) {
+    var o = window, p = nome.split('.');
+    for (var k = 0; k < p.length - 1; k++) { o = o && o[p[k]]; }
+    var f = o && o[p[p.length - 1]];
+    return typeof f === 'function' ? function (d) { f.call(o, d); } : null;
+  }
+  window.addEventListener('error', function (ev) {
+    var el = ev.target;
+    if (!el || el.tagName !== 'SCRIPT' || el._gasProva || el._gasPlanoB || typeof APPS_SCRIPT_URL === 'undefined') return;
+    var src = el.src || '';
+    if (src.indexOf(APPS_SCRIPT_URL) !== 0) return;
+    var m = /[?&]callback=([A-Za-z0-9_$.]+)/.exec(src);
+    if (!m) return;
+    ev.stopImmediatePropagation();   // segura o erro: só vira erro de verdade se o plano B também falhar
+    el._gasPlanoB = true;
+    var falhou = function () { try { el.dispatchEvent(new Event('error')); } catch (e) {} };
+    testar(function (barra) {
+      if (!barra) return falhou();
+      var x = new XMLHttpRequest();
+      try { x.open('GET', src); } catch (e) { return falhou(); }
+      x.timeout = 90000;
+      x.onload = function () {
+        var t = x.responseText || '', a = t.indexOf('('), b = t.lastIndexOf(')'), d;
+        try { d = JSON.parse(t.slice(a + 1, b)); } catch (e) { return falhou(); }
+        var cb = acharCb(m[1]);
+        GAS_PLANO_B.refeitos++;
+        if (cb) cb(d);
+      };
+      x.onerror = x.ontimeout = falhou;
+      x.send();
+    });
+  }, true);
+})();
 function comentMarcar(insta, campo, valor) {
   if (soOlhar()) return;
   if (!insta) { alert('Esta pessoa está sem o @ do Instagram — não dá para marcar.'); return; }
@@ -22277,7 +22335,7 @@ function _loginFinEntrar() {
     var esp = time ? 'conteudo' : (ACESSOS.filter(function(x){ return x.nome === window._lgEscolhido; })[0] || {}).financeiro ? 'financeiro' : 'admin';
     var m2 = document.getElementById('lg-fmsg');
     if (!d || !d.success || !d.token || d.papel !== esp) {
-      var er = (d && d.error) || (d && d.success ? 'esse acesso não é deste nome' : 'o robô não respondeu');
+      var er = (d && d.error) || (d && d.success ? 'esse acesso não é deste nome' : 'o robô não respondeu: tente de novo em 1 minuto; se repetir, abra o dash numa janela anônima');
       if (cod && /c[oó]digo/i.test(er)) { window._lgEtapa = 2; _lgCriarRender('❌ ' + er + ' — confira o código ou peça outro'); return; }
       if (m2) m2.textContent = '❌ ' + er; return;
     }
@@ -33973,7 +34031,7 @@ function scEu() {
   return { adm: adm, k: adm ? '' : scK(lg) };
 }
 function scPodeC(r) { var eu = scEu(); return eu.adm || r.ck === eu.k; }
-function scPodeS(l) { var eu = scEu(); return (scEhSdr(l.sdr) || scEhSs(l.sdr)) && (eu.adm || scK(l.sdr) === eu.k); }
+function scPodeS(l) { return scEhSdr(l.sdr) || scEhSs(l.sdr); }   // 16/10/2026 (Bruno: "abre o SDR Score para todos"): o SDR Score do time inteiro, para todos
 function scVerComo(k) { SCORE.verComo = k; SCORE.quem = ''; SCORE.papel = ''; scRedesenhar(); }
 // ---------- dados ----------
 // no ar (SC_FONTE = 'robo'): as notas vêm do robô, que guarda numa planilha fechada e devolve só as de quem entrou
