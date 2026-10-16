@@ -1578,6 +1578,18 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
   <span id="boot-msg">abrindo o dash…</span>
 </div>
 <script>
+// 🛡️ 16/10/2026 (Bruno/PV: "demorando abrir", "o robô não respondeu" — no anônimo funciona): todo <script> que o dash põe para falar
+// com o robô (script.google.com) ou ler a planilha (docs.google.com/…/gviz) vai SEM a conta Google do navegador (crossorigin
+// "anonymous" = sem cookies, como a janela anônima). Com a conta logada o Google às vezes devolve outra coisa e o pedido ficava parado
+// até o limite de tempo. O robô e a planilha liberam o site do dash (CORS): a resposta é a mesma.
+(function () {
+  var rx = /^https:\/\/(script\.google\.com\/macros\/|docs\.google\.com\/spreadsheets\/d\/[^\/]+\/gviz\/)/;
+  var marca = function (el) { try { if (el && el.tagName === 'SCRIPT' && !el.crossOrigin && rx.test(el.src || '')) el.crossOrigin = 'anonymous'; } catch (e) {} };
+  ['appendChild', 'insertBefore'].forEach(function (m) {
+    var orig = Node.prototype[m];
+    Node.prototype[m] = function (el) { marca(el); return orig.apply(this, arguments); };
+  });
+})();
 // barrinha anda sozinha enquanto baixa; se algo travar de verdade, oferece recarregar
 (function(){
   var p = 20;
@@ -2907,7 +2919,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-16-1118';
+var VERSAO_DASH = '2026-10-16-1703';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
