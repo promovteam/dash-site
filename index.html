@@ -2907,7 +2907,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-16-1031';
+var VERSAO_DASH = '2026-10-16-1034';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25500,7 +25500,7 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .sgd-abas button { border:0; border-radius:999px; padding:8px 16px; background:transparent; color:var(--text2); font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; }
 .sgd-abas button.on { background:rgba(246,163,80,.16); color:var(--accent); }
 .sgd-abas button:focus-visible, .sgd-sem-d:focus-visible, .sgd-post:focus-visible, .sgd-tab tr:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.sgd-kpis { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; }
+.sgd-kpis { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:12px; }
 .sgd-kpi { display:flex; flex-direction:column; gap:4px; min-width:0; padding:16px 18px; border-radius:18px; border:1px solid var(--border); background:var(--panel); }
 .sgd-kpi span { font-size:.66rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); }
 .sgd-kpi b { font-size:1.9rem; font-weight:900; letter-spacing:-.03em; line-height:1.1; font-variant-numeric:tabular-nums; }
@@ -25557,6 +25557,7 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .sgd-post-m small { font-size:.72rem; color:var(--text2); font-variant-numeric:tabular-nums; }
 .sgd-post-v { flex:none; display:flex; flex-direction:column; align-items:flex-end; text-align:right; }
 .sgd-post-v b { font-size:1.15rem; font-weight:900; color:var(--accent); font-variant-numeric:tabular-nums; } .sgd-post-v small { font-size:.66rem; color:var(--muted); }
+@media (max-width:1250px) { .sgd-kpis { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
 @media (max-width:900px) { .sgd-kpis { grid-template-columns:repeat(2, minmax(0, 1fr)); } .sgd-esc { display:none; } }
 @media (max-width:520px) { .sgd-kpi b { font-size:1.45rem; } .sgd-sem { gap:4px; } .sgd-sem-d { padding:10px 2px 8px; } .sgd-sem-d b { font-size:.72rem; } .sgd-post { gap:10px; padding:10px 12px; } .sgd-post-t { display:none; } }
 @media (prefers-reduced-motion:reduce) { .sgd * { transition:none !important; animation:none !important; } }
@@ -35002,6 +35003,19 @@ function sgdCarregar(forcar) {
 }
 
 // ---------- contas ----------
+// 👥 leads orgânicos por dia (16/10/2026 · Bruno: "seguidores para cada lead"): quem comentou a palavra nos posts (a mesma conta do
+// ranking, aba "IG Pedidos"); a mesma pessoa conta 1 vez por dia. Brasília = UTC−3 (sem horário de verão).
+var _sgdLdMemo = { n: -1, m: {} };
+function _sgdLeads() {
+  var ped = (typeof IGO !== 'undefined' && IGO.ped) || [];
+  if (_sgdLdMemo.n === ped.length) return _sgdLdMemo.m;
+  var vis = {}, m = {};
+  ped.forEach(function(p) { if (!p.t || !p.u) return; var d = new Date(p.t - 3 * 3600e3).toISOString().slice(0, 10), k = d + '|' + p.u; if (vis[k]) return; vis[k] = 1; m[d] = (m[d] || 0) + 1; });
+  _sgdLdMemo = { n: ped.length, m: m };
+  return m;
+}
+function _sgdPorLead(seg, leads) { if (!leads || seg == null) return null; return seg / leads; }
+function _sgdPorLeadTxt(v) { return v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: v < 10 ? 1 : 0 }); }
 function _sgdHoje() { try { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); } catch (e) { return new Date().toISOString().slice(0, 10); } }
 function _sgdHoraHoje() {   // fração do dia que já passou (Brasília), para o ritmo não punir o dia de hoje
   try { var p = new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Sao_Paulo', hour12: false }).split(':'); return Math.min(1, Math.max(.04, (+p[0] + +p[1] / 60) / 24)); } catch (e) { return .5; }
@@ -35054,10 +35068,11 @@ function _sgdConta(J) {
     if (x && x.mais != null) { mais += x.mais; menos += x.menos || 0; temMm = true; }
   });
   Object.keys(SGD.dias).sort().forEach(function(d) { if (SGD.dias[d].seg != null) ult = { d: d, seg: SGD.dias[d].seg, quando: SGD.dias[d].quando }; });
+  var LD = _sgdLeads(), leads = 0; J.dias.forEach(function(d) { if (d <= hoje) leads += LD[d] || 0; });
   var media = diasCont ? soma / diasCont : null, total = J.dias.length, ritmo = media != null ? media * total : null;
   // média só dos dias da semana marcados (dias inteiros)
   var sm = 0, sn = 0; J.dias.forEach(function(d) { if (d >= hoje || !SGD.sem[_sgdSemana(d)]) return; var g = _sgdG(d); if (g != null) { sm += g; sn++; } });
-  return { soma: soma, diasCont: diasCont, media: media, ritmo: ritmo, mais: temMm ? mais : null, menos: temMm ? menos : null, ult: ult, melhor: melhor, pior: pior,
+  return { soma: soma, diasCont: diasCont, media: media, ritmo: ritmo, leads: leads, mais: temMm ? mais : null, menos: temMm ? menos : null, ult: ult, melhor: melhor, pior: pior,
     mediaSem: sn ? sm / sn : null, nSem: sn, acabou: J.dias[J.dias.length - 1] < hoje };
 }
 
@@ -35090,7 +35105,7 @@ function _sgdGrafico(J, C) {
       var fora = !SGD.sem[_sgdSemana(d)], cls = 'sgd-barra' + (v < 0 ? ' neg' : '') + (d === hoje ? ' hoje' : '') + (fora ? ' fora' : ''), xx = SGD.dias[d] || {};
       s += '<rect x="' + x0.toFixed(1) + '" y="' + y0.toFixed(1) + '" width="' + Math.max(1, w).toFixed(1) + '" height="' + Math.max(1, h0).toFixed(1) + '" rx="2" class="' + cls + '"><title>'
         + d.split('-').reverse().join('/') + ' (' + SGD_SEM[_sgdSemana(d)] + ')' + (d === hoje ? ' · até agora' : '') + ': ' + _sgdSinal(v) + ' seguidores'
-        + (xx.mais != null ? ' · começaram ' + rkoN(xx.mais) + ' · deixaram ' + rkoN(xx.menos) : '') + (C.v[i] != null ? ' · comparação: ' + _sgdSinal(C.v[i]) : '') + '</title></rect>';
+        + (xx.mais != null ? ' · começaram ' + rkoN(xx.mais) + ' · deixaram ' + rkoN(xx.menos) : '') + (_sgdLeads()[d] ? ' · ' + rkoN(_sgdLeads()[d]) + ' leads orgânicos' : '') + (C.v[i] != null ? ' · comparação: ' + _sgdSinal(C.v[i]) : '') + '</title></rect>';
     });
   }
   var linha = function(arr, cls) {
@@ -35114,6 +35129,10 @@ function sgdHtml() {
   if (!SGD.carregado) return '<div class="panel rko-vazio"><span class="mv-brilho-txt">Lendo os seguidores na planilha…</span></div>';
   if (SGD.semAba || !Object.keys(SGD.dias).length) return '<div class="panel rko-vazio">' + (SGD.erro ? 'Não consegui ler a planilha agora. <a href="#" onclick="event.preventDefault();sgdCarregar(true);renderRankOrg();">Tentar de novo</a>'
     : 'O Robô do Instagram ainda não começou a anotar os seguidores. Assim que ele for ligado, os números aparecem aqui (e o histórico de até 1 ano vem em seguida).') + '</div>';
+  if (typeof IGO !== 'undefined' && !IGO.carregado) {   // os leads orgânicos vêm da mesma leitura do ranking
+    try { carregarIGOrganico(); } catch (eI) {}
+    if ((SGD.esperaIg || 0) < 40) { SGD.esperaIg = (SGD.esperaIg || 0) + 1; setTimeout(function() { if (RKO.aba === 'seg' && (typeof telaVisivel !== 'function' || telaVisivel('s-rankorg'))) renderRankOrg(); }, 1500); }
+  }
   var J = _sgdJanela(), C = _sgdComparar(J), K = _sgdConta(J), hoje = J.hoje, atual = hoje.slice(0, 7);
   // comparação no mesmo ponto: quanto a comparação tinha até o mesmo dia
   var ia = J.dias.indexOf(hoje), ate = ia === -1 ? J.dias.length - 1 : ia, cmpAte = 0, cmpTot = 0, temCmp = false;
@@ -35135,6 +35154,7 @@ function sgdHtml() {
     + (emCurso && K.ritmo != null
       ? '<div class="sgd-kpi destaque"><span>Ritmo: se continuar assim</span><b>' + _sgdSinal(K.ritmo) + '</b><small>' + (SGD.per === 'mes' ? 'no mês' : 'no período') + (K.ult ? ' · fecha perto de ' + rkoN(Math.round(K.ult.seg + (K.media || 0) * (J.dias.length - K.diasCont))) + ' seguidores' : '') + '</small></div>'
       : '<div class="sgd-kpi"><span>Comparado com ' + C.rot + '</span><b>' + (temCmp ? _sgdSinal(cmpTot) : '—') + '</b><small>' + (temCmp && cmpTot ? (K.soma >= cmpTot ? '▲ ' : '▼ ') + Math.abs(Math.round((K.soma - cmpTot) / Math.abs(cmpTot) * 100)) + '% de diferença' : 'sem dados para comparar') + '</small></div>')
+    + _sgdCardLead(J, K)
     + '</div>';
   if (emCurso && temCmp) h += '<div class="sgd-faixa ' + (dif != null && dif < 0 ? 'abaixo' : 'acima') + '">' + (dif == null ? 'Sem número para comparar até este ponto.' : (dif >= 0 ? '▲ ' : '▼ ') + '<b>' + Math.abs(Math.round(dif)) + '% ' + (dif >= 0 ? 'à frente' : 'atrás') + '</b> de ' + C.rot + ' no mesmo ponto (' + _sgdSinal(K.soma) + ' contra ' + _sgdSinal(cmpAte) + ')' + (cmpTot ? ' · ' + C.rot + ' fechou com ' + _sgdSinal(cmpTot) : '')) + '</div>';
   // filtros
@@ -35148,6 +35168,18 @@ function sgdHtml() {
   h += _sgdMesesHtml(atual);
   h += _sgdPostsHtml(J);
   return '<div class="sgd">' + h + '</div>';
+}
+function _sgdCardLead(J, K) {
+  var lendo = typeof IGO !== 'undefined' && !IGO.carregado, v = _sgdPorLead(K.soma, K.leads);
+  // o mesmo número do período de comparação (mês anterior ou período anterior)
+  var LD = _sgdLeads(), cs = 0, cl = 0, C = _sgdComparar(J);
+  C.v.forEach(function(g) { if (g != null) cs += g; });
+  var desl = J.mes ? null : (SGD.cmp === 'ano' ? 364 : J.dias.length);
+  if (J.mes) { var y = +J.mes.slice(0, 4), m = +J.mes.slice(5, 7) - (SGD.cmp === 'ano' ? 12 : 1); while (m < 1) { m += 12; y--; } var pm = y + '-' + ('0' + m).slice(-2); Object.keys(LD).forEach(function(d) { if (d.slice(0, 7) === pm) cl += LD[d]; }); }
+  else J.dias.forEach(function(d) { cl += LD[_sgdDiaMais(d, -desl)] || 0; });
+  var vc = SGD.cmp === 'm3' ? null : _sgdPorLead(cs, cl);
+  return '<div class="sgd-kpi"><span>Seguidores por lead</span><b>' + (lendo ? '…' : _sgdPorLeadTxt(v)) + '</b><small>'
+    + (lendo ? 'lendo os comentários…' : rkoN(K.leads) + ' leads orgânicos' + (vc != null ? ' · antes: ' + _sgdPorLeadTxt(vc) : '')) + '</small></div>';
 }
 function sgdMes(n) { var J = _sgdJanela(), y = +J.mes.slice(0, 4), m = +J.mes.slice(5, 7) + n; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } SGD.mes = y + '-' + ('0' + m).slice(-2); renderRankOrg(); }
 function sgdPer(p) { SGD.per = p; if (p !== 'mes' && SGD.cmp === 'm3') SGD.cmp = 'ant'; renderRankOrg(); }
@@ -35174,13 +35206,14 @@ function _sgdSemanaHtml(J) {
 function _sgdMesesHtml(atual) {
   var M = {}; Object.keys(SGD.dias).forEach(function(d) { var x = SGD.dias[d]; if (x.g == null) return; var m = d.slice(0, 7), o = M[m] || (M[m] = { s: 0, n: 0, mais: 0, menos: 0, mm: false, best: null }); o.s += x.g; o.n++; if (x.mais != null) { o.mais += x.mais; o.menos += x.menos || 0; o.mm = true; } if (!o.best || x.g > o.best.g) o.best = { d: d, g: x.g }; });
   var ms = Object.keys(M).sort().reverse().slice(0, 13); if (!ms.length) return '';
+  var LM = {}, LD = _sgdLeads(); Object.keys(LD).forEach(function(d) { LM[d.slice(0, 7)] = (LM[d.slice(0, 7)] || 0) + LD[d]; });
   var mx = Math.max.apply(null, ms.map(function(m) { return M[m].n ? M[m].s / M[m].n : 0; }).concat([1]));
-  return '<div class="rko-sec"><h3>Mês a mês</h3><span class="rko-meta">toque num mês para ver no gráfico</span></div><div class="panel sgd-tab-w"><table class="sgd-tab"><thead><tr><th>Mês</th><th>Ganho</th><th>Média/dia</th><th class="sgd-esc">Começaram</th><th class="sgd-esc">Deixaram</th><th class="sgd-esc">Melhor dia</th></tr></thead><tbody>'
+  return '<div class="rko-sec"><h3>Mês a mês</h3><span class="rko-meta">toque num mês para ver no gráfico</span></div><div class="panel sgd-tab-w"><table class="sgd-tab"><thead><tr><th>Mês</th><th>Ganho</th><th>Média/dia</th><th class="sgd-esc">Começaram</th><th class="sgd-esc">Deixaram</th><th>Leads</th><th title="seguidores novos para cada lead orgânico">Seg./lead</th><th class="sgd-esc">Melhor dia</th></tr></thead><tbody>'
     + ms.map(function(m) {
       var o = M[m], md = o.n ? o.s / o.n : 0, cheio = o.n >= _sgdDiasNoMes(m) || m < atual;
       return '<tr tabindex="0" onkeydown="if(event.key===\'Enter\')sgdVerMes(\'' + m + '\')" onclick="sgdVerMes(\'' + m + '\')" class="' + (SGD.per === 'mes' && (SGD.mes || atual) === m ? 'on' : '') + '"><td>' + _sgdMesCurto(m) + (m === atual ? ' <em>em curso</em>' : !cheio ? ' <em>' + o.n + ' dias</em>' : '') + '</td><td><b>' + _sgdSinal(o.s) + '</b></td>'
         + '<td><span class="sgd-mini"><i style="width:' + Math.max(3, Math.max(0, md) / mx * 100).toFixed(0) + '%"></i></span>' + _sgdSinal(md) + '</td>'
-        + '<td class="sgd-esc">' + (o.mm ? rkoN(o.mais) : '—') + '</td><td class="sgd-esc">' + (o.mm ? rkoN(o.menos) : '—') + '</td><td class="sgd-esc">' + (o.best ? o.best.d.slice(8, 10) + '/' + o.best.d.slice(5, 7) + ' · ' + _sgdSinal(o.best.g) : '—') + '</td></tr>';
+        + '<td class="sgd-esc">' + (o.mm ? rkoN(o.mais) : '—') + '</td><td class="sgd-esc">' + (o.mm ? rkoN(o.menos) : '—') + '</td><td>' + (LM[m] ? rkoN(LM[m]) : '—') + '</td><td>' + _sgdPorLeadTxt(_sgdPorLead(o.s, LM[m])) + '</td><td class="sgd-esc">' + (o.best ? o.best.d.slice(8, 10) + '/' + o.best.d.slice(5, 7) + ' · ' + _sgdSinal(o.best.g) : '—') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 // os posts do período: carrossel tem o número exato de seguidores; reels não (a Meta não entrega) → mostra o que o perfil ganhou no dia
