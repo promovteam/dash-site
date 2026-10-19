@@ -35912,7 +35912,7 @@ function _vfProd(produto) { var p = v2norm(produto || ''); return /legado|wld/.t
 // "coloque no meio o no-show e etc"): cada funil numa LINHA (da esquerda para a direita); em cima o Diagnóstico (HT, Legado, total), embaixo
 // o Workshop por edição; entre os passos, o que ficou pelo caminho (futuras, no-show, não vendido, na mesa…); filtros de período, origem,
 // SDR, closer e edição.
-var VF = { fun: 'tot', wfun: 'tot', mom: '', modo: 'coorte', per: 'visao', de: '', ate: '', origem: '', sdr: '', closer: '', ed: '' };   // modo: 'coorte' = leads que chegaram (Bruno: "quantos leads chegaram e quantos se tornaram vendas") · 'periodo' = reuniões do período
+var VF = { fun: 'tot', wfun: 'tot', mom: '', modo: 'coorte', per: 'tudo', de: '', ate: '', origem: '', sdr: '', closer: '', ed: '' };   // modo: 'coorte' = leads que chegaram (Bruno: "quantos leads chegaram e quantos se tornaram vendas") · 'periodo' = reuniões do período
 var _VF_PASSOS = [['marc', 'Marcadas', 'todas as reuniões, inclusive as futuras'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado (inclui faltas)'],
   ['comp', 'Apareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['fech', 'Disse sim', 'vendido, entrada ou bloqueio'], ['pag', 'Pagou', 'status Vendido']];
 function _vfNovo() { return { leads: 0, mql: 0, insc: 0, part: 0, apl: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0, fut: 0, rem: 0, ns: 0, nv: 0, mesa: 0, mesaV: 0, est: 0 }; }
@@ -35967,6 +35967,7 @@ function _vfLinha(rot, sub, cor, z, passos, de) {
 function _vfOrigemR(o) { var t = v2norm(o || ''); return /\[ads\]|\bads\b|pago|trafego/.test(t) ? 'Anúncio' : /social/.test(t) ? 'Social Selling' : /indica/.test(t) ? 'Indicação' : /recupera/.test(t) ? 'Recuperação' : /\[org\]|organic|mchat|manychat|\bbio\b|\borg\b/.test(t) ? 'Orgânico' : 'Outras'; }
 function _vfOrigemL(l) { var r = ''; try { r = ldOrigemRotulo(l); } catch (e) {} return /Anúncio/.test(r) ? 'Anúncio' : /Social/.test(r) ? 'Social Selling' : /ManyChat|bio|Orgânico/.test(r) ? 'Orgânico' : _vfOrigemR(l.origem); }
 function _vfPer() {
+  if (VF.per === 'tudo') return { ini: 1, fim: 8.64e15, rot: 'todo o período' };   // 19/10/2026, Bruno: "quero que mostre todo período" (abre assim)
   if (VF.per === 'visao') { var p0 = _vfPeriodo(); p0.rot = 'o mesmo período da Visão Geral'; return p0; }
   var h = new Date(), h0 = new Date(h.getFullYear(), h.getMonth(), h.getDate()).getTime();
   if (VF.per === 'mesant') return { ini: new Date(h.getFullYear(), h.getMonth() - 1, 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), rot: 'o mês passado' };
@@ -35980,7 +35981,7 @@ function vfFiltro(campo, valor) { VF[campo] = valor; if (campo === 'per' && valo
 function _vfFiltrosHtml(sdrs, closers) {
   var chip = function(v, rot) { return '<button type="button" class="pl-chip' + (VF.per === v ? ' on' : '') + '" onclick="vfFiltro(\'per\',\'' + v + '\')">' + rot + '</button>'; };
   var sel = function(rot, campo, lista) { return '<label class="vf-sel">' + rot + ' <select onchange="vfFiltro(\'' + campo + '\',this.value)"><option value="">Todos</option>' + lista.map(function(v) { return '<option' + (VF[campo] === v ? ' selected' : '') + '>' + _vfEsc(v) + '</option>'; }).join('') + '</select></label>'; };
-  return '<div class="vf-filtros"><div class="pl-chips">' + chip('visao', 'Como a Visão Geral') + chip('mes', 'Mês atual') + chip('mesant', 'Mês passado') + chip('30', '30 dias') + chip('90', '90 dias') + chip('pers', 'Período') + '</div>'
+  return '<div class="vf-filtros"><div class="pl-chips">' + chip('tudo', 'Todo o período') + chip('visao', 'Como a Visão Geral') + chip('mes', 'Mês atual') + chip('mesant', 'Mês passado') + chip('30', '30 dias') + chip('90', '90 dias') + chip('pers', 'Período') + '</div>'
     + (VF.per === 'pers' ? '<span class="vf-datas"><input type="date" value="' + VF.de + '" onchange="vfFiltro(\'de\',this.value)" aria-label="De"> até <input type="date" value="' + VF.ate + '" onchange="vfFiltro(\'ate\',this.value)" aria-label="Até"></span>' : '')
     + sel('Origem', 'origem', ['Anúncio', 'Orgânico', 'Social Selling', 'Indicação', 'Recuperação', 'Outras']) + sel('SDR', 'sdr', sdrs) + sel('Closer', 'closer', closers) + '</div>';
 }
