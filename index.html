@@ -2919,7 +2919,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-19-0903';
+var VERSAO_DASH = '2026-10-19-0905';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25612,6 +25612,10 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .csd-como p { margin:10px 0 0; } .csd-como b { color:var(--text); }
 @media (max-width:760px) { .csd-kpis { grid-template-columns:1fr; } .csd-kpi b { font-size:1.6rem; } }
 .csd-pl { margin:6px 0 24px; } .csd-pl .csd-filtros { margin-top:6px; }
+.csd-abas { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 12px; padding:4px; border-radius:14px; background:var(--panel); border:1px solid var(--border); width:fit-content; max-width:100%; }
+.csd-abas button { border:0; border-radius:10px; padding:8px 14px; background:transparent; color:var(--text2); font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; }
+.csd-abas button.on { background:var(--accent); color:#1a1206; } .csd-abas button:not(.on):hover { background:rgba(255,255,255,.06); color:var(--text); }
+.csd-abas button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 /* ===== fim do 📊 desempenho SDR ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35314,7 +35318,7 @@ function _sgdMesesHtml(atual) {
 // reversa"). Mesmas regras da tela "Desempenho SDR" da mia (dash-fontes/mia/regras-desempenho-sdr.md). O Robô da Clint (projeto
 // separado) grava uma linha por negócio dos funis comerciais (últimos 35 dias) na aba "Clint SDR (base)" a cada 10 minutos, com os
 // horários que decidem cada número; aqui o dash faz as contas do período escolhido na hora (Hoje, Ontem, 7 dias, 30 dias, período).
-var CSD = { rows: [], carregado: false, buscando: 0, erro: '', semAba: false, quando: 0, lidoEm: '',
+var CSD = { aba: 'sdr', rows: [], carregado: false, buscando: 0, erro: '', semAba: false, quando: 0, lidoEm: '',
   per: 'hoje', de: '', ate: '', fFalou: 'todos', fResp: '', fEtapa: '', mostrar: 120 };
 var CSD_FERIADOS = { '2025-11-02': 1, '2025-11-15': 1, '2025-11-20': 1, '2025-12-25': 1, '2026-01-01': 1, '2026-04-03': 1, '2026-04-21': 1, '2026-05-01': 1,
   '2026-09-07': 1, '2026-10-12': 1, '2026-11-02': 1, '2026-11-15': 1, '2026-11-20': 1, '2026-12-25': 1, '2027-01-01': 1 };
@@ -35491,6 +35495,15 @@ function plMiaSecoes(p) {
   var cab = '<div class="px-wrap csd-pl"><div class="px-titulo"><h3>💬 Atendimento na Clint</h3><span class="hint">por dia ou período, por responsável, a partir dos negócios e das conversas da Clint (as regras da mia) · relido a cada 10 min' + (CSD.lidoEm ? ' · conversas lidas às ' + _csdEsc(CSD.lidoEm) : '') + '</span></div>';
   if (!CSD.carregado) return cab + '<div class="hint" style="padding:14px;">Lendo os leads e as conversas da Clint…</div></div>';
   if (!CSD.rows.length) return '';
+  // 19/10/2026 (Bruno: "coloque as abas como no da mia"): Operação Clint · Performance Time · Desempenho SDR · Recuperação
+  var abas = [['operacao', 'Operação Clint'], ['performance', 'Performance Time'], ['sdr', 'Desempenho SDR'], ['recuperacao', 'Recuperação']];
+  var barra = '<div class="csd-abas" role="tablist">' + abas.map(function(a) { return '<button type="button" role="tab" aria-selected="' + (CSD.aba === a[0]) + '" class="' + (CSD.aba === a[0] ? 'on' : '') + '" onclick="csdAba(\'' + a[0] + '\')">' + a[1] + '</button>'; }).join('') + '</div>';
+  if (CSD.aba !== 'sdr') {
+    var oque = { operacao: 'valor ganho, negócios ganhos e ticket médio, taxa de conversão, tempo até a 1ª resposta, negócios criados, abertos e parados, perdidos, atendimentos e respondidos em até 15 min, reuniões agendadas e realizadas, gráficos por dia e a tabela por pessoa',
+      performance: 'por atendente: conversas, mensagens enviadas, tempo para responder (mediana e 3 de cada 4), duração das conversas e conversas atendidas por dia',
+      recuperacao: 'perdas do período (marcadas pela equipe × automáticas), quantas têm motivo, perdas por pessoa, principais motivos e a lista de quem não comprou com telefone pronto para disparo' }[CSD.aba];
+    return cab + barra + '<div class="panel rko-vazio" style="text-align:left;line-height:1.6;"><b>Em construção</b> — esta aba vai mostrar ' + oque + ', com as mesmas regras da mia e os dados da Clint. Por enquanto, veja a aba <a href="#" onclick="event.preventDefault();csdAba(\'sdr\')">Desempenho SDR</a>.</div></div>';
+  }
   // 19/10/2026 (Bruno: "cadê os filtros?"): o bloco tem os filtros da mia (não depende do período do Placar)
   var P = _csdPeriodo();
   var logado = true; try { logado = !document.documentElement.classList.contains('visitante') && !!localStorage.getItem('v2Login'); } catch (e) {}
@@ -35499,8 +35512,9 @@ function plMiaSecoes(p) {
     + chip(CSD.per === '30', '30', '30 dias') + chip(CSD.per === 'pers', 'pers', 'Período personalizado') + '</div>'
     + (CSD.per === 'pers' ? '<span class="csd-datas"><input type="date" value="' + (CSD.de || P.de) + '" onchange="CSD.de=this.value;csdRedesenhar()" aria-label="De"> até <input type="date" value="' + (CSD.ate || P.ate) + '" onchange="CSD.ate=this.value;csdRedesenhar()" aria-label="Até"></span>' : '') + '</div>'
     + '<p class="csd-nota">' + (P.inclHoje ? 'O período inclui hoje: os números ainda vão mudar. ' : '') + '"Antes" ao lado dos números é ' + P.antes.rot + '.</p>';
-  return cab + filtros + csdCorpo(P, logado) + '</div>';
+  return cab + barra + filtros + csdCorpo(P, logado) + '</div>';
 }
+function csdAba(a) { CSD.aba = a; csdRedesenhar(); }
 function csdPer(v) { CSD.per = v; if (v === 'pers' && !CSD.de) { var P0 = _csdPeriodo(); CSD.de = P0.de; CSD.ate = P0.ate; } try { localStorage.setItem('csdPer', v); } catch (e) {} csdRedesenhar(); }
 try { var _csdP0 = localStorage.getItem('csdPer'); if (_csdP0 && _csdP0 !== 'pers') CSD.per = _csdP0; } catch (eP0) {}
 function csdRedesenhar() { try { if (typeof telaVisivel === 'function' && telaVisivel('s-placar') && typeof renderPlacar === 'function') renderPlacar(); } catch (e) {} }
