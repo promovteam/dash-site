@@ -64,7 +64,7 @@
 :root { --bg: #0b0a10; --card: #18161f; --card2: #1f1c29; --linha: #2c2836; --tx: #f3effa; --tx2: #d9d3e6; --mut: #a39cb4;
         --rosa: #f0449f; --rosa2: #ff9ad6; --lilas: #c13be0; --roxo: #7b4af2; --sec: #ad92ff; --pill: #261d3d; --pillb: #4a3a78;
         --grad: linear-gradient(100deg, #f0449f 0%, #c13be0 48%, #7b4af2 100%) }
-html { background: var(--bg); -webkit-text-size-adjust: 100%; color-scheme: dark }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; color-scheme: dark; scroll-behavior: smooth }
 body { background: var(--bg); color: var(--tx); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, Arial, sans-serif;
        font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden }
 img { display: block; max-width: 100%; height: auto }
@@ -73,6 +73,7 @@ em { font-style: normal; color: var(--rosa) }
 h1 em, h2 em, h3 em, .gr { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
                            -webkit-box-decoration-break: clone; box-decoration-break: clone }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+a:focus-visible, summary:focus-visible, .corre:focus-visible, .rolo:focus-visible { outline: 3px solid #fff; outline-offset: 3px; border-radius: 10px }
 .fundo { position: fixed; inset: 0; z-index: 0; pointer-events: none;
          background: radial-gradient(60vmax 48vmax at 8% 4%, rgba(123,74,242,.24), rgba(123,74,242,0) 70%),
                      radial-gradient(55vmax 45vmax at 96% 72%, rgba(240,68,159,.13), rgba(240,68,159,0) 70%) }
@@ -81,6 +82,7 @@ h1 em, h2 em, h3 em, .gr { background: var(--grad); -webkit-background-clip: tex
 header, main, footer { position: relative; z-index: 1 }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px }
 section { padding: 64px 0 }
+section[id] { scroll-margin-top: 50px }
 .logo { display: inline-flex; align-items: center; justify-content: center; border-radius: 26%; color: #fff; font-weight: 800; flex: none;
         background: linear-gradient(135deg, #f0449f 0%, #c13be0 50%, #7b4af2 100%); box-shadow: 0 8px 30px rgba(193,59,224,.40), inset 0 1px 0 rgba(255,255,255,.35) }
 .marca { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; letter-spacing: .22em }
@@ -88,9 +90,27 @@ section { padding: 64px 0 }
 .marca .logo { width: 34px; height: 34px; font-size: 19px; letter-spacing: 0 }
 .topo { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 22px; padding-bottom: 6px }
 .topo-dir { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--mut) }
-/* topo: proposta + vídeo */
+/* barra fixa no topo (aparece depois do topo da página) */
+.barra-fixa { position: fixed; top: 0; left: 0; right: 0; z-index: 40; background: rgba(13,11,20,.88); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+              border-bottom: 1px solid rgba(255,255,255,.08); transform: translateY(-105%); visibility: hidden; transition: transform .3s ease, visibility 0s linear .3s }
+.barra-fixa.on { transform: none; visibility: visible; transition: transform .3s ease }
+.barra-in { display: flex; align-items: center; justify-content: space-between; gap: 14px; height: 54px }
+.barra-marca { display: inline-flex; align-items: center; gap: 8px; color: var(--tx); text-decoration: none; font-size: 12px; letter-spacing: .2em; flex: none }
+.barra-marca .logo { width: 26px; height: 26px; font-size: 14px; letter-spacing: 0; box-shadow: none }
+.barra-marca b { font-weight: 800 } .barra-marca i { font-style: normal; font-weight: 800; color: var(--rosa); margin-left: -3px }
+.barra-links { display: flex; align-items: center; gap: 2px; min-width: 0 }
+.barra-links a { color: var(--tx2); text-decoration: none; font-size: 14px; font-weight: 700; padding: 7px 11px; border-radius: 999px; white-space: nowrap }
+.barra-links a:hover, .barra-links a.at { color: #fff; background: rgba(255,255,255,.08) }
+.barra-links a.barra-cta { background: var(--rosa); color: #fff; margin-left: 6px }
+/* botões */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-size: 17px; font-weight: 800; color: #fff; background: var(--rosa);
+       text-decoration: none; padding: 15px 26px; border-radius: 999px; box-shadow: 0 14px 40px rgba(240,68,159,.36); position: relative; line-height: 1.2 }
+.btn:hover { background: #ff58ad }
+.fale-fixo { display: none }
+/* topo: proposta + vídeo + a Legacy em 3 linhas */
 .hero { padding: 40px 0 56px }
-.hero-g { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: center }
+.hero-g { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); grid-template-areas: "t v" "l v"; column-gap: 48px; row-gap: 26px; align-items: center }
+.hero-t { grid-area: t; align-self: end } .hero-v { grid-area: v } .hero-l { grid-area: l; align-self: start }
 .kick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 22px }
 .pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #e8defd;
         background: rgba(123,74,242,.16); border: 1px solid rgba(160,120,255,.40); padding: 7px 14px; border-radius: 999px }
@@ -98,9 +118,12 @@ section { padding: 64px 0 }
 .nw { white-space: nowrap }
 h1 { font-size: clamp(42px, 5.4vw, 66px); line-height: 1.03; font-weight: 800; letter-spacing: -.035em; text-wrap: balance }
 .sub { font-size: clamp(17px, 1.6vw, 19px); color: var(--tx2); margin-top: 20px; line-height: 1.55; max-width: 34em }
-.chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px }
-.chips li { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; background: var(--card); border: 1px solid var(--linha);
-            border-radius: 999px; padding: 6px 14px 6px 7px }
+.tres-t { font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sec); margin-bottom: 10px }
+.tres { list-style: none; display: grid; gap: 8px }
+.tres li { display: flex; gap: 11px; align-items: flex-start; background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 11px 14px }
+.tres p { font-size: 15.5px; line-height: 1.45; color: var(--tx2) } .tres b { color: var(--tx) }
+.tres .ok { margin-top: 1px }
+.hero-l .btn { margin-top: 18px }
 .ok { width: 20px; height: 20px; border-radius: 50%; background: var(--rosa); color: #fff; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex: none }
 .video { position: relative; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; background: #0b0a10; border: 1px solid rgba(255,255,255,.13);
          box-shadow: 0 40px 100px rgba(0,0,0,.55), 0 0 90px rgba(123,74,242,.24) }
@@ -120,10 +143,11 @@ h1 { font-size: clamp(42px, 5.4vw, 66px); line-height: 1.03; font-weight: 800; l
 /* comuns */
 .sec { font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sec); margin-bottom: 12px }
 h2 { font-size: clamp(30px, 4.2vw, 46px); line-height: 1.08; font-weight: 800; letter-spacing: -.028em; text-wrap: balance }
+h2.h2-menor { font-size: clamp(26px, 3.4vw, 38px) }
 h3 { font-weight: 800; letter-spacing: -.02em }
 .lead { font-size: clamp(16px, 1.5vw, 18px); line-height: 1.6; color: var(--tx2); margin-top: 16px; max-width: 46em }
 .lead b { color: var(--tx) }
-.card { background: var(--card); border: 1px solid var(--linha); border-radius: 14px }
+.card { background: var(--card); border: 1px solid var(--linha); border-radius: 16px }
 .faixa { background: var(--pill); border: 1px solid var(--pillb); border-radius: 14px; padding: 15px 20px; font-size: clamp(17px, 1.7vw, 20px); font-weight: 800;
          text-align: center; margin-top: 28px; text-wrap: balance }
 .cartao-g { border-radius: 24px; background: linear-gradient(160deg, #2a1c4c, #1f1734 55%, #17121f); border: 1.5px solid rgba(193,59,224,.55);
@@ -133,116 +157,257 @@ h3 { font-weight: 800; letter-spacing: -.02em }
 .janela .barra b { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.16) }
 .janela .barra span { position: absolute; left: 50%; transform: translateX(-50%); font-size: 11px; color: #bdb6cf; background: rgba(255,255,255,.06); padding: 2px 12px; border-radius: 6px }
 .janela img { width: 100% }
-.prova { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--tx2); margin-top: 12px }
-.prova::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--rosa); flex: none }
-.prova span { color: var(--mut); font-weight: 600 } .prova span::after { content: ' ·' }
+.prova { display: block; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--tx2); margin-top: 12px; line-height: 1.5 }
+.prova::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--rosa); margin-right: 7px; vertical-align: 1px }
+.prova span { color: var(--mut); font-weight: 600 } .prova span::after { content: ' · ' }
 .pq { width: 24px; height: 24px; border-radius: 50%; background: var(--rosa); color: #fff; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex: none }
-.t2 { font-size: 18px; font-weight: 800; margin-top: 34px }
-.t2 span { font-weight: 500; color: var(--mut); font-size: 13px; margin-left: 8px }
-/* quem você é */
-.dores { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px }
-.dor { background: var(--card); border: 1px solid var(--linha); border-radius: 14px; padding: 18px 20px }
-.dor p { font-size: 18px; font-weight: 800; line-height: 1.3 }
-.dor span { display: block; font-size: 15px; color: var(--mut); margin-top: 6px; line-height: 1.5 }
-.dor.funda { margin-top: 12px; background: var(--pill); border-color: var(--pillb) }
-.dor.funda p { font-size: clamp(20px, 2.2vw, 24px); color: var(--rosa2) }
-.dor.funda span { color: var(--tx2) }
-/* a virada e quem criou */
-.virada { text-align: center; padding: 56px 28px }
-.virada h2 { font-size: clamp(32px, 5vw, 58px) }
-.virada .lead { margin: 20px auto 0; max-width: 40em }
-.criada { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 44px; align-items: center; margin-top: 56px }
-.criada h3 { font-size: clamp(26px, 3.2vw, 36px); line-height: 1.12 }
-.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 24px }
-.nums div { background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 14px 14px 12px }
-.nums b { display: block; font-size: clamp(22px, 2.4vw, 28px); font-weight: 800; letter-spacing: -.02em; color: var(--rosa); line-height: 1.1; white-space: nowrap }
-.nums span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--mut); margin-top: 6px; line-height: 1.3 }
-/* o que muda */
-.ben { margin-top: 64px }
-.ben-cab { display: flex; gap: 16px; align-items: center }
-.ben-cab h3 { font-size: clamp(25px, 3.2vw, 36px); line-height: 1.12 }
-.pn { flex: none; width: 60px; height: 60px; border-radius: 50%; position: relative; display: inline-flex; align-items: center; justify-content: center;
-      font-size: 30px; font-weight: 800; background: rgba(123,74,242,.14) }
-.pn::before { content: ''; position: absolute; inset: 0; border-radius: 50%; padding: 3px; background: var(--grad);
-              -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude }
-.ben-lado { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 44px; align-items: start }
-.ben-foto { padding-top: 8px }
-.lista { display: grid; gap: 10px; margin-top: 22px }
-.lista div { background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 13px 16px }
-.lista b { display: block; font-size: 16px; line-height: 1.35 }
-.lista span { display: block; font-size: 14px; color: var(--mut); margin-top: 3px; line-height: 1.5 }
-.grade3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 26px }
-.passo .tela { width: 100%; aspect-ratio: 408 / 340; object-fit: cover; object-position: left top; border-radius: 12px; border: 1px solid #36313f; background: #0d0c12 }
-.passo .tela.centro { object-position: center }
-.pt { display: flex; gap: 10px; margin-top: 12px; align-items: flex-start }
-.pt .pq { margin-top: 1px }
-.pt p { font-size: 15px; line-height: 1.5; color: var(--tx2) }
-.pt b { color: var(--tx) }
-.ferr { display: block; font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); margin-bottom: 3px }
+.t3 { font-size: 17px; font-weight: 800; margin: 36px 0 12px }
+.t3 span { font-weight: 500; color: var(--mut); font-size: 13.5px; margin-left: 8px }
+.nota { font-size: 13px; color: var(--mut); line-height: 1.5; margin-top: 14px }
+.icn { width: 48px; height: 48px; border-radius: 14px; background: rgba(123,74,242,.16); border: 1px solid rgba(160,120,255,.38); display: flex; align-items: center; justify-content: center; color: #e3d6ff; flex: none }
+.icn.rosa { background: rgba(240,68,159,.13); border-color: rgba(240,68,159,.45); color: #ff8cc6 }
 .ic { display: inline-flex; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex: none;
       position: relative; overflow: hidden; vertical-align: middle; line-height: 1 }
 .ic.s { background: var(--rosa); color: #fff }
 .ic.p { border: 2px solid #a78bfa }
 .ic.p i { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: #a78bfa }
 .ic.n { border: 2px solid #565066; color: #8a849b; font-size: 12px }
-.antes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 26px }
-.antes div, .nao div { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 16px 18px }
-.antes .agora { background: var(--pill); border-color: var(--pillb) }
-.antes p, .nao p { font-size: 15.5px; line-height: 1.5; color: var(--tx2) }
-.antes b, .nao b { color: var(--tx) }
-.mapa { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 24px; margin-top: 26px; align-items: start }
-.pergs { padding: 20px 22px }
-.pergs .t { font-size: 17px; font-weight: 800; margin-bottom: 14px }
-.pergs ol { list-style: none; display: grid; gap: 11px }
-.pergs li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; color: var(--tx2) }
-.pergs .obs { font-size: 13.5px; color: var(--mut); margin-top: 16px }
-.secs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin-top: 14px }
-.sd { background: var(--card); border: 1px solid var(--linha); border-radius: 10px; padding: 11px 14px }
-.sd b { display: flex; gap: 8px; font-size: 15px }
-.sd b span { color: var(--rosa); font-weight: 800; width: 20px; flex: none }
-.sd i { display: block; font-style: normal; font-size: 13.5px; color: var(--mut); margin: 2px 0 0 28px; line-height: 1.45 }
-.frase { display: flex; gap: 14px; background: var(--pill); border: 1px solid var(--pillb); border-radius: 14px; padding: 18px 22px; margin-top: 20px; align-items: flex-start }
-.frase .aspas { font-family: Georgia, serif; font-size: 56px; line-height: .9; color: var(--rosa); font-weight: 800 }
-.frase p { font-size: clamp(18px, 2vw, 22px); font-weight: 700; line-height: 1.35 }
-.frase i { display: block; font-style: normal; font-size: 13.5px; color: var(--mut); margin-top: 6px }
-.dest2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 64px }
-.dest { background: var(--card); border: 1px solid var(--linha); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column }
-.dest img { width: 100%; aspect-ratio: 604 / 284; object-fit: cover; object-position: left top; border-bottom: 1px solid var(--linha) }
-.dest-t { padding: 20px 22px 22px }
-.dest .pn { width: 48px; height: 48px; font-size: 24px }
-.dest h3 { font-size: clamp(21px, 2.2vw, 25px); line-height: 1.15 }
-.dest p { font-size: 15.5px; color: var(--tx2); margin-top: 12px; line-height: 1.55 }
-/* autonomia */
-.ritmo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 28px }
-.rit { padding: 24px; border-radius: 16px; background: var(--card); border: 1px solid var(--linha) }
-.icn { width: 48px; height: 48px; border-radius: 14px; background: rgba(123,74,242,.16); border: 1px solid rgba(160,120,255,.38); display: flex; align-items: center; justify-content: center; color: #e3d6ff }
-.rit h3 { font-size: 21px; margin-top: 16px }
-.rit p { font-size: 15.5px; color: var(--tx2); margin-top: 8px; line-height: 1.55 }
-/* o teste */
+/* o problema */
+.dores { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px }
+.dor { background: var(--card); border: 1px solid var(--linha); border-radius: 14px; padding: 18px 20px }
+.dor p { font-size: 18px; font-weight: 800; line-height: 1.3 }
+.dor span { display: block; font-size: 15px; color: var(--mut); margin-top: 6px; line-height: 1.5 }
+.virada { text-align: center; padding: 48px 28px; margin-top: 22px }
+.vir-q { font-size: clamp(18px, 2vw, 22px); font-weight: 800; color: var(--rosa2) }
+.vir-t { font-size: clamp(30px, 4.6vw, 54px); line-height: 1.1; letter-spacing: -.028em; margin-top: 14px; text-wrap: balance }
+.pp { display: inline-block }
+.pw { display: inline-block }
+.virada .lead { margin: 18px auto 0; max-width: 40em }
+/* para quem é */
+.faixa-rosa { border-radius: 18px; background: var(--grad); padding: 20px 24px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 20px 60px rgba(240,68,159,.22) }
+.faixa-rosa span { font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.85) }
+.faixa-rosa b { font-size: clamp(20px, 2.4vw, 28px); font-weight: 800; line-height: 1.2; letter-spacing: -.015em; color: #fff; text-wrap: balance }
+.pq3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px }
+.pq-card { background: var(--card); border: 1px solid var(--linha); border-radius: 16px; padding: 22px }
+.pq-card h3 { font-size: 20px; margin-top: 14px }
+.pq-card p { font-size: 15px; color: var(--tx2); margin-top: 6px; line-height: 1.55 }
+.aviso { display: flex; gap: 16px; align-items: center; margin-top: 14px; background: var(--pill); border: 1px solid var(--pillb); border-radius: 16px; padding: 18px 22px }
+.aviso p { font-size: clamp(15.5px, 1.5vw, 17px); line-height: 1.55; color: var(--tx2) } .aviso b { color: var(--tx) }
+/* o que você ganha */
+.b6 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px; align-items: start }
+.bcard { background: var(--card); border: 1px solid var(--linha); border-radius: 16px; padding: 20px 20px 16px }
+.bcard h3 { font-size: 20px; line-height: 1.2; margin-top: 14px }
+.bcard > p { font-size: 15px; color: var(--tx2); margin-top: 7px; line-height: 1.5 }
+.vercomo { margin-top: 12px; border-top: 1px solid var(--linha); padding-top: 10px }
+.vercomo summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--rosa2); padding: 4px 0 }
+.vercomo summary::-webkit-details-marker { display: none }
+.vercomo summary i { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translate(-2px, -2px); transition: transform .2s }
+.vercomo[open] summary i { transform: rotate(-135deg) translate(-2px, -2px) }
+.vercomo .vc-f, .vercomo[open] .vc-a { display: none } .vercomo[open] .vc-f { display: inline }
+.vc-in { margin-top: 10px }
+/* o teste em cenas */
 .selo { display: inline-flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; background: var(--pill); border: 1px solid var(--pillb);
         padding: 6px 16px 6px 7px; border-radius: 999px; margin-bottom: 16px }
-.rolo-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 34px }
+.cenas { list-style: none; display: grid; gap: 60px; margin-top: 44px }
+.cena-l { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 44px; align-items: center }
+.cena-l:nth-child(even) { grid-template-columns: minmax(0, 6fr) minmax(0, 4fr) } .cena-l:nth-child(even) .cena-t { order: 2 }
+.cena-l.largo { grid-template-columns: 1fr; gap: 22px }
+.cena-l.largo .cena-t { max-width: 46em; order: 0 }
+.cena-t { display: flex; gap: 16px; align-items: flex-start }
+.cn-n { flex: none; width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 800;
+        background: rgba(123,74,242,.14); box-shadow: inset 0 0 0 2px rgba(193,59,224,.8) }
+.cena-t h3 { font-size: clamp(23px, 2.6vw, 30px); line-height: 1.15 }
+.cena-t p { color: var(--tx2); margin-top: 10px; font-size: 16px; line-height: 1.55 }
+.painel { background: #121019; border: 1px solid #2f2a3b; border-radius: 18px; padding: 16px 18px 18px; box-shadow: 0 30px 80px rgba(0,0,0,.45), 0 0 60px rgba(123,74,242,.14); min-width: 0; overflow: hidden }
+.pn-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid #262231; margin-bottom: 14px }
+.pn-tt { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; letter-spacing: .03em }
+.pn-tt::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--grad); flex: none }
+.pn-cont { font-size: 12px; color: var(--mut); font-weight: 700; white-space: nowrap } .pn-cont b { color: #fff; font-size: 14px }
+.pn-tag { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #cbb9f5; background: rgba(123,74,242,.18);
+          border: 1px solid rgba(160,120,255,.4); padding: 3px 9px; border-radius: 999px; white-space: nowrap }
+.pn-sub { font-size: 13px; color: var(--tx2); margin: -2px 0 12px } .pn-sub span { color: var(--mut) }
+.perg { list-style: none; display: grid; gap: 8px }
+.perg li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #19161f; border: 1px solid #27232f }
+.ck { flex: none; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px #4a4458; position: relative; margin-top: 1px }
+.ck::after { content: '✓'; position: absolute; inset: 0; border-radius: 50%; background: var(--rosa); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center }
+.perg b { display: block; font-size: 14.5px; line-height: 1.35 }
+.perg i { display: block; font-style: normal; font-size: 13px; color: var(--mut); margin-top: 3px; line-height: 1.45 }
+.pn-fim { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 800; background: var(--pill); border: 1px solid var(--pillb); border-radius: 12px; padding: 10px 12px }
+.semana { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #fff;
+          background: rgba(240,68,159,.16); border: 1px solid rgba(240,68,159,.5); padding: 4px 10px; border-radius: 999px; white-space: nowrap }
+.semana i { width: 7px; height: 7px; border-radius: 50%; background: var(--rosa); box-shadow: 0 0 0 3px rgba(240,68,159,.25) }
+.temas { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+.temas li { position: relative; background: #19161f; border: 1px solid #27232f; border-radius: 12px; padding: 9px 28px 10px 11px; display: flex; flex-direction: column; gap: 2px }
+.temas small { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--sec) }
+.temas b { font-size: 13.5px; line-height: 1.3 }
+.temas li.esc { border-color: var(--rosa); background: rgba(240,68,159,.10); box-shadow: 0 0 0 1px var(--rosa), 0 10px 30px rgba(240,68,159,.2) }
+.temas li.esc::after { content: '✓'; position: absolute; top: 9px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--rosa); color: #fff;
+                       font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center }
+.tema-fim { margin-top: 12px; font-size: 14px; color: var(--tx2); display: flex; align-items: center; gap: 8px } .tema-fim b { color: #fff }
+.tema-fim .seta { color: var(--rosa); font-weight: 800 }
+.msg.eu { margin-left: auto; max-width: 90%; background: #2a2340; border: 1px solid #3d3360; border-radius: 16px 16px 4px 16px; padding: 10px 13px; font-size: 14px; line-height: 1.45 }
+.ia { display: flex; gap: 10px; margin-top: 14px }
+.ia-av { flex: none; width: 28px; height: 28px; border-radius: 9px; background: var(--grad); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px }
+.ia-c { flex: 1; min-width: 0 }
+.r-bloco small { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--sec) }
+.r-bloco + .r-bloco, .g-row + .r-bloco { margin-top: 12px }
+.r-bloco p { font-size: 14.5px; line-height: 1.45; font-weight: 700; margin-top: 4px }
+.g-row { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; font-size: 13.5px; line-height: 1.45; color: var(--tx2); padding: 7px 0; border-bottom: 1px solid #262231 }
+.g-row:first-of-type { margin-top: 4px }
+.g-row b { color: #fff; font-size: 12px; padding-top: 1px }
+.r-etapas { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px }
+.r-etapas li { font-size: 12.5px; font-weight: 700; background: rgba(123,74,242,.16); border: 1px solid rgba(160,120,255,.38); padding: 4px 10px; border-radius: 999px }
+.dig { white-space: pre-wrap }
+.dig-resto { visibility: hidden }
+.caret { display: inline-block; width: 2px; height: 1.05em; background: var(--rosa); vertical-align: -.15em; margin: 0 1px }
+/* o construtor: réplica da tela "Construtor de Roteiro FCP" da plataforma (sem o menu lateral) */
+.fcp { background: #0e0d12; padding: 0 }
+.fcp-top { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #24212c }
+.fcp-ic { width: 34px; height: 34px; border-radius: 9px; background: rgba(123,74,242,.22); color: #c4b1ff; display: flex; align-items: center; justify-content: center; flex: none }
+.fcp-tt { min-width: 0; flex: 1 } .fcp-tt b { display: block; font-size: 15px; font-weight: 800; line-height: 1.25 } .fcp-tt small { display: block; font-size: 12px; color: var(--mut) }
+.fcp-prog { display: grid; grid-template-columns: auto 150px; column-gap: 14px; align-items: center; text-align: right }
+.fcp-prog small { grid-column: 1; font-size: 11px; color: var(--mut) } .fcp-prog b { grid-column: 1; font-size: 15px; font-weight: 800 }
+.fcp-barra { grid-column: 2; grid-row: 1 / 3; display: block; height: 6px; border-radius: 3px; background: #2a2732; overflow: hidden }
+.fcp-barra i { display: block; height: 100%; width: 100%; background: var(--grad); border-radius: 3px; transition: width .45s ease }
+.fcp-acoes { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px 0 }
+.fcp-in { display: flex; align-items: center; min-height: 36px; background: #15131b; border: 1px solid #2c2935; border-radius: 9px; padding: 7px 11px; font-size: 13px; color: var(--tx); font-weight: 600; min-width: 0; line-height: 1.3 }
+.fcp-tit { color: #77718a; flex: 1 1 200px; font-weight: 500 }
+.fcp-bt { display: inline-flex; align-items: center; min-height: 36px; padding: 7px 13px; border-radius: 9px; border: 1px solid #2c2935; background: #15131b; font-size: 13px; font-weight: 700; white-space: nowrap }
+.fcp-bt.prim { background: #7b4af2; border-color: #7b4af2; color: #fff }
+.fcp-brief { margin: 14px 18px 0; border: 1px solid #3a3644; border-radius: 12px; padding: 14px 16px 16px }
+.fcp-h2 { display: flex; align-items: center; gap: 9px; font-size: 14.5px; font-weight: 800 }
+.fcp-h2 i { width: 15px; height: 15px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 2px #a78bfa, inset 0 0 0 4.5px transparent; background: radial-gradient(circle, #a78bfa 0 2.5px, transparent 3px) }
+.fcp-campos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px }
+.fcp-f small { display: block; font-size: 11.5px; font-weight: 700; color: var(--tx2); margin-bottom: 6px }
+.fcp-seg { display: flex; gap: 4px; background: #15131b; border: 1px solid #2c2935; border-radius: 9px; padding: 3px; min-height: 36px }
+.fcp-seg > * { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 12.5px; border-radius: 7px }
+.fcp-seg b { background: #7b4af2; color: #fff; font-weight: 800 } .fcp-seg span { color: var(--mut); font-weight: 600 }
+.fcp-g { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1.05fr); gap: 14px; padding: 14px 18px 18px }
+.fcp-col { border: 1px solid #3a3644; border-radius: 12px; padding: 14px; min-width: 0 }
+.fcp-h { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--mut) }
+.fcp-gr small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #a78bfa; margin: 10px 0 4px }
+.fcp-gr ol { list-style: none; display: grid; gap: 2px }
+.fcp-gr li { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; color: var(--tx); padding: 6px 8px; border-radius: 8px; line-height: 1.25 }
+.fcp-gr li i { flex: none; width: 15px; height: 15px; border-radius: 50%; background: var(--rosa); position: relative }
+.fcp-gr li i::after { content: '✓'; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 800; font-style: normal }
+.fcp-gr li.atual { background: #24212d }
+.fcp-card { background: #121017 }
+.cf-cab { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--mut) }
+.cf-pill { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #d9ccff; background: rgba(123,74,242,.3); padding: 3px 9px; border-radius: 999px }
+.cf h4 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 10px }
+.cf-obj { color: #a78bfa; font-size: 14px; line-height: 1.45; margin-top: 8px; font-weight: 600 }
+.cf p + p { color: var(--tx2); font-size: 13.5px; line-height: 1.5; margin-top: 10px }
+.pilha .cf { visibility: hidden } .pilha .cf.cf-fim { visibility: visible }
+.fcp-funil { background: linear-gradient(170deg, #241a44, #16112a); border-color: #3b2f63 }
+.fcp-funil ol { list-style: none; display: grid; gap: 5px; margin-top: 12px }
+.fcp-funil li { display: flex; align-items: center; gap: 8px; margin-left: calc(var(--k) * 3.4%); height: 26px; padding: 0 9px 0 4px; border-radius: 6px; background: #5b3fc4; color: #fff; font-size: 12px; font-weight: 700; min-width: 0 }
+.fcp-funil li b { flex: none; width: 18px; height: 18px; border-radius: 5px; background: rgba(0,0,0,.28); display: flex; align-items: center; justify-content: center; font-size: 10px }
+.fcp-funil li span { flex: 1; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.fcp-funil li.atual { background: #7b4af2; box-shadow: 0 0 0 1px #c4b1ff, 0 6px 20px rgba(123,74,242,.5) }
+.cr-g { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 22px; align-items: start; margin-bottom: 16px }
+.cr-g .cr-passo + .cr-passo { margin-top: 0 }
+.cr-passo + .cr-passo { margin-top: 14px }
+.cr-passo > small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--sec); margin-bottom: 7px }
+.cr-campo { background: #19161f; border: 1px solid #3a3350; border-radius: 10px; padding: 10px 12px; font-size: 15px; font-weight: 700; line-height: 1.35 }
+.capas { list-style: none; display: flex; flex-wrap: wrap; gap: 6px }
+.capas li { font-size: 12.5px; font-weight: 700; padding: 5px 11px; border-radius: 999px; background: #19161f; border: 1px solid #2f2a3b; color: var(--tx2) }
+.capas li.esc { background: var(--rosa); border-color: var(--rosa); color: #fff }
+.capa-esc { font-size: 15px; font-weight: 800; line-height: 1.35; margin-top: 10px }
+.pilha { display: grid } .pilha > * { grid-area: 1 / 1 }
+.cr-textos { list-style: none; display: grid; gap: 6px; align-content: start }
+.cr-textos li { font-size: 13.5px; color: var(--tx2); line-height: 1.4; display: flex; gap: 8px; background: #19161f; border: 1px solid #27232f; border-radius: 10px; padding: 7px 10px }
+.cr-textos li b { color: var(--rosa); flex: none; width: 12px }
+.cr-textos.sai { opacity: 0; visibility: hidden }
+.cr-fotos { display: flex; gap: 8px; align-self: center }
+.cr-fotos img { flex: 1 1 0; min-width: 0; width: 10%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; border: 1px solid #36313f; box-shadow: 0 10px 24px rgba(0,0,0,.4) }
+.rolo-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 56px }
 .rolo-cab b { font-size: 17px; font-weight: 800 }
 .rolo-cab span { font-size: 13px; color: var(--mut); white-space: nowrap }
 .rolo { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 12px 2px 14px; -webkit-overflow-scrolling: touch; scrollbar-color: #4a3a78 transparent }
 .rolo::-webkit-scrollbar { height: 6px } .rolo::-webkit-scrollbar-thumb { background: #4a3a78; border-radius: 3px }
 .rolo img { flex: none; width: 236px; aspect-ratio: 4 / 5; border-radius: 12px; border: 1px solid #36313f; scroll-snap-align: start; object-fit: cover }
-.rolo:focus-visible { outline: 2px solid var(--sec); outline-offset: 4px; border-radius: 8px }
-.nota { font-size: 13.5px; color: var(--mut); line-height: 1.5; margin-top: 10px }
-/* o futuro */
-.futuro { text-align: center; padding: 52px 28px }
-.futuro .sec { color: #cbb9f5 }
-.futuro .grande { font-size: clamp(30px, 4.4vw, 52px); font-weight: 800; line-height: 1.1; letter-spacing: -.028em }
-.futuro > span { display: block; font-size: clamp(16px, 1.6vw, 19px); color: var(--tx2); margin: 18px auto 0; max-width: 34em; line-height: 1.55 }
-/* a escolha */
+/* por dentro: formatos e aulas */
+.formatos { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; perspective: 1000px }
+.fmt { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 12px }
+.fe { flex: none; width: 34px; height: 34px; border-radius: 10px; background: rgba(240,68,159,.12); border: 1px solid rgba(240,68,159,.35); display: flex; align-items: center; justify-content: center; font-size: 17px; line-height: 1 }
+.fmt b { display: block; font-size: 14.5px; line-height: 1.25 }
+.fmt small { display: block; font-size: 12.5px; color: var(--mut); margin-top: 3px; line-height: 1.4 }
+.corre { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent) }
+.corre-trilho { display: flex; width: max-content; animation: corre var(--dur, 40s) linear infinite }
+.corre:hover .corre-trilho, .corre:focus-within .corre-trilho { animation-play-state: paused }
+.corre-g { display: flex; gap: 12px; padding-right: 12px }
+@keyframes corre { to { transform: translateX(-50%) } }
+.curso { flex: none; width: 220px; height: 120px; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; color: #fff;
+         border: 1px solid rgba(255,255,255,.14); box-shadow: inset 0 1px 0 rgba(255,255,255,.18) }
+.curso .ce { font-size: 22px; line-height: 1 }
+.curso small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .85; line-height: 1.3 }
+.curso b { display: block; font-size: 17px; font-weight: 800; line-height: 1.15; letter-spacing: -.01em; margin-top: 3px }
+.c1 { background: linear-gradient(135deg, #f0449f, #7b4af2) } .c2 { background: linear-gradient(135deg, #3b2a8a, #c13be0) } .c3 { background: linear-gradient(135deg, #7b4af2, #2a1c5c) }
+.c4 { background: linear-gradient(135deg, #ff7a59, #f0449f) } .c5 { background: linear-gradient(135deg, #1f6feb, #7b4af2) } .c6 { background: linear-gradient(135deg, #c13be0, #3a1458) }
+.metodo { margin-top: 22px; background: var(--card); border: 1px solid var(--linha); border-radius: 16px; padding: 18px 20px 22px }
+.metodo-t { font-size: 15px; font-weight: 800 }
+.modulos { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 16px }
+.modulos li { position: relative; text-align: center; padding: 34px 6px 0; font-size: 14px; font-weight: 700; color: var(--tx); line-height: 1.3 }
+.modulos li::before { content: ''; position: absolute; top: 12px; left: -50%; right: 50%; height: 3px; background: var(--grad) }
+.modulos li:first-child::before { display: none }
+.mo-p { position: absolute; top: 1px; left: 50%; margin-left: -13px; width: 26px; height: 26px; border-radius: 50%; background: var(--rosa); z-index: 1;
+        box-shadow: 0 0 0 5px rgba(240,68,159,.18), 0 0 22px rgba(240,68,159,.55); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center }
+.modulos small { display: block; font-size: 10px; color: var(--mut); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 2px }
+/* apoio: cases e famosos */
+.casebar { margin-top: 24px }
+.casebar .corre-g { gap: 14px; padding-right: 14px; align-items: stretch }
+.case { flex: none; width: 380px; background: var(--card); border: 1px solid var(--linha); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column }
+.ba { position: relative; aspect-ratio: 3 / 1; background: #0d0c12; overflow: hidden; border-bottom: 1px solid var(--linha) }
+.ba img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover }
+.ba-d { z-index: 1 }
+.ba-linha { position: absolute; top: 0; bottom: 0; left: 0; width: 3px; z-index: 2; background: var(--rosa); box-shadow: 0 0 14px 2px rgba(240,68,159,.8); opacity: 0; pointer-events: none }
+.selo { position: absolute; top: 8px; left: 8px; z-index: 3; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.35) }
+.selo-a { background: #fff; color: #1a1424; opacity: 0 } .selo-d { background: var(--rosa); color: #fff }
+.case figcaption { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 2px; flex: 1 }
+.case-tag { align-self: flex-start; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #cbb9f5; background: rgba(123,74,242,.18); border-radius: 999px; padding: 3px 8px; margin-bottom: 4px }
+.case-n { font-size: 15px; font-weight: 800 }
+.ba-num { font-size: 13px; color: var(--mut); font-weight: 700 }
+.ba-n { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--rosa2); margin-right: 3px; font-variant-numeric: tabular-nums }
+.case small { font-size: 12px; color: var(--mut) }
+.nichos { font-size: 14.5px; color: var(--tx2); margin-top: 14px; line-height: 1.55 }
+.reel { flex: none; width: 140px; aspect-ratio: 300 / 470; height: auto; object-fit: cover; border-radius: 12px; border: 1px solid #36313f }
+.fam { flex: none; display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--linha); border-radius: 999px; padding: 6px 16px 6px 6px }
+.fam img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover }
+.fam b { display: block; font-size: 14px; white-space: nowrap } .fam small { display: block; font-size: 12px; color: var(--rosa2); font-weight: 700; white-space: nowrap }
+/* compare */
 table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; margin-top: 30px }
 .cmp th { font-size: 16px; font-weight: 800; padding: 16px 8px 14px; color: var(--tx2); text-align: center; vertical-align: bottom }
-.cmp th:first-child { width: 28% }
+.cmp th:first-child { width: 24% }
 .cmp th .logo { width: 24px; height: 24px; font-size: 13px; margin-right: 8px; vertical-align: -6px; box-shadow: none }
 .cmp td { text-align: center; padding: 14px 10px; border-top: 1px solid var(--linha); vertical-align: middle; height: 74px }
 .cmp td.cr { text-align: left; font-weight: 700; font-size: 16px; color: var(--tx); padding-left: 4px; line-height: 1.3 }
 .cmp td small { display: block; font-size: 12.5px; color: var(--mut); margin-top: 6px; line-height: 1.3 }
 .cmp td.leg small { color: var(--tx2) }
+.sem-ap { margin-top: 56px }
+.sem-ap-t { font-size: 30px; font-weight: 900; line-height: 1.12; margin: 8px 0 10px }
+.sem-ap-t em { font-style: normal; background: linear-gradient(90deg, #ff4fa3, #a66bff); -webkit-background-clip: text; background-clip: text; color: transparent }
+.carr-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 20px }
+.carr { margin: 0; background: var(--card); border: 1px solid var(--linha); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column }
+.carr img { display: block; width: 100%; height: 230px; object-fit: cover; object-position: top; border-bottom: 1px solid var(--linha) }
+.carr figcaption { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 2px }
+.carr-n { font-size: 26px; font-weight: 900; color: #ff4fa3; font-variant-numeric: tabular-nums; line-height: 1.1 }
+.carr-l { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--tx2) }
+.carr strong { font-size: 14px; margin-top: 8px; color: #fff; line-height: 1.3 }
+.carr small { font-size: 12.5px; color: var(--mut) }
+.carr-pre .carr { opacity: 0; transform: translateY(24px) scale(.97) }
+.carr-in .carr { opacity: 1; transform: none; transition: opacity .6s ease, transform .7s cubic-bezier(.2,.8,.2,1) }
+.carr-in .carr:nth-child(2) { transition-delay: .12s } .carr-in .carr:nth-child(3) { transition-delay: .24s } .carr-in .carr:nth-child(4) { transition-delay: .36s }
+.carr-in .carr:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(255,79,163,.18) }
+@media print { .carr-pre .carr { opacity: 1; transform: none } }
+.cmp tr.custo td { height: auto; padding-top: 18px; padding-bottom: 18px }
+.cmp tr.custo td b { display: block; font-size: 15px; font-weight: 800; color: #fff; line-height: 1.25 }
+.cmp tr.custo td.leg b { color: #f3c2ff }
+.contratar { margin-top: 22px; background: var(--card); border: 1px solid var(--linha); border-radius: 16px; padding: 18px 20px }
+.contratar > b { font-size: 16px; font-weight: 800 }
+.contratar ul { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0 10px; padding: 0 }
+.contratar li { background: rgba(255,255,255,.04); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 700; color: #fff; line-height: 1.3 }
+.contratar li span { display: block; font-size: 12px; font-weight: 700; color: var(--tx2); margin-bottom: 4px }
+.contratar small { display: block; font-size: 12px; color: var(--mut); line-height: 1.4 }
 .cmp .leg { background: rgba(123,74,242,.14); border-left: 2px solid rgba(193,59,224,.75); border-right: 2px solid rgba(193,59,224,.75); color: #fff }
 .cmp thead .leg { border-top: 2px solid rgba(193,59,224,.75); border-radius: 16px 16px 0 0 }
 .cmp tbody tr:last-child .leg { border-bottom: 2px solid rgba(193,59,224,.75); border-radius: 0 0 16px 16px }
@@ -250,28 +415,57 @@ table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-lay
 .leg-ic > span { display: inline-flex; align-items: center; gap: 7px }
 .leg-ic .ic { width: 18px; height: 18px; font-size: 10px }
 .leg-nota { margin-right: auto }
-/* tudo */
-.tudo { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 28px }
-.tudo li { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 15px 16px }
-.tudo .ok { margin-top: 1px }
-.tudo div b { display: block; font-size: 16px; line-height: 1.3 }
-.tudo div span { display: block; font-size: 14px; color: var(--mut); margin-top: 4px; line-height: 1.5 }
-/* sendo honestos */
-.nao { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 26px }
-.nao .ic { margin-top: 1px }
-.faz { font-size: clamp(16px, 1.6vw, 18px); line-height: 1.55; color: var(--tx2); border-left: 3px solid var(--rosa); padding: 6px 0 6px 16px; margin-top: 24px }
+/* o que vem × o que não faz */
+.vem-g { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; margin-top: 28px; align-items: start }
+.vem { padding: 20px }
+.vem h3 { display: flex; align-items: center; gap: 10px; font-size: 19px; margin-bottom: 14px }
+.tudo { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px }
+.tudo li { display: flex; gap: 10px; align-items: flex-start }
+.tudo .ok { margin-top: 2px; width: 18px; height: 18px; font-size: 10px }
+.tudo div b { display: block; font-size: 15px; line-height: 1.3 }
+.tudo div span { display: block; font-size: 13.5px; color: var(--mut); margin-top: 2px; line-height: 1.45 }
+.nao { list-style: none; display: grid; gap: 12px }
+.nao li { display: flex; gap: 10px; align-items: flex-start }
+.nao .ic { margin-top: 1px; width: 22px; height: 22px }
+.nao p { font-size: 15px; line-height: 1.5; color: var(--tx2) } .nao b { color: var(--tx) }
+.faz { font-size: 15px; line-height: 1.55; color: var(--tx2); border-left: 3px solid var(--rosa); padding: 4px 0 4px 14px; margin-top: 18px }
 .faz b { color: var(--tx) }
-.comecar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px }
-.comecar div { display: flex; gap: 12px; align-items: flex-start; background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 16px }
-.comecar p { font-size: 15px; line-height: 1.5; color: var(--tx2) }
-.comecar b { color: var(--tx) }
+/* perguntas frequentes */
+.faq { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 26px; align-items: start }
+.pf { background: var(--card); border: 1px solid var(--linha); border-radius: 14px }
+.pf summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 16px 18px; font-size: 16.5px; font-weight: 800; line-height: 1.3 }
+.pf summary::-webkit-details-marker { display: none }
+.pf summary i { flex: none; width: 26px; height: 26px; border-radius: 50%; background: rgba(240,68,159,.14); position: relative }
+.pf summary i::before, .pf summary i::after { content: ''; position: absolute; left: 7px; right: 7px; top: 12px; height: 2px; background: var(--rosa); border-radius: 1px; transition: transform .2s }
+.pf summary i::after { transform: rotate(90deg) }
+.pf[open] summary i::after { transform: rotate(0) }
+.pf p { padding: 0 18px 17px; font-size: 15px; line-height: 1.6; color: var(--tx2) }
+/* quem criou */
+.criadores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px }
+.cri { background: var(--card); border: 1px solid var(--linha); border-radius: 16px; padding: 18px }
+.cri-cab { display: flex; gap: 14px; align-items: center }
+.cri-f { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none; border: 2px solid rgba(193,59,224,.6) }
+.cri-cab b { display: block; font-size: 18px; font-weight: 800 } .cri-cab small { display: block; font-size: 13.5px; color: var(--tx2); line-height: 1.45; margin-top: 2px }
+.soc-n { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px }
+.soc-n div { background: #13111a; border: 1px solid var(--linha); border-radius: 10px; padding: 10px 8px 9px; min-width: 0 }
+.soc-n b { display: block; font-size: clamp(17px, 1.8vw, 21px); font-weight: 800; letter-spacing: -.02em; color: var(--rosa); line-height: 1.1; white-space: nowrap }
+.soc-n span { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin-top: 5px; line-height: 1.3 }
+.eventos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 14px }
+.eventos > span { font-size: 14px; color: var(--tx2); background: var(--card); border: 1px solid var(--linha); border-radius: 999px; padding: 7px 14px }
+.eventos b { color: var(--tx) }
+.eventos .ev-t { background: none; border: 0; padding: 0 4px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--sec) }
+.frase-q { font-size: clamp(22px, 2.8vw, 32px); font-weight: 800; letter-spacing: -.02em; line-height: 1.2; margin-top: 30px; text-align: center; text-wrap: balance }
 /* fechamento */
 .fim { padding-bottom: 40px }
 .talento { font-size: clamp(30px, 4.6vw, 54px); font-weight: 800; letter-spacing: -.028em; line-height: 1.12; text-align: center; text-wrap: balance }
-.cta { margin-top: 44px; padding: 44px 28px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px }
+.cta { margin-top: 40px; padding: 40px 28px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px }
 .cta .marca.grande { font-size: 17px; gap: 12px } .cta .marca.grande .logo { width: 44px; height: 44px; font-size: 24px }
 .cta h2 { font-size: clamp(28px, 3.8vw, 42px) }
 .cta > p { font-size: clamp(16px, 1.6vw, 18px); color: var(--tx2); max-width: 32em; line-height: 1.55 }
+.btn-obs { font-size: 13px; color: var(--mut); margin-top: -6px; max-width: 30em }
+.passos3 { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; text-align: left; margin-top: 6px }
+.passos3 li { display: flex; gap: 10px; align-items: flex-start; background: rgba(11,10,16,.45); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 13px 14px }
+.passos3 p { font-size: 14.5px; line-height: 1.45; color: var(--tx2) } .passos3 b { color: var(--tx) }
 .quem { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 30px 15px; border-radius: 16px; background: rgba(123,74,242,.18); border: 1px solid rgba(160,120,255,.45) }
 .quem small { font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: #cbb9f5 }
 .quem b { font-size: 22px; font-weight: 800 }
@@ -279,64 +473,241 @@ table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-lay
 .rodape { padding: 8px 16px 44px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #6f6981 }
 /* telas menores */
 @media (max-width: 980px) {
-  .hero-g, .criada, .ben-lado { grid-template-columns: 1fr; gap: 30px }
+  .hero-g { grid-template-columns: 1fr; grid-template-areas: "t" "v" "l"; row-gap: 26px }
   .hero { padding-top: 26px }
-  .grade3 { grid-template-columns: repeat(2, minmax(0, 1fr)) }
-  .tudo { grid-template-columns: repeat(2, minmax(0, 1fr)) }
-  .ritmo, .comecar { grid-template-columns: 1fr }
+  .cena-l, .cena-l.largo, .cena-l:nth-child(even) { grid-template-columns: 1fr; gap: 20px } .cena-l:nth-child(even) .cena-t { order: 0 }
+  .b6, .pq3, .criadores { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .formatos { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+  .fcp-g { grid-template-columns: repeat(2, minmax(0, 1fr)) } .fcp-funil { grid-column: 1 / -1 } .fcp-funil li { height: 22px }
+  .fcp-campos { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .vem-g, .faq { grid-template-columns: 1fr }
+  .cr-g { grid-template-columns: 1fr; gap: 14px; margin-bottom: 14px }
 }
 @media (max-width: 700px) {
   .wrap { padding: 0 16px }
   section { padding: 46px 0 }
-  .dores, .antes, .nao, .mapa, .secs, .dest2, .tudo, .grade3 { grid-template-columns: 1fr }
-  .ben { margin-top: 52px } .dest2 { margin-top: 52px }
-  .pn { width: 50px; height: 50px; font-size: 25px }
-  .ben-cab { gap: 13px }
-  .virada, .futuro { padding: 40px 20px } .cta { padding: 36px 18px }
-  .nums { gap: 8px } .nums div { padding: 12px 10px 10px } .nums span { font-size: 10px; letter-spacing: .06em }
+  .dores, .b6, .pq3, .criadores, .tudo, .passos3 { grid-template-columns: 1fr }
   .topo-dir { display: none }
   br.largo { display: none }
   .tocar { font-size: 14px; padding: 8px 16px 8px 8px; bottom: 13% } .pl { width: 24px; height: 24px }
   .embreve { padding-bottom: 9% } .embreve b { font-size: 11px; padding: 6px 14px }
-  .tudo li { padding: 13px 14px }
+  .hero-l .btn { width: 100% }
+  .virada { padding: 34px 18px } .cta { padding: 32px 16px }
+  .aviso { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 18px }
+  .barra-in { height: 48px; justify-content: center }
+  .barra-marca { display: none }
+  .barra-links { gap: 0 } .barra-links a { font-size: 13px; padding: 6px 8px } .barra-links a.barra-cta { margin-left: 4px; padding: 6px 11px }
+  section[id] { scroll-margin-top: 44px }
+  .fale-fixo { display: flex; align-items: center; justify-content: center; gap: 8px; position: fixed; left: 16px; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom));
+               z-index: 45; font-size: 16px; font-weight: 800; color: #fff; background: var(--rosa); text-decoration: none; padding: 14px 18px; border-radius: 999px;
+               box-shadow: 0 12px 34px rgba(0,0,0,.5), 0 8px 26px rgba(240,68,159,.4); transition: transform .3s ease, opacity .3s ease }
+  .fale-fixo.fora { transform: translateY(150%); opacity: 0; pointer-events: none }
+  .rodape { padding-bottom: 96px }
+  .cenas { gap: 46px; margin-top: 32px }
+  .cena-t { gap: 12px } .cn-n { width: 38px; height: 38px; font-size: 18px }
+  .painel { padding: 14px 12px 14px; border-radius: 16px }
+  .perg li { padding: 9px 10px; gap: 10px }
+  .temas { gap: 6px } .temas li { padding: 8px 24px 9px 9px } .temas b { font-size: 12.5px }
+  .fcp-top { padding: 12px; flex-wrap: wrap; gap: 10px } .fcp-tt { flex: 1 1 200px } .fcp-tt b { font-size: 14px }
+  .fcp-prog { flex: 1 1 100%; grid-template-columns: auto minmax(0, 1fr); text-align: left }
+  .fcp-acoes { padding: 12px 12px 0; gap: 6px } .fcp-tit { flex-basis: 100% } .fcp-bt { min-height: 30px; padding: 5px 9px; font-size: 11.5px }
+  .fcp-brief { margin: 12px 12px 0; padding: 12px } .fcp-campos { gap: 10px } .fcp-in { font-size: 12.5px; padding: 6px 9px }
+  .fcp-g { grid-template-columns: 1fr; padding: 12px; gap: 10px } .fcp-col { padding: 12px }
+  .fcp-grupos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px }
+  .fcp-gr small { margin-top: 8px } .fcp-gr li { font-size: 12px; padding: 4px 5px; gap: 6px }
+  .cf h4 { font-size: 20px }
+  .fcp-funil ol { gap: 3px; margin-top: 10px } .fcp-funil li { height: 19px; font-size: 10.5px; margin-left: calc(var(--k) * 4.6%) } .fcp-funil li b { width: 15px; height: 15px; font-size: 9px }
+  /* no celular, as 9 lâminas ficam em leque (uma sobre a outra), do tamanho que dá para ver */
+  .cr-fotos { gap: 0 } .cr-fotos img { flex: none; width: 30%; margin-left: -21.25% } .cr-fotos img:first-child { margin-left: 0 }
+  .cr-textos { gap: 5px } .cr-textos li { font-size: 12.5px; padding: 5px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block } .cr-textos li b { display: inline-block; margin-right: 6px }
   .rolo img { width: 62vw; max-width: 260px }
+  .formatos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px }
+  .fmt { padding: 10px; align-items: center } .fmt small { display: none } .fmt b { font-size: 13px } .fe { width: 30px; height: 30px; font-size: 15px }
+  .curso { width: 180px; height: 108px; padding: 12px } .curso b { font-size: 15px }
+  .metodo { padding: 16px 16px 18px }
+  .modulos { grid-template-columns: 1fr; gap: 14px }
+  .modulos li { text-align: left; padding: 0 0 0 40px; min-height: 26px }
+  .modulos li::before { top: -15px; left: 12px; right: auto; width: 3px; height: 16px }
+  .mo-p { top: 0; left: 0; margin-left: 0 }
+  .case { width: 78vw; max-width: 340px } .casebar .corre-trilho { animation-duration: 80s } .casebar .corre-g { gap: 12px; padding-right: 12px }
+  .case figcaption { padding: 10px 12px 12px } .ba-n { font-size: 21px } .case-tag { font-size: 9px; letter-spacing: .04em }
+  .reel { width: 112px }
+  .fam img { width: 38px; height: 38px } .fam b { font-size: 13px }
+  .faq { gap: 8px } .pf summary { padding: 14px 14px; font-size: 15.5px } .pf p { padding: 0 14px 15px }
+  .soc-n b { font-size: 18px }
   /* a comparação vira um cartão por linha */
   .cmp thead { display: none }
   .cmp, .cmp tbody, .cmp tr { display: block; width: 100% }
-  .cmp tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; background: var(--card); border: 1px solid var(--linha); border-radius: 14px; padding: 14px 10px 10px; margin-bottom: 10px }
+  .cmp tr { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; background: var(--card); border: 1px solid var(--linha); border-radius: 14px; padding: 14px 10px 10px; margin-bottom: 10px }
   .cmp td { display: block; border: 0; padding: 8px 2px; height: auto; border-radius: 10px }
   .cmp td.cr { grid-column: 1 / -1; padding: 0 4px 6px; font-size: 16px }
   .cmp td::before { content: attr(data-c); display: block; font-size: 11px; font-weight: 800; color: var(--tx2); margin-bottom: 7px; line-height: 1.2 }
   .cmp td.cr::before { content: none }
   .cmp td.leg, .cmp tbody tr:last-child .leg { border: 1.5px solid rgba(193,59,224,.75); border-radius: 10px }
   .cmp td small { font-size: 11px; margin-top: 5px }
+  .cmp tr.custo td b { font-size: 12.5px }
+  .contratar ul { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .carr-g { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px }
+  .carr img { height: 170px }
+  .carr-n { font-size: 20px }
+  .sem-ap-t { font-size: 24px }
   .leg-ic { justify-content: flex-start } .leg-nota { width: 100% }
+}
+/* as faixas que correm: paradas (e roláveis) com "reduzir movimento"; na impressão, em linhas */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto }
+  .corre { overflow-x: auto; -webkit-mask-image: none; mask-image: none } .corre-trilho { animation: none } .corre-dup { display: none }
+  .barra-fixa, .fale-fixo { transition: none }
 }
 @media print {
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact }
-  .fundo { position: absolute } .tocar, .embreve, .video-leg, .rolo-cab span { display: none !important }
+  .fundo { position: absolute } .tocar, .embreve, .video-leg, .rolo-cab span, .barra-fixa, .fale-fixo, .btn-obs { display: none !important }
   .rolo { flex-wrap: wrap; overflow: visible } .rolo img { width: 18% }
-  section, .ben, .dest, .cartao-g { break-inside: avoid }
+  .corre { overflow: visible; -webkit-mask-image: none; mask-image: none } .corre-trilho { animation: none; width: auto } .corre-g { flex-wrap: wrap } .corre-dup { display: none }
+  section, .cena-l, .bcard, .case, .cri, .cartao-g, .pf { break-inside: avoid }
+  .selo-a, .ba-linha { display: none !important } .ba-d { -webkit-clip-path: none !important; clip-path: none !important }
 }
-@media (prefers-reduced-motion: reduce) { .rolo { scroll-behavior: auto } }
+
+/* ✨ ANIMAÇÕES (19/10/2026): só valem com a classe "anim" no <html> (posta pelo script). Fonte: propostas/animacoes/animacoes.py */
+html.anim .rv:not(.rv-in) { opacity: 0; transform: translateY(20px) }          /* escondido na hora, sem transição */
+html.anim .rv.rv-fade:not(.rv-in) { transform: none }                         /* o que rola por dentro (carrossel) só aparece, sem subir */
+html.anim .rv.rv-in { transition: opacity .6s cubic-bezier(.22,.61,.36,1), transform .6s cubic-bezier(.22,.61,.36,1) }
+html.anim .rv.rv-in.rv-d1 { transition-delay: 80ms } html.anim .rv.rv-in.rv-d2 { transition-delay: 160ms } html.anim .rv.rv-in.rv-d3 { transition-delay: 240ms }
+html.anim .rv.rv-in.rv-d4 { transition-delay: 320ms } html.anim .rv.rv-in.rv-d5 { transition-delay: 400ms } html.anim .rv.rv-in.rv-d6 { transition-delay: 480ms }
+html.anim .rv.rv-in.rv-d7 { transition-delay: 560ms }
+@keyframes an-respira { from { opacity: .35 } to { opacity: 1 } }
+@keyframes an-pulso { 0%, 100% { opacity: 0 } 50% { opacity: 1 } }
+@media (hover: hover) and (pointer: fine) {
+  html.anim .an-card:not(.rv) { transition: transform .25s ease }
+  html.anim .an-card:not(.rv):hover { transform: translateY(-3px) }
+}
+
+/* brilho que respira no fundo do topo (atrás do vídeo) */
+html.anim .hero { position: relative }
+html.anim .hero::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(40% 60% at 74% 50%, rgba(193,59,224,.22), rgba(193,59,224,0) 70%),
+              radial-gradient(32% 46% at 12% 28%, rgba(123,74,242,.16), rgba(123,74,242,0) 70%);
+  animation: an-respira 7s ease-in-out infinite alternate }
+/* o botão principal (Assista ao vídeo) respira */
+html.anim .tocar::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 34px 6px rgba(240,68,159,.55); opacity: 0; animation: an-pulso 2.8s ease-in-out infinite }
+/* o L do logo: um reflexo suave de vez em quando */
+html.anim .marca .logo { position: relative; overflow: hidden }
+html.anim .marca .logo::after { content: ''; position: absolute; top: -12%; bottom: -12%; left: 0; width: 55%; pointer-events: none;
+  background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+  transform: translateX(-140%) skewX(-16deg); animation: an-reflexo 6s ease-in-out 1.4s infinite }
+@keyframes an-reflexo { 0% { transform: translateX(-140%) skewX(-16deg) } 32%, 100% { transform: translateX(260%) skewX(-16deg) } }
+/* a palavra em degradê dos títulos se move devagar (o começo do movimento é o degradê original) */
+html.anim .an-mov { background-image: linear-gradient(100deg, #f0449f 0%, #c13be0 24%, #7b4af2 50%, #c13be0 76%, #f0449f 100%);
+  background-size: 200% 100%; animation: an-degrade 9s ease-in-out infinite alternate; animation-play-state: paused }
+html.anim .an-mov.an-vivo { animation-play-state: running }
+@keyframes an-degrade { from { background-position: 0% 0 } to { background-position: 100% 0 } }
+/* o botão do fechamento pulsa de leve (uma onda rosa que se abre) */
+html.anim .btn-pulsa::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: inherit; pointer-events: none;
+  animation: an-onda 2.6s ease-out infinite }
+@keyframes an-onda { 0% { box-shadow: 0 0 0 0 rgba(240,68,159,.5) } 70%, 100% { box-shadow: 0 0 0 16px rgba(240,68,159,0) } }
+
+@media (prefers-reduced-motion: reduce) {
+  html.anim .rv { opacity: 1 !important; transform: none !important; transition: none !important }
+  html.anim .an-card:hover { transform: none !important }
+  html.anim .hero::before, html.anim .tocar::before, html.anim .marca .logo::after, html.anim .btn-pulsa::after { animation: none !important; display: none !important }
+  html.anim .an-mov { animation: none !important; background-image: var(--grad) !important; background-size: auto !important }
+}
+@media print {
+  html.anim .rv { opacity: 1 !important; transform: none !important; transition: none !important }
+  html.anim .an-card:hover { transform: none !important }
+  html.anim .hero::before, html.anim .tocar::before, html.anim .marca .logo::after, html.anim .btn-pulsa::after { animation: none !important; display: none !important }
+  html.anim .an-mov { animation: none !important; background-image: var(--grad) !important; background-size: auto !important }
+}
+
+/* 🎬 CENAS da Legacy (fonte: propostas/animacoes/animacoes.py). Sem html.cenas, tudo no estado final. */
+html.cenas .c-pre .ent { transition: opacity .45s ease, transform .5s cubic-bezier(.22,.61,.36,1) }
+html.cenas .c-pre .ent:not(.on) { opacity: 0; transform: translateY(10px) }
+/* as perguntas vão sendo marcadas, e a resposta entra */
+html.cenas .c-pre .perg .ck::after { transition: transform .35s cubic-bezier(.2,.9,.3,1.3) }
+html.cenas .c-pre .perg li:not(.on) .ck::after { transform: scale(0) }
+html.cenas .c-pre .perg i, html.cenas .c-pre .perg b { transition: opacity .4s ease, color .3s ease }
+html.cenas .c-pre .perg li:not(.on) i { opacity: 0 }
+html.cenas .c-pre .perg li:not(.on) b { color: var(--mut) }
+/* os temas da semana chegam de cima, como notificação; o escolhido acende */
+html.cenas .c-pre .temas li { transition: opacity .4s ease, transform .55s cubic-bezier(.2,.9,.3,1.25), border-color .3s, background-color .3s, box-shadow .3s }
+html.cenas .c-pre .temas li:not(.on) { opacity: 0; transform: translateY(-18px) scale(.96) }
+/* o construtor (réplica da plataforma): a bolinha da camada vira ✓ e acende, o cartão do meio troca de etapa, a barra do funil acende */
+html.cenas .c-pre .fcp-gr li { transition: background-color .3s, color .3s }
+html.cenas .c-pre .fcp-gr li i { transition: background-color .3s, box-shadow .3s }
+html.cenas .c-pre .fcp-gr li i::after { transition: opacity .25s ease, transform .35s cubic-bezier(.2,.9,.3,1.4) }
+html.cenas .c-pre .fcp-gr li:not(.on) i { background-color: transparent; box-shadow: inset 0 0 0 1.5px #8b84a0 }
+html.cenas .c-pre .fcp-gr li:not(.on) i::after { opacity: 0; transform: scale(.3) }
+html.cenas .c-pre .fcp-gr li.on.atual i { animation: an-acende .9s ease-out }
+@keyframes an-acende { 0% { box-shadow: 0 0 0 0 rgba(240,68,159,.7) } 100% { box-shadow: 0 0 0 10px rgba(240,68,159,0) } }
+html.cenas .c-pre .pilha .cf { visibility: visible; transition: opacity .12s ease, transform .2s ease }
+html.cenas .c-pre .pilha .cf.on { transition: opacity .3s ease .12s, transform .4s cubic-bezier(.22,.61,.36,1) .12s }   /* a etapa anterior sai antes */
+html.cenas .c-pre .pilha .cf:not(.on) { opacity: 0; transform: translateY(10px) }
+html.cenas .c-pre .fcp-funil li { transition: background-color .35s, color .35s, box-shadow .35s }
+html.cenas .c-pre .fcp-funil li:not(.on) { background-color: #2a2540; color: #8b84a0 }
+/* os cases: a cortina revela o DEPOIS (a linha rosa corre junto), o selo troca e o número conta (o script põe ba-vivo/ba-dep/ba-mov) */
+html.cenas .ba-vivo .ba-d { -webkit-clip-path: inset(0 100% 0 0); clip-path: inset(0 100% 0 0); transition: -webkit-clip-path .9s cubic-bezier(.65,0,.35,1), clip-path .9s cubic-bezier(.65,0,.35,1) }
+html.cenas .ba-vivo.ba-dep .ba-d { -webkit-clip-path: inset(0 0 0 0); clip-path: inset(0 0 0 0) }
+html.cenas .ba-vivo .ba-linha { transition: left .9s cubic-bezier(.65,0,.35,1), opacity .25s ease }
+html.cenas .ba-vivo.ba-dep .ba-linha { left: calc(100% - 3px) }
+html.cenas .ba-vivo.ba-mov .ba-linha { opacity: 1 }
+html.cenas .ba-vivo .selo { transition: opacity .35s ease }
+html.cenas .ba-vivo .selo-a, html.cenas .ba-vivo.ba-dep .selo-d { opacity: 1 }
+html.cenas .ba-vivo .selo-d, html.cenas .ba-vivo.ba-dep .selo-a { opacity: 0 }
+/* o carrossel: as capas, o texto das lâminas entrando e as lâminas com foto se encaixando lado a lado */
+html.cenas .c-pre .capas li { transition: opacity .35s ease, transform .4s ease, background-color .3s, border-color .3s, color .3s }
+html.cenas .c-pre .cr-textos { transition: opacity .35s ease, visibility 0s linear .35s }
+html.cenas .c-pre .cr-textos li { transition: opacity .25s ease, clip-path .7s ease }
+html.cenas .c-pre .cr-textos li:not(.on) { opacity: 0; -webkit-clip-path: inset(0 100% 0 0); clip-path: inset(0 100% 0 0) }
+html.cenas .c-pre .cr-fotos img { transition: opacity .35s ease, transform .55s cubic-bezier(.2,.9,.3,1.15) }
+html.cenas .c-pre .cr-fotos img:not(.on) { opacity: 0; transform: translateX(48px) rotate(5deg) }
+/* os formatos viram em cascata */
+html.cenas .c-pre.formatos .fmt { transition: opacity .3s ease, transform .6s cubic-bezier(.2,.8,.3,1); transform-origin: 0 50% }
+html.cenas .c-pre.formatos .fmt:not(.on) { opacity: 0; transform: rotateY(-75deg) }
+/* os módulos do método acendem em sequência */
+html.cenas .c-pre.modulos li, html.cenas .c-pre.modulos .mo-p { transition: color .35s, background-color .35s, box-shadow .35s }
+html.cenas .c-pre.modulos li::before { transition: background-color .35s }
+html.cenas .c-pre.modulos li:not(.on) { color: var(--mut) }
+html.cenas .c-pre.modulos li:not(.on) .mo-p { background-color: #2b2737; box-shadow: none; color: var(--mut) }
+html.cenas .c-pre.modulos li:not(.on)::before { background: #2b2737 }
+/* a virada: "É falta de caminho." palavra por palavra */
+html.cenas .c-pre .pw { transition: opacity .5s ease, transform .55s cubic-bezier(.22,.61,.36,1) }
+html.cenas .c-pre .pw:not(.on) { opacity: 0; transform: translateY(.4em) }
+/* o cursor da digitação */
+html.cenas .caret { animation: an-caret .8s steps(1) infinite }
+@keyframes an-caret { 50% { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) {
+  html.cenas .c-pre .pilha .cf.on, html.cenas .c-pre .ent, html.cenas .c-pre .temas li, html.cenas .c-pre .cr-fotos img, html.cenas .c-pre.formatos .fmt, html.cenas .c-pre .pw,
+  html.cenas .c-pre .perg i, html.cenas .c-pre .cr-textos li { opacity: 1 !important; transform: none !important; -webkit-clip-path: none !important; clip-path: none !important; transition: none !important }
+  html.cenas .caret { display: none }
+  html.cenas .ba-vivo .ba-d { -webkit-clip-path: none !important; clip-path: none !important } html.cenas .ba-vivo .selo-a, html.cenas .ba-vivo .ba-linha { opacity: 0 !important }
+}
+@media print {
+  html.cenas .c-pre .pilha .cf.on, html.cenas .c-pre .ent, html.cenas .c-pre .temas li, html.cenas .c-pre .cr-fotos img, html.cenas .c-pre.formatos .fmt, html.cenas .c-pre .pw,
+  html.cenas .c-pre .perg i, html.cenas .c-pre .cr-textos li { opacity: 1 !important; transform: none !important; -webkit-clip-path: none !important; clip-path: none !important; transition: none !important }
+  html.cenas .caret { display: none }
+}
 </style>
 </head>
 <body>
 
 <div class="fundo" aria-hidden="true"></div>
-<header class="wrap topo">
+<nav class="barra-fixa" id="barra" aria-label="Atalhos da proposta"><div class="wrap barra-in">
+  <a class="barra-marca" href="#topo"><span class="logo" aria-hidden="true">L</span><b>LEGACY</b> <i>IA</i></a>
+  <div class="barra-links"><a href="#beneficios">Benefícios</a><a href="#teste">Teste</a><a href="#cases">Cases</a><a href="#compare">Compare</a><a class="barra-cta" href="#fale">Começar</a></div>
+</div></nav>
+<header class="wrap topo" id="topo">
   <div class="marca"><span class="logo">L</span><b>LEGACY</b> <i>IA</i></div>
   <div class="topo-dir">uma plataforma Promov</div>
 </header>
 <main>
 
-<!-- ══════════ TOPO: proposta + vídeo ══════════ -->
+<!-- ══════════ TOPO: a promessa, o vídeo, a Legacy em 3 linhas e o botão ══════════ -->
 <section class="hero"><div class="wrap hero-g">
   <div class="hero-t">
     <div class="kick"><span class="pill">Proposta · Legacy IA</span><span id="prop-para" class="para" hidden>Preparada para <b></b></span></div>
     <h1>Deus te deu <span class="nw">uma <em>mensagem.</em></span></h1>
     <p class="sub">Você prega, ensina, aconselha. Mas na hora de postar, trava. A Legacy IA te dá o caminho: o que falar, um jeito de ensinar que prende e o carrossel pronto.</p>
-    <ul class="chips"><li><span class="ok" aria-hidden="true">✓</span>Saber o que falar</li><li><span class="ok" aria-hidden="true">✓</span>Conteúdo que ensina</li><li><span class="ok" aria-hidden="true">✓</span>Com a sua essência</li><li><span class="ok" aria-hidden="true">✓</span>No seu ritmo</li></ul>
   </div>
   <div class="hero-v">
     <div class="video">
@@ -346,179 +717,156 @@ table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-lay
     </div>
     <p class="video-leg">Veja a Legacy IA funcionando, do tema do dia ao carrossel pronto.</p>
   </div>
+  <div class="hero-l">
+    <div class="tres-t">A Legacy em 3 linhas</div>
+    <ul class="tres"><li><span class="ok" aria-hidden="true">✓</span><p><b>Te diz o que falar.</b> 10 temas em alta por semana, com o olhar cristão.</p></li><li><span class="ok" aria-hidden="true">✓</span><p><b>Escreve com você.</b> Roteiro que ensina e carrossel pronto, na sua linguagem.</p></li><li><span class="ok" aria-hidden="true">✓</span><p><b>No seu ritmo.</b> Uma plataforma para usar sozinho, quando quiser.</p></li></ul>
+    <a class="btn" href="#fale">Falar com a equipe <span aria-hidden="true">→</span></a>
+  </div>
 </div></section>
 
-<!-- ══════════ QUEM VOCÊ É ══════════ -->
-<section><div class="wrap">
-  <div class="sec">Quem você é</div>
+<!-- ══════════ O PROBLEMA: as dores e a virada ══════════ -->
+<section id="problema"><div class="wrap">
+  <div class="sec">O problema</div>
   <h2>Fora da tela, as pessoas te ouvem.<br><em>Na tela, parece que você não existe.</em></h2>
-  <p class="lead">São anos de estrada e vidas transformadas. No púlpito, no consultório, na empresa, a sua palavra tem peso.
-  Mas quando você tenta levar essa mensagem para o Instagram, a história é outra:</p>
+  <p class="lead">No púlpito, no consultório, na empresa, a sua palavra tem peso. Mas quando você tenta levar essa mensagem para o Instagram, a história é outra:</p>
   <div class="dores"><div class="dor"><p>“O que eu falo hoje?”</p><span>Você abre o celular para postar, e trava. Para quem? De que jeito?</span></div><div class="dor"><p>“Comecei uma série e parei na terceira semana.”</p><span>A vontade existe. O que falta é um caminho que sustente a constância.</span></div><div class="dor"><p>“Paguei um curso que não fala a minha língua.”</p><span>Feito para outro público, com outros valores. Você não sabe como levar aquilo para a sua mensagem.</span></div><div class="dor"><p>“A IA tirou a essência da minha mensagem.”</p><span>O texto sai bonito, mas não parece você. E não fala com quem te acompanha.</span></div></div>
-  <div class="dor funda"><p>“Será que o digital não é para mim?”</p><span>O pensamento que dói. E que faz muita gente com um chamado de verdade guardar a mensagem na gaveta.</span></div>
-</div></section>
-
-<!-- ══════════ A VIRADA + QUEM CRIOU ══════════ -->
-<section><div class="wrap">
   <div class="cartao-g virada">
-    <div class="sec">A virada</div>
-    <h2>Não é falta de dom. Nem de chamado.<br><em>É falta de caminho.</em></h2>
+    <p class="vir-q">“Será que o digital não é para mim?”</p>
+    <h3 class="vir-t">Não é falta de dom. Nem de chamado.<br><span class="pp" data-cena="palavras" data-ritmo="260"><span class="pw gr" data-s="1">É</span> <span class="pw gr" data-s="2">falta</span> <span class="pw gr" data-s="3">de</span> <span class="pw gr" data-s="4">caminho.</span></span></h3>
     <p class="lead">Você não precisa virar personagem. Precisa de ideia na hora certa, de um jeito de ensinar que prende, e de constância.</p>
   </div>
-  <div class="criada">
-    <div>
-      <h3>Foi para isso que a gente criou a <em>Legacy IA.</em></h3>
-      <p class="lead">A Legacy IA é da Promov. Ela leva para dentro de uma plataforma o método que a gente ensina há mais de uma década
-      no segmento cristão, para você usar sozinho, quando quiser.</p>
-      <div class="nums"><div><b>+10 anos</b><span>no segmento cristão</span></div><div><b>180 mil</b><span>alunos</span></div><div><b>63</b><span>países</span></div></div>
-    </div>
-    <div><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/inicio.jpg" alt="Tela de início da Legacy IA: “Qual é o seu foco hoje?”" width="800" height="500" loading="lazy" decoding="async"></div></div>
-  </div>
 </div></section>
 
-<!-- ══════════ O QUE MUDA PARA VOCÊ ══════════ -->
-<section id="muda"><div class="wrap">
-  <div class="sec">O que muda para você</div>
+<!-- ══════════ PARA QUEM É ══════════ -->
+<section id="para-quem"><div class="wrap">
+  <div class="faixa-rosa"><span>Para quem é</span><b>Líderes, terapeutas e especialistas cristãos que querem levar a mensagem mais longe:</b></div>
+  <div class="pq3"><div class="pq-card"><span class="icn rosa"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg></span><h3>Pastores e líderes</h3><p>Que querem levar a palavra além do púlpito, com constância e sem perder a essência.</p></div><div class="pq-card"><span class="icn rosa"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span><h3>Terapeutas e especialistas</h3><p>Que querem ensinar o que sabem e gerar confiança em quem precisa da sua ajuda.</p></div><div class="pq-card"><span class="icn rosa"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5M22 9v6"/></svg></span><h3>Mentores e educadores</h3><p>Que querem transformar o que ensinam em conteúdo que forma, prende e marca.</p></div></div>
+  <div class="aviso"><span class="icn rosa"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></span><p><b>Você não precisa dominar tecnologia, escrever bem ou entender de algoritmo.</b>
+  A Legacy te entrega o caminho, os modelos e as ferramentas. Você entra com a mensagem e adapta tudo à sua essência.</p></div>
+</div></section>
+
+<!-- ══════════ O QUE VOCÊ GANHA: 6 cartões curtos (a tela abre em "ver como é") ══════════ -->
+<section id="beneficios"><div class="wrap">
+  <div class="sec">O que você ganha</div>
   <h2>O que muda <em>no seu dia a dia.</em></h2>
-
-  <article class="ben ben-lado">
-    <div>
-      <div class="ben-cab"><span class="pn">1</span><h3>Você nunca mais começa do <em>zero.</em></h3></div>
-      <p class="lead">Toda semana, chegam <b>10 temas em alta</b> para você: os assuntos que as pessoas estão vivendo e comentando,
-      já com o olhar do conteúdo cristão. Você abre o celular e já sabe por onde começar.</p>
-      <div class="lista">
-        <div><b>Você fala do que importa para o seu público</b><span>Família, devocional, liderança, igreja e fé, relacionamentos, louvor e outros. Você escolhe.</span></div>
-        <div><b>Você entra na conversa do momento sem perder a fé de vista</b><span>Cada tema já vem com o ângulo do conteúdo cristão.</span></div>
-        <div><b>Nenhuma boa ideia se perde</b><span>Guarde os temas que quiser e use quando chegar a hora.</span></div>
-        <div><b>O tema vira conteúdo ali mesmo</b><span>Ele segue direto para o roteiro ou para o carrossel, na sua linguagem.</span></div>
-      </div>
-    </div>
-    <div class="ben-foto"><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/mochila.jpg" alt="Mochila de Ideias: temas em alta separados por assunto" width="604" height="430" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Mochila de Ideias</div>
-      <div class="faixa">Nunca mais “o que eu falo hoje?”.</div></div>
-  </article>
-
-  <article class="ben">
-    <div class="ben-cab"><span class="pn">2</span><h3>O que você posta passa a <em>ensinar.</em></h3></div>
-    <p class="lead">Cada vídeo prende a atenção e deixa uma lição, como você já faz quando prega ou aconselha.
-    Você pede, e recebe o <b>roteiro pronto</b>, na sua linguagem. Exemplo: uma mentora de mães cristãs.</p>
-    <div class="grade3"><figure class="passo"><img src="propostas/legacy/angulos.jpg" alt="Agente de roteiros" width="408" height="340" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">1</span><p><i class="ferr">Agente de roteiros</i><b>Começa por uma cena que o seu público reconhece</b> na hora. A atenção vem desde a primeira frase.</p></figcaption></figure><figure class="passo"><img src="propostas/legacy/ganchos.jpg" alt="Agente de roteiros" width="408" height="340" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">2</span><p><i class="ferr">Agente de roteiros</i><b>Ninguém vai embora no começo</b>: o gancho, o texto da tela e o título já vêm prontos.</p></figcaption></figure><figure class="passo"><img src="propostas/legacy/construtor.jpg" alt="Construtor de roteiro" width="604" height="500" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">3</span><p><i class="ferr">Construtor de roteiro</i><b>Você entende o porquê de cada etapa</b>, com exemplo e checklist. E aprende enquanto faz.</p></figcaption></figure></div>
-    <div class="faixa">Sem folha em branco: a Legacy pergunta, propõe e escreve com você.</div>
-  </article>
-
-  <article class="ben">
-    <div class="ben-cab"><span class="pn">3</span><h3>O carrossel fica pronto, <em>sem esperar designer.</em></h3></div>
-    <p class="lead">Você diz o tema. A Legacy escreve e monta o carrossel com você, já pensando em quem vai ler.
-    Sem explicar tudo de novo, sem esperar a fila de ninguém.</p>
-    <div class="grade3"><figure class="passo"><img src="propostas/legacy/capas.jpg" alt="Mestre dos Carrosséis" width="408" height="340" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">1</span><p><i class="ferr">Mestre dos Carrosséis</i><b>Você escolhe a capa</b> entre cinco opções, cada uma com uma estrutura diferente.</p></figcaption></figure><figure class="passo"><img src="propostas/legacy/laminas-texto.jpg" alt="Mestre dos Carrosséis" width="408" height="340" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">2</span><p><i class="ferr">Mestre dos Carrosséis</i><b>O texto de cada lâmina</b> sai escrito, do gancho à conclusão.</p></figcaption></figure><figure class="passo"><img src="propostas/legacy/editor.jpg" alt="Editor de carrossel" width="604" height="500" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">3</span><p><i class="ferr">Editor de carrossel</i><b>Você ajusta o que quiser</b>, põe as suas fotos e exporta pronto para postar.</p></figcaption></figure></div>
-    <div class="antes">
-      <div><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Antes:</b> horas tentando montar sozinho, ou esperando o designer e explicando tudo de novo.</p></div>
-      <div class="agora"><span class="ic s" role="img" aria-label="Sim">✓</span><p><b>Agora:</b> você diz o tema, escolhe a capa, confere o texto e posta.</p></div>
-    </div>
-  </article>
-
-  <article class="ben">
-    <div class="ben-cab"><span class="pn">4</span><h3>Você deixa de falar para todo mundo. E passa a <em>falar com alguém.</em></h3></div>
-    <p class="lead">Tudo na Legacy começa entendendo quem você ajuda: as dores, os desejos, as dúvidas, até as frases que essa pessoa usa.
-    Daí em diante, cada tema, roteiro e carrossel é escrito para ela.</p>
-    <div class="mapa">
-      <div class="card pergs"><div class="t">Você responde 5 perguntas</div><ol><li><span class="pq">1</span>Quem é você e o que você faz hoje?</li><li><span class="pq">2</span>Quem exatamente você ajuda? O perfil e o momento de vida dessa pessoa.</li><li><span class="pq">3</span>Qual problema principal essa pessoa quer resolver?</li><li><span class="pq">4</span>Qual transformação você entrega?</li><li><span class="pq">5</span>Por que essa pessoa ainda não conseguiu chegar nesse resultado sozinha?</li></ol>
-        <p class="obs">Do seu jeito, escrevendo ou falando. Uma pergunta de cada vez.</p></div>
-      <div><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/perguntas.jpg" alt="Mapeamento do público: as 5 perguntas" width="604" height="500" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Mapeamento do público</div></div>
-    </div>
-    <div class="t2">E recebe o retrato de quem você ajuda, em 10 partes <span>exemplo: uma mentora de mães cristãs</span></div>
-    <div class="secs"><div class="sd"><b><span>1</span>Identidade</b><i>voz acolhedora, didática e espiritual</i></div><div class="sd"><b><span>2</span>Descrição do público</b><i>mãe cristã de 28 a 40 anos, filhos pequenos, rotina exaustiva</i></div><div class="sd"><b><span>3</span>Dores</b><i>“culpa por não dar conta de tudo”</i></div><div class="sd"><b><span>4</span>Desejos</b><i>“uma rotina simples que caiba na vida real”</i></div><div class="sd"><b><span>5</span>Crenças</b><i>“o tempo com Deus tem de ser perfeito para valer”</i></div><div class="sd"><b><span>6</span>Dúvidas</b><i>“vai funcionar na minha vida corrida?”</i></div><div class="sd"><b><span>7</span>Frustrações e sentimentos</b><i>cansaço, culpa, comparação</i></div><div class="sd"><b><span>8</span>Situações reais</b><i>“tenta orar de manhã e os filhos pedem atenção”</i></div><div class="sd"><b><span>9</span>Linguagem do público</b><i>as frases e as palavras que ela usa</i></div><div class="sd"><b><span>10</span>Aplicação para conteúdo</b><i>temas, ganchos e objeções que viram post</i></div></div>
-    <div class="frase"><span class="aspas" aria-hidden="true">“</span><div><p>Eu amo a Deus, mas parece que o dia não tem horas suficientes pra tudo.</p>
-      <i>Uma das frases que a Legacy tirou do público do exemplo. Isso já é o começo de um post.</i></div></div>
-  </article>
-
-  <div class="dest2">
-    <article class="dest"><img src="propostas/legacy/sistematizacao.jpg" alt="Sistematização: quadro da produção, da ideia à publicação" width="604" height="284" loading="lazy" decoding="async">
-      <div class="dest-t"><div class="ben-cab"><span class="pn">5</span><h3>A sua produção fica <em>organizada.</em></h3></div>
-      <p>Do tema ao roteiro, da gravação à publicação. Você vê onde está cada conteúdo, e nada fica pela metade.</p><div class="prova"><span>Na plataforma</span>Sistematização</div></div></article>
-    <article class="dest"><img src="propostas/legacy/aulas.jpg" alt="Aulas e cursos dentro da plataforma" width="604" height="284" loading="lazy" decoding="async">
-      <div class="dest-t"><div class="ben-cab"><span class="pn">6</span><h3>Você cresce com <em>autonomia.</em></h3></div>
-      <p>As aulas do método mostram o porquê de cada passo. Você entende o que faz, e não depende de ninguém para continuar.</p><div class="prova"><span>Na plataforma</span>Aulas do método</div></div></article>
-  </div>
+  <div class="b6"><article class="bcard"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg></span><h3>Você nunca mais começa <em>do zero.</em></h3><p>10 temas em alta por semana, já com o olhar do conteúdo cristão.</p><details class="vercomo"><summary><span class="vc-a">Ver como é</span><span class="vc-f">Fechar</span><i aria-hidden="true"></i></summary><div class="vc-in"><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/mochila.jpg" alt="Mochila de Ideias: temas em alta separados por assunto" width="604" height="430" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Mochila de Ideias</div></div></details></article><article class="bcard"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg></span><h3>Você passa a falar <em>com alguém.</em></h3><p>Cinco perguntas e o retrato de quem você ajuda: dores, desejos e as palavras que essa pessoa usa.</p><details class="vercomo"><summary><span class="vc-a">Ver como é</span><span class="vc-f">Fechar</span><i aria-hidden="true"></i></summary><div class="vc-in"><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/perguntas.jpg" alt="Mapeamento do público: as 5 perguntas" width="604" height="500" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Mapeamento do público</div></div></details></article><article class="bcard"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5.5C5.5 4 9 4 12 6c3-2 6.5-2 9-.5V19c-2.5-1.5-6-1.5-9 .5-3-2-6.5-2-9-.5z"/><path d="M12 6v13.5"/></svg></span><h3>O que você posta passa a <em>ensinar.</em></h3><p>Você pede, e recebe o roteiro pronto: do gancho à lição, na sua linguagem.</p><details class="vercomo"><summary><span class="vc-a">Ver como é</span><span class="vc-f">Fechar</span><i aria-hidden="true"></i></summary><div class="vc-in"><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/angulos.jpg" alt="Agente de roteiros: os ângulos de um roteiro" width="408" height="340" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Agente de roteiros</div></div></details></article><article class="bcard"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></span><h3>O carrossel fica pronto, <em>sem esperar designer.</em></h3><p>Do texto de cada lâmina ao modelo com as suas fotos, pronto para postar.</p><details class="vercomo"><summary><span class="vc-a">Ver como é</span><span class="vc-f">Fechar</span><i aria-hidden="true"></i></summary><div class="vc-in"><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/editor.jpg" alt="Editor de carrossel com as fotos" width="604" height="500" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Editor de carrossel</div></div></details></article><article class="bcard"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg></span><h3>A sua produção fica <em>organizada.</em></h3><p>Da ideia ao post publicado, num quadro só. Nada fica pela metade.</p><details class="vercomo"><summary><span class="vc-a">Ver como é</span><span class="vc-f">Fechar</span><i aria-hidden="true"></i></summary><div class="vc-in"><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/sistematizacao.jpg" alt="Sistematização: quadro da produção, da ideia à publicação" width="604" height="284" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Sistematização</div></div></details></article><article class="bcard"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span><h3>Você cresce com <em>autonomia.</em></h3><p>As aulas mostram o porquê de cada passo. No seu ritmo, sem depender de ninguém.</p><details class="vercomo"><summary><span class="vc-a">Ver como é</span><span class="vc-f">Fechar</span><i aria-hidden="true"></i></summary><div class="vc-in"><div class="janela"><div class="barra"><b></b><b></b><b></b><span>legado.club</span></div><img src="propostas/legacy/aulas.jpg" alt="Aulas e cursos dentro da plataforma" width="604" height="284" loading="lazy" decoding="async"></div><div class="prova"><span>Na plataforma</span>Aulas do método</div></div></details></article></div>
 </div></section>
 
-<!-- ══════════ AUTONOMIA ══════════ -->
-<section><div class="wrap">
-  <div class="sec">Autonomia</div>
-  <h2>Uma plataforma para usar sozinho. <em>No seu ritmo.</em></h2>
-  <p class="lead">A Legacy IA não depende de agenda, de equipe nem de horário marcado. Ela fica pronta para quando você estiver.</p>
-  <div class="ritmo"><div class="rit"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><h3>No seu ritmo</h3><p>Você decide quando e quanto produzir. A plataforma se adapta à sua rotina, não o contrário.</p></div><div class="rit"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></span><h3>A qualquer hora</h3><p>De manhã cedo, entre um compromisso e outro ou depois do culto: abriu, está tudo lá.</p></div><div class="rit"><span class="icn"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></span><h3>Sem depender de ninguém</h3><p>Sem fila de designer, sem esperar agência, sem horário marcado. Você entra e faz.</p></div></div>
-</div></section>
-
-<!-- ══════════ A PROVA: O TESTE NA PLATAFORMA ══════════ -->
+<!-- ══════════ UM TESTE DE VERDADE: as cenas tocam quando aparecem ══════════ -->
 <section id="teste"><div class="wrap">
   <div class="selo"><span class="ok" aria-hidden="true">✓</span>Um teste de verdade, na plataforma</div>
   <h2>Em poucos minutos, <em>o conteúdo da semana.</em></h2>
-  <p class="lead">A gente fez o teste com uma criadora de exemplo, uma mentora de mães cristãs. Ela pediu um roteiro sobre a culpa de não dar conta de tudo.
-  Em poucos minutos, tinha o roteiro, na linguagem dela, e um carrossel de dez lâminas, com a cara do público dela.</p>
-  <div class="grade3"><figure class="passo"><img src="propostas/legacy/teste-pedido.jpg" alt="O pedido" width="420" height="420" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">1</span><p><i class="ferr">O pedido</i><b>Uma frase, do jeito que ela falaria</b>: um roteiro para mães cristãs sobre a culpa de não dar conta de tudo.</p></figcaption></figure><figure class="passo"><img src="propostas/legacy/teste-roteiro.jpg" alt="O roteiro" width="408" height="340" class="tela" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">2</span><p><i class="ferr">O roteiro</i><b>O roteiro pronto</b>, do gancho à história, com o que gravar e o que escrever na tela.</p></figcaption></figure><figure class="passo"><img src="propostas/legacy/teste-carrossel.jpg" alt="O carrossel" width="1200" height="750" class="tela centro" loading="lazy" decoding="async"><figcaption class="pt"><span class="pq">3</span><p><i class="ferr">O carrossel</i><b>O carrossel montado</b>, com o nome, as fotos e a linguagem do público dela.</p></figcaption></figure></div>
-  <div class="rolo-cab"><b>As lâminas, uma a uma</b><span>Arraste para o lado →</span></div>
+  <p class="lead">A gente fez o teste com uma criadora de exemplo, a Ana, mentora de mães cristãs. Veja, passo a passo, o que a Legacy fez com ela.</p>
+  <ol class="cenas"><li class="cena-l"><div class="cena-t"><span class="cn-n">1</span><div><h3>Primeiro, a Legacy conhece <em>o público dela.</em></h3><p>Cinco perguntas, uma de cada vez, do jeito dela. Daí sai o retrato de quem ela ajuda, em 10 partes.</p><div class="prova"><span>Na plataforma</span>Mapeamento do público</div></div></div><div class="cena painel" data-cena="perguntas" data-ritmo="700" data-loop="3000"><div class="pn-cab"><span class="pn-tt">Mapeamento do público</span><span class="pn-cont"><b data-cont=".perg li">5</b>/5</span></div><ol class="perg"><li data-s="1"><span class="ck" aria-hidden="true"></span><div><b>Quem é você e o que você faz hoje?</b><i>“Sou a Ana, 38 anos, mãe de dois. Sirvo no ministério de mulheres há 10 anos.”</i></div></li><li data-s="2"><span class="ck" aria-hidden="true"></span><div><b>Quem exatamente você ajuda?</b><i>“Mães cristãs de 28 a 40 anos, com filhos pequenos e uma rotina cansada.”</i></div></li><li data-s="3"><span class="ck" aria-hidden="true"></span><div><b>Qual problema essa pessoa quer resolver?</b><i>“Sair do caos e da culpa, com tempo com Deus todo dia.”</i></div></li><li data-s="4"><span class="ck" aria-hidden="true"></span><div><b>Qual transformação você entrega?</b><i>“Uma rotina simples que funciona, e uma mãe em paz.”</i></div></li><li data-s="5"><span class="ck" aria-hidden="true"></span><div><b>Por que ela ainda não chegou lá sozinha?</b><i>“Tenta sozinha, sem um método, e a culpa faz desistir.”</i></div></li></ol><div class="pn-fim ent" data-s="6"><span class="ok" aria-hidden="true">✓</span>Retrato do público pronto, em 10 partes</div></div></li><li class="cena-l"><div class="cena-t"><span class="cn-n">2</span><div><h3>As pautas quentes da semana <em>chegam prontas.</em></h3><p>Toda semana chegam notícias e temas em alta, já com o olhar cristão. Ela escolhe um e manda para a produção.</p><div class="prova"><span>Na plataforma</span>Mochila de Ideias</div></div></div><div class="cena painel" data-cena="temas" data-ritmo="190" data-loop="3000"><div class="pn-cab"><span class="pn-tt">Mochila de Ideias</span><span class="semana"><i aria-hidden="true"></i>Esta semana</span></div><p class="pn-sub">Ideias reais da Mochila, com o olhar cristão</p><ul class="temas"><li data-s="1"><small>Igreja e Fé</small><b>Bear Grylls: em Cristo, o que as conquistas nunca entregaram</b></li><li data-s="2"><small>Teologia</small><b>Aslan surge na prévia do novo Nárnia, na criação do mundo</b></li><li data-s="3"><small>Psicologia</small><b>Criança de 2 anos reconhece letras em três idiomas com os pais</b></li><li data-s="4"><small>Família</small><b>Menina de 10 anos memoriza o livro de Tiago e recita os 108 versículos</b></li><li data-s="5"><small>Saúde</small><b>Aos 61 anos, canadense fica mais de 5 horas em prancha</b></li><li data-s="6"><small>Liderança Cristã</small><b>The Chosen vence o prêmio de Série de TV do Ano no Dove Awards</b></li><li data-s="7" class="esc" data-mark="12:esc"><small>Relacionamentos</small><b>Pai se emociona ao ver a filha de 21 anos pregando pela primeira vez</b></li><li data-s="8"><small>Louvor</small><b>Alok relembra o caminho do ateísmo à fé: “Jesus é meu melhor amigo”</b></li><li data-s="9"><small>Comunicação</small><b>“Carro voador” de Elon Musk vira febre e enche as redes de memes</b></li><li data-s="10" data-w="800"><small>Devocional</small><b>Mãe grava a filha cantando sobre a presença de Deus, e a cena emociona</b></li></ul><div class="tema-fim ent" data-s="12" data-w="900"><span class="seta" aria-hidden="true">→</span><b>Enviada para Sistematização</b></div></div></li><li class="cena-l"><div class="cena-t"><span class="cn-n">3</span><div><h3>Ela pede o roteiro. <em>A IA escreve com ela.</em></h3><p>Uma frase, do jeito que ela falaria. O agente devolve o ângulo, os ganchos e o roteiro em etapas, na linguagem do público dela.</p><div class="prova"><span>Na plataforma</span>Agente de roteiros</div></div></div><div class="cena painel chat" data-cena="roteiro" data-ritmo="450" data-loop="3000"><div class="pn-cab"><span class="pn-tt">Agente de roteiros</span><span class="pn-tag">Legacy IA</span></div><div class="msg eu ent" data-s="1"><span class="sr">Crie um roteiro de reels pedagógico para mães cristãs sobre a culpa de não dar conta de tudo.</span><span class="dig" aria-hidden="true" data-dig data-vel="20">Crie um roteiro de reels pedagógico para mães cristãs sobre a culpa de não dar conta de tudo.</span></div><div class="ia"><span class="ia-av" aria-hidden="true">L</span><div class="ia-c"><div class="r-bloco ent" data-s="2"><small>O ângulo</small><p><span class="sr">Você tenta orar de manhã, mas os filhos interrompem, e termina o dia achando que falhou com Deus.</span><span class="dig" aria-hidden="true" data-dig data-vel="16">Você tenta orar de manhã, mas os filhos interrompem, e termina o dia achando que falhou com Deus.</span></p></div><div class="r-bloco ent" data-s="3" data-w="300"><small>Os ganchos</small></div><div class="g-row ent" data-s="4" data-w="650"><b>Visual</b><span>Você diante da câmera, com a Bíblia aberta ao lado dos brinquedos das crianças.</span></div><div class="g-row ent" data-s="5" data-w="650"><b>Falado</b><span>“Se você quer ter tempo com Deus com filhos pequenos, talvez precise parar de esperar pela manhã perfeita.”</span></div><div class="g-row ent" data-s="6" data-w="650"><b>Escrito</b><span>“Seu devocional precisa ser perfeito?”</span></div><div class="r-bloco ent" data-s="7" data-w="250"><small>O roteiro em etapas</small></div><ol class="r-etapas"><li class="ent" data-s="8" data-w="200">Gancho visual</li><li class="ent" data-s="9" data-w="200">Gancho falado</li><li class="ent" data-s="10" data-w="200">Gancho escrito</li><li class="ent" data-s="11" data-w="200">Curiosidade</li><li class="ent" data-s="12" data-w="200">Contexto / história curta</li></ol></div></div></div></li><li class="cena-l largo"><div class="cena-t"><span class="cn-n">4</span><div><h3>O construtor monta o roteiro <em>camada por camada.</em></h3><p>O briefing, as 10 etapas do Formato Pedagógico de Conteúdo, do gancho ao fechamento, e a explicação de cada uma. Ela entende o porquê de cada parte, e aprende enquanto faz.</p><div class="prova"><span>Na plataforma</span>Construtor de Roteiro FCP</div></div></div><div class="cena painel fcp" data-cena="construtor" data-ritmo="780" data-loop="3000"><div class="fcp-top"><span class="fcp-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5.5C5.5 4 9 4 12 6c3-2 6.5-2 9-.5V19c-2.5-1.5-6-1.5-9 .5-3-2-6.5-2-9-.5z"/><path d="M12 6v13.5"/></svg></span><div class="fcp-tt"><b>Construtor de Roteiro FCP</b><small>Formato Pedagógico de Conteúdo</small></div><div class="fcp-prog"><small>Progresso</small><b><span data-cont=".fcp-cam li">10</span>/10</b><span class="fcp-barra" aria-hidden="true"><i data-prog=".fcp-cam li"></i></span></div></div><div class="fcp-acoes" aria-hidden="true"><span class="fcp-in fcp-tit">Título do roteiro</span><span class="fcp-bt prim">Salvar novo</span><span class="fcp-bt">+ Novo</span><span class="fcp-bt">Meus Roteiros</span><span class="fcp-bt">Exportar PDF</span></div><div class="fcp-brief"><div class="fcp-h2"><i aria-hidden="true"></i>Briefing do conteúdo</div><div class="fcp-campos"><div class="fcp-f"><small>Formato</small><span class="fcp-seg"><b>Reels</b><span>Carrossel</span></span></div><div class="fcp-f"><small>Tema</small><span class="fcp-in" data-s="1"><span class="sr">a culpa de não dar conta de tudo</span><span class="dig" aria-hidden="true" data-dig data-vel="34">a culpa de não dar conta de tudo</span></span></div><div class="fcp-f"><small>Avatar</small><span class="fcp-in" data-s="2"><span class="sr">mães cristãs de 28 a 40 anos</span><span class="dig" aria-hidden="true" data-dig data-vel="34">mães cristãs de 28 a 40 anos</span></span></div><div class="fcp-f"><small>Objetivo</small><span class="fcp-in" data-s="3"><span class="sr">gerar identificação</span><span class="dig" aria-hidden="true" data-dig data-vel="34">gerar identificação</span></span></div></div></div><div class="fcp-g"><div class="fcp-col fcp-cam" data-atual><div class="fcp-h">Camadas</div><div class="fcp-grupos"><div class="fcp-gr"><small>Abertura</small><ol><li data-s="4"><i aria-hidden="true"></i>Gancho Visual</li><li data-s="5"><i aria-hidden="true"></i>Gancho Escrito (Headline)</li><li data-s="6"><i aria-hidden="true"></i>Gancho Falado</li><li data-s="7"><i aria-hidden="true"></i>Curiosidade</li></ol></div><div class="fcp-gr"><small>Desenvolvimento</small><ol><li data-s="8"><i aria-hidden="true"></i>Contexto / História Curta</li><li data-s="9"><i aria-hidden="true"></i>Correlação</li><li data-s="10"><i aria-hidden="true"></i>Embasamento</li></ol></div><div class="fcp-gr"><small>Resolução</small><ol><li data-s="11"><i aria-hidden="true"></i>Moral</li><li data-s="12"><i aria-hidden="true"></i>Autoridade</li></ol></div><div class="fcp-gr"><small>Fechamento</small><ol><li data-s="13"><i aria-hidden="true"></i>CTA</li></ol></div></div></div><div class="fcp-col fcp-card"><div class="pilha" data-solo><div class="cf" data-s="4"><div class="cf-cab"><span class="cf-pill">Abertura</span><span>Etapa 1 de 10</span></div><h4>Gancho Visual</h4><p class="cf-obj">Capturar atenção nos primeiros 0,5 segundos com um estímulo visual forte.</p><p>É a primeira coisa que o espectador VÊ. Precisa ser inesperado e gerar pausa no scroll.</p></div><div class="cf" data-s="5"><div class="cf-cab"><span class="cf-pill">Abertura</span><span>Etapa 2 de 10</span></div><h4>Gancho Escrito (Headline)</h4><p class="cf-obj">Dizer na tela, em poucas palavras, por que vale ficar.</p><p>O texto grande que a pessoa lê antes de ouvir qualquer coisa.</p></div><div class="cf" data-s="6"><div class="cf-cab"><span class="cf-pill">Abertura</span><span>Etapa 3 de 10</span></div><h4>Gancho Falado</h4><p class="cf-obj">A primeira frase dita: curta, direta e com tensão.</p><p>Ela confirma o que a imagem e o texto prometeram.</p></div><div class="cf" data-s="7"><div class="cf-cab"><span class="cf-pill">Abertura</span><span>Etapa 4 de 10</span></div><h4>Curiosidade</h4><p class="cf-obj">Abrir uma pergunta que só o resto do vídeo responde.</p><p>É o que faz a pessoa assistir até o fim.</p></div><div class="cf" data-s="8"><div class="cf-cab"><span class="cf-pill">Desenvolvimento</span><span>Etapa 5 de 10</span></div><h4>Contexto / História Curta</h4><p class="cf-obj">Uma cena real que o público reconhece na hora.</p><p>A história curta aproxima e prepara o ensino.</p></div><div class="cf" data-s="9"><div class="cf-cab"><span class="cf-pill">Desenvolvimento</span><span>Etapa 6 de 10</span></div><h4>Correlação</h4><p class="cf-obj">Ligar a história ao problema de quem assiste.</p><p>A pessoa entende que aquilo é sobre ela.</p></div><div class="cf" data-s="10"><div class="cf-cab"><span class="cf-pill">Desenvolvimento</span><span>Etapa 7 de 10</span></div><h4>Embasamento</h4><p class="cf-obj">A base que sustenta o que você ensina.</p><p>A Palavra, um dado ou a sua experiência.</p></div><div class="cf" data-s="11"><div class="cf-cab"><span class="cf-pill">Resolução</span><span>Etapa 8 de 10</span></div><h4>Moral</h4><p class="cf-obj">A lição que fica, em uma frase.</p><p>O que a pessoa leva para a vida depois do vídeo.</p></div><div class="cf" data-s="12"><div class="cf-cab"><span class="cf-pill">Resolução</span><span>Etapa 9 de 10</span></div><h4>Autoridade</h4><p class="cf-obj">Mostrar por que você pode ensinar isso.</p><p>Com humildade, a partir da sua história e do seu chamado.</p></div><div class="cf cf-fim" data-s="13"><div class="cf-cab"><span class="cf-pill">Fechamento</span><span>Etapa 10 de 10</span></div><h4>CTA</h4><p class="cf-obj">O próximo passo claro para quem assistiu.</p><p>Salvar, comentar, compartilhar ou seguir: uma ação só.</p></div></div></div><div class="fcp-col fcp-funil" data-atual><div class="fcp-h2"><i aria-hidden="true"></i>Funil FCP</div><ol><li data-s="4" style="--k:0"><b>1</b><span>Gancho Visual</span></li><li data-s="5" style="--k:1"><b>2</b><span>Gancho Escrito (Headline)</span></li><li data-s="6" style="--k:2"><b>3</b><span>Gancho Falado</span></li><li data-s="7" style="--k:3"><b>4</b><span>Curiosidade</span></li><li data-s="8" style="--k:4"><b>5</b><span>Contexto / História Curta</span></li><li data-s="9" style="--k:5"><b>6</b><span>Correlação</span></li><li data-s="10" style="--k:6"><b>7</b><span>Embasamento</span></li><li data-s="11" style="--k:7"><b>8</b><span>Moral</span></li><li data-s="12" style="--k:8"><b>9</b><span>Autoridade</span></li><li data-s="13" style="--k:9"><b>10</b><span>CTA</span></li></ol></div></div></div></li><li class="cena-l largo"><div class="cena-t"><span class="cn-n">5</span><div><h3>E o carrossel fica pronto, <em>sem esperar designer.</em></h3><p>Ela diz o tema, escolhe a capa entre cinco opções, confere o texto de cada lâmina e exporta com as fotos. Em poucos minutos.</p><div class="prova"><span>Na plataforma</span>Mestre dos Carrosséis</div></div></div><div class="cena painel carro" data-cena="carrossel" data-ritmo="420" data-loop="3000"><div class="pn-cab"><span class="pn-tt">Mestre dos Carrosséis</span><span class="pn-tag">Carrossel</span></div><div class="cr-g"><div class="cr-passo"><small>O tema</small><div class="cr-campo ent" data-s="1"><span class="sr">a culpa de não dar conta de tudo</span><span class="dig" aria-hidden="true" data-dig data-vel="45">a culpa de não dar conta de tudo</span></div></div><div class="cr-passo"><small>Escolha a capa · 5 opções</small><ul class="capas"><li class="ent" data-s="2" data-w="170">Contraste</li><li class="ent" data-s="3" data-w="170">Causa e efeito</li><li class="ent esc" data-s="4" data-w="170" data-mark="7:esc">Inversão</li><li class="ent" data-s="5" data-w="170">Dados</li><li class="ent" data-s="6" data-w="170">Duas partes</li></ul><p class="capa-esc ent" data-s="7" data-w="900">“Por que a sua culpa não é falta de disciplina, mas uma armadilha espiritual.”</p></div></div><div class="cr-passo"><small>As lâminas</small><div class="pilha"><ol class="cr-textos sai" data-mark="13:sai"><li data-s="8" data-w="480"><b>1</b>Por que a sua culpa não é falta de disciplina, mas uma armadilha espiritual.</li><li data-s="9" data-w="480"><b>2</b>O cobrador que nunca sai da sua casa.</li><li data-s="10" data-w="480"><b>3</b>Quanto mais você tenta, mais se afunda.</li><li data-s="11" data-w="480"><b>4</b>A ilusão da mãe perfeita.</li><li data-s="12" data-w="480"><b>5</b>A verdade que ninguém te contou.</li></ol><div class="cr-fotos"><img data-s="13" data-w="230" src="propostas/legacy/lamina-1.jpg" alt="Lâmina 1 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="14" data-w="230" src="propostas/legacy/lamina-2.jpg" alt="Lâmina 2 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="15" data-w="230" src="propostas/legacy/lamina-3.jpg" alt="Lâmina 3 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="16" data-w="230" src="propostas/legacy/lamina-4.jpg" alt="Lâmina 4 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="17" data-w="230" src="propostas/legacy/lamina-5.jpg" alt="Lâmina 5 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="18" data-w="230" src="propostas/legacy/lamina-6.jpg" alt="Lâmina 6 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="19" data-w="230" src="propostas/legacy/lamina-7.jpg" alt="Lâmina 7 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="20" data-w="230" src="propostas/legacy/lamina-8.jpg" alt="Lâmina 8 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img data-s="21" data-w="230" src="propostas/legacy/lamina-9.jpg" alt="Lâmina 9 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"></div></div></div></div></li></ol>
+  <div class="rolo-cab"><b>O carrossel pronto, lâmina por lâmina</b><span>Arraste para o lado →</span></div>
   <div class="rolo" tabindex="0" aria-label="Lâminas do carrossel “A armadilha da culpa”"><img src="propostas/legacy/lamina-1.jpg" alt="Lâmina 1 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-2.jpg" alt="Lâmina 2 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-3.jpg" alt="Lâmina 3 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-4.jpg" alt="Lâmina 4 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-5.jpg" alt="Lâmina 5 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-6.jpg" alt="Lâmina 6 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-7.jpg" alt="Lâmina 7 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-8.jpg" alt="Lâmina 8 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"><img src="propostas/legacy/lamina-9.jpg" alt="Lâmina 9 do carrossel “A armadilha da culpa”" width="540" height="675" loading="lazy" decoding="async"></div>
-  <p class="nota">Exemplo feito na própria Legacy IA, com uma pessoa fictícia (“Ana”, mentora de mães cristãs). O carrossel “A armadilha da culpa” foi exportado da plataforma.</p>
-  <div class="faixa">Sem esperar ninguém.</div>
-</div></section>
-
-<!-- ══════════ O FUTURO ══════════ -->
-<section><div class="wrap">
-  <div class="cartao-g futuro">
-    <div class="sec">Agora imagine</div>
-    <p class="grande">Abrir o celular e saber<br><em class="gr">exatamente o que falar.</em></p>
-    <span>Postar com constância, sem perder a sua essência. E ver a sua mensagem chegar em quem precisa dela.</span>
+  <p class="nota">Exemplo feito na própria Legacy IA, com uma pessoa fictícia (“Ana”, mentora de mães cristãs). Os textos das cenas são os do teste; as ideias da Mochila são reais, da própria plataforma (mudam toda semana). O carrossel “A armadilha da culpa” foi exportado da plataforma.</p>
+  <div class="sem-ap" id="sem-aparecer">
+    <div class="sec">Crescer sem aparecer</div>
+    <h3 class="sem-ap-t">Carrossel não pede câmera <em>nem rosto.</em></h3>
+    <p class="lead">Você ensina com texto e imagem, no seu tempo. Veja carrosséis reais de quem aplica o método da Promov:</p>
+    <div class="carr-g"><figure class="carr"><img src="propostas/legacy/carr-diane.jpg" alt="Print real das estatísticas de um carrossel no Instagram" width="420" height="562" loading="lazy" decoding="async"><figcaption><b class="carr-n" data-ate="3087964">3.087.964</b><span class="carr-l">visualizações</span><strong>Diane de Paula</strong><small>+4.186 seguidores com um só carrossel</small></figcaption></figure><figure class="carr"><img src="propostas/legacy/carr-641.jpg" alt="Print real das estatísticas de um carrossel no Instagram" width="420" height="481" loading="lazy" decoding="async"><figcaption><b class="carr-n" data-ate="641913">641.913</b><span class="carr-l">visualizações</span><strong>Carrossel feito logo depois do workshop</strong><small>98 seguidores novos</small></figcaption></figure><figure class="carr"><img src="propostas/legacy/carr-158.jpg" alt="Print real das estatísticas de um carrossel no Instagram" width="420" height="455" loading="lazy" decoding="async"><figcaption><b class="carr-n" data-ate="158550">158.550</b><span class="carr-l">visualizações</span><strong>Seguindo o método, passo a passo</strong><small>+221 seguidores</small></figcaption></figure><figure class="carr"><img src="propostas/legacy/carr-joao.jpg" alt="Print real das estatísticas de um carrossel no Instagram" width="420" height="601" loading="lazy" decoding="async"><figcaption><b class="carr-n" data-ate="58153">58.153</b><span class="carr-l">visualizações</span><strong>João Stecca, quem criou o método</strong><small>677 comentários</small></figcaption></figure></div>
+    <p class="nota">Prints reais do Instagram, de quem aplica o método da Promov (resultado do método, não da plataforma sozinha). A capa do primeiro foi borrada porque fala de outra pessoa; no segundo, os perfis da colaboração.</p>
   </div>
+  <script>(function () { var g = document.querySelector('.carr-g'); if (!g || !window.IntersectionObserver) return;
+    try { if (matchMedia('(prefers-reduced-motion: reduce)').matches || matchMedia('print').matches) return; } catch (e) { return; }
+    var ns = g.querySelectorAll('.carr-n'), fmt = function (v) { return Math.round(v).toLocaleString('pt-BR'); };
+    var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (!e.isIntersecting) return; io.disconnect(); g.classList.add('carr-in');
+      Array.prototype.forEach.call(ns, function (el, i) { var ate = +el.getAttribute('data-ate'), t0 = null, D = 1600 + i * 250;
+        el.style.minWidth = el.getBoundingClientRect().width + 'px'; el.textContent = '0';
+        (function passo(t) { if (!t0) t0 = t; var u = Math.min(1, (t - t0) / D); el.textContent = fmt(ate * (1 - Math.pow(1 - u, 3))); if (u < 1) requestAnimationFrame(passo); })(performance.now());
+      }); }); }, { threshold: .25 });
+    g.classList.add('carr-pre'); io.observe(g); })();</script>
 </div></section>
 
-<!-- ══════════ A ESCOLHA ══════════ -->
-<section id="escolha"><div class="wrap">
-  <div class="sec">A escolha</div>
+<!-- ══════════ POR DENTRO: formatos e aulas ══════════ -->
+<section id="por-dentro"><div class="wrap">
+  <div class="sec">Por dentro da Legacy</div>
+  <h2>17 formatos pedagógicos <em>e as aulas do método.</em></h2>
+  <p class="lead">Para variar a gravação sem perder o método, e para você entender o porquê de cada passo.</p>
+  <div class="t3">Formatos de vídeo <span>para gravar do seu jeito</span></div>
+  <ul class="formatos" data-cena="formatos" data-ritmo="70"><li class="fmt" data-s="1"><span class="fe" aria-hidden="true">🎬</span><div><b>Análise / React</b><small>Desconstrua o sucesso de alguém e mostre as decisões por trás.</small></div></li><li class="fmt" data-s="2"><span class="fe" aria-hidden="true">🟢</span><div><b>Fundo verde</b><small>Qualquer parede vira cenário profissional.</small></div></li><li class="fmt" data-s="3"><span class="fe" aria-hidden="true">🗣️</span><div><b>“Fofoca” pedagógica</b><small>Conversa íntima, com efeito de bastidor.</small></div></li><li class="fmt" data-s="4"><span class="fe" aria-hidden="true">⚡</span><div><b>Dinamismo</b><small>Mudança de cena, ângulo ou movimento a cada poucos segundos.</small></div></li><li class="fmt" data-s="5"><span class="fe" aria-hidden="true">✂️</span><div><b>Tramontina / Corte rápido</b><small>Responda uma ideia errada com firmeza e clareza.</small></div></li><li class="fmt" data-s="6"><span class="fe" aria-hidden="true">☕</span><div><b>Trivial</b><small>Fale enquanto faz uma ação do dia a dia.</small></div></li><li class="fmt" data-s="7"><span class="fe" aria-hidden="true">🎧</span><div><b>Lo-fi</b><small>Simples, cru e direto, como um Stories gravado na hora.</small></div></li><li class="fmt" data-s="8"><span class="fe" aria-hidden="true">📹</span><div><b>Vlog</b><small>Uma janela para a sua vida real.</small></div></li><li class="fmt" data-s="9"><span class="fe" aria-hidden="true">🎭</span><div><b>Encenação</b><small>Exagere um comportamento para criar identificação.</small></div></li><li class="fmt" data-s="10"><span class="fe" aria-hidden="true">🧠</span><div><b>Vozes da minha cabeça</b><small>Narre um roteiro interno enquanto atua a cena.</small></div></li><li class="fmt" data-s="11"><span class="fe" aria-hidden="true">⚖️</span><div><b>Comparação</b><small>Dois personagens lado a lado no mesmo quadro.</small></div></li><li class="fmt" data-s="12"><span class="fe" aria-hidden="true">💭</span><div><b>Diálogo</b><small>Dois personagens com visões opostas.</small></div></li><li class="fmt" data-s="13"><span class="fe" aria-hidden="true">🎤</span><div><b>Palestra</b><small>Postura de palestrante, diante de slides ou quadro.</small></div></li><li class="fmt" data-s="14"><span class="fe" aria-hidden="true">📩</span><div><b>Caixinha de perguntas</b><small>Responda perguntas fortes da sua audiência.</small></div></li><li class="fmt" data-s="15"><span class="fe" aria-hidden="true">✅</span><div><b>Certo × errado</b><small>O comportamento errado, a virada e a solução certa.</small></div></li><li class="fmt" data-s="16"><span class="fe" aria-hidden="true">📖</span><div><b>Narrado</b><small>Narração sobre imagens da sua galeria ou do dia a dia.</small></div></li><li class="fmt" data-s="17"><span class="fe" aria-hidden="true">🎙️</span><div><b>Entrevista</b><small>Uma autoridade, ou pessoas em espaços públicos.</small></div></li></ul>
+  <div class="t3">Aulas e cursos <span>dentro da plataforma</span></div>
+  <div class="corre cursos" role="region" aria-label="Cursos dentro da Legacy IA" tabindex="0"><div class="corre-trilho" style="--dur:34s"><div class="corre-g"><div class="curso c1"><span class="ce" aria-hidden="true">🧭</span><div><small>Fundamentos, temas, formatos e ganchos</small><b>Método Conteúdo Pedagógico</b></div></div><div class="curso c2"><span class="ce" aria-hidden="true">✍️</span><div><small>Do tema ao roteiro, organizado</small><b>Roteiros</b></div></div><div class="curso c3"><span class="ce" aria-hidden="true">📘</span><div><small>O seu e-book e o seu próprio agente</small><b>Ebooks com IA</b></div></div><div class="curso c4"><span class="ce" aria-hidden="true">📱</span><div><small>Curso</small><b>Estúdio de bolso</b></div></div><div class="curso c5"><span class="ce" aria-hidden="true">⚙️</span><div><small>Curso</small><b>Máquina automática de Copys</b></div></div><div class="curso c6"><span class="ce" aria-hidden="true">🔎</span><div><small>Análise dos melhores criativos</small><b>Coleção Secreta dos Criativos</b></div></div></div><div class="corre-g corre-dup" aria-hidden="true"><div class="curso c1"><span class="ce" aria-hidden="true">🧭</span><div><small>Fundamentos, temas, formatos e ganchos</small><b>Método Conteúdo Pedagógico</b></div></div><div class="curso c2"><span class="ce" aria-hidden="true">✍️</span><div><small>Do tema ao roteiro, organizado</small><b>Roteiros</b></div></div><div class="curso c3"><span class="ce" aria-hidden="true">📘</span><div><small>O seu e-book e o seu próprio agente</small><b>Ebooks com IA</b></div></div><div class="curso c4"><span class="ce" aria-hidden="true">📱</span><div><small>Curso</small><b>Estúdio de bolso</b></div></div><div class="curso c5"><span class="ce" aria-hidden="true">⚙️</span><div><small>Curso</small><b>Máquina automática de Copys</b></div></div><div class="curso c6"><span class="ce" aria-hidden="true">🔎</span><div><small>Análise dos melhores criativos</small><b>Coleção Secreta dos Criativos</b></div></div></div></div></div>
+  <div class="metodo"><div class="metodo-t">Método Conteúdo Pedagógico</div><ol class="modulos" data-cena="modulos" data-ritmo="520"><li data-s="1"><span class="mo-p" aria-hidden="true">1</span><small>Módulo 1</small>Fundamentos</li><li data-s="2"><span class="mo-p" aria-hidden="true">2</span><small>Módulo 2</small>Temas interessantes</li><li data-s="3"><span class="mo-p" aria-hidden="true">3</span><small>Módulo 3</small>Formatos de conteúdo</li><li data-s="4"><span class="mo-p" aria-hidden="true">4</span><small>Módulo 4</small>Ganchos</li><li data-s="5"><span class="mo-p" aria-hidden="true">+</span><small>Extra</small>Bônus</li></ol></div>
+</div></section>
+
+<!-- ══════════ APOIO: cases e famosos (da PROMOV; compacto) ══════════ -->
+<section id="cases" class="apoio"><div class="wrap">
+  <div class="sec">Quem já aplicou o método</div>
+  <h2 class="h2-menor">O método que está dentro da Legacy <em>já levou essas pessoas longe.</em></h2>
+  <p class="lead">Mentorados da Promov que aplicaram o mesmo método de conteúdo que você usa na plataforma.</p>
+  <div class="corre casebar" role="region" aria-label="Cases: o perfil antes e depois de aplicar o método" tabindex="0"><div class="corre-trilho" style="--dur:95s"><div class="corre-g"><figure class="case" data-ba data-antes="68 mil" data-depois="256 mil"><div class="ba"><img src="propostas/legacy/ba-denio-a.jpg" alt="Perfil de Dênio Lara antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-denio-d.jpg" alt="Perfil de Dênio Lara depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Dênio Lara</b><span class="ba-num"><b class="ba-n">256 mil</b> seguidores</span><small>de 68 mil para 256 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="16 mil" data-depois="204 mil"><div class="ba"><img src="propostas/legacy/ba-alexsandra-a.jpg" alt="Perfil de Alexsandra Sardinha antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-alexsandra-d.jpg" alt="Perfil de Alexsandra Sardinha depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Alexsandra Sardinha</b><span class="ba-num"><b class="ba-n">204 mil</b> seguidores</span><small>de 16 mil para 204 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="2.654" data-depois="178 mil"><div class="ba"><img src="propostas/legacy/ba-leticia-a.jpg" alt="Perfil de Dra. Letícia Bolentine antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-leticia-d.jpg" alt="Perfil de Dra. Letícia Bolentine depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Dra. Letícia Bolentine</b><span class="ba-num"><b class="ba-n">178 mil</b> seguidores</span><small>de 2.654 para 178 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="2.254" data-depois="129 mil"><div class="ba"><img src="propostas/legacy/ba-diego-a.jpg" alt="Perfil de Diego Ângelo antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-diego-d.jpg" alt="Perfil de Diego Ângelo depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Diego Ângelo</b><span class="ba-num"><b class="ba-n">129 mil</b> seguidores</span><small>de 2.254 para 129 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="6 mil" data-depois="+200 mil"><div class="ba"><img src="propostas/legacy/ba-stecca-a.jpg" alt="Perfil de João Stecca antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-stecca-d.jpg" alt="Perfil de João Stecca depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><span class="case-tag">Quem criou o método, no próprio perfil</span><b class="case-n">João Stecca</b><span class="ba-num"><b class="ba-n">+200 mil</b> seguidores</span><small>de 6 mil para +200 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="9 mil" data-depois="77,7 mil"><div class="ba"><img src="propostas/legacy/ba-aline-a.jpg" alt="Perfil de Aline Resende antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-aline-d.jpg" alt="Perfil de Aline Resende depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Aline Resende</b><span class="ba-num"><b class="ba-n">77,7 mil</b> seguidores</span><small>de 9 mil para 77,7 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="537" data-depois="62,1 mil"><div class="ba"><img src="propostas/legacy/ba-fabio-a.jpg" alt="Perfil de Fabio Pires antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-fabio-d.jpg" alt="Perfil de Fabio Pires depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Fabio Pires</b><span class="ba-num"><b class="ba-n">62,1 mil</b> seguidores</span><small>de 537 para 62,1 mil no Instagram</small></figcaption></figure></div><div class="corre-g corre-dup" aria-hidden="true"><figure class="case" data-ba data-antes="68 mil" data-depois="256 mil"><div class="ba"><img src="propostas/legacy/ba-denio-a.jpg" alt="Perfil de Dênio Lara antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-denio-d.jpg" alt="Perfil de Dênio Lara depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Dênio Lara</b><span class="ba-num"><b class="ba-n">256 mil</b> seguidores</span><small>de 68 mil para 256 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="16 mil" data-depois="204 mil"><div class="ba"><img src="propostas/legacy/ba-alexsandra-a.jpg" alt="Perfil de Alexsandra Sardinha antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-alexsandra-d.jpg" alt="Perfil de Alexsandra Sardinha depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Alexsandra Sardinha</b><span class="ba-num"><b class="ba-n">204 mil</b> seguidores</span><small>de 16 mil para 204 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="2.654" data-depois="178 mil"><div class="ba"><img src="propostas/legacy/ba-leticia-a.jpg" alt="Perfil de Dra. Letícia Bolentine antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-leticia-d.jpg" alt="Perfil de Dra. Letícia Bolentine depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Dra. Letícia Bolentine</b><span class="ba-num"><b class="ba-n">178 mil</b> seguidores</span><small>de 2.654 para 178 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="2.254" data-depois="129 mil"><div class="ba"><img src="propostas/legacy/ba-diego-a.jpg" alt="Perfil de Diego Ângelo antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-diego-d.jpg" alt="Perfil de Diego Ângelo depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Diego Ângelo</b><span class="ba-num"><b class="ba-n">129 mil</b> seguidores</span><small>de 2.254 para 129 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="6 mil" data-depois="+200 mil"><div class="ba"><img src="propostas/legacy/ba-stecca-a.jpg" alt="Perfil de João Stecca antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-stecca-d.jpg" alt="Perfil de João Stecca depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><span class="case-tag">Quem criou o método, no próprio perfil</span><b class="case-n">João Stecca</b><span class="ba-num"><b class="ba-n">+200 mil</b> seguidores</span><small>de 6 mil para +200 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="9 mil" data-depois="77,7 mil"><div class="ba"><img src="propostas/legacy/ba-aline-a.jpg" alt="Perfil de Aline Resende antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-aline-d.jpg" alt="Perfil de Aline Resende depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Aline Resende</b><span class="ba-num"><b class="ba-n">77,7 mil</b> seguidores</span><small>de 9 mil para 77,7 mil no Instagram</small></figcaption></figure><figure class="case" data-ba data-antes="537" data-depois="62,1 mil"><div class="ba"><img src="propostas/legacy/ba-fabio-a.jpg" alt="Perfil de Fabio Pires antes" width="720" height="240" class="ba-a" loading="lazy" decoding="async"><img src="propostas/legacy/ba-fabio-d.jpg" alt="Perfil de Fabio Pires depois" width="720" height="240" class="ba-d" loading="lazy" decoding="async"><i class="ba-linha" aria-hidden="true"></i><span class="selo selo-a" aria-hidden="true">Antes</span><span class="selo selo-d" aria-hidden="true">Depois</span></div><figcaption><b class="case-n">Fabio Pires</b><span class="ba-num"><b class="ba-n">62,1 mil</b> seguidores</span><small>de 537 para 62,1 mil no Instagram</small></figcaption></figure></div></div></div>
+  <p class="nichos">A Promov já ajudou a impulsionar centenas de perfis pequenos, de diversos nichos: psiquiatria, pastores, finanças, moda, terapeutas, desenvolvimento pessoal.</p>
+  <div class="t3">Conteúdos de quem aplica o método <span>com as visualizações</span></div>
+  <div class="corre reels" role="region" aria-label="Conteúdos de quem aplica o método, com as visualizações" tabindex="0"><div class="corre-trilho" style="--dur:60s"><div class="corre-g"><img src="propostas/legacy/reel-6.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-7.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-8.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-9.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-11.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-12.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-13.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-18.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-20.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-24.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-25.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-26.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"></div><div class="corre-g corre-dup" aria-hidden="true"><img src="propostas/legacy/reel-6.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-7.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-8.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-9.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-11.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-12.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-13.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-18.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-20.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-24.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-25.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"><img src="propostas/legacy/reel-26.webp" alt="Capa de um conteúdo com o número de visualizações" width="300" height="470" class="reel" loading="lazy" decoding="async"></div></div></div>
+  <div class="t3">Projetos e pessoas com quem a Promov já trabalhou</div>
+  <div class="corre fams" role="region" aria-label="Projetos e pessoas com quem a Promov já trabalhou" tabindex="0"><div class="corre-trilho" style="--dur:48s"><div class="corre-g"><div class="fam"><img src="propostas/legacy/fam-claudio-duarte.jpg" alt="Cláudio Duarte" width="128" height="128" loading="lazy" decoding="async"><div><b>Cláudio Duarte</b><small>+10M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-tiago-brunet.jpg" alt="Tiago Brunet" width="128" height="128" loading="lazy" decoding="async"><div><b>Tiago Brunet</b><small>+7M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-camila-barros.jpg" alt="Camila Barros" width="128" height="128" loading="lazy" decoding="async"><div><b>Camila Barros</b><small>+4M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-elizeu-rodrigues.jpg" alt="Elizeu Rodrigues" width="128" height="128" loading="lazy" decoding="async"><div><b>Elizeu Rodrigues</b><small>+3M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-sarah-farias.jpg" alt="Sarah Farias" width="128" height="128" loading="lazy" decoding="async"><div><b>Sarah Farias</b><small>+2,8M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-thalitha-pereira.jpg" alt="Thalitha Pereira" width="128" height="128" loading="lazy" decoding="async"><div><b>Thalitha Pereira</b><small>+1,5M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-gabriela-lopes.jpg" alt="Gabriela Lopes" width="128" height="128" loading="lazy" decoding="async"><div><b>Gabriela Lopes</b><small>+1,2M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-helena-raquel.jpg" alt="Helena Raquel" width="128" height="128" loading="lazy" decoding="async"><div><b>Helena Raquel</b><small>+1,2M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-mateus-eleuterio.jpg" alt="Mateus Eleutério" width="128" height="128" loading="lazy" decoding="async"><div><b>Mateus Eleutério</b><small>+1,1M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-alana-anijar.jpg" alt="Alana Anijar" width="128" height="128" loading="lazy" decoding="async"><div><b>Alana Anijar</b><small>+377 mil seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-fernanda-boaventura.jpg" alt="Fernanda Boaventura" width="128" height="128" loading="lazy" decoding="async"><div><b>Fernanda Boaventura</b><small>+358 mil seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-davi-lago.jpg" alt="Davi Lago" width="128" height="128" loading="lazy" decoding="async"><div><b>Davi Lago</b><small>+124 mil seguidores</small></div></div></div><div class="corre-g corre-dup" aria-hidden="true"><div class="fam"><img src="propostas/legacy/fam-claudio-duarte.jpg" alt="Cláudio Duarte" width="128" height="128" loading="lazy" decoding="async"><div><b>Cláudio Duarte</b><small>+10M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-tiago-brunet.jpg" alt="Tiago Brunet" width="128" height="128" loading="lazy" decoding="async"><div><b>Tiago Brunet</b><small>+7M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-camila-barros.jpg" alt="Camila Barros" width="128" height="128" loading="lazy" decoding="async"><div><b>Camila Barros</b><small>+4M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-elizeu-rodrigues.jpg" alt="Elizeu Rodrigues" width="128" height="128" loading="lazy" decoding="async"><div><b>Elizeu Rodrigues</b><small>+3M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-sarah-farias.jpg" alt="Sarah Farias" width="128" height="128" loading="lazy" decoding="async"><div><b>Sarah Farias</b><small>+2,8M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-thalitha-pereira.jpg" alt="Thalitha Pereira" width="128" height="128" loading="lazy" decoding="async"><div><b>Thalitha Pereira</b><small>+1,5M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-gabriela-lopes.jpg" alt="Gabriela Lopes" width="128" height="128" loading="lazy" decoding="async"><div><b>Gabriela Lopes</b><small>+1,2M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-helena-raquel.jpg" alt="Helena Raquel" width="128" height="128" loading="lazy" decoding="async"><div><b>Helena Raquel</b><small>+1,2M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-mateus-eleuterio.jpg" alt="Mateus Eleutério" width="128" height="128" loading="lazy" decoding="async"><div><b>Mateus Eleutério</b><small>+1,1M seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-alana-anijar.jpg" alt="Alana Anijar" width="128" height="128" loading="lazy" decoding="async"><div><b>Alana Anijar</b><small>+377 mil seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-fernanda-boaventura.jpg" alt="Fernanda Boaventura" width="128" height="128" loading="lazy" decoding="async"><div><b>Fernanda Boaventura</b><small>+358 mil seguidores</small></div></div><div class="fam"><img src="propostas/legacy/fam-davi-lago.jpg" alt="Davi Lago" width="128" height="128" loading="lazy" decoding="async"><div><b>Davi Lago</b><small>+124 mil seguidores</small></div></div></div></div></div>
+  <p class="nota">Resultados da mentoria e do método da Promov, não da plataforma sozinha. Números de seguidores conforme resultados.joaostecca.com; as imagens registram os perfis em outro momento.</p>
+</div></section>
+
+<!-- ══════════ COMPARE ══════════ -->
+<section id="compare"><div class="wrap">
+  <div class="sec">Compare</div>
   <h2>Como você quer <em>chegar lá?</em></h2>
-  <p class="lead">Sozinho, você trava. Com a IA comum, a mensagem perde a essência. Com uma agência, você explica tudo de novo e perde a sua voz.</p>
-  <table class="cmp"><thead><tr><th scope="col"><span class="sr">O que você ganha</span></th><th scope="col" class="leg"><span class="logo">L</span>Legacy IA</th><th scope="col" class="">Sozinho</th><th scope="col" class="">IA comum</th><th scope="col" class="">Agência</th></tr></thead><tbody><tr><td class="cr">Você sabe o que postar</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span><small>temas em alta toda semana</small></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA comum" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>ideias genéricas</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>se você passar o briefing</small></td></tr><tr><td class="cr">Fala a língua do público cristão</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="IA comum" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>só se você explicar toda vez</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>depende da equipe</small></td></tr><tr><td class="cr">Conteúdo que ensina, com método</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA comum" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>se você souber pedir</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>depende da equipe</small></td></tr><tr><td class="cr">Continua sendo a sua voz</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="IA comum" class=""><span class="ic n" role="img" aria-label="Não">✕</span><small>troca as suas palavras</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>muitas vezes, não</small></td></tr><tr><td class="cr">Constância sem depender de ninguém</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA comum" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span></td><td data-c="Agência" class=""><span class="ic n" role="img" aria-label="Não">✕</span><small>prazo e fila</small></td></tr><tr><td class="cr">Faz e posta por você</td><td data-c="Legacy IA" class="leg"><span class="ic n" role="img" aria-label="Não">✕</span><small>quem posta é você</small></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA comum" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="Agência" class=""><span class="ic s" role="img" aria-label="Sim">✓</span></td></tr></tbody></table>
+  <p class="lead">Sozinho, você trava. Com IA e Canva, a mensagem perde a essência. Com designer ou agência, você explica tudo de novo e espera na fila.</p>
+  <table class="cmp"><thead><tr><th scope="col"><span class="sr">O que você ganha</span></th><th scope="col" class="leg"><span class="logo">L</span>Legacy IA</th><th scope="col" class="">Sozinho</th><th scope="col" class="">IA + Canva</th><th scope="col" class="">Designer</th><th scope="col" class="">Agência</th></tr></thead><tbody><tr><td class="cr">Você sabe o que postar</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span><small>temas em alta toda semana</small></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA + Canva" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>ideias genéricas</small></td><td data-c="Designer" class=""><span class="ic n" role="img" aria-label="Não">✕</span><small>faz a arte do que você pedir</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>se você passar o briefing</small></td></tr><tr><td class="cr">Fala a língua do público cristão</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="IA + Canva" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>só se você explicar toda vez</small></td><td data-c="Designer" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>depende da pessoa</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>depende da equipe</small></td></tr><tr><td class="cr">Conteúdo que ensina, com método</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA + Canva" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>se você souber pedir</small></td><td data-c="Designer" class=""><span class="ic n" role="img" aria-label="Não">✕</span><small>o texto é seu</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>depende da equipe</small></td></tr><tr><td class="cr">Continua sendo a sua voz</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="IA + Canva" class=""><span class="ic n" role="img" aria-label="Não">✕</span><small>troca as suas palavras</small></td><td data-c="Designer" class=""><span class="ic s" role="img" aria-label="Sim">✓</span><small>usa o seu texto</small></td><td data-c="Agência" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>muitas vezes, não</small></td></tr><tr><td class="cr">Constância sem depender de ninguém</td><td data-c="Legacy IA" class="leg"><span class="ic s" role="img" aria-label="Sim">✓</span></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA + Canva" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span></td><td data-c="Designer" class=""><span class="ic n" role="img" aria-label="Não">✕</span><small>prazo e fila</small></td><td data-c="Agência" class=""><span class="ic n" role="img" aria-label="Não">✕</span><small>prazo e fila</small></td></tr><tr><td class="cr">Faz e posta por você</td><td data-c="Legacy IA" class="leg"><span class="ic n" role="img" aria-label="Não">✕</span><small>quem posta é você</small></td><td data-c="Sozinho" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="IA + Canva" class=""><span class="ic n" role="img" aria-label="Não">✕</span></td><td data-c="Designer" class=""><span class="ic p" role="img" aria-label="Em parte"><i></i></span><small>faz a arte, não posta</small></td><td data-c="Agência" class=""><span class="ic s" role="img" aria-label="Sim">✓</span></td></tr><tr class="custo"><td class="cr">Quanto custa</td><td data-c="Legacy IA" class="leg"><b>Assinatura anual</b><small>condição com quem te enviou</small></td><td data-c="Sozinho" class=""><b>R$ 0</b><small>e o seu tempo, travado</small></td><td data-c="IA + Canva" class=""><b>≈ R$ 135 por mês</b><small>IA ≈ R$ 100 + Canva R$ 35 · ≈ R$ 1.490 por ano</small></td><td data-c="Designer" class=""><b>a partir de R$ 50 por carrossel</b><small>2 por semana ≈ R$ 4.800 por ano</small></td><td data-c="Agência" class=""><b>a partir de R$ 2 mil por mês</b><small>≈ R$ 24 mil por ano, anúncios à parte</small></td></tr></tbody></table>
   <div class="leg-ic"><span class="leg-nota">Pelo jeito de trabalhar de cada opção.</span><span><span class="ic s" role="img" aria-label="Sim">✓</span> Sim</span><span><span class="ic p" role="img" aria-label="Em parte"><i></i></span> Em parte</span><span><span class="ic n" role="img" aria-label="Não">✕</span> Não</span></div>
+  <div class="contratar"><b>E se fosse contratar mais gente?</b><ul><li><span>Social media</span>R$ 500 a R$ 1.000 por mês</li><li><span>Roteirista de reels</span>a partir de R$ 400 por roteiro</li><li><span>Texto da página do seu curso</span>a partir de R$ 800 por página</li></ul>
+    <small>Valores de referência, pesquisados nas páginas oficiais das IAs e em levantamentos de mercado; sempre o menor de cada faixa.</small></div>
   <div class="faixa">Com a Legacy, você ganha direção, e continua sendo você.</div>
 </div></section>
 
-<!-- ══════════ TUDO O QUE VEM NA PLATAFORMA ══════════ -->
-<section><div class="wrap">
-  <div class="sec">Na plataforma</div>
-  <h2>Tudo o que vem <em>na Legacy IA.</em></h2>
-  <p class="lead">Tudo num lugar só, para você usar a qualquer hora, sem depender de ninguém.</p>
-  <ul class="tudo"><li><span class="ok" aria-hidden="true">✓</span><div><b>Mapeamento do seu público</b><span>Cinco perguntas e o retrato de quem você ajuda, em 10 partes.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Mochila de Ideias</b><span>10 temas em alta por semana, já com o olhar do conteúdo cristão.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Agente de roteiros</b><span>Ângulos, ganchos e o roteiro completo, na sua voz.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Construtor de roteiro em etapas</b><span>Do gancho ao fechamento, com exemplo e checklist.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Formatos de vídeo</b><span>Formatos pedagógicos para variar a gravação sem perder o método.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Mestre dos Carrosséis</b><span>O texto de cada lâmina, da capa à conclusão.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Editor e modelos de carrossel</b><span>Ajuste o texto, ponha as suas fotos e exporte pronto para postar.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Sistematização</b><span>A sua produção num quadro, da ideia ao post publicado.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Plano de Ação</b><span>As suas tarefas à vista, para não parar no meio do caminho.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Aulas do método e cursos</b><span>O porquê de cada passo, e ainda e-book com IA, escrita que convence e análise de criativos.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Páginas, VSL e iscas digitais</b><span>Agentes que escrevem com você a apresentação do seu curso, livro ou trabalho.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Assistente geral</b><span>Para tirar dúvidas e destravar ideias, a qualquer hora.</span></div></li></ul>
+<!-- ══════════ O QUE VEM × O QUE NÃO FAZ ══════════ -->
+<section id="vem"><div class="wrap">
+  <div class="sec">Sendo honestos</div>
+  <h2>O que vem na Legacy IA, <em>e o que ela não faz.</em></h2>
+  <div class="vem-g">
+    <div class="vem card"><h3><span class="ok" aria-hidden="true">✓</span>O que vem</h3><ul class="tudo"><li><span class="ok" aria-hidden="true">✓</span><div><b>Mapeamento do seu público</b><span>Cinco perguntas e o retrato de quem você ajuda, em 10 partes.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Mochila de Ideias</b><span>10 temas em alta por semana, já com o olhar do conteúdo cristão.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Agente de roteiros</b><span>Ângulos, ganchos e o roteiro completo, na sua voz.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Construtor de roteiro em etapas</b><span>Do gancho ao fechamento, com exemplo e checklist.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>17 formatos de vídeo</b><span>Formatos pedagógicos para variar a gravação sem perder o método.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Mestre dos Carrosséis</b><span>O texto de cada lâmina, da capa à conclusão.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Editor e modelos de carrossel</b><span>Ajuste o texto, ponha as suas fotos e exporte pronto para postar.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Sistematização</b><span>A sua produção num quadro, da ideia ao post publicado.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Plano de Ação</b><span>As suas tarefas à vista, para não parar no meio do caminho.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Aulas e cursos</b><span>O Método Conteúdo Pedagógico, roteiros, e-books com IA, copys e criativos.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Páginas, VSL e iscas digitais</b><span>Agentes que escrevem com você a apresentação do seu curso, livro ou trabalho.</span></div></li><li><span class="ok" aria-hidden="true">✓</span><div><b>Assistente geral</b><span>Para tirar dúvidas e destravar ideias, a qualquer hora.</span></div></li></ul></div>
+    <div class="vem card"><h3><span class="ic n" role="img" aria-label="Não">✕</span>O que ela não faz</h3><ul class="nao"><li><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não posta por você.</b> Quem faz e posta é você, com a ideia, o caminho e as palavras na mão.</p></li><li><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não edita os seus vídeos,</b> não agenda posts e não responde a sua audiência.</p></li><li><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não tem acompanhamento nem consultoria.</b> É uma plataforma para você usar sozinho, no seu ritmo, quando quiser.</p></li><li><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não promete números.</b> O que muda a sua presença é a constância e a aplicação do método.</p></li></ul>
+      <div class="faz"><b>O que ela faz:</b> te dá o caminho. A ideia, o jeito de ensinar e as palavras, para você postar com constância e com a sua essência.</div></div>
+  </div>
 </div></section>
 
-<!-- ══════════ SENDO HONESTOS ══════════ -->
-<section><div class="wrap">
-  <div class="sec">Sendo honestos</div>
-  <h2>O que a Legacy IA <em>não faz.</em></h2>
-  <div class="nao">
-    <div><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não posta por você.</b> Quem faz e posta é você, com a ideia, o caminho e as palavras na mão.</p></div>
-    <div><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não edita os seus vídeos</b>, não agenda posts e não responde a sua audiência.</p></div>
-    <div><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não tem acompanhamento nem consultoria.</b> É uma plataforma para você usar sozinho, no seu ritmo, quando quiser.</p></div>
-    <div><span class="ic n" role="img" aria-label="Não">✕</span><p><b>Não promete números.</b> O que muda a sua presença é a constância e a aplicação do método.</p></div>
+<!-- ══════════ PERGUNTAS FREQUENTES ══════════ -->
+<section id="perguntas"><div class="wrap">
+  <div class="sec">Perguntas frequentes</div>
+  <h2>O que as pessoas <em>perguntam antes de começar.</em></h2>
+  <div class="faq"><details class="pf"><summary>Funciona pra quem não é expert em digital?<i aria-hidden="true"></i></summary><p>Funciona. A Legacy foi feita para quem tem a mensagem, não para quem domina tecnologia. Ela pergunta, propõe e escreve com você, em linguagem simples, e as aulas mostram o porquê de cada passo.</p></details><details class="pf"><summary>Vai me tomar mais tempo?<i aria-hidden="true"></i></summary><p>A ideia é o contrário: tirar o tempo que você perde travado, pensando no que falar ou esperando alguém. O tema, o roteiro e o carrossel saem em minutos. Quando e quanto produzir, quem decide é você.</p></details><details class="pf"><summary>Preciso estar pronto para começar?<i aria-hidden="true"></i></summary><p>Não. Você começa com o que já tem: a sua história e a sua mensagem. As 5 perguntas do mapeamento ajudam a organizar quem você ajuda, e o resto vem com a prática.</p></details><details class="pf"><summary>A IA não vai tirar a minha essência?<i aria-hidden="true"></i></summary><p>Esse é o cuidado da Legacy. Tudo parte do seu público e da sua voz, e você revisa e ajusta antes de postar. Ela foi pensada para o conteúdo cristão: você não precisa virar personagem.</p></details><details class="pf"><summary>Tem acompanhamento?<i aria-hidden="true"></i></summary><p>Não. A Legacy é uma plataforma para você usar sozinho, no seu ritmo. O time da Promov tem outros programas com acompanhamento: se é isso que você procura, fale com quem te enviou esta proposta.</p></details><details class="pf"><summary>Serve para o meu nicho?<i aria-hidden="true"></i></summary><p>Serve para quem comunica com fé e valores cristãos: pastores e líderes, terapeutas e especialistas, mentores e educadores. Família, devocional, liderança, relacionamentos, louvor e outros temas: o mapeamento ajusta tudo ao público que você ajuda.</p></details></div>
+</div></section>
+
+<!-- ══════════ QUEM CRIOU ══════════ -->
+<section id="quem"><div class="wrap">
+  <div class="sec">Quem criou</div>
+  <h2>A Legacy IA é <em>da Promov.</em></h2>
+  <p class="lead">Ela leva para dentro de uma plataforma o método que a gente ensina há mais de uma década no segmento cristão, para você usar sozinho, quando quiser.</p>
+  <div class="criadores">
+    <article class="cri"><div class="cri-cab"><span class="cri-f icn rosa"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></span><div><b>Promov</b><small>A maior empresa de estratégia digital do segmento cristão da América Latina.</small></div></div>
+      <div class="soc-n"><div><b>+10 anos</b><span>no segmento cristão</span></div><div><b>180 mil</b><span>alunos</span></div><div><b>63</b><span>países</span></div></div></article>
+    <article class="cri"><div class="cri-cab"><img src="propostas/legacy/socio-stecca.jpg" alt="João Stecca" width="240" height="240" class="cri-f" loading="lazy" decoding="async"><div><b>João Stecca</b><small>Estrategista digital e sócio da Promov. O método por trás da Legacy.</small></div></div>
+      <div class="soc-n"><div><b>+10 anos</b><span>no segmento cristão</span></div><div><b>150+</b><span>clientes</span></div><div><b>+200 mil</b><span>seguidores</span></div></div></article>
+    <article class="cri"><div class="cri-cab"><img src="propostas/legacy/socio-pv.jpg" alt="DJ PV" width="240" height="240" class="cri-f" loading="lazy" decoding="async"><div><b>DJ PV</b><small>Pedro Victor, sócio da Promov e o maior DJ cristão do mundo.</small></div></div>
+      <div class="soc-n"><div><b>1 bilhão</b><span>de plays</span></div><div><b>725 mil</b><span>ouvintes por mês</span></div><div><b>1,2 mi</b><span>inscritos</span></div></div></article>
   </div>
-  <div class="faz"><b>O que ela faz:</b> te dá o caminho. A ideia, o jeito de ensinar e as palavras, para você postar com constância e com a sua essência.</div>
-  <div class="t2">Como começar</div>
-  <div class="comecar">
-    <div><span class="pq">1</span><p><b>Responda a quem te enviou esta proposta</b> e tire as suas dúvidas.</p></div>
-    <div><span class="pq">2</span><p><b>Conte quem você ajuda</b>, nas 5 perguntas. A Legacy passa a falar a língua do seu público.</p></div>
-    <div><span class="pq">3</span><p><b>Peça o primeiro conteúdo</b>: um tema, um roteiro ou um carrossel. No seu ritmo.</p></div>
-  </div>
+  <div class="eventos"><span class="ev-t">Nos grandes palcos</span><span><b>Radicais Livres</b> · 60 mil pessoas</span><span><b>Festival Promessas</b> · Rede Globo · 20 mil pessoas</span></div>
+  <p class="frase-q">“Não é sobre postar muito ou pouco. <em>É sobre postar certo.</em>”</p>
 </div></section>
 
 <!-- ══════════ FECHAMENTO ══════════ -->
-<section class="fim"><div class="wrap">
+<section class="fim" id="fale"><div class="wrap">
   <p class="talento">Deus não te deu um talento<br class="largo"> para ficar <em class="gr">enterrado.</em></p>
   <div class="cartao-g cta">
     <div class="marca grande"><span class="logo">L</span><b>LEGACY</b> <i>IA</i></div>
     <h2 id="prop-cta"><span id="prop-cta-t">Fale com quem te enviou</span> <em>esta proposta.</em></h2>
-    <p>Responda a mensagem em que você recebeu esta proposta: é por ali que você tira as suas dúvidas e começa.</p>
+    <p>Responda a mensagem em que você recebeu esta proposta, ou chame a nossa equipe no WhatsApp: é por ali que você tira as suas dúvidas e começa.</p>
+    <a class="btn btn-pulsa" href="https://wa.me/556281019057?text=Oi!%20Vi%20a%20proposta%20da%20Legacy%20IA%20e%20quero%20conversar." target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2.3 2.2 4.2 4.5 4.5l1-1.2 2 .8-.4 1.8c-3.6.2-7.4-3.6-7.2-7.2l1.8-.4.8 2z"/></svg>Chamar no WhatsApp</a>
+    <small class="btn-obs">Abre o WhatsApp da nossa equipe com a mensagem pronta.</small>
+    <ol class="passos3"><li><span class="pq">1</span><p><b>Responda a quem te enviou esta proposta</b> e tire as suas dúvidas.</p></li><li><span class="pq">2</span><p><b>Conte quem você ajuda</b> nas 5 perguntas. A Legacy passa a falar a língua do seu público.</p></li><li><span class="pq">3</span><p><b>Peça o primeiro conteúdo:</b> um tema, um roteiro ou um carrossel. No seu ritmo.</p></li></ol>
     <div class="quem"><small>Quem te enviou</small><b id="prop-closer">Nossa equipe</b><span>Promov · Legacy IA</span></div>
   </div>
 </div></section>
 </main>
+<a class="fale-fixo" href="#fale">Falar com a equipe <span aria-hidden="true">→</span></a>
 <footer class="rodape">Legacy IA · uma plataforma Promov</footer>
 
 <script>
@@ -542,6 +890,327 @@ table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; table-lay
   v.addEventListener('click', function () { if (!v.controls) tocar(); });
   if (/^https?:/.test(location.protocol)) { try { fetch(v.currentSrc || v.getAttribute('src'), { method: 'HEAD', cache: 'no-store' }).then(function (r) { if (!r.ok) emBreve(); }).catch(function () {}); } catch (e) {} }
   var t0 = Date.now(), iv = setInterval(function () { if (v.error || v.networkState === 3) { emBreve(); clearInterval(iv); } if (Date.now() - t0 > 15000) clearInterval(iv); }, 400);
+})();
+</script>
+<script>
+// 🧭 barra fixa no topo (aparece depois do topo da página; marca a seção da vez) e o botão fixo "Falar com a equipe" do celular
+// (some no topo e no fechamento, que é para onde ele leva). Na impressão/PDF, as telas de "ver como é" e as respostas abrem.
+(function () {
+  var d = document, W = window, cada = function (l, f) { Array.prototype.forEach.call(l, f); };
+  try {
+    var barra = d.getElementById('barra'), hero = d.querySelector('.hero'), fale = d.getElementById('fale'), fixo = d.querySelector('.fale-fixo');
+    if (W.IntersectionObserver && hero) {
+      var heroVis = true, faleVis = false;
+      var aplicar = function () {
+        if (barra) barra.classList.toggle('on', !heroVis);
+        if (fixo) fixo.classList.toggle('fora', heroVis || faleVis);
+      };
+      new IntersectionObserver(function (es) { heroVis = es[es.length - 1].isIntersecting; aplicar(); }).observe(hero);
+      if (fale) new IntersectionObserver(function (es) { faleVis = es[es.length - 1].isIntersecting; aplicar(); }, { threshold: 0.12 }).observe(fale);
+      var links = barra ? barra.querySelectorAll('.barra-links a') : [], mapa = {};
+      cada(links, function (a) { var s = d.getElementById(a.getAttribute('href').slice(1)); if (s) mapa[s.id] = a; });
+      var ioS = new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          cada(links, function (a) { a.classList.remove('at'); a.removeAttribute('aria-current'); });
+          var a = mapa[e.target.id || '']; if (a) { a.classList.add('at'); a.setAttribute('aria-current', 'true'); }
+        });
+      }, { rootMargin: '-45% 0px -50% 0px' });
+      cada(d.querySelectorAll('main > section'), function (s) { ioS.observe(s); });     // fora das 5 seções da barra, nenhum link fica marcado
+    }
+  } catch (e) {}
+  var abertos = [];
+  W.addEventListener('beforeprint', function () { cada(d.querySelectorAll('details:not([open])'), function (x) { x.open = true; abertos.push(x); }); });
+  W.addEventListener('afterprint', function () { abertos.forEach(function (x) { x.open = false; }); abertos = []; });
+})();
+</script>
+<script>
+// ✨ ANIMAÇÕES (19/10/2026, Bruno: "coloque animações nesses sites de proposta"). Fonte: propostas/animacoes/animacoes.py
+// Blocos entram com fade + subida curta ao rolar (o que entra junto vem em sequência), números contam até o valor, o topo e o botão respiram.
+// Só esconde depois de marcar (classe "anim" no <html>); sem IntersectionObserver ou com "reduzir movimento", não faz nada;
+// na impressão/PDF (e se der qualquer erro) mostra tudo com os números finais. Não mexe em texto, cor, imagem nem ordem.
+(function () {
+  'use strict';
+  var d = document, de = d.documentElement, W = window, AP = Array.prototype;
+  if (!W.IntersectionObserver || !W.requestAnimationFrame || !W.getComputedStyle || !de.classList || !AP.forEach || !d.querySelectorAll) return;
+  try { if (W.matchMedia && W.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { return; }
+  var cada = function (l, f) { AP.forEach.call(l, f); };
+  var CLS = ['rv', 'rv-in', 'rv-fade', 'rv-d1', 'rv-d2', 'rv-d3', 'rv-d4', 'rv-d5', 'rv-d6', 'rv-d7'], contas = [], acabou = false;
+
+  // ---- entrada dos blocos
+  function limpar(el) {      // o elemento volta a ser exatamente o que era
+    CLS.forEach(function (c) { el.classList.remove(c); });
+    if (el.__anSemClasse && !el.getAttribute('class')) el.removeAttribute('class');
+  }
+  function revelar(el, k) {
+    if (!el.__an || el.__anFeito) return;
+    el.__anFeito = 1;
+    if (k) el.classList.add('rv-d' + k);
+    el.classList.add('rv-in');
+    (el.__anNums || []).forEach(function (n) { contar(n, k * 80 + 100); });
+    setTimeout(function () { limpar(el); }, 760 + k * 80);
+  }
+  var io = new IntersectionObserver(function (es) {
+    var v = [];
+    es.forEach(function (e) { if (e.isIntersecting) v.push(e.target); });
+    v.sort(function (a, b) { return a.compareDocumentPosition(b) & 4 ? -1 : 1; });     // na ordem da página
+    v.forEach(function (el, i) { io.unobserve(el); revelar(el, Math.min(i, 7)); });
+  }, { rootMargin: '0px 0px -6% 0px', threshold: 0 });
+  // marca um bloco para entrar ao rolar. so_abaixo: só o que ainda está abaixo da tela (nada some diante de quem já está lendo)
+  function marcar(el, so_abaixo) {
+    if (el.__an || acabou) return false;
+    for (var p = el.parentElement; p; p = p.parentElement) if (p.__an) return false;
+    if (/transform|opacity|animation|transition/i.test(el.getAttribute('style') || '')) return false;
+    var cs = W.getComputedStyle(el);
+    if (cs.display === 'none' || /fixed|sticky|absolute/.test(cs.position)) return false;
+    var r = el.getBoundingClientRect();
+    if (!r.height || r.bottom < 0 || (so_abaixo && r.top < W.innerHeight)) return false;
+    el.__an = 1; el.__anSemClasse = !el.hasAttribute('class');
+    el.classList.add('rv');
+    if (/auto|scroll/.test(cs.overflowX + cs.overflowY)) el.classList.add('rv-fade');   // o que rola por dentro (carrossel): só fade
+    io.observe(el);
+    return true;
+  }
+
+  // ---- números que contam (o texto final é o original, letra por letra)
+  var NUM = /^(R\$ ?|\+)?(\d{1,3}(?:\.\d{3})+|\d+(?:,\d+)?)( ?(?:mil|mi|milhão|milhões|bilhão|bilhões|anos|M\+|M|\+|%))?$/;
+  function numero(el) {
+    if (el.children.length || el.childNodes.length !== 1 || el.firstChild.nodeType !== 3) return null;
+    var t = el.firstChild.nodeValue, s = t.replace(/^\s+|\s+$/g, ''), m = NUM.exec(s);
+    if (!m || /^0\d/.test(m[2])) return null;
+    var v = parseFloat(m[2].replace(/\./g, '').replace(',', '.'));
+    if (!(v > 0)) return null;
+    var dec = m[2].indexOf(',') > 0 ? m[2].split(',')[1].length : (v < 10 ? 1 : 0), i = t.indexOf(s);
+    return { no: el.firstChild, orig: t, antes: t.slice(0, i) + (m[1] || ''), depois: (m[3] || '') + t.slice(i + s.length),
+             v: v, dec: dec, milhar: m[2].indexOf('.') > 0 };
+  }
+  function fmt(x, n) {
+    var p = x.toFixed(n.dec).split('.'), int = p[0];
+    if (n.milhar) int = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return n.antes + int + (p[1] ? ',' + p[1] : '') + n.depois;
+  }
+  function registrar(el) {   // o número conta quando o bloco dele entra
+    var n = numero(el); if (!n) return;
+    for (var p = el; p; p = p.parentElement) if (p.__an && !p.__anFeito) { el.__anNum = n; (p.__anNums = p.__anNums || []).push(el); return; }
+  }
+  function contar(el, atraso) {
+    var n = el.__anNum; if (!n || n.feito || acabou) return;
+    n.feito = 1;
+    var est = el.getAttribute('style'), trava = false, DUR = 1400, t0 = null;
+    try {   // número numa linha (no meio do texto ou lado a lado, como antes → depois): segura a largura final para nada ao lado tremer
+      var w = el.getBoundingClientRect().width, pai = el.parentElement ? W.getComputedStyle(el.parentElement).display : '';
+      if (W.getComputedStyle(el).display === 'inline') { el.style.display = 'inline-block'; el.style.minWidth = w + 'px'; trava = true; }
+      else if (/flex/.test(pai)) { el.style.minWidth = w + 'px'; trava = true; }
+    } catch (e) {}
+    var c = { acabar: function () {
+      if (c.ok) return; c.ok = 1;
+      n.no.nodeValue = n.orig;
+      if (trava) { if (est === null) el.removeAttribute('style'); else el.setAttribute('style', est); }
+      var i = contas.indexOf(c); if (i >= 0) contas.splice(i, 1);
+    } };
+    contas.push(c);
+    n.no.nodeValue = fmt(0, n);
+    function passo(t) {
+      if (c.ok) return;
+      if (t0 === null) t0 = t + atraso;
+      var q = (t - t0) / DUR;
+      if (q >= 1) return c.acabar();
+      var txt = fmt(n.v * (1 - Math.pow(1 - Math.max(0, q), 3)), n);
+      if (n.no.nodeValue !== txt) n.no.nodeValue = txt;
+      W.requestAnimationFrame(passo);
+    }
+    W.requestAnimationFrame(passo);
+    setTimeout(c.acabar, atraso + DUR + 700);     // garantia: o valor final aparece mesmo se a aba ficar parada
+  }
+
+  // ---- impressão, PDF ou erro: tudo à vista, números finais
+  function mostrarTudo() {
+    acabou = true;
+    cada(d.querySelectorAll('.rv'), function (el) { el.__anFeito = 1; limpar(el); });
+    contas.slice().forEach(function (c) { c.acabar(); });
+    de.classList.remove('an-espera');
+  }
+  W.addEventListener('beforeprint', mostrarTudo);
+  try { var mp = W.matchMedia && W.matchMedia('print'); if (mp && mp.addListener) mp.addListener(function (m) { if (m.matches) mostrarTudo(); }); } catch (e) {}
+
+  try {
+    // Legacy: o que entra junto (grades) e os blocos soltos, na ordem da página; o que está dentro de um bloco marcado entra com ele
+    // (19/10, reorganização) as cenas do teste, os formatos e os módulos têm animação própria: CENAS, mais abaixo
+    var GRADES = '.tres > li, .dores > .dor, .pq3 > .pq-card, .b6 > .bcard, .vem-g > .vem, .faq > .pf, .criadores > .cri, .eventos > span, .passos3 > li';
+    var BLOCOS = '.virada, .cta, .kick, h1, .sub, .hero-v, .tres-t, .hero-l .btn, .sec, h2, h3, .lead, .faixa, .faixa-rosa, .aviso, .selo, .cena-t, .cena, .t3, .corre, .metodo, .rolo-cab, .rolo, .nota, .nichos, table.cmp, .leg-ic, .talento, .frase-q';
+    var CARTOES = '.dor, .tres > li, .pq-card, .bcard, .cri';
+    var m = d.querySelector('main') || d.body;
+    cada(m.querySelectorAll(GRADES + ', ' + BLOCOS), function (el) { marcar(el, false); });
+    cada(m.querySelectorAll(CARTOES), function (el) { el.classList.add('an-card'); });
+    cada(m.querySelectorAll('.soc-n b'), registrar);
+    // o degradê das palavras só se move enquanto elas estão na tela
+    var ioMov = new IntersectionObserver(function (es) { es.forEach(function (e) { e.target.classList.toggle('an-vivo', e.isIntersecting); }); });
+    cada(d.querySelectorAll('h1 em, h2 em, h3 em, .gr'), function (el) { el.classList.add('an-mov'); ioMov.observe(el); });
+    de.classList.add('anim');
+  } catch (e) { mostrarTudo(); de.classList.remove('anim'); }
+})();
+
+// 🎬 CENAS da Legacy (19/10/2026). Fonte: propostas/animacoes/animacoes.py. Cada [data-cena] toca quando aparece; o HTML é o estado final.
+// As do teste (data-loop) repetem enquanto estão na tela: tocam, seguram o resultado, limpam e tocam de novo; ao sair da tela, voltam ao zero.
+// [data-solo]: só o último item que entrou fica aceso (o cartão do construtor); [data-atual]: o último que entrou ganha a classe "atual".
+// E os CASES: cada cartão [data-ba] mostra o ANTES, a cortina revela o DEPOIS enquanto o número conta, segura e volta, sem parar.
+(function () {
+  'use strict';
+  var d = document, de = d.documentElement, W = window, AP = Array.prototype;
+  if (!W.IntersectionObserver || !de.classList || !d.querySelectorAll || !AP.forEach) return;
+  try { if (W.matchMedia && W.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { return; }
+  var cada = function (l, f) { AP.forEach.call(l, f); }, cenas = [], parado = false;
+  var esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+
+  function Cena(el) {
+    var c = this, passos = {}, max = 0;
+    c.el = el; c.t = []; c.vis = false; c.estado = 'espera';
+    c.ritmo = +el.getAttribute('data-ritmo') || 400; c.loop = +el.getAttribute('data-loop') || 0;
+    cada(el.querySelectorAll('[data-s]'), function (x) { var k = +x.getAttribute('data-s'); (passos[k] = passos[k] || []).push(x); if (k > max) max = k; });
+    c.passos = passos; c.max = max;
+    c.marcas = el.querySelectorAll('[data-mark]');
+    cada(c.marcas, function (x) { x.__mk = x.getAttribute('data-mark').split(':'); });
+    c.digs = el.querySelectorAll('[data-dig]');
+    cada(c.digs, function (x) { x.__txt = x.textContent; });
+    c.conts = el.querySelectorAll('[data-cont]');
+    cada(c.conts, function (x) { x.__orig = x.textContent; });
+    c.progs = el.querySelectorAll('[data-prog]');
+    el.__cena = c;
+  }
+  Cena.prototype.depois = function (ms, f) { var c = this; c.t.push(setTimeout(function () { if (!parado) f(); }, ms)); };
+  Cena.prototype.limparT = function () { this.t.forEach(clearTimeout); this.t = []; };
+  Cena.prototype.contar = function () {
+    var c = this, n = function (sel) { var l = c.el.querySelectorAll(sel), k = 0; cada(l, function (y) { if (y.classList.contains('on')) k++; }); return [k, l.length]; };
+    cada(c.conts, function (x) { x.textContent = n(x.getAttribute('data-cont'))[0]; });
+    cada(c.progs, function (x) { var r = n(x.getAttribute('data-prog')); x.style.width = (r[1] ? Math.round(100 * r[0] / r[1]) : 100) + '%'; });
+  };
+  Cena.prototype.preparar = function () {      // o começo: o que vai entrar fica escondido (no lugar certo: nada pula na tela)
+    var c = this;
+    c.limparT();
+    cada(c.el.querySelectorAll('.on, .atual'), function (x) { x.classList.remove('on'); x.classList.remove('atual'); });
+    cada(c.marcas, function (x) { x.classList.remove(x.__mk[1]); });
+    cada(c.digs, function (x) { x.innerHTML = '<span class="dig-resto">' + esc(x.__txt) + '</span>'; });
+    c.el.classList.add('c-pre');
+    c.contar();
+    c.estado = 'espera';
+  };
+  Cena.prototype.final = function () {          // o fim = o HTML original, parado
+    var c = this;
+    c.limparT();
+    cada(c.digs, function (x) { x.textContent = x.__txt; });
+    cada(c.marcas, function (x) { x.classList.add(x.__mk[1]); });
+    cada(c.conts, function (x) { x.textContent = x.__orig; });
+    cada(c.progs, function (x) { x.style.width = ''; if (!x.getAttribute('style')) x.removeAttribute('style'); });
+    c.el.classList.remove('c-pre');
+    cada(c.el.querySelectorAll('.on, .atual'), function (x) { x.classList.remove('on'); x.classList.remove('atual'); });
+    c.estado = 'fim';
+  };
+  Cena.prototype.digitar = function (x, pronto) {
+    var c = this, txt = x.__txt, vel = +x.getAttribute('data-vel') || 24, i = 0, por = vel < 18 ? 2 : 1;
+    (function passo() {
+      i = Math.min(txt.length, i + por);
+      x.innerHTML = esc(txt.slice(0, i)) + '<i class="caret"></i><span class="dig-resto">' + esc(txt.slice(i)) + '</span>';
+      if (i < txt.length) c.depois(vel, passo);
+      else c.depois(450, function () { x.textContent = txt; pronto(); });
+    })();
+  };
+  Cena.prototype.passo = function (k) {
+    var c = this;
+    if (k > c.max) return c.acabar();
+    var els = c.passos[k] || [], espera = c.ritmo, digs = [];
+    els.forEach(function (x) {
+      var pai = x.parentElement, cx = x.closest ? x.closest('[data-atual]') : null;
+      if (pai && pai.hasAttribute('data-solo')) cada(pai.children, function (y) { if (y !== x) y.classList.remove('on'); });
+      if (cx) { cada(cx.querySelectorAll('.atual'), function (y) { y.classList.remove('atual'); }); x.classList.add('atual'); }
+      x.classList.add('on');
+      if (x.hasAttribute('data-w')) espera = +x.getAttribute('data-w');
+      if (x.hasAttribute('data-dig')) digs.push(x);
+      cada(x.querySelectorAll('[data-dig]'), function (y) { digs.push(y); });
+    });
+    cada(c.marcas, function (x) { if (+x.__mk[0] === k) x.classList.add(x.__mk[1]); });
+    c.contar();
+    if (!digs.length) return c.depois(espera, function () { c.passo(k + 1); });
+    var falta = digs.length;
+    c.depois(260, function () { digs.forEach(function (x) { c.digitar(x, function () { if (--falta === 0) c.passo(k + 1); }); }); });
+  };
+  Cena.prototype.tocar = function () { var c = this; c.estado = 'toca'; c.depois(250, function () { c.passo(1); }); };
+  Cena.prototype.acabar = function () {
+    var c = this;
+    if (!c.loop) return c.depois(400, function () { c.final(); });
+    c.estado = 'segura';                        // em repetição: segura o resultado (como está, aceso) e recomeça do zero
+    c.depois(c.loop, function () {
+      if (!c.vis) { c.preparar(); return; }
+      c.preparar(); c.depois(800, function () { c.tocar(); });
+    });
+  };
+
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      var c = e.target.__cena; if (!c) return;
+      var bom = e.isIntersecting && (e.intersectionRatio >= 0.3 || e.intersectionRect.height >= (W.innerHeight || 600) * 0.45);
+      c.vis = e.isIntersecting;
+      if (parado) return;
+      if (!e.isIntersecting) { if (c.loop && c.estado !== 'espera') c.preparar(); return; }     // saiu da tela: pausa e volta ao zero
+      if (bom && c.estado === 'espera') c.tocar();
+    });
+  }, { threshold: [0, 0.3, 0.6] });
+
+  // ---- cases: ANTES → DEPOIS (cortina + número contando), cartões defasados; só enquanto a faixa está na tela
+  var cards = [];
+  var valor = function (t) { var m = /([\d.,]+)\s*(mil)?/.exec(t || ''); if (!m) return 0; var v = parseFloat(m[1].replace(/\./g, '').replace(',', '.')); return m[2] ? v * 1000 : v; };
+  var fmtN = function (n) {
+    n = Math.round(n); if (n < 10000) return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    var k = n / 1000; return (k < 100 ? String(Math.round(k * 10) / 10).replace('.', ',') : String(Math.round(k))) + ' mil';
+  };
+  function BA(el, i) { var b = this; b.el = el; b.n = el.querySelector('.ba-n'); b.a = el.getAttribute('data-antes'); b.d = el.getAttribute('data-depois'); b.i = i; b.t = []; b.raf = 0; }
+  BA.prototype.limpar = function () { this.t.forEach(clearTimeout); this.t = []; if (this.raf) W.cancelAnimationFrame(this.raf); this.raf = 0; };
+  BA.prototype.depois = function (ms, f) { this.t.push(setTimeout(function () { if (!parado) f(); }, ms)); };
+  BA.prototype.contar = function (de, ate, dur) {
+    var b = this, v0 = valor(de), v1 = valor(ate), t0 = null;
+    if (b.raf) W.cancelAnimationFrame(b.raf);
+    (function p(t) {
+      if (t === undefined) { b.raf = W.requestAnimationFrame(p); return; }
+      if (t0 === null) t0 = t;
+      var q = Math.min(1, (t - t0) / dur), e = q < .5 ? 2 * q * q : 1 - Math.pow(-2 * q + 2, 2) / 2;
+      if (b.n) b.n.textContent = q >= 1 ? ate : fmtN(v0 + (v1 - v0) * e);
+      b.raf = q < 1 ? W.requestAnimationFrame(p) : 0;
+    })();
+  };
+  BA.prototype.ciclo = function () {
+    var b = this, cl = b.el.classList;
+    b.depois(1500, function () {                                 // ~1,5 s no ANTES
+      cl.add('ba-dep'); cl.add('ba-mov'); b.contar(b.a, b.d, 900); // a cortina revela o DEPOIS e o número conta
+      b.depois(950, function () { cl.remove('ba-mov'); });
+      b.depois(900 + 2500, function () {                         // segura ~2,5 s no DEPOIS e volta
+        cl.remove('ba-dep'); cl.add('ba-mov'); b.contar(b.d, b.a, 700);
+        b.depois(950, function () { cl.remove('ba-mov'); b.ciclo(); });
+      });
+    });
+  };
+  BA.prototype.comecar = function () {
+    var b = this; b.limpar(); b.el.classList.add('ba-vivo'); b.el.classList.remove('ba-dep'); if (b.n) b.n.textContent = b.a;
+    b.depois((b.i % 7) * 700, function () { b.ciclo(); });        // os cartões ficam defasados entre si
+  };
+  BA.prototype.parar = function () {
+    var b = this, cl = b.el.classList; b.limpar(); cl.remove('ba-vivo'); cl.remove('ba-dep'); cl.remove('ba-mov'); if (b.n) b.n.textContent = b.d;
+  };
+  var faixaBA = d.querySelector('.casebar');
+  var ioBA = new IntersectionObserver(function (es) {
+    var vis = es[es.length - 1].isIntersecting;
+    if (parado) return;
+    cards.forEach(function (b) { if (vis) b.comecar(); else b.parar(); });
+  });
+
+  function pararTudo() { parado = true; cenas.forEach(function (c) { c.final(); }); cards.forEach(function (b) { b.parar(); }); }
+  W.addEventListener('beforeprint', pararTudo);
+  try { var mp = W.matchMedia && W.matchMedia('print'); if (mp && mp.addListener) mp.addListener(function (m) { if (m.matches) pararTudo(); }); } catch (e) {}
+
+  try {
+    cada(d.querySelectorAll('[data-cena]'), function (el) { var c = new Cena(el); cenas.push(c); c.preparar(); io.observe(el); });
+    cada(d.querySelectorAll('[data-ba]'), function (el, i) { cards.push(new BA(el, i)); });
+    if (faixaBA && cards.length) ioBA.observe(faixaBA);
+    de.classList.add('cenas');
+  } catch (e) { pararTudo(); de.classList.remove('cenas'); }
 })();
 </script>
 </body>
