@@ -35899,6 +35899,9 @@ function _vfPeriodo() {
   return { ini: new Date(a, m, 1).getTime(), fim: new Date(a, m + 1, 1).getTime() };
 }
 function _vfEhWs(origem) { var o = v2norm(origem || ''); return /workshop/.test(o) && !/pos/.test(o); }
+// MQL (19/10/2026, Bruno: "MQL é quem colocou algum tipo de investimento" · "o mesmo no workshop"): marcou um investimento no formulário
+// (ou na aplicação do workshop); "não tenho disponibilidade" e em branco não contam.
+function _vfMql(invest) { var t = v2norm(String(invest || '')); return !!t && !/nao tenho|sem disponib|sem_disponib|nenhum/.test(t); }
 function _vfProd(produto) { var p = v2norm(produto || ''); return /legado|wld/.test(p) ? 'leg' : 'ht'; }
 // 19/10/2026 (Bruno: "crie por edição, separado abaixo" · "crie um separado horizontal" · "Lead - MQL e a sequência" · "coloque filtro" ·
 // "coloque no meio o no-show e etc"): cada funil numa LINHA (da esquerda para a direita); em cima o Diagnóstico (HT, Legado, total), embaixo
@@ -35915,7 +35918,8 @@ function _vfReuniao(o, r) {
 // o que fica "no meio", entre um passo e o próximo
 function _vfMeio(de, para, z) {
   var pc = function(a, b) { return b ? ' · ' + Math.round(a / b * 100) + '%' : ''; }, t = [];
-  if (de === 'leads' && para === 'mql') t.push([z.leads - z.mql, 'não MQL']);
+  if (de === 'leads' && para === 'mql') t.push([z.leads - z.mql, 'sem investimento']);
+  if (de === 'apl' && para === 'mql') t.push([z.apl - z.mql, 'sem investimento']);
   if (de === 'marc') { if (z.fut) t.push([z.fut, '🔜 futuras']); if (z.rem) t.push([z.rem, '🔁 remarcadas']); }
   if (de === 'real' && z.ns) t.push([z.ns, '❌ no-show' + pc(z.ns, z.real)]);
   if (de === 'comp' && z.nv) t.push([z.nv, 'não vendido' + pc(z.nv, z.comp)]);
@@ -35994,7 +35998,7 @@ function v2FunilProdutos(mesRows) {
   var leadsP = [];
   (LD.rows || []).forEach(function(l) { var d = l.date ? l.date.getTime() : 0; if (!d || d < P.ini || d >= P.fim || (l.tel8 && wsTel[l.tel8])) return;
     if (VF.origem && _vfOrigemL(l) !== VF.origem) return; if (VF.sdr && !okSdr(l.dono)) return;
-    var cl = null; try { cl = classeDoLead(l); } catch (e) {} var mql = !!(cl && (cl.classe === 'A' || cl.classe === 'B') && !cl.semDisp);
+    var mql = _vfMql(l.invest);
     var k = l.faixa === 'alta' ? 'ht' : l.faixa === 'media' ? 'leg' : null;
     leadsP.push({ l: l, d: d, k: k, mql: mql });
     [D.tot].concat(k ? [D[k]] : []).forEach(function(z) { z.leads++; if (mql) z.mql++; }); if (!k) semPerfil++; });
@@ -36003,7 +36007,7 @@ function v2FunilProdutos(mesRows) {
   var porTel = {}; (V2.rows || []).forEach(function(r) { if (!okCl(r.closer)) return; var t = ldTel8(r.telefone || r.tel || ''); if (t) (porTel[t] = porTel[t] || []).push(r); });
   var C = _vfCoorte(leadsP, porTel);
   if (VF.modo === 'coorte') D = C;
-  var passosD = [['leads', 'Leads', 'base de leads do período (sem quem está no app do workshop) · HT = investimento alto · Legado = perfil legado (R$ 500–1 mil)'], ['mql', 'MQL', 'nota A ou B (a mesma régua do dash)']].concat(_VF_PASSOS);
+  var passosD = [['leads', 'Leads', 'base de leads do período (sem quem está no app do workshop) · HT = investimento alto · Legado = perfil legado (R$ 500–1 mil)'], ['mql', 'MQL', 'marcou algum investimento no formulário ("não tenho disponibilidade" e em branco não contam)']].concat(_VF_PASSOS);
   // ---- 🎓 Workshop SEPARADO, com o filtro de edição (19/10/2026, Bruno: "separe o workshop e filtre por edição" · "e sobre o pré, pós e
   // workshop?" · "tem pessoas de uma edição anterior que fecham no próximo mês"). Cada pessoa fica na edição dela no app do workshop e a
   // reunião conta lá, mesmo que feche no mês seguinte. O momento sai da data da reunião contra o 2º dia (o pitch): Pré = antes do pitch;
@@ -36016,7 +36020,7 @@ function v2FunilProdutos(mesRows) {
     if (!o.d2 && x.d2 instanceof Date) o.d2 = dia0(x.d2);
     if (VF.sdr && !okSdr(x.sdr)) return;
     var fx = leadFaixa(_wsInvTxt(x.inv)), k = fx === 'alta' ? 'ht' : fx === 'media' ? 'leg' : null;
-    [o.base.tot].concat(k ? [o.base[k]] : []).forEach(function(z) { if (x.ing instanceof Date) z.insc++; if (x.p1 || x.p2 || x.p3) z.part++; if (x.apl instanceof Date) z.apl++; });
+    [o.base.tot].concat(k ? [o.base[k]] : []).forEach(function(z) { if (x.ing instanceof Date) z.insc++; if (x.p1 || x.p2 || x.p3) z.part++; if (x.apl instanceof Date) { z.apl++; if (_vfMql(x.inv)) z.mql++; } });
   });
   var semEd = 0;
   (V2.rows || []).forEach(function(r) {
@@ -36051,10 +36055,10 @@ function v2FunilProdutos(mesRows) {
     + (VF.origem === 'Social Selling' || VF.origem === 'Indicação' || VF.origem === 'Recuperação' ? '<p class="hint" style="margin:4px 0 0;">Os leads da base vêm do formulário: ' + _vfEsc(VF.origem) + ' quase não aparece nos leads, só nas reuniões.</p>' : '')
     + heroi('🌐 Geral do Diagnóstico', 'fun', '#2fd4c4', [['📥 Leads que chegaram', g.leads], ['✅ MQL', g.mql, pct(g.mql, g.leads) + ' dos leads'], ['📅 ' + (co ? 'Marcaram reunião' : 'Reuniões marcadas'), g.marc, pct(g.marc, g.leads) + ' dos leads'],
       ['💰 ' + (co ? 'Viraram venda' : 'Vendas'), g.pag, cv(g.pag, g.leads) + ' dos leads']], g.valor)
-    + '<div class="vf-esc1">' + card('fun', 'tot', dk, 'Total', DC.tot.cor, D.tot, 'leads') + card('fun', 'ht', dk, 'HT', DC.ht.cor, D.ht, 'leads') + card('fun', 'leg', dk, 'Legado', DC.leg.cor, D.leg, 'leads') + '</div>'
+    + '<div class="vf-grp"><small>Perfil · clique para filtrar</small><div class="vf-esc1">' + card('fun', 'tot', dk, 'Total', DC.tot.cor, D.tot, 'leads') + card('fun', 'ht', dk, 'HT', DC.ht.cor, D.ht, 'leads') + card('fun', 'leg', dk, 'Legado', DC.leg.cor, D.leg, 'leads') + '</div></div>'
     + '<div class="vf-big">' + _vfLinha(DC[dk].rot, DC[dk].sub, DC[dk].cor, D[dk], passosD, 'leads') + '</div>'
-    + '<div class="hint" style="margin-top:8px;">Diagnóstico = anúncio, orgânico, social selling, indicação, recuperação… (quem veio do workshop, no Pré, no Workshop ou no Pós, fica no funil do Workshop, abaixo). MQL = nota A ou B. HT = Spark / Growth; Legado = Mentoria Legado Digital e Legado Club.'
-    + (semPerfil ? ' ' + semPerfil + ' lead' + (semPerfil > 1 ? 's' : '') + ' sem perfil (investimento abaixo do Legado) entra' + (semPerfil > 1 ? 'm' : '') + ' só no total.' : '') + '</div></div>';
+    + '<div class="hint" style="margin-top:8px;">Diagnóstico = anúncio, orgânico, social selling, indicação, recuperação… (quem veio do workshop, no Pré, no Workshop ou no Pós, fica no funil do Workshop, abaixo). MQL = quem marcou algum investimento no formulário ("não tenho disponibilidade" e em branco não contam). HT = Spark / Growth; Legado = Mentoria Legado Digital e Legado Club.'
+    + (semPerfil ? ' ' + semPerfil + ' lead' + (semPerfil > 1 ? 's' : '') + ' sem perfil (sem investimento ou abaixo do Legado) entra' + (semPerfil > 1 ? 'm' : '') + ' só no total.' : '') + '</div></div>';
   // 🎓 Workshop
   if (eds.length) {
     var ZW = { tot: zW(lista, 'tot', mom), ht: zW(lista, 'ht', mom), leg: zW(lista, 'leg', mom) }, zM = { pre: zW(lista, wk, 'pre'), ws: zW(lista, wk, 'ws'), pos: zW(lista, wk, 'pos') }, w = ZW[wk];
@@ -36070,16 +36074,16 @@ function v2FunilProdutos(mesRows) {
     h += '<div class="panel vf-wrap vf-ws"><div class="vf-topo"><h3>🎓 Funil do Workshop</h3><span class="hint">por edição · cada pessoa fica na edição dela no app, mesmo que feche no mês seguinte · valem os filtros de SDR e closer de cima</span></div>'
       + '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Edição</span>' + eds.slice().reverse().slice(0, 10).map(function(o) { return edChip(o.ed, o.ed + (o.d2 > hoje0 ? ' · vai acontecer' : ''), o.d2 ? '2º dia ' + new Date(o.d2).toLocaleDateString('pt-BR') : ''); }).join('') + edChip('*', 'Todas') + '</div></div>'
       + (futura ? '<p class="hint" style="margin:0 0 8px;">Esta edição ainda vai acontecer (2º dia ' + new Date(oSel.d2).toLocaleDateString('pt-BR') + '): por enquanto só tem inscritos. As aplicações e o perfil (HT ou Legado) chegam no dia do workshop.</p>' : '')
-      + heroi('🎓 ' + _vfEsc(edRot), 'wfun', '#f6a350', [['🎟️ Inscritos', w.insc], ['🙋 Participaram', w.part, pct(w.part, w.insc) + ' dos inscritos'], ['✅ Aplicaram (MQL)', w.apl, pct(w.apl, w.insc) + ' dos inscritos'],
+      + heroi('🎓 ' + _vfEsc(edRot), 'wfun', '#f6a350', [['🎟️ Inscritos', w.insc], ['🙋 Aplicaram', w.apl, pct(w.apl, w.insc) + ' dos inscritos'], ['✅ MQL', w.mql, pct(w.mql, w.insc) + ' dos inscritos'],
         ['📅 Reuniões', w.marc], ['💰 Vendas', w.pag, cv(w.pag, w.insc) + ' dos inscritos']], w.valor)
       + '<div class="vf-grp"><small>Momento da reunião' + (mom ? ' · filtrando: ' + MO[mom][1] + ' (clique de novo para tirar)' : ' · clique para filtrar') + '</small><div class="vf-esc1">' + moBox('pre') + moBox('ws') + moBox('pos') + '</div></div>'
-      + '<div class="vf-grp"><small>Perfil</small><div class="vf-esc1">' + card('wfun', 'tot', wk, 'Total', WC.tot.cor, ZW.tot, 'insc') + card('wfun', 'ht', wk, 'HT', WC.ht.cor, ZW.ht, 'insc') + card('wfun', 'leg', wk, 'Legado', WC.leg.cor, ZW.leg, 'insc') + '</div></div>'
-      + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, [['insc', 'Inscritos', 'ingresso pago no app do workshop'], ['part', 'Participaram', 'presentes em pelo menos um dia'], ['apl', 'Aplicaram', 'fizeram a aplicação no app (o MQL do workshop)']].concat(_VF_PASSOS), 'insc') + '</div>'
-      + '<div class="vf-comp"><table><thead><tr><th>Edição</th><th>Inscritos</th><th>Aplicaram</th><th>Reuniões</th><th>Vendas</th><th>🕐 Pré</th><th>🎯 Workshop</th><th>📆 Pós</th><th>Inscrito → venda</th><th>Valor</th></tr></thead><tbody>'
+      + '<div class="vf-grp"><small>Perfil · clique para filtrar</small><div class="vf-esc1">' + card('wfun', 'tot', wk, 'Total', WC.tot.cor, ZW.tot, 'insc') + card('wfun', 'ht', wk, 'HT', WC.ht.cor, ZW.ht, 'insc') + card('wfun', 'leg', wk, 'Legado', WC.leg.cor, ZW.leg, 'insc') + '</div></div>'
+      + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, [['insc', 'Inscritos', 'ingresso pago no app do workshop'], ['part', 'Participaram', 'presentes em pelo menos um dia'], ['apl', 'Aplicaram', 'fizeram a aplicação no app'], ['mql', 'MQL', 'aplicaram e marcaram algum investimento']].concat(_VF_PASSOS), 'insc') + '</div>'
+      + '<div class="vf-comp"><table><thead><tr><th>Edição</th><th>Inscritos</th><th>Aplicaram</th><th>MQL</th><th>Reuniões</th><th>Vendas</th><th>🕐 Pré</th><th>🎯 Workshop</th><th>📆 Pós</th><th>Inscrito → venda</th><th>Valor</th></tr></thead><tbody>'
       + eds.slice().reverse().slice(0, 10).map(function(o) { var z = zW([o], wk, ''), p = function(m) { var y = zW([o], wk, m); return rkoN(y.pag) + (y.marc ? ' <small>de ' + rkoN(y.marc) + '</small>' : ''); };
-        return '<tr class="' + (edSel === o.ed ? 'on' : '') + '" tabindex="0" onclick="vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\')" onkeydown="if(event.key===\'Enter\'){vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\');}"><th>' + _vfEsc(o.ed) + (o.d2 ? ' <small>' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</th><td>' + rkoN(z.insc) + '</td><td>' + rkoN(z.apl) + '</td><td>' + rkoN(z.marc) + '</td><td>' + rkoN(z.pag) + '</td><td>' + p('pre') + '</td><td>' + p('ws') + '</td><td>' + p('pos') + '</td><td><b>' + cv(z.pag, z.insc) + '</b></td><td>' + v2moeda0(z.valor) + '</td></tr>'; }).join('')
+        return '<tr class="' + (edSel === o.ed ? 'on' : '') + '" tabindex="0" onclick="vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\')" onkeydown="if(event.key===\'Enter\'){vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\');}"><th>' + _vfEsc(o.ed) + (o.d2 ? ' <small>' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</th><td>' + rkoN(z.insc) + '</td><td>' + rkoN(z.apl) + '</td><td>' + rkoN(z.mql) + '</td><td>' + rkoN(z.marc) + '</td><td>' + rkoN(z.pag) + '</td><td>' + p('pre') + '</td><td>' + p('ws') + '</td><td>' + p('pos') + '</td><td><b>' + cv(z.pag, z.insc) + '</b></td><td>' + v2moeda0(z.valor) + '</td></tr>'; }).join('')
       + '</tbody></table></div>'
-      + '<div class="hint" style="margin-top:8px;">Pré / Workshop / Pós pela data da reunião contra o 2º dia da edição da pessoa (a mesma regra dos ' + JAN + ' dias). Na tabela, "2 de 5" = 2 vendas em 5 reuniões. Aplicaram = o MQL do workshop. HT ou Legado pelo investimento que a pessoa marcou na aplicação; quem não aplicou fica só no total.'
+      + '<div class="hint" style="margin-top:8px;">Pré / Workshop / Pós pela data da reunião contra o 2º dia da edição da pessoa (a mesma regra dos ' + JAN + ' dias). Na tabela, "2 de 5" = 2 vendas em 5 reuniões. MQL = aplicou e marcou algum investimento. HT ou Legado pelo investimento que a pessoa marcou na aplicação; quem não aplicou fica só no total.'
       + (semEd ? ' ' + semEd + ' reuniões com origem de workshop não foram achadas no app (telefone diferente).' : '') + '</div></div>';
   }
   return h;
