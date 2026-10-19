@@ -25755,6 +25755,18 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .vf-cl td.vf-cl-ns { color:#ff6b6b; } .vf-cl td.vf-cl-ns small { color:#ff9a9a; font-weight:700; }
 .vf-cl tr.vf-cl-time th, .vf-cl tr.vf-cl-time td { background:rgba(255,255,255,.03); cursor:default; }
 .vf-cl tbody tr.on { background:rgba(255,209,102,.08); }
+/* 19/10/2026 · tabelas numa janela por cima */
+.vf-abrir { border-color:rgba(255,209,102,.45) !important; color:#ffd166 !important; background:rgba(255,209,102,.08) !important; cursor:pointer; }
+.vf-abrir:hover { background:rgba(255,209,102,.16) !important; }
+.vf-modal { position:fixed; inset:0; z-index:9999; display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px; background:rgba(5,7,10,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); overflow-y:auto; }
+.vf-modal-box { position:relative; width:100%; max-width:1180px; padding:22px 22px 16px; border-radius:22px; border:1px solid var(--border, rgba(255,255,255,.08)); background:var(--panel, #14171d); color:var(--text, #fff); box-shadow:0 30px 80px -20px rgba(0,0,0,.7); }
+.vf-modal-t { margin:0 40px 4px 0; font-size:1.05rem; font-weight:900; }
+.vf-modal-box > .hint { margin:0 0 12px; }
+.vf-modal-x { position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--border, rgba(255,255,255,.1)); background:rgba(255,255,255,.05); color:var(--text, #fff); font-size:.9rem; cursor:pointer; }
+.vf-modal-x:hover { background:rgba(255,255,255,.12); } .vf-modal-x:focus-visible { outline:2px solid #ffd166; outline-offset:2px; }
+.vf-modal .vf-comp { margin-bottom:0; }
+@media (prefers-reduced-motion:no-preference) { .vf-modal-box { animation:vfSobe .18s ease-out; } @keyframes vfSobe { from { transform:translateY(10px); opacity:0; } to { transform:none; opacity:1; } } }
+.vf-vend .vf-tk { display:block; margin-top:4px; font-size:.6rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text2); } .vf-vend .vf-tk b { display:block; font-size:.86rem; color:var(--text); letter-spacing:0; }
 /* ===== fim do 🔻 funil completo por produto ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35977,7 +35989,7 @@ function _vfLinha(rot, sub, cor, z, passos, de) {
   return '<div class="vf-linha2" style="--c:' + cor + ';"><div class="vf-lab2"><i></i><b>' + rot + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '<em>' + conv + '<small>' + (de === 'leads' ? 'do lead à venda' : de === 'insc' ? 'do inscrito à venda' : 'de quem apareceu') + '</small></em></div>'
     + '<div class="vf-corpo"><div class="vf-fun" style="grid-template-columns:repeat(' + passos.length + ', minmax(76px, 1fr));">' + segs + '</div>'
     + '<div class="vf-subs" style="grid-template-columns:repeat(' + passos.length + ', minmax(76px, 1fr));">' + subs + '</div></div>'
-    + '<div class="vf-vend"><small>Vendido</small><b>' + v2moeda0(z.valor) + '</b><span>' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + '</span>'
+    + '<div class="vf-vend"><small>Vendido</small><b>' + v2moeda0(z.valor) + '</b><span>' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + '</span>' + (z.pag ? '<span class="vf-tk">ticket médio <b>' + v2moeda0(z.valor / z.pag) + '</b></span>' : '')
     + (z.mesa ? '<span class="vf-se2">se a mesa fechar<b>' + v2moeda0(z.valor + z.mesaV) + '</b><i>' + rkoN(z.pag + z.mesa) + ' vendas</i><i>+' + v2moeda0(z.mesaV) + ' da mesa</i></span>' : '') + '</div></div>';
 }
 // ---- filtros ----
@@ -35993,13 +36005,24 @@ function _vfPer() {
     return { ini: new Date(+pa[0], +pa[1] - 1, +pa[2]).getTime(), fim: new Date(+pb[0], +pb[1] - 1, +pb[2] + 1).getTime(), rot: a.split('-').reverse().join('/') + ' a ' + b.split('-').reverse().join('/') }; }
   return { ini: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth() + 1, 1).getTime(), rot: 'o mês atual' };
 }
-function vfFiltro(campo, valor) { VF[campo] = valor; if (campo === 'per' && valor === 'pers' && !VF.de) { var h = new Date(); VF.de = new Date(h.getFullYear(), h.getMonth(), 1).toISOString().slice(0, 10); VF.ate = h.toISOString().slice(0, 10); } try { renderV2(); } catch (e) {} }
-function _vfFiltrosHtml(sdrs, closers) {
+// 19/10/2026 (Bruno: "isso deve ser clicável em algum lugar, não embaixo"): as tabelas (desempenho por closer, comparar edições) abrem
+// numa janela por cima, por um botão ao lado do filtro; clicar numa linha filtra o funil e fecha a janela
+function vfAbrir(k) {
+  var html = (window._vfModal || {})[k]; if (!html) return; vfFechar();
+  var d = document.createElement('div'); d.id = 'vf-modal'; d.className = 'vf-modal';
+  d.innerHTML = '<div class="vf-modal-box" role="dialog" aria-modal="true"><button type="button" class="vf-modal-x" onclick="vfFechar()" aria-label="Fechar">✕</button>' + html + '</div>';
+  d.addEventListener('click', function(e) { if (e.target === d) vfFechar(); });
+  document.body.appendChild(d); document.addEventListener('keydown', _vfTecla); try { d.querySelector('.vf-modal-x').focus(); } catch (e) {}
+}
+function vfFechar() { var m = document.getElementById('vf-modal'); if (m) m.remove(); document.removeEventListener('keydown', _vfTecla); }
+function _vfTecla(e) { if (e.key === 'Escape') vfFechar(); }
+function vfFiltro(campo, valor) { vfFechar(); VF[campo] = valor; if (campo === 'per' && valor === 'pers' && !VF.de) { var h = new Date(); VF.de = new Date(h.getFullYear(), h.getMonth(), 1).toISOString().slice(0, 10); VF.ate = h.toISOString().slice(0, 10); } try { renderV2(); } catch (e) {} }
+function _vfFiltrosHtml(sdrs, closers, extra) {
   var chip = function(v, rot) { return '<button type="button" class="pl-chip' + (VF.per === v ? ' on' : '') + '" onclick="vfFiltro(\'per\',\'' + v + '\')">' + rot + '</button>'; };
   var sel = function(rot, campo, lista) { return '<label class="vf-sel">' + rot + ' <select onchange="vfFiltro(\'' + campo + '\',this.value)"><option value="">Todos</option>' + lista.map(function(v) { return '<option' + (VF[campo] === v ? ' selected' : '') + '>' + _vfEsc(v) + '</option>'; }).join('') + '</select></label>'; };
   return '<div class="vf-filtros"><div class="pl-chips">' + chip('visao', 'Como a Visão Geral') + chip('mes', 'Mês atual') + chip('mesant', 'Mês passado') + chip('30', '30 dias') + chip('90', '90 dias') + chip('pers', 'Período') + '</div>'
     + (VF.per === 'pers' ? '<span class="vf-datas"><input type="date" value="' + VF.de + '" onchange="vfFiltro(\'de\',this.value)" aria-label="De"> até <input type="date" value="' + VF.ate + '" onchange="vfFiltro(\'ate\',this.value)" aria-label="Até"></span>' : '')
-    + sel('Origem', 'origem', ['Anúncio', 'Orgânico', 'Social Selling', 'Indicação', 'Recuperação', 'Outras']) + sel('SDR', 'sdr', sdrs) + sel('Closer', 'closer', closers) + '</div>';
+    + sel('Origem', 'origem', ['Anúncio', 'Orgânico', 'Social Selling', 'Indicação', 'Recuperação', 'Outras']) + sel('SDR', 'sdr', sdrs) + sel('Closer', 'closer', closers) + (extra || '') + '</div>';
 }
 function _vfCoorte(leads, porTel) {
   var D = { ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() };
@@ -36095,7 +36118,7 @@ function v2FunilProdutos(mesRows) {
   var g = D.tot, h = '<div class="panel vf-wrap"><div class="vf-topo"><h3>🔻 Funil do Diagnóstico</h3><span class="hint">' + _vfEsc(P.rot) + ' · todas as origens menos o workshop · escolha o funil para trabalhar · % = quanto passou do passo anterior · passe o mouse no passo para ver o que conta</span></div>'
     + '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Contar</span>' + modo('coorte', 'Leads que chegaram', 'cada lead que chegou no período, seguido até a venda (as reuniões dele em qualquer data depois)')
     + modo('periodo', 'Movimento do período', 'as reuniões que aconteceram no período, de leads de qualquer data') + '</div></div>'
-    + _vfFiltrosHtml(Object.keys(sdrs).sort(), Object.keys(closers).sort())
+    + _vfFiltrosHtml(Object.keys(sdrs).sort(), Object.keys(closers).sort(), '<button type="button" class="pl-chip vf-abrir" onclick="vfAbrir(\'dcl\')">📋 Desempenho por closer</button>')
     + (VF.origem === 'Social Selling' || VF.origem === 'Indicação' || VF.origem === 'Recuperação' ? '<p class="hint" style="margin:4px 0 0;">Os leads da base vêm do formulário: ' + _vfEsc(VF.origem) + ' quase não aparece nos leads, só nas reuniões.</p>' : '')
     + heroi('🌐 Geral do Diagnóstico' + (comCl ? ' · closer ' + _vfEsc(VF.closer) : ''), 'fun', '#2fd4c4', comCl ? heroiCl(g) : [['📥 Leads que chegaram', g.leads], ['✅ MQL', g.mql, pct(g.mql, g.leads) + ' dos leads'], ['📅 ' + (co ? 'Marcaram reunião' : 'Reuniões marcadas'), g.marc, pct(g.marc, g.leads) + ' dos leads'],
       ['💰 ' + (co ? 'Viraram venda' : 'Vendas'), g.pag, cv(g.pag, g.leads) + ' dos leads']], g.valor)
@@ -36104,7 +36127,7 @@ function v2FunilProdutos(mesRows) {
     + (function() { var M = {}; rowsCl.forEach(function(r) { if (/workshop/.test(v2norm(r.origem || ''))) return; var cn = String(r.closer || '').trim(); if (!cn) return;
         var t = M[cn] || (M[cn] = { tot: _vfNovo(), ht: _vfNovo(), leg: _vfNovo() }); _vfReuniao(t.tot, r); _vfReuniao(t[_vfProd(r.produto)], r); });
         var L = Object.keys(M).map(function(n) { return { n: n, z: M[n] }; }).filter(function(c) { return c.z.tot.marc > 0; }).sort(function(a, b) { return b.z.tot.pag - a.z.tot.pag || b.z.tot.marc - a.z.tot.marc; });
-        return _vfClTabela('Closer · ' + _vfEsc(P.rot), L, 'closer'); })()
+        window._vfModal = window._vfModal || {}; window._vfModal.dcl = '<h3 class="vf-modal-t">📋 Desempenho por closer · Diagnóstico</h3><p class="hint">' + _vfEsc(P.rot) + ' · clique no closer para filtrar o funil</p>' + (_vfClTabela('Closer', L, 'closer') || '<p class="hint">Nenhuma reunião no período.</p>'); return ''; })()
     + '<div class="hint" style="margin-top:8px;">Diagnóstico = anúncio, orgânico, social selling, indicação, recuperação… (quem veio do workshop, no Pré, no Workshop ou no Pós, fica no funil do Workshop, abaixo). MQL = quem marcou algum investimento no formulário ("não tenho disponibilidade" e em branco não contam). HT = Spark / Growth; Legado = Mentoria Legado Digital e Legado Club.'
     + (semPerfil ? ' ' + semPerfil + ' lead' + (semPerfil > 1 ? 's' : '') + ' sem perfil (sem investimento ou abaixo do Legado) entra' + (semPerfil > 1 ? 'm' : '') + ' só no total.' : '') + '</div></div>';
   // 🎓 Workshop
@@ -36120,13 +36143,13 @@ function v2FunilProdutos(mesRows) {
         + '<span class="vf-op-r"><i></i>' + m[0] + ' ' + m[1] + '</span><small>' + m[2] + '</small><b>' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + (tv ? ' <em>' + pct(z.pag, tv) + '</em>' : '') + '</b>'
         + '<span class="vf-op-n">' + rkoN(z.marc) + ' reuniões · ' + rkoN(z.comp) + ' apareceram</span><span class="vf-op-v">' + v2moeda0(z.valor) + '</span></button>'; };
     h += '<div class="panel vf-wrap vf-ws"><div class="vf-topo"><h3>🎓 Funil do Workshop</h3><span class="hint">por edição · cada pessoa fica na edição dela no app, mesmo que feche no mês seguinte · o closer se escolhe aqui embaixo · vale o filtro de SDR de cima</span></div>'
-      + '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Edição</span>' + eds.slice().reverse().slice(0, 10).map(function(o) { return edChip(o.ed, o.ed + (o.d2 > hoje0 ? ' · vai acontecer' : ''), o.d2 ? '2º dia ' + new Date(o.d2).toLocaleDateString('pt-BR') : ''); }).join('') + edChip('*', 'Todas') + '</div></div>'
+      + '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Edição</span>' + eds.slice().reverse().slice(0, 10).map(function(o) { return edChip(o.ed, o.ed + (o.d2 > hoje0 ? ' · vai acontecer' : ''), o.d2 ? '2º dia ' + new Date(o.d2).toLocaleDateString('pt-BR') : ''); }).join('') + edChip('*', 'Todas') + '<button type="button" class="pl-chip vf-abrir" onclick="vfAbrir(\'eds\')">📅 Comparar edições</button></div></div>'
       + (function() {
         var cls = Object.keys(pcl).map(function(n) { var t = trio(); lista.forEach(function(o) { var pe = pcl[n][o.ed]; if (pe) ['tot', 'ht', 'leg'].forEach(function(k) { somar(t[k], pe[k]); }); }); return { n: n, z: t.tot, zz: t }; })
           .filter(function(c) { return c.z.marc > 0 || pn(c.n) === pn(VF.wcl); }).sort(function(a, b) { return b.z.pag - a.z.pag || b.z.marc - a.z.marc; });
         window._vfCls = cls;
         var clChip = function(v, rot) { var on = v ? pn(v) === pn(VF.wcl) : !VF.wcl; return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" onclick="vfFiltro(\'wcl\',\'' + _vfEsc(v).replace(/'/g, '&#39;') + '\')">' + rot + '</button>'; };
-        return cls.length ? '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Closer</span>' + clChip('', 'Todos') + cls.map(function(c) { return clChip(c.n, _vfEsc(c.n) + ' <small>' + rkoN(c.z.pag) + ' venda' + (c.z.pag === 1 ? '' : 's') + '</small>'); }).join('') + '</div></div>' : '';
+        return cls.length ? '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Closer</span>' + clChip('', 'Todos') + cls.map(function(c) { return clChip(c.n, _vfEsc(c.n) + ' <small>' + rkoN(c.z.pag) + ' venda' + (c.z.pag === 1 ? '' : 's') + '</small>'); }).join('') + '<button type="button" class="pl-chip vf-abrir" onclick="vfAbrir(\'wcl\')">📋 Desempenho por closer</button></div></div>' : '';
       })()
       + (futura ? '<p class="hint" style="margin:0 0 8px;">Esta edição ainda vai acontecer (2º dia ' + new Date(oSel.d2).toLocaleDateString('pt-BR') + '): por enquanto só tem inscritos. As aplicações e o perfil (HT ou Legado) chegam no dia do workshop.</p>' : '')
       + heroi('🎓 ' + _vfEsc(edRot), 'wfun', '#f6a350', comWcl ? heroiCl(w) : [['🎟️ Inscritos', w.insc], ['🙋 Aplicaram', w.apl, pct(w.apl, w.insc) + ' dos inscritos'], ['✅ MQL', w.mql, pct(w.mql, w.insc) + ' dos inscritos'],
@@ -36134,11 +36157,11 @@ function v2FunilProdutos(mesRows) {
       + '<div class="vf-grp"><small>Momento da reunião' + (mom ? ' · filtrando: ' + MO[mom][1] + ' (clique de novo para tirar)' : ' · clique para filtrar') + '</small><div class="vf-esc1">' + moBox('pre') + moBox('ws') + moBox('pos') + '</div></div>'
       + '<div class="vf-grp"><small>Perfil · clique para filtrar</small><div class="vf-esc1">' + card('wfun', 'tot', wk, 'Total', WC.tot.cor, ZW.tot, comWcl ? 'comp' : 'insc') + card('wfun', 'ht', wk, 'HT', WC.ht.cor, ZW.ht, comWcl ? 'comp' : 'insc') + card('wfun', 'leg', wk, 'Legado', WC.leg.cor, ZW.leg, comWcl ? 'comp' : 'insc') + '</div></div>'
       + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, comWcl ? _VF_PASSOS : [['insc', 'Inscritos', 'ingresso pago no app do workshop']].concat(semPres ? [] : [['part', 'Participaram', 'presença marcada no app em pelo menos um dia']]).concat([['apl', 'Aplicaram', 'fizeram a aplicação no app'], ['mql', 'MQL', 'aplicaram e marcaram algum investimento']]).concat(_VF_PASSOS), comWcl ? 'comp' : 'insc') + '</div>'
-      + _vfClTabela('Closer · ' + _vfEsc(edSel === '*' ? 'todas as edições' : edSel), (window._vfCls || []).map(function(c) { return { n: c.n, z: c.zz }; }), 'wcl')
-      + '<div class="vf-comp"><table><thead><tr><th>Edição' + (comWcl ? ' · ' + _vfEsc(VF.wcl) : '') + '</th>' + (comWcl ? '' : '<th>Inscritos</th><th>Aplicaram</th><th>MQL</th>') + '<th>Reuniões</th>' + (comWcl ? '<th>Apareceram</th>' : '') + '<th>Vendas</th><th>🕐 Pré</th><th>🎯 Workshop</th><th>📆 Pós</th><th>' + (comWcl ? 'Conversão de quem apareceu' : 'Inscrito → venda') + '</th><th>Valor</th></tr></thead><tbody>'
+      + (function() { window._vfModal = window._vfModal || {}; window._vfModal.wcl = '<h3 class="vf-modal-t">📋 Desempenho por closer · Workshop</h3><p class="hint">' + _vfEsc(edSel === '*' ? 'todas as edições' : 'edição de ' + edSel) + ' · clique no closer para filtrar o funil</p>' + _vfClTabela('Closer', (window._vfCls || []).map(function(c) { return { n: c.n, z: c.zz }; }), 'wcl'); return ''; })()
+      + (function() { window._vfModal = window._vfModal || {}; window._vfModal.eds = '<h3 class="vf-modal-t">📅 Comparar edições do Workshop</h3><p class="hint">clique na edição para abrir o funil dela · "2 de 5" = 2 vendas em 5 reuniões</p>' + '<div class="vf-comp"><table><thead><tr><th>Edição' + (comWcl ? ' · ' + _vfEsc(VF.wcl) : '') + '</th>' + (comWcl ? '' : '<th>Inscritos</th><th>Aplicaram</th><th>MQL</th>') + '<th>Reuniões</th>' + (comWcl ? '<th>Apareceram</th>' : '') + '<th>Vendas</th><th>🕐 Pré</th><th>🎯 Workshop</th><th>📆 Pós</th><th>' + (comWcl ? 'Conversão de quem apareceu' : 'Inscrito → venda') + '</th><th>Valor</th><th>Ticket médio</th></tr></thead><tbody>'
       + eds.slice().reverse().slice(0, 10).map(function(o) { var z = zW([o], wk, ''), p = function(m) { var y = zW([o], wk, m); return rkoN(y.pag) + (y.marc ? ' <small>de ' + rkoN(y.marc) + '</small>' : ''); };
-        return '<tr class="' + (edSel === o.ed ? 'on' : '') + '" tabindex="0" onclick="vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\')" onkeydown="if(event.key===\'Enter\'){vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\');}"><th>' + _vfEsc(o.ed) + (o.d2 ? ' <small>' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</th>' + (comWcl ? '' : '<td>' + rkoN(z.insc) + '</td><td>' + rkoN(z.apl) + '</td><td>' + rkoN(z.mql) + '</td>') + '<td>' + rkoN(z.marc) + '</td>' + (comWcl ? '<td>' + rkoN(z.comp) + '</td>' : '') + '<td>' + rkoN(z.pag) + '</td><td>' + p('pre') + '</td><td>' + p('ws') + '</td><td>' + p('pos') + '</td><td><b>' + (comWcl ? cv(z.pag, z.comp) : cv(z.pag, z.insc)) + '</b></td><td>' + v2moeda0(z.valor) + '</td></tr>'; }).join('')
-      + '</tbody></table></div>'
+        return '<tr class="' + (edSel === o.ed ? 'on' : '') + '" tabindex="0" onclick="vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\')" onkeydown="if(event.key===\'Enter\'){vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\');}"><th>' + _vfEsc(o.ed) + (o.d2 ? ' <small>' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</th>' + (comWcl ? '' : '<td>' + rkoN(z.insc) + '</td><td>' + rkoN(z.apl) + '</td><td>' + rkoN(z.mql) + '</td>') + '<td>' + rkoN(z.marc) + '</td>' + (comWcl ? '<td>' + rkoN(z.comp) + '</td>' : '') + '<td>' + rkoN(z.pag) + '</td><td>' + p('pre') + '</td><td>' + p('ws') + '</td><td>' + p('pos') + '</td><td><b>' + (comWcl ? cv(z.pag, z.comp) : cv(z.pag, z.insc)) + '</b></td><td>' + v2moeda0(z.valor) + '</td><td>' + (z.pag ? v2moeda0(z.valor / z.pag) : '—') + '</td></tr>'; }).join('')
+      + '</tbody></table></div>'; return ''; })()
       + (semPres && !comWcl ? '<p class="hint" style="margin:0 0 8px;">⚠️ O app do workshop não registrou a lista de presença ' + (edSel === '*' ? 'em algumas edições' : 'nesta edição') + ' (só a edição de julho tem): por isso o passo "Participaram" ficou de fora.</p>' : '')
       + '<div class="hint" style="margin-top:8px;">Pré / Workshop / Pós pela data da reunião contra o 2º dia da edição da pessoa (a mesma regra dos ' + JAN + ' dias). Na tabela, "2 de 5" = 2 vendas em 5 reuniões. MQL = aplicou e marcou algum investimento. HT ou Legado pelo investimento que a pessoa marcou na aplicação; quem não aplicou fica só no total.'
       + (semEd ? ' ' + semEd + ' reuniões com origem de workshop não foram achadas no app (telefone diferente).' : '') + '</div></div>';
@@ -36157,8 +36180,8 @@ function _vfClTabela(titulo, lista, campo) {
     return [['tot', 'Geral'], ['ht', 'HT'], ['leg', 'Legado']].map(function(pp, i) { var z = Z[pp[0]];
       return '<tr class="vf-cl-' + pp[0] + (on ? ' on' : '') + (time ? ' vf-cl-time' : '') + '"' + (arg !== null ? ' tabindex="0" onclick="vfFiltro(\'' + campo + '\',\'' + arg + '\')" onkeydown="if(event.key===\'Enter\'){vfFiltro(\'' + campo + '\',\'' + arg + '\');}"' : '') + '>'
         + (i ? '' : '<th rowspan="3">' + _vfEsc(nome) + '</th>') + '<td class="vf-cl-p">' + pp[1] + '</td><td>' + rkoN(z.marc) + '</td><td class="vf-cl-ns">' + rkoN(z.ns) + (z.real ? ' <small>' + pc(z.ns, z.real) + '</small>' : '') + '</td><td>' + rkoN(z.comp) + '</td><td>' + rkoN(z.fech)
-        + '</td><td>' + rkoN(z.pag) + '</td><td>' + rkoN(z.mesa) + '</td><td><b>' + cv(z.pag, z.comp) + '</b></td><td>' + v2moeda0(z.valor) + '</td></tr>'; }).join(''); };
-  return '<div class="vf-comp vf-cl"><table><thead><tr><th>' + titulo + '</th><th>Produto</th><th>Reuniões</th><th>No-show</th><th>Apareceram</th><th>Disse sim</th><th>Vendas</th><th>Na mesa</th><th>Conversão de quem apareceu</th><th>Valor</th></tr></thead><tbody>'
+        + '</td><td>' + rkoN(z.pag) + '</td><td>' + rkoN(z.mesa) + '</td><td><b>' + cv(z.pag, z.comp) + '</b></td><td>' + v2moeda0(z.valor) + '</td><td>' + (z.pag ? v2moeda0(z.valor / z.pag) : '—') + '</td></tr>'; }).join(''); };
+  return '<div class="vf-comp vf-cl"><table><thead><tr><th>' + titulo + '</th><th>Produto</th><th>Reuniões</th><th>No-show</th><th>Apareceram</th><th>Disse sim</th><th>Vendas</th><th>Na mesa</th><th>Conversão de quem apareceu</th><th>Valor</th><th>Ticket médio</th></tr></thead><tbody>'
     + lista.map(function(c) { var on = !!sel && pn(c.n) === pn(sel); return linhas(c.n, c.z, on ? '' : _vfEsc(c.n).replace(/'/g, '&#39;'), on, false); }).join('')
     + (lista.length > 1 ? linhas('Time', T, null, false, true) : '') + '</tbody></table></div>';
 }
