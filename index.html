@@ -2919,7 +2919,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-19-0932';
+var VERSAO_DASH = '2026-10-19-0955';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25642,6 +25642,19 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .vf-bar { display:block; height:5px; margin-top:6px; border-radius:5px; background:rgba(255,255,255,.06); overflow:hidden; } .vf-bar i { display:block; height:100%; border-radius:5px; }
 .vf-valor td b, .vf-conv td b { font-size:.95rem; } .vf-conv td b { color:var(--green); }
 .vf-tab tbody tr:last-child th, .vf-tab tbody tr:last-child td { border-bottom:0; }
+.vf-ed { margin-top:14px; } .vf-ed h4 { margin:0 0 6px; font-size:.9rem; font-weight:900; } .vf-ed h4 small { font-size:.7rem; color:var(--muted); font-weight:600; margin-left:6px; }
+.vf-ed .vf-tab { min-width:560px; }
+.vf-linha { display:grid; grid-template-columns:150px minmax(0, 1fr); gap:12px; align-items:stretch; padding:10px 0; border-top:1px solid var(--border); }
+.vf-linha:first-of-type { border-top:0; }
+.vf-lab { display:flex; flex-direction:column; justify-content:center; gap:2px; } .vf-lab b { font-size:.82rem; font-weight:900; letter-spacing:.02em; } .vf-lab small { font-size:.66rem; color:var(--muted); }
+.vf-steps { display:flex; align-items:stretch; gap:4px; overflow-x:auto; padding-bottom:2px; }
+.vf-st { flex:1 1 0; min-width:84px; display:flex; flex-direction:column; gap:1px; padding:8px 10px; border-radius:12px; background:rgba(255,255,255,.035); border:1px solid var(--border); font-variant-numeric:tabular-nums; }
+.vf-st-r { font-size:.6rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); }
+.vf-st b { font-size:1.25rem; font-weight:900; line-height:1.1; } .vf-st small { font-size:.64rem; color:var(--muted); font-weight:700; }
+.vf-st-b { display:flex; align-items:flex-end; height:22px; margin-top:4px; border-radius:6px; background:rgba(255,255,255,.04); overflow:hidden; } .vf-st-b i { display:block; width:100%; border-radius:6px 6px 0 0; opacity:.85; }
+.vf-fim { min-width:120px; background:rgba(61,220,151,.06); border-color:rgba(61,220,151,.25); } .vf-fim b { font-size:1rem; color:var(--green); }
+.vf-seta { align-self:center; color:var(--muted); font-size:1rem; flex:none; }
+@media (max-width:760px) { .vf-linha { grid-template-columns:1fr; } }
 /* ===== fim do 🔻 funil completo por produto ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35809,40 +35822,80 @@ function _vfPeriodo() {
 }
 function _vfEhWs(origem) { var o = v2norm(origem || ''); return /workshop/.test(o) && !/pos/.test(o); }
 function _vfProd(produto) { var p = v2norm(produto || ''); return /legado|wld/.test(p) ? 'leg' : 'ht'; }
-function v2FunilProdutos(mesRows) {
-  var P = _vfPeriodo(), seg = { dht: null, dleg: null, wht: null, wleg: null };
-  var novo = function() { return { leads: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0 }; };
-  Object.keys(seg).forEach(function(k) { seg[k] = novo(); }); var T = novo(), semPerfil = 0, leadsWs = 0, leadsDiag = 0;
-  // leads do workshop: quem aplicou no app no período (se as aplicações ainda não foram lidas, lê e redesenha uma vez)
-  var wsTel = {};
-  try { if (typeof WSL !== 'undefined' && !WSL.carregado && typeof carregarWS === 'function') { carregarWS(); if (!window._vfEsperaWs) { window._vfEsperaWs = 1; var tW = 0, ve = function() { if (WSL.carregado) { try { renderV2(); } catch (e) {} } else if (tW++ < 20) setTimeout(ve, 1500); }; setTimeout(ve, 1500); } } } catch (eC) {}
-  try { Object.keys(WSL.porTel || {}).forEach(function(t8) { var x = WSL.porTel[t8], d = x.apl instanceof Date ? x.apl.getTime() : 0; if (!d || d < P.ini || d >= P.fim || x.prog === 'ILD') return; wsTel[t8] = 1; leadsWs++;
-    var fx = leadFaixa(_wsInvTxt(x.inv)); if (fx === 'alta') seg.wht.leads++; else if (fx === 'media') seg.wleg.leads++; else semPerfil++; }); } catch (eW) {}
-  (LD.rows || []).forEach(function(l) { var d = l.date ? l.date.getTime() : 0; if (!d || d < P.ini || d >= P.fim || (l.tel8 && wsTel[l.tel8])) return; leadsDiag++;
-    if (l.faixa === 'alta') seg.dht.leads++; else if (l.faixa === 'media') seg.dleg.leads++; else semPerfil++; });
-  (mesRows || []).forEach(function(r) {
-    var k = (_vfEhWs(r.origem) ? 'w' : 'd') + _vfProd(r.produto), z = seg[k];
-    [z, T].forEach(function(o) { o.marc++; if (isReal(r.sn)) o.real++; if (isComp(r.sn)) o.comp++; if (isFechouReuniao(r.sn)) o.fech++; if (r.sn === 'vendido') { o.pag++; o.valor += r.valor || 0; } });
-  });
-  T.leads = leadsWs + leadsDiag;
-  var cols = [['dht', 'Diagnóstico · HT', '#6ea8ff'], ['dleg', 'Diagnóstico · Legado', '#b98aff'], ['wht', 'Workshop · HT', '#f6a350'], ['wleg', 'Workshop · Legado', '#3ddc97']];
-  var passos = [['leads', 'Leads', 'base de leads (diagnóstico) e aplicações no app (workshop) no período · HT = investimento alto · Legado = perfil legado'],
-    ['marc', 'Reuniões marcadas', 'todas as reuniões do período, inclusive as futuras'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado (inclui faltas)'],
-    ['comp', 'Lead apareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['fech', 'Disse sim na reunião', 'vendido, entrada ou bloqueio'], ['pag', 'Pagou tudo', 'status Vendido']];
+// 19/10/2026 (Bruno: "crie por edição, separado abaixo"): em cima o Diagnóstico (HT, Legado, total) no período da Visão Geral; embaixo o
+// Workshop POR EDIÇÃO (cada reunião vai para a edição da pessoa no app do workshop), com HT, Legado e total.
+var _VF_PASSOS = [['marc', 'Marcadas', 'todas as reuniões, inclusive as futuras'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado (inclui faltas)'],
+  ['comp', 'Apareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['fech', 'Disse sim', 'vendido, entrada ou bloqueio'], ['pag', 'Pagou', 'status Vendido']];
+function _vfNovo() { return { leads: 0, insc: 0, part: 0, apl: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0 }; }
+function _vfReuniao(o, r) { o.marc++; if (isReal(r.sn)) o.real++; if (isComp(r.sn)) o.comp++; if (isFechouReuniao(r.sn)) o.fech++; if (r.sn === 'vendido') { o.pag++; o.valor += r.valor || 0; } }
+function _vfTabela(cols, passos, extraLinhas) {   // cols: [{ rot, cor, z }]
   var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
   var celula = function(z, i, cor) {
-    var k = passos[i][0], v = z[k], ant = i ? z[passos[i - 1][0]] : null, topo = Math.max(z.leads, z.marc, 1);
+    var k = passos[i][0], v = z[k], ant = i ? z[passos[i - 1][0]] : null, topo = Math.max(z[passos[0][0]], z.marc, 1);
     return '<td><div class="vf-n"><b>' + v + '</b>' + (i ? '<small>' + pc(v, ant) + '</small>' : '') + '</div><span class="vf-bar"><i style="width:' + Math.min(100, Math.max(v ? 3 : 0, v / topo * 100)).toFixed(0) + '%;background:' + cor + ';"></i></span></td>';
   };
-  var h = '<div class="panel vf-wrap"><div class="vf-topo"><h3>🔻 Funil completo por produto</h3><span class="hint">mesmo período da Visão Geral · % = quanto passou do passo anterior</span></div>'
-    + '<div class="vf-tab-w"><table class="vf-tab"><thead><tr><th></th>' + cols.map(function(c) { return '<th style="color:' + c[2] + ';">' + c[1] + '</th>'; }).join('') + '<th>Total</th></tr></thead><tbody>'
-    + passos.map(function(p, i) { return '<tr><th scope="row">' + p[1] + '<small>' + p[2] + '</small></th>' + cols.map(function(c) { return celula(seg[c[0]], i, c[2]); }).join('') + celula(T, i, '#9aa3b2') + '</tr>'; }).join('')
-    + '<tr class="vf-valor"><th scope="row">Valor vendido<small>soma dos que pagaram tudo</small></th>' + cols.map(function(c) { return '<td><b>' + v2moeda0(seg[c[0]].valor) + '</b></td>'; }).join('') + '<td><b>' + v2moeda0(T.valor) + '</b></td></tr>'
-    + '<tr class="vf-conv"><th scope="row">Do lead à venda<small>pagou tudo ÷ leads</small></th>' + cols.map(function(c) { var z = seg[c[0]]; return '<td><b>' + (z.leads ? (z.pag / z.leads * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</b></td>'; }).join('') + '<td><b>' + (T.leads ? (T.pag / T.leads * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</b></td></tr>'
-    + '</tbody></table></div><div class="hint" style="margin-top:8px;">Workshop = origem Workshop ou Pré workshop (até 15 dias do 2º dia); o resto é Diagnóstico. HT = Spark / Growth; Legado = Mentoria Legado Digital, Legado Club e Entrevista WLD. '
+  return '<div class="vf-tab-w"><table class="vf-tab"><thead><tr><th></th>' + cols.map(function(c) { return '<th style="color:' + c.cor + ';">' + c.rot + '</th>'; }).join('') + '</tr></thead><tbody>'
+    + passos.map(function(p, i) { return '<tr><th scope="row">' + p[1] + '<small>' + p[2] + '</small></th>' + cols.map(function(c) { return celula(c.z, i, c.cor); }).join('') + '</tr>'; }).join('')
+    + '<tr class="vf-valor"><th scope="row">Valor vendido<small>soma dos que pagaram tudo</small></th>' + cols.map(function(c) { return '<td><b>' + v2moeda0(c.z.valor) + '</b></td>'; }).join('') + '</tr>'
+    + (extraLinhas || '') + '</tbody></table></div>';
+}
+// 19/10/2026 (Bruno: "crie um separado horizontal"): cada funil numa LINHA, da esquerda para a direita, um por produto
+function _vfLinha(rot, sub, cor, z, passos, de) {
+  var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }, topo = Math.max(z[passos[0][0]], z.marc, 1);
+  var steps = passos.map(function(p, i) {
+    var v = z[p[0]], ant = i ? z[passos[i - 1][0]] : null, alt = Math.min(100, Math.max(v ? 6 : 0, v / topo * 100));
+    return (i ? '<span class="vf-seta" aria-hidden="true">›</span>' : '') + '<div class="vf-st" title="' + _vfEsc(p[2]) + '"><span class="vf-st-r">' + p[1] + '</span><b>' + v + '</b><small>' + (i ? pc(v, ant) + ' do anterior' : '&nbsp;') + '</small>'
+      + '<span class="vf-st-b"><i style="height:' + alt.toFixed(0) + '%;background:' + cor + ';"></i></span></div>';
+  }).join('');
+  var conv = z[de] ? (z.pag / z[de] * 100).toFixed(1).replace('.', ',') + '%' : '—';
+  return '<div class="vf-linha"><div class="vf-lab"><b style="color:' + cor + ';">' + rot + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><div class="vf-steps">' + steps
+    + '<span class="vf-seta" aria-hidden="true">›</span><div class="vf-st vf-fim"><span class="vf-st-r">Vendido</span><b>' + v2moeda0(z.valor) + '</b><small>' + conv + ' ' + (de === 'leads' ? 'dos leads' : 'dos inscritos') + ' viraram venda</small></div></div></div>';
+}
+function v2FunilProdutos(mesRows) {
+  var P = _vfPeriodo(), D = { ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() }, semPerfil = 0;
+  // as aplicações do workshop (para tirar do Diagnóstico e montar as edições); se ainda não foram lidas, lê e redesenha uma vez
+  try { if (typeof WSL !== 'undefined' && !WSL.carregado && typeof carregarWS === 'function') { carregarWS(); if (!window._vfEsperaWs) { window._vfEsperaWs = 1; var tW = 0, ve = function() { if (WSL.carregado) { try { renderV2(); } catch (e) {} } else if (tW++ < 20) setTimeout(ve, 1500); }; setTimeout(ve, 1500); } } } catch (eC) {}
+  var wsTel = {}; try { Object.keys(WSL.porTel || {}).forEach(function(t8) { var x = WSL.porTel[t8]; if (x.prog !== 'ILD' && (x.apl instanceof Date || x.ing instanceof Date)) wsTel[t8] = x; }); } catch (eW) {}
+  // ---- Diagnóstico no período ----
+  (LD.rows || []).forEach(function(l) { var d = l.date ? l.date.getTime() : 0; if (!d || d < P.ini || d >= P.fim || (l.tel8 && wsTel[l.tel8])) return;
+    D.tot.leads++; if (l.faixa === 'alta') D.ht.leads++; else if (l.faixa === 'media') D.leg.leads++; else semPerfil++; });
+  (mesRows || []).forEach(function(r) { if (_vfEhWs(r.origem)) return; var k = _vfProd(r.produto); _vfReuniao(D[k], r); _vfReuniao(D.tot, r); });
+  var passosD = [['leads', 'Leads', 'base de leads do período (sem quem veio do workshop) · HT = investimento alto · Legado = perfil legado (R$ 500–1 mil)']].concat(_VF_PASSOS);
+  var conv = function(cols, de) { return '<tr class="vf-conv"><th scope="row">Do ' + (de === 'leads' ? 'lead' : 'inscrito') + ' à venda<small>pagou tudo ÷ ' + (de === 'leads' ? 'leads' : 'inscritos') + '</small></th>' + cols.map(function(c) { var z = c.z; return '<td><b>' + (z[de] ? (z.pag / z[de] * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</b></td>'; }).join('') + '</tr>'; };
+  var colsD = [{ rot: 'Diagnóstico · HT', cor: '#6ea8ff', z: D.ht }, { rot: 'Diagnóstico · Legado', cor: '#b98aff', z: D.leg }, { rot: 'Diagnóstico · total', cor: '#9aa3b2', z: D.tot }];
+  var h = '<div class="panel vf-wrap"><div class="vf-topo"><h3>🔻 Funil do Diagnóstico por produto</h3><span class="hint">mesmo período da Visão Geral · % = quanto passou do passo anterior · passe o mouse no passo para ver o que conta</span></div>'
+    + colsD.map(function(c) { return _vfLinha(c.rot, '', c.cor, c.z, passosD, 'leads'); }).join('')
+    + '<div class="hint" style="margin-top:8px;">Diagnóstico = todas as origens menos o workshop (anúncio, orgânico, social selling, indicação, recuperação, pós workshop…). HT = Spark / Growth; Legado = Mentoria Legado Digital e Legado Club. '
     + (semPerfil ? semPerfil + ' lead' + (semPerfil > 1 ? 's' : '') + ' sem perfil (investimento abaixo do Legado) entra' + (semPerfil > 1 ? 'm' : '') + ' só no total.' : '') + '</div></div>';
+  // ---- Workshop por edição ----
+  var E = {};
+  Object.keys(wsTel).forEach(function(t8) {
+    var x = wsTel[t8], ed = _wsMes(x) || 'sem edição', o = E[ed] || (E[ed] = { ed: ed, d2: x.d2 instanceof Date ? x.d2.getTime() : 0, ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() });
+    var fx = leadFaixa(_wsInvTxt(x.inv)), k = fx === 'alta' ? 'ht' : fx === 'media' ? 'leg' : null;
+    [o.tot].concat(k ? [o[k]] : []).forEach(function(z) { if (x.ing instanceof Date) z.insc++; if (x.p1 || x.p2 || x.p3) z.part++; if (x.apl instanceof Date) z.apl++; });
+  });
+  var semEd = 0;
+  (V2.rows || []).forEach(function(r) {
+    if (!/workshop/.test(v2norm(r.origem || '')) || !r.date) return;
+    var x = wsTel[ldTel8(r.telefone || r.tel || '')]; if (!x) { semEd++; return; }
+    var o = E[_wsMes(x) || 'sem edição']; if (!o) return;
+    _vfReuniao(o[_vfProd(r.produto)], r); _vfReuniao(o.tot, r);
+  });
+  var eds = Object.keys(E).map(function(k) { return E[k]; }).filter(function(o) { return o.tot.insc || o.tot.apl || o.tot.marc; }).sort(function(a, b) { return a.d2 - b.d2; });
+  if (eds.length) {
+    var cores = ['#f6a350', '#3ddc97', '#ffd166', '#e2647a', '#6ea8ff'];
+    var passosW = [['insc', 'Inscritos', 'ingresso pago no app do workshop'], ['part', 'Participaram', 'presentes em pelo menos um dia'], ['apl', 'Aplicaram', 'fizeram a aplicação no app']].concat(_VF_PASSOS);
+    h += '<div class="panel vf-wrap"><div class="vf-topo"><h3>🎓 Funil do Workshop por edição</h3><span class="hint">cada reunião vai para a edição da pessoa no app do workshop (origem Workshop, Pré ou Pós) · HT = investimento alto · Legado = perfil legado</span></div>';
+    eds.slice().reverse().forEach(function(o, i) {
+      var cor = cores[i % cores.length], cols = [{ rot: 'HT', cor: '#6ea8ff', z: o.ht }, { rot: 'Legado', cor: '#b98aff', z: o.leg }, { rot: 'Total', cor: cor, z: o.tot }];
+      h += '<div class="vf-ed"><h4 style="color:' + cor + ';">Edição de ' + _vfEsc(o.ed) + (o.d2 ? ' <small>2º dia ' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</h4>'
+        + cols.map(function(c) { return _vfLinha(c.rot, '', c.cor, c.z, passosW, 'insc'); }).join('') + '</div>';
+    });
+    h += '<div class="hint" style="margin-top:8px;">Inscritos e aplicações com investimento abaixo do Legado (ou sem resposta) entram só no total.' + (semEd ? ' ' + semEd + ' reuniões com origem de workshop não foram achadas no app (telefone diferente).' : '') + '</div></div>';
+  }
   return h;
 }
+function _vfEsc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 // ===== fim do 🔻 funil completo por produto =====
 // 📸 fotos do time de Produção de conteúdo (Bruno 10/10/2026: "com a foto de cada" — 1ª Rafa Sabino, 2ª Eduardo, 3ª Rebeca; 14/10: "foto da Lilian"), 420 px, guardadas aqui dentro
 var RKO_FOTOS = {
