@@ -2919,7 +2919,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-19-0857';
+var VERSAO_DASH = '2026-10-19-0903';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25611,6 +25611,7 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .csd-como summary { cursor:pointer; font-weight:800; color:var(--text); }
 .csd-como p { margin:10px 0 0; } .csd-como b { color:var(--text); }
 @media (max-width:760px) { .csd-kpis { grid-template-columns:1fr; } .csd-kpi b { font-size:1.6rem; } }
+.csd-pl { margin:6px 0 24px; } .csd-pl .csd-filtros { margin-top:6px; }
 /* ===== fim do 📊 desempenho SDR ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35371,6 +35372,19 @@ function csdCarregar(forcar) {
   });
 }
 
+// ---------- período do bloco (os filtros da mia: Hoje · Ontem · 7 dias · 30 dias · Período) ----------
+function _csdPeriodo() {
+  var hoje = _csdDia(Date.now()), mais = function(d, n) { return new Date(_csdIni(d) + n * 864e5 + 12 * CSD_H).toISOString().slice(0, 10); };
+  var de, ate, rot;
+  if (CSD.per === 'ontem') { de = ate = mais(hoje, -1); rot = 'ontem'; }
+  else if (CSD.per === '7') { ate = hoje; de = mais(hoje, -6); rot = 'últimos 7 dias'; }
+  else if (CSD.per === '30') { ate = hoje; de = mais(hoje, -29); rot = 'últimos 30 dias'; }
+  else if (CSD.per === 'pers' && CSD.de && CSD.ate) { de = CSD.de <= CSD.ate ? CSD.de : CSD.ate; ate = CSD.de <= CSD.ate ? CSD.ate : CSD.de; rot = de.split('-').reverse().join('/') + ' a ' + ate.split('-').reverse().join('/'); }
+  else { de = ate = hoje; rot = 'hoje'; }
+  var n = Math.round((_csdIni(ate) - _csdIni(de)) / 864e5) + 1;
+  return { de: de, ate: ate, ini: _csdIni(de), fim: _csdIni(ate) + 864e5, rot: rot, inclHoje: ate >= hoje,
+    antes: { ini: _csdIni(de) - n * 864e5, fim: _csdIni(de), rot: n === 1 ? (CSD.per === 'hoje' ? 'ontem' : 'o dia anterior') : 'os ' + n + ' dias anteriores' } };
+}
 // ---------- contas ----------
 function _csdDono(x) { return x.por || x.resp || 'Sem responsável'; }
 // os números de um período, por responsável e do time (regras da mia)
@@ -35474,13 +35488,21 @@ function csdCorpo(P, comLista) {
 }
 function plMiaSecoes(p) {
   csdCarregar();
-  var cab = '<div class="px-wrap csd-pl"><div class="px-titulo"><h3>💬 Atendimento na Clint</h3><span class="hint">' + _csdEsc(p.rot) + ' · as regras da mia (negócios e conversas da Clint, relidos a cada 10 min) · "antes" = período anterior do mesmo tamanho</span></div>';
+  var cab = '<div class="px-wrap csd-pl"><div class="px-titulo"><h3>💬 Atendimento na Clint</h3><span class="hint">por dia ou período, por responsável, a partir dos negócios e das conversas da Clint (as regras da mia) · relido a cada 10 min' + (CSD.lidoEm ? ' · conversas lidas às ' + _csdEsc(CSD.lidoEm) : '') + '</span></div>';
   if (!CSD.carregado) return cab + '<div class="hint" style="padding:14px;">Lendo os leads e as conversas da Clint…</div></div>';
   if (!CSD.rows.length) return '';
-  var n = p.fim - p.ini, P = { ini: p.ini, fim: p.fim, rot: String(p.rot || '').split(' · ')[0].toLowerCase() || 'no período', inclHoje: p.fim > Date.now(), antes: { ini: p.ini - n, fim: p.ini, rot: 'o período anterior' } };
+  // 19/10/2026 (Bruno: "cadê os filtros?"): o bloco tem os filtros da mia (não depende do período do Placar)
+  var P = _csdPeriodo();
   var logado = true; try { logado = !document.documentElement.classList.contains('visitante') && !!localStorage.getItem('v2Login'); } catch (e) {}
-  return cab + (P.inclHoje ? '<p class="csd-nota">O período inclui hoje: os números ainda vão mudar.</p>' : '') + csdCorpo(P, logado) + '</div>';
+  var chip = function(on, v, rot) { return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" onclick="csdPer(\'' + v + '\')">' + rot + '</button>'; };
+  var filtros = '<div class="csd-filtros"><div class="pl-chips">' + chip(CSD.per === 'hoje', 'hoje', 'Hoje') + chip(CSD.per === 'ontem', 'ontem', 'Ontem') + chip(CSD.per === '7', '7', '7 dias')
+    + chip(CSD.per === '30', '30', '30 dias') + chip(CSD.per === 'pers', 'pers', 'Período personalizado') + '</div>'
+    + (CSD.per === 'pers' ? '<span class="csd-datas"><input type="date" value="' + (CSD.de || P.de) + '" onchange="CSD.de=this.value;csdRedesenhar()" aria-label="De"> até <input type="date" value="' + (CSD.ate || P.ate) + '" onchange="CSD.ate=this.value;csdRedesenhar()" aria-label="Até"></span>' : '') + '</div>'
+    + '<p class="csd-nota">' + (P.inclHoje ? 'O período inclui hoje: os números ainda vão mudar. ' : '') + '"Antes" ao lado dos números é ' + P.antes.rot + '.</p>';
+  return cab + filtros + csdCorpo(P, logado) + '</div>';
 }
+function csdPer(v) { CSD.per = v; if (v === 'pers' && !CSD.de) { var P0 = _csdPeriodo(); CSD.de = P0.de; CSD.ate = P0.ate; } try { localStorage.setItem('csdPer', v); } catch (e) {} csdRedesenhar(); }
+try { var _csdP0 = localStorage.getItem('csdPer'); if (_csdP0 && _csdP0 !== 'pers') CSD.per = _csdP0; } catch (eP0) {}
 function csdRedesenhar() { try { if (typeof telaVisivel === 'function' && telaVisivel('s-placar') && typeof renderPlacar === 'function') renderPlacar(); } catch (e) {} }
 function _csdQuemChamar(A) {
   var hoje = Date.now(), base = A.leads.filter(function(x) { return !x.ja && !x.em; });
