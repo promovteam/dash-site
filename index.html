@@ -25767,6 +25767,10 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .vf-modal .vf-comp { margin-bottom:0; }
 @media (prefers-reduced-motion:no-preference) { .vf-modal-box { animation:vfSobe .18s ease-out; } @keyframes vfSobe { from { transform:translateY(10px); opacity:0; } to { transform:none; opacity:1; } } }
 .vf-vend .vf-tk { display:block; margin-top:4px; font-size:.6rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text2); } .vf-vend .vf-tk b { display:block; font-size:.86rem; color:var(--text); letter-spacing:0; }
+/* 19/10/2026 · passos clicáveis (lista de quem está ali) */
+.vf-seg.vf-click { cursor:pointer; } .vf-seg.vf-click:hover .vf-forma { filter:brightness(1.18); } .vf-seg.vf-click:focus-visible { outline:2px solid #ffd166; outline-offset:-2px; }
+.vf-meio em.vf-click { cursor:pointer; } .vf-meio em.vf-click:hover { filter:brightness(1.25); text-decoration:underline; } .vf-meio em.vf-click:focus-visible { outline:2px solid #ffd166; outline-offset:1px; }
+.vf-pess { display:flex; flex-direction:column; gap:2px; padding:9px 12px; border-bottom:1px solid var(--border); } .vf-pess b { font-size:.84rem; } .vf-pess small { font-size:.7rem; color:var(--text2); }
 /* ===== fim do 🔻 funil completo por produto ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35944,42 +35948,42 @@ function _vfProd(produto) { var p = v2norm(produto || ''); return /legado|wld/.t
 var VF = { fun: 'tot', wfun: 'tot', mom: '', wcl: '', modo: 'periodo', per: 'mes', de: '', ate: '', origem: '', sdr: '', closer: '', ed: '' };   // modo: 'coorte' = leads que chegaram (Bruno: "quantos leads chegaram e quantos se tornaram vendas") · 'periodo' = reuniões do período
 var _VF_PASSOS = [['marc', 'Marcadas', 'todas as reuniões, inclusive as futuras'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado (inclui faltas)'],
   ['comp', 'Apareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['fech', 'Disse sim', 'vendido, entrada ou bloqueio'], ['pag', 'Pagou', 'status Vendido']];
-function _vfNovo() { return { leads: 0, mql: 0, insc: 0, part: 0, apl: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0, fut: 0, rem: 0, ns: 0, nv: 0, mesa: 0, mesaV: 0, est: 0 }; }
+function _vfNovo() { return { leads: 0, mql: 0, insc: 0, part: 0, apl: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0, fut: 0, rem: 0, ns: 0, nv: 0, mesa: 0, mesaV: 0, est: 0, naoapl: 0, naoforam: 0 }; }
 function _vfReuniao(o, r) {
   o.marc++; if (isReal(r.sn)) o.real++; if (isComp(r.sn)) o.comp++; if (isFechouReuniao(r.sn)) o.fech++; if (r.sn === 'vendido') { o.pag++; o.valor += r.valor || 0; }
   if (isFut(r.sn)) o.fut++; if (r.sn === 'remarcada 2 reuniao') o.rem++; if (r.sn === 'no show') o.ns++; if (r.sn === 'nao vendido') o.nv++;
   if (r.sn === 'bloqueio de oferta' || r.sn === 'entrada') { o.mesa++; o.mesaV += r.valor || 0; } if (r.sn === 'estorno') o.est++;
 }
 // o que fica "no meio", entre um passo e o próximo
-function _vfMeio(de, para, z) {
+function _vfMeio(de, para, z, painel) {
   var pc = function(a, b) { return b ? ' · ' + Math.round(a / b * 100) + '%' : ''; }, t = [];
-  if (de === 'leads' && para === 'mql') t.push([z.leads - z.mql, 'sem investimento']);
-  if (de === 'apl' && para === 'mql') t.push([z.apl - z.mql, 'sem investimento']);
-  if (de === 'marc') { if (z.fut) t.push([z.fut, '🔜 futuras']); if (z.rem) t.push([z.rem, '🔁 remarcadas']); }
-  if (de === 'real' && z.ns) t.push([z.ns, '❌ no-show' + pc(z.ns, z.real)]);
-  if (de === 'comp' && z.nv) t.push([z.nv, 'não vendido' + pc(z.nv, z.comp)]);
-  if (de === 'fech' && z.mesa) t.push([z.mesa, '⏳ na mesa (bloqueio/entrada)']);
-  if (de === 'fech' && z.est) t.push([z.est, '↩️ estorno' + (z.est > 1 ? 's' : '')]);
-  if (de === 'insc' && para === 'part') t.push([Math.max(0, z.insc - z.part), 'não foram']);
-  if (de === 'insc' && para === 'apl') t.push([Math.max(0, z.insc - z.apl), 'não aplicaram']);
-  if (de === 'part') t.push([Math.max(0, z.part - z.apl), 'não aplicaram']);
+  if (de === 'leads' && para === 'mql') t.push([z.leads - z.mql, 'sem investimento', 'semmql']);
+  if (de === 'apl' && para === 'mql') t.push([z.apl - z.mql, 'sem investimento', 'semmql']);
+  if (de === 'marc') { if (z.fut) t.push([z.fut, '🔜 futuras', 'fut']); if (z.rem) t.push([z.rem, '🔁 remarcadas', 'rem']); }
+  if (de === 'real' && z.ns) t.push([z.ns, '❌ no-show' + pc(z.ns, z.real), 'ns']);
+  if (de === 'comp' && z.nv) t.push([z.nv, 'não vendido' + pc(z.nv, z.comp), 'nv']);
+  if (de === 'fech' && z.mesa) t.push([z.mesa, '⏳ na mesa (bloqueio/entrada)', 'mesa']);
+  if (de === 'fech' && z.est) t.push([z.est, '↩️ estorno' + (z.est > 1 ? 's' : ''), 'est']);
+  if (de === 'insc' && para === 'part') t.push([z.naoforam, 'não foram', 'naoforam']);
+  if (de === 'insc' && para === 'apl') t.push([z.naoapl, 'não aplicaram', 'naoapl']);
+  if (de === 'part') t.push([Math.max(0, z.part - z.apl), 'não aplicaram', '']);
   t = t.filter(function(x) { return x[0] > 0; });
-  return '<span class="vf-meio"><span class="vf-seta" aria-hidden="true">›</span>' + t.map(function(x) { return '<em class="' + (/no-show/.test(x[1]) ? 'ns' : /mesa/.test(x[1]) ? 'mesa' : '') + '">' + x[0] + ' ' + x[1] + '</em>'; }).join('') + '</span>';
+  return '<span class="vf-meio"><span class="vf-seta" aria-hidden="true">›</span>' + t.map(function(x) { var ck = painel && x[2]; return '<em class="' + (/no-show/.test(x[1]) ? 'ns' : /mesa/.test(x[1]) ? 'mesa' : '') + (ck ? ' vf-click' : '') + '"' + (ck ? ' role="button" tabindex="0" title="ver quem são" onclick="vfLista(\'' + painel + '\',\'' + x[2] + '\')" onkeydown="if(event.key===\'Enter\')vfLista(\'' + painel + '\',\'' + x[2] + '\')"' : '') + '>' + x[0] + ' ' + x[1] + '</em>'; }).join('') + '</span>';
 }
 // 🎨 19/10/2026 (Bruno: "crie um designer top"): cada linha é um funil de verdade — a forma afina da esquerda para a direita conforme os
 // números (cada pedaço liga a altura do passo anterior à do passo atual), o número fica dentro; embaixo, o % e o que ficou pelo caminho.
-function _vfLinha(rot, sub, cor, z, passos, de) {
+function _vfLinha(rot, sub, cor, z, passos, de, painel) {
   var vals = passos.map(function(p) { return z[p[0]] || 0; }), topo = Math.max.apply(null, vals.concat([1]));
   var alt = function(v) { return Math.max(14, Math.min(100, v / topo * 100)); };
   var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
   var segs = passos.map(function(p, i) {
     var v = vals[i], a0 = alt(i ? vals[i - 1] : v), a1 = alt(v), y0 = (100 - a0) / 2, y1 = (100 - a1) / 2;
     var poly = 'polygon(0% ' + y0.toFixed(1) + '%, 100% ' + y1.toFixed(1) + '%, 100% ' + (100 - y1).toFixed(1) + '%, 0% ' + (100 - y0).toFixed(1) + '%)';
-    return '<div class="vf-seg" title="' + _vfEsc(p[1] + ': ' + p[2]) + '"><i class="vf-forma" style="clip-path:' + poly + ';-webkit-clip-path:' + poly + ';--c:' + cor + ';--o:' + (1 - i * 0.07).toFixed(2) + ';"></i>'
+    return '<div class="vf-seg' + (painel ? ' vf-click' : '') + '" title="' + _vfEsc(p[1] + ': ' + p[2]) + (painel ? ' · clique para ver quem são' : '') + '"' + (painel ? ' role="button" tabindex="0" onclick="vfLista(\'' + painel + '\',\'' + p[0] + '\')" onkeydown="if(event.key===\'Enter\')vfLista(\'' + painel + '\',\'' + p[0] + '\')"' : '') + '><i class="vf-forma" style="clip-path:' + poly + ';-webkit-clip-path:' + poly + ';--c:' + cor + ';--o:' + (1 - i * 0.07).toFixed(2) + ';"></i>'
       + '<span class="vf-txt"><span>' + p[1] + '</span><b>' + rkoN(v) + '</b></span></div>';
   }).join('');
   var subs = passos.map(function(p, i) {
-    var ped = i ? _vfMeio(passos[i - 1][0], p[0], z).replace('<span class="vf-seta" aria-hidden="true">›</span>', '') : '';
+    var ped = i ? _vfMeio(passos[i - 1][0], p[0], z, painel).replace('<span class="vf-seta" aria-hidden="true">›</span>', '') : '';
     // o "Pagou" é sobre quem apareceu (19/10/2026, Bruno: "com base no que apareceram")
     var sobreAp = p[0] === 'pag' && z.comp != null && passos.some(function(q) { return q[0] === 'comp'; });
     var seFechar = p[0] === 'pag' && z.mesa ? '<span class="vf-se">se a mesa fechar: <b>' + rkoN(vals[i] + z.mesa) + '</b>' + (sobreAp ? ' · ' + pc(vals[i] + z.mesa, z.comp || 0) : '') + '</span>' : '';
@@ -36007,6 +36011,48 @@ function _vfPer() {
 }
 // 19/10/2026 (Bruno: "isso deve ser clicável em algum lugar, não embaixo"): as tabelas (desempenho por closer, comparar edições) abrem
 // numa janela por cima, por um botão ao lado do filtro; clicar numa linha filtra o funil e fecha a janela
+// 19/10/2026 (Bruno: "que esses leads sejam clicáveis"): clicar num passo do funil (ou no no-show, na mesa…) abre a lista de quem está
+// ali, na mesma janela de lista do dash (clicar no nome abre a ficha). Usa o que o funil guardou no último desenho (window._vfCtx).
+function vfLista(painel, passo) {
+  var c = (window._vfCtx || {})[painel]; if (!c) return;
+  var F = { marc: function() { return true; }, real: function(r) { return isReal(r.sn); }, comp: function(r) { return isComp(r.sn); }, fech: function(r) { return isFechouReuniao(r.sn); },
+    pag: function(r) { return r.sn === 'vendido'; }, fut: function(r) { return isFut(r.sn); }, rem: function(r) { return r.sn === 'remarcada 2 reuniao'; }, ns: function(r) { return r.sn === 'no show'; },
+    nv: function(r) { return r.sn === 'nao vendido'; }, mesa: function(r) { return r.sn === 'bloqueio de oferta' || r.sn === 'entrada'; }, est: function(r) { return r.sn === 'estorno'; } };
+  var NOME = { leads: 'Leads', mql: 'MQL', semmql: 'Sem investimento', insc: 'Inscritos', part: 'Participaram', apl: 'Aplicaram', naoapl: 'Não aplicaram', naoforam: 'Não foram',
+    marc: 'Marcadas', real: 'Realizadas', comp: 'Apareceu', fech: 'Disse sim', pag: 'Pagou tudo', fut: 'Futuras', rem: 'Remarcadas', ns: 'No-show', nv: 'Não vendido', mesa: 'Na mesa (bloqueio/entrada)', est: 'Estorno' };
+  var lista = [], tipo = 'reun', titulo;
+  if (painel === 'd') {
+    var dk = { ht: 1, leg: 1 }[VF.fun] ? VF.fun : '';
+    titulo = 'Diagnóstico' + (dk ? ' · ' + (dk === 'ht' ? 'HT' : 'Legado') : '') + (VF.closer ? ' · ' + VF.closer : '');
+    if (passo === 'leads' || passo === 'mql' || passo === 'semmql' || VF.modo === 'coorte') {
+      tipo = 'lead';
+      lista = (c.leads || []).filter(function(L) { if (dk && L.k !== dk) return false; if (passo === 'leads') return true; if (passo === 'mql') return L.mql; if (passo === 'semmql') return !L.mql; return !!_vfFlags(L, c.porTel)[passo]; }).map(function(L) { return L.l; });
+    } else lista = (c.rows || []).filter(function(r) { return (!dk || _vfProd(r.produto) === dk) && F[passo] && F[passo](r); });
+  } else {
+    var wk = { ht: 1, leg: 1 }[VF.wfun] ? VF.wfun : '', mom = VF.mom || '';
+    titulo = 'Workshop' + (wk ? ' · ' + (wk === 'ht' ? 'HT' : 'Legado') : '') + (VF.wcl ? ' · ' + VF.wcl : '');
+    var PP = { insc: function(x) { return x.ing instanceof Date; }, part: function(x) { return x.p1 || x.p2 || x.p3; }, apl: function(x) { return x.apl instanceof Date; }, mql: function(x) { return x.apl instanceof Date && _vfMql(x.inv); },
+      semmql: function(x) { return x.apl instanceof Date && !_vfMql(x.inv); }, naoapl: function(x) { return x.ing instanceof Date && !(x.apl instanceof Date); }, naoforam: function(x) { return x.ing instanceof Date && !(x.p1 || x.p2 || x.p3); } };
+    if (PP[passo]) { tipo = 'ws'; (c.lista || []).forEach(function(o) { (o.parts || []).forEach(function(p) { if ((!wk || p.k === wk) && PP[passo](p.x)) lista.push(p.x); }); }); }
+    else (c.lista || []).forEach(function(o) { (o.reun || []).forEach(function(q) { if ((!wk || q.k === wk) && (!mom || q.mo === mom) && F[passo] && F[passo](q.r)) lista.push(q.r); }); });
+  }
+  if (tipo === 'reun') lista.sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
+  var h = lista.map(function(it) {
+    if (tipo === 'reun') { try { return v2row(it); } catch (e) {} }
+    if (tipo === 'lead') { try { return ldRow(it); } catch (e) {} }
+    if (tipo === 'ws') { var l = null; try { l = ldPorTel8(it.t8); } catch (e) {} if (l) { try { return ldRow(l); } catch (e2) {} } }
+    return '<div class="vf-pess"><b>' + _vfEsc(it.nome || '—') + '</b><small>' + _vfEsc([it.ws ? _wsMes(it) : '', it.inv ? _wsInvTxt(it.inv) : (it.invest || ''), it.sdr || it.dono || ''].filter(Boolean).join(' · ')) + '</small></div>';
+  }).join('');
+  var un = tipo === 'reun' ? (lista.length === 1 ? ' reunião' : ' reuniões') : (lista.length === 1 ? ' pessoa' : ' pessoas');
+  var el = function(id) { return document.getElementById(id); };
+  if (!el('modal-b')) return;
+  el('mb-titulo').textContent = titulo + ' — ' + (NOME[passo] || passo) + ' — ' + lista.length + un;
+  el('mb-ico').textContent = '🔻';
+  el('mb-sub').textContent = 'Clique no nome para abrir a ficha';
+  el('mb-lista').innerHTML = h || '<div style="color:var(--muted);font-size:.8rem;">Ninguém neste passo.</div>';
+  var bq = el('mb-busca'); if (bq) { bq.value = ''; bq.style.display = ''; }
+  el('modal-b').classList.add('open');
+}
 function vfAbrir(k) {
   var html = (window._vfModal || {})[k]; if (!html) return; vfFechar();
   var d = document.createElement('div'); d.id = 'vf-modal'; d.className = 'vf-modal';
@@ -36024,16 +36070,21 @@ function _vfFiltrosHtml(sdrs, closers, extra) {
     + (VF.per === 'pers' ? '<span class="vf-datas"><input type="date" value="' + VF.de + '" onchange="vfFiltro(\'de\',this.value)" aria-label="De"> até <input type="date" value="' + VF.ate + '" onchange="vfFiltro(\'ate\',this.value)" aria-label="Até"></span>' : '')
     + sel('Origem', 'origem', ['Anúncio', 'Orgânico', 'Social Selling', 'Indicação', 'Recuperação', 'Outras']) + sel('SDR', 'sdr', sdrs) + sel('Closer', 'closer', closers) + (extra || '') + '</div>';
 }
+// o que aconteceu com um lead que chegou (as reuniões dele depois de chegar, sem as de workshop)
+function _vfFlags(L, porTel) {
+  var l = L.l, rs = ((l.tel8 && porTel[l.tel8]) || []).filter(function(r) { return r.date && r.date.getTime() >= L.d - 2 * 864e5 && !/workshop/.test(v2norm(r.origem || '')); });
+  var o = { marc: rs.length > 0, real: rs.some(function(r) { return isReal(r.sn); }), comp: rs.some(function(r) { return isComp(r.sn); }), fech: rs.some(function(r) { return isFechouReuniao(r.sn); }),
+    pag: rs.some(function(r) { return r.sn === 'vendido'; }), valor: rs.reduce(function(a, r) { return a + (r.sn === 'vendido' ? (r.valor || 0) : 0); }, 0) };
+  o.fut = o.marc && !o.real && rs.some(function(r) { return isFut(r.sn); }); o.rem = o.marc && !o.real && !o.fut && rs.some(function(r) { return r.sn === 'remarcada 2 reuniao'; });
+  o.ns = o.real && !o.comp; o.nv = o.comp && !o.fech;
+  var rm = rs.filter(function(r) { return r.sn === 'bloqueio de oferta' || r.sn === 'entrada'; });
+  o.mesa = !o.pag && rm.length > 0; o.mesaV = o.mesa ? rm.reduce(function(a, r) { return a + (r.valor || 0); }, 0) : 0; o.est = !o.pag && !o.mesa && rs.some(function(r) { return r.sn === 'estorno'; });
+  return o;
+}
 function _vfCoorte(leads, porTel) {
   var D = { ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() };
   leads.forEach(function(L) {
-    var l = L.l, rs = ((l.tel8 && porTel[l.tel8]) || []).filter(function(r) { return r.date && r.date.getTime() >= L.d - 2 * 864e5 && !/workshop/.test(v2norm(r.origem || '')); });
-    var o = { marc: rs.length > 0, real: rs.some(function(r) { return isReal(r.sn); }), comp: rs.some(function(r) { return isComp(r.sn); }), fech: rs.some(function(r) { return isFechouReuniao(r.sn); }),
-      pag: rs.some(function(r) { return r.sn === 'vendido'; }), valor: rs.reduce(function(a, r) { return a + (r.sn === 'vendido' ? (r.valor || 0) : 0); }, 0) };
-    o.fut = o.marc && !o.real && rs.some(function(r) { return isFut(r.sn); }); o.rem = o.marc && !o.real && !o.fut && rs.some(function(r) { return r.sn === 'remarcada 2 reuniao'; });
-    o.ns = o.real && !o.comp; o.nv = o.comp && !o.fech;
-    var rm = rs.filter(function(r) { return r.sn === 'bloqueio de oferta' || r.sn === 'entrada'; });
-    o.mesa = !o.pag && rm.length > 0; o.mesaV = o.mesa ? rm.reduce(function(a, r) { return a + (r.valor || 0); }, 0) : 0; o.est = !o.pag && !o.mesa && rs.some(function(r) { return r.sn === 'estorno'; });
+    var o = _vfFlags(L, porTel);
     [D.tot].concat(L.k ? [D[L.k]] : []).forEach(function(z) { z.leads++; if (L.mql) z.mql++; ['marc', 'real', 'comp', 'fech', 'pag', 'fut', 'rem', 'ns', 'nv', 'mesa', 'est'].forEach(function(c) { if (o[c]) z[c]++; }); z.valor += o.valor; z.mesaV += o.mesaV; });
   });
   return D;
@@ -36064,6 +36115,7 @@ function v2FunilProdutos(mesRows) {
   // 📥→💰 os leads que chegaram no período, seguidos até a venda (as reuniões deles em qualquer data depois de chegar)
   var porTel = {}; (V2.rows || []).forEach(function(r) { if (!okCl(r.closer)) return; var t = ldTel8(r.telefone || r.tel || ''); if (t) (porTel[t] = porTel[t] || []).push(r); });
   var C = _vfCoorte(leadsP, porTel);
+  window._vfCtx = { d: { leads: leadsP, porTel: porTel, rows: rows.filter(function(r) { return !/workshop/.test(v2norm(r.origem || '')); }) } };
   if (VF.modo === 'coorte') D = C;
   var passosD = [['leads', 'Leads', 'base de leads do período (sem quem está no app do workshop) · HT = investimento alto · Legado = perfil legado (R$ 500–1 mil)'], ['mql', 'MQL', 'marcou algum investimento no formulário ("não tenho disponibilidade" e em branco não contam)']].concat(_VF_PASSOS);
   // ---- 🎓 Workshop SEPARADO, com o filtro de edição (19/10/2026, Bruno: "separe o workshop e filtre por edição" · "e sobre o pré, pós e
@@ -36074,11 +36126,11 @@ function v2FunilProdutos(mesRows) {
   var trio = function() { return { ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() }; }, somar = function(a, b) { Object.keys(b).forEach(function(c) { a[c] += b[c] || 0; }); };
   var E = {};
   Object.keys(wsTel).forEach(function(t8) {
-    var x = wsTel[t8], ed = _wsMes(x) || 'sem edição', o = E[ed] || (E[ed] = { ed: ed, d2: 0, base: trio(), m: { pre: trio(), ws: trio(), pos: trio() } });
+    var x = wsTel[t8], ed = _wsMes(x) || 'sem edição', o = E[ed] || (E[ed] = { ed: ed, d2: 0, base: trio(), m: { pre: trio(), ws: trio(), pos: trio() }, parts: [], reun: [] });
     if (!o.d2 && x.d2 instanceof Date) o.d2 = dia0(x.d2);
     if (VF.sdr && !okSdr(x.sdr)) return;
-    var fx = leadFaixa(_wsInvTxt(x.inv)), k = fx === 'alta' ? 'ht' : fx === 'media' ? 'leg' : null;
-    [o.base.tot].concat(k ? [o.base[k]] : []).forEach(function(z) { if (x.ing instanceof Date) z.insc++; if (x.p1 || x.p2 || x.p3) z.part++; if (x.apl instanceof Date) { z.apl++; if (_vfMql(x.inv)) z.mql++; } });
+    var fx = leadFaixa(_wsInvTxt(x.inv)), k = fx === 'alta' ? 'ht' : fx === 'media' ? 'leg' : null; o.parts.push({ x: x, k: k });
+    [o.base.tot].concat(k ? [o.base[k]] : []).forEach(function(z) { if (x.ing instanceof Date) z.insc++; if (x.p1 || x.p2 || x.p3) z.part++; if (x.apl instanceof Date) { z.apl++; if (_vfMql(x.inv)) z.mql++; } if (x.ing instanceof Date && !(x.apl instanceof Date)) z.naoapl++; if (x.ing instanceof Date && !(x.p1 || x.p2 || x.p3)) z.naoforam++; });
   });
   // 19/10/2026 (Bruno: "cadê a aba dos closers aqui"): o Workshop tem a aba de closers dele (VF.wcl) — o closer de cima não vale aqui
   var semEd = 0, pcl = {};
@@ -36089,12 +36141,13 @@ function v2FunilProdutos(mesRows) {
     var cn = String(r.closer || '').trim() || 'Sem closer', pc1 = pcl[cn] || (pcl[cn] = {}), pe = pc1[edk] || (pc1[edk] = trio()); _vfReuniao(pe.tot, r); _vfReuniao(pe[_vfProd(r.produto)], r);
     if (VF.wcl && pn(cn) !== pn(VF.wcl)) return;
     var dd = x.d2 instanceof Date ? Math.round((dia0(r.date) - dia0(x.d2)) / 864e5) : 0, mo = dd < 0 ? 'pre' : dd <= JAN ? 'ws' : 'pos';
-    _vfReuniao(o.m[mo][_vfProd(r.produto)], r); _vfReuniao(o.m[mo].tot, r);
+    _vfReuniao(o.m[mo][_vfProd(r.produto)], r); _vfReuniao(o.m[mo].tot, r); o.reun.push({ r: r, k: _vfProd(r.produto), mo: mo });
   });
   var zW = function(lista, k, mom) { var z = _vfNovo(); lista.forEach(function(o) { somar(z, o.base[k]); (mom ? [mom] : ['pre', 'ws', 'pos']).forEach(function(m) { somar(z, o.m[m][k]); }); }); return z; };
   var eds = Object.keys(E).map(function(k) { return E[k]; }).filter(function(o) { var z = zW([o], 'tot', ''); return o.ed !== 'sem edição' && (z.insc || z.apl || z.marc); }).sort(function(a, b) { return a.d2 - b.d2; });
   var hoje0 = dia0(new Date()), feitas = eds.filter(function(o) { return o.d2 && o.d2 <= hoje0; }), edPad = ((feitas[feitas.length - 1] || eds[eds.length - 1]) || {}).ed || '';
   var edSel = VF.ed === '*' ? '*' : (VF.ed && E[VF.ed] ? VF.ed : edPad), lista = edSel === '*' ? eds : eds.filter(function(o) { return o.ed === edSel; });
+  window._vfCtx.w = { lista: lista };
   var oSel = edSel !== '*' ? E[edSel] : null, futura = !!(oSel && oSel.d2 > hoje0);
   // 19/10/2026 (Bruno: "participaram 2?"): o app só mandou a lista de presença na edição de julho; de agosto em diante a coluna veio vazia.
   // Quando a edição tem menos presentes do que aplicações, a presença não foi registrada: o passo "Participaram" sai do funil.
@@ -36124,7 +36177,7 @@ function v2FunilProdutos(mesRows) {
     + heroi('🌐 Geral do Diagnóstico' + (comCl ? ' · closer ' + _vfEsc(VF.closer) : ''), 'fun', '#2fd4c4', comCl ? heroiCl(g) : [['📥 Leads que chegaram', g.leads], ['✅ MQL', g.mql, pct(g.mql, g.leads) + ' dos leads'], ['📅 ' + (co ? 'Marcaram reunião' : 'Reuniões marcadas'), g.marc, pct(g.marc, g.leads) + ' dos leads'],
       ['💰 ' + (co ? 'Viraram venda' : 'Vendas'), g.pag, cv(g.pag, g.leads) + ' dos leads']], g.valor)
     + '<div class="vf-grp"><small>Perfil · clique para filtrar</small><div class="vf-esc1">' + card('fun', 'tot', dk, 'Total', DC.tot.cor, D.tot, comCl ? 'comp' : 'leads') + card('fun', 'ht', dk, 'HT', DC.ht.cor, D.ht, comCl ? 'comp' : 'leads') + card('fun', 'leg', dk, 'Legado', DC.leg.cor, D.leg, comCl ? 'comp' : 'leads') + '</div></div>'
-    + '<div class="vf-big">' + _vfLinha(DC[dk].rot, DC[dk].sub + (comCl ? ' · closer ' + _vfEsc(VF.closer) : ''), DC[dk].cor, D[dk], comCl ? _VF_PASSOS : passosD, comCl ? 'comp' : 'leads') + '</div>'
+    + '<div class="vf-big">' + _vfLinha(DC[dk].rot, DC[dk].sub + (comCl ? ' · closer ' + _vfEsc(VF.closer) : ''), DC[dk].cor, D[dk], comCl ? _VF_PASSOS : passosD, comCl ? 'comp' : 'leads', 'd') + '</div>'
     + (function() { var M = {}; rowsCl.forEach(function(r) { if (/workshop/.test(v2norm(r.origem || ''))) return; var cn = String(r.closer || '').trim(); if (!cn) return;
         var t = M[cn] || (M[cn] = { tot: _vfNovo(), ht: _vfNovo(), leg: _vfNovo() }); _vfReuniao(t.tot, r); _vfReuniao(t[_vfProd(r.produto)], r); });
         var L = Object.keys(M).map(function(n) { return { n: n, z: M[n] }; }).filter(function(c) { return c.z.tot.marc > 0; }).sort(function(a, b) { return b.z.tot.pag - a.z.tot.pag || b.z.tot.marc - a.z.tot.marc; });
@@ -36157,7 +36210,7 @@ function v2FunilProdutos(mesRows) {
         ['📅 Reuniões', w.marc], ['💰 Vendas', w.pag, cv(w.pag, w.insc) + ' dos inscritos']], w.valor)
       + '<div class="vf-grp"><small>Momento da reunião' + (mom ? ' · filtrando: ' + MO[mom][1] + ' (clique de novo para tirar)' : ' · clique para filtrar') + '</small><div class="vf-esc1">' + moBox('pre') + moBox('ws') + moBox('pos') + '</div></div>'
       + '<div class="vf-grp"><small>Perfil · clique para filtrar</small><div class="vf-esc1">' + card('wfun', 'tot', wk, 'Total', WC.tot.cor, ZW.tot, comWcl ? 'comp' : 'insc') + card('wfun', 'ht', wk, 'HT', WC.ht.cor, ZW.ht, comWcl ? 'comp' : 'insc') + card('wfun', 'leg', wk, 'Legado', WC.leg.cor, ZW.leg, comWcl ? 'comp' : 'insc') + '</div></div>'
-      + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, comWcl ? _VF_PASSOS : [['insc', 'Inscritos', 'ingresso pago no app do workshop']].concat(semPres ? [] : [['part', 'Participaram', 'presença marcada no app em pelo menos um dia']]).concat([['apl', 'Aplicaram', 'fizeram a aplicação no app'], ['mql', 'MQL', 'aplicaram e marcaram algum investimento']]).concat(_VF_PASSOS), comWcl ? 'comp' : 'insc') + '</div>'
+      + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, comWcl ? _VF_PASSOS : [['insc', 'Inscritos', 'ingresso pago no app do workshop']].concat(semPres ? [] : [['part', 'Participaram', 'presença marcada no app em pelo menos um dia']]).concat([['apl', 'Aplicaram', 'fizeram a aplicação no app'], ['mql', 'MQL', 'aplicaram e marcaram algum investimento']]).concat(_VF_PASSOS), comWcl ? 'comp' : 'insc', 'w') + '</div>'
       + (function() { window._vfModal = window._vfModal || {}; window._vfModal.wcl = '<h3 class="vf-modal-t">📋 Desempenho por closer · Workshop</h3><p class="hint">' + _vfEsc(edSel === '*' ? 'todas as edições' : 'edição de ' + edSel) + ' · clique no closer para filtrar o funil</p>' + _vfClTabela('Closer', (window._vfCls || []).map(function(c) { return { n: c.n, z: c.zz }; }), 'wcl'); return ''; })()
       + (function() { window._vfModal = window._vfModal || {}; window._vfModal.eds = '<h3 class="vf-modal-t">📅 Comparar edições do Workshop</h3><p class="hint">clique na edição para abrir o funil dela · "2 de 5" = 2 vendas em 5 reuniões</p>' + '<div class="vf-comp"><table><thead><tr><th>Edição' + (comWcl ? ' · ' + _vfEsc(VF.wcl) : '') + '</th>' + (comWcl ? '' : '<th>Inscritos</th><th>Aplicaram</th><th>MQL</th>') + '<th>Reuniões</th>' + (comWcl ? '<th>Apareceram</th>' : '') + '<th>Vendas</th><th>🕐 Pré</th><th>🎯 Workshop</th><th>📆 Pós</th><th>' + (comWcl ? 'Conversão de quem apareceu' : 'Inscrito → venda') + '</th><th>Valor</th><th>Ticket médio</th></tr></thead><tbody>'
       + eds.slice().reverse().slice(0, 10).map(function(o) { var z = zW([o], wk, ''), p = function(m) { var y = zW([o], wk, m); return rkoN(y.pag) + (y.marc ? ' <small>de ' + rkoN(y.marc) + '</small>' : ''); };
