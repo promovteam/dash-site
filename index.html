@@ -25733,6 +25733,11 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .vf-op b em { font-style:normal; font-size:.72rem; color:var(--text2); font-weight:800; margin-left:4px; }
 .vf-comp td small { color:var(--muted); font-weight:600; }
 @media (max-width:620px) { .vf-esc1 { grid-template-columns:1fr; } }
+/* 19/10/2026 · "se a mesa fechar" */
+.vf-se { display:block; margin-top:4px; font-size:.62rem; font-weight:800; color:#ffd166; line-height:1.3; } .vf-se b { font-size:.8rem; }
+.vf-se2 { display:flex; flex-direction:column; align-items:flex-end; margin-top:8px; padding-top:7px; border-top:1px dashed rgba(255,209,102,.35); font-size:.6rem; font-weight:800; color:#ffd166; letter-spacing:.04em; text-transform:uppercase; line-height:1.35; }
+.vf-se2 b { font-size:.95rem; color:#ffd166; letter-spacing:0; text-transform:none; } .vf-se2 i { font-style:normal; font-size:.66rem; color:var(--text2); letter-spacing:0; text-transform:none; white-space:nowrap; }
+@media (max-width:900px) { .vf-se2 { align-items:flex-start; } }
 /* ===== fim do 🔻 funil completo por produto ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35910,10 +35915,11 @@ function _vfProd(produto) { var p = v2norm(produto || ''); return /legado|wld/.t
 var VF = { fun: 'tot', wfun: 'tot', mom: '', modo: 'coorte', per: 'visao', de: '', ate: '', origem: '', sdr: '', closer: '', ed: '' };   // modo: 'coorte' = leads que chegaram (Bruno: "quantos leads chegaram e quantos se tornaram vendas") · 'periodo' = reuniões do período
 var _VF_PASSOS = [['marc', 'Marcadas', 'todas as reuniões, inclusive as futuras'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado (inclui faltas)'],
   ['comp', 'Apareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['fech', 'Disse sim', 'vendido, entrada ou bloqueio'], ['pag', 'Pagou', 'status Vendido']];
-function _vfNovo() { return { leads: 0, mql: 0, insc: 0, part: 0, apl: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0, fut: 0, rem: 0, ns: 0, nv: 0, mesa: 0 }; }
+function _vfNovo() { return { leads: 0, mql: 0, insc: 0, part: 0, apl: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0, fut: 0, rem: 0, ns: 0, nv: 0, mesa: 0, mesaV: 0, est: 0 }; }
 function _vfReuniao(o, r) {
   o.marc++; if (isReal(r.sn)) o.real++; if (isComp(r.sn)) o.comp++; if (isFechouReuniao(r.sn)) o.fech++; if (r.sn === 'vendido') { o.pag++; o.valor += r.valor || 0; }
-  if (isFut(r.sn)) o.fut++; if (r.sn === 'remarcada 2 reuniao') o.rem++; if (r.sn === 'no show') o.ns++; if (r.sn === 'nao vendido') o.nv++; if (isFechouReuniao(r.sn) && r.sn !== 'vendido') o.mesa++;
+  if (isFut(r.sn)) o.fut++; if (r.sn === 'remarcada 2 reuniao') o.rem++; if (r.sn === 'no show') o.ns++; if (r.sn === 'nao vendido') o.nv++;
+  if (r.sn === 'bloqueio de oferta' || r.sn === 'entrada') { o.mesa++; o.mesaV += r.valor || 0; } if (r.sn === 'estorno') o.est++;
 }
 // o que fica "no meio", entre um passo e o próximo
 function _vfMeio(de, para, z) {
@@ -35924,6 +35930,7 @@ function _vfMeio(de, para, z) {
   if (de === 'real' && z.ns) t.push([z.ns, '❌ no-show' + pc(z.ns, z.real)]);
   if (de === 'comp' && z.nv) t.push([z.nv, 'não vendido' + pc(z.nv, z.comp)]);
   if (de === 'fech' && z.mesa) t.push([z.mesa, '⏳ na mesa (bloqueio/entrada)']);
+  if (de === 'fech' && z.est) t.push([z.est, '↩️ estorno' + (z.est > 1 ? 's' : '')]);
   if (de === 'insc' && para === 'part') t.push([Math.max(0, z.insc - z.part), 'não foram']);
   if (de === 'insc' && para === 'apl') t.push([Math.max(0, z.insc - z.apl), 'não aplicaram']);
   if (de === 'part') t.push([Math.max(0, z.part - z.apl), 'não aplicaram']);
@@ -35946,13 +35953,15 @@ function _vfLinha(rot, sub, cor, z, passos, de) {
     var ped = i ? _vfMeio(passos[i - 1][0], p[0], z).replace('<span class="vf-seta" aria-hidden="true">›</span>', '') : '';
     // o "Pagou" é sobre quem apareceu (19/10/2026, Bruno: "com base no que apareceram")
     var sobreAp = p[0] === 'pag' && z.comp != null && passos.some(function(q) { return q[0] === 'comp'; });
-    return '<div class="vf-sub">' + (!i ? '<b>&nbsp;</b><small>começo</small>' : sobreAp ? '<b>' + pc(vals[i], z.comp || 0) + '</b><small>dos que apareceram</small>' : '<b>' + pc(vals[i], vals[i - 1]) + '</b><small>do anterior</small>') + ped + '</div>';
+    var seFechar = p[0] === 'pag' && z.mesa ? '<span class="vf-se">se a mesa fechar: <b>' + rkoN(vals[i] + z.mesa) + '</b>' + (sobreAp ? ' · ' + pc(vals[i] + z.mesa, z.comp || 0) : '') + '</span>' : '';
+    return '<div class="vf-sub">' + (!i ? '<b>&nbsp;</b><small>começo</small>' : sobreAp ? '<b>' + pc(vals[i], z.comp || 0) + '</b><small>dos que apareceram</small>' : '<b>' + pc(vals[i], vals[i - 1]) + '</b><small>do anterior</small>') + ped + seFechar + '</div>';
   }).join('');
   var conv = z[de] ? (z.pag / z[de] * 100).toFixed(1).replace('.', ',') + '%' : '—';
   return '<div class="vf-linha2" style="--c:' + cor + ';"><div class="vf-lab2"><i></i><b>' + rot + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '<em>' + conv + '<small>' + (de === 'leads' ? 'do lead à venda' : 'do inscrito à venda') + '</small></em></div>'
     + '<div class="vf-corpo"><div class="vf-fun" style="grid-template-columns:repeat(' + passos.length + ', minmax(76px, 1fr));">' + segs + '</div>'
     + '<div class="vf-subs" style="grid-template-columns:repeat(' + passos.length + ', minmax(76px, 1fr));">' + subs + '</div></div>'
-    + '<div class="vf-vend"><small>Vendido</small><b>' + v2moeda0(z.valor) + '</b><span>' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + '</span></div></div>';
+    + '<div class="vf-vend"><small>Vendido</small><b>' + v2moeda0(z.valor) + '</b><span>' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + '</span>'
+    + (z.mesa ? '<span class="vf-se2">se a mesa fechar<b>' + v2moeda0(z.valor + z.mesaV) + '</b><i>' + rkoN(z.pag + z.mesa) + ' vendas</i><i>+' + v2moeda0(z.mesaV) + ' da mesa</i></span>' : '') + '</div></div>';
 }
 // ---- filtros ----
 function _vfOrigemR(o) { var t = v2norm(o || ''); return /\[ads\]|\bads\b|pago|trafego/.test(t) ? 'Anúncio' : /social/.test(t) ? 'Social Selling' : /indica/.test(t) ? 'Indicação' : /recupera/.test(t) ? 'Recuperação' : /\[org\]|organic|mchat|manychat|\bbio\b|\borg\b/.test(t) ? 'Orgânico' : 'Outras'; }
@@ -35982,8 +35991,10 @@ function _vfCoorte(leads, porTel) {
     var o = { marc: rs.length > 0, real: rs.some(function(r) { return isReal(r.sn); }), comp: rs.some(function(r) { return isComp(r.sn); }), fech: rs.some(function(r) { return isFechouReuniao(r.sn); }),
       pag: rs.some(function(r) { return r.sn === 'vendido'; }), valor: rs.reduce(function(a, r) { return a + (r.sn === 'vendido' ? (r.valor || 0) : 0); }, 0) };
     o.fut = o.marc && !o.real && rs.some(function(r) { return isFut(r.sn); }); o.rem = o.marc && !o.real && !o.fut && rs.some(function(r) { return r.sn === 'remarcada 2 reuniao'; });
-    o.ns = o.real && !o.comp; o.nv = o.comp && !o.fech; o.mesa = o.fech && !o.pag;
-    [D.tot].concat(L.k ? [D[L.k]] : []).forEach(function(z) { z.leads++; if (L.mql) z.mql++; ['marc', 'real', 'comp', 'fech', 'pag', 'fut', 'rem', 'ns', 'nv', 'mesa'].forEach(function(c) { if (o[c]) z[c]++; }); z.valor += o.valor; });
+    o.ns = o.real && !o.comp; o.nv = o.comp && !o.fech;
+    var rm = rs.filter(function(r) { return r.sn === 'bloqueio de oferta' || r.sn === 'entrada'; });
+    o.mesa = !o.pag && rm.length > 0; o.mesaV = o.mesa ? rm.reduce(function(a, r) { return a + (r.valor || 0); }, 0) : 0; o.est = !o.pag && !o.mesa && rs.some(function(r) { return r.sn === 'estorno'; });
+    [D.tot].concat(L.k ? [D[L.k]] : []).forEach(function(z) { z.leads++; if (L.mql) z.mql++; ['marc', 'real', 'comp', 'fech', 'pag', 'fut', 'rem', 'ns', 'nv', 'mesa', 'est'].forEach(function(c) { if (o[c]) z[c]++; }); z.valor += o.valor; z.mesaV += o.mesaV; });
   });
   return D;
 }
