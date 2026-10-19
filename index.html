@@ -2922,7 +2922,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-19-0750';
+var VERSAO_DASH = '2026-10-19-0758';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -23837,6 +23837,7 @@ function plPainelSdrs(p, d) {
   var tcPor = {}; try { (TC.dados && TC.dados.leads || []).forEach(function(x) { tcPor[x.t8] = x; }); } catch (e) {}
   var resp = {}; try { (CLINT_PAINEL && CLINT_PAINEL.primeiraResposta || []).forEach(function(x) { resp[plPxPrimeiro(x.dono)] = x; }); } catch (e) {}
   var espTxt = plPxEspacosTxt(closerKeys(), janelas);
+  try { plMiaPrep(p); } catch (eMia) { _PLMIA = null; }   // 💬 19/10/2026: as contas da mia (csdr.js) para os cartões
   var sdrs = (d.sdrs || []).slice().sort(function(a, b) { return b.marc - a.marc || b.re - a.re; });
   // SDRs sem marcação no período mas com marcação no anterior também aparecem (para a comparação não sumir)
   if (dAnt) (dAnt.sdrs || []).forEach(function(y) { if (!sdrs.some(function(x) { return plPxPrimeiro(x.nome) === plPxPrimeiro(y.nome); })) sdrs.push({ nome: y.nome, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [] } }); });
@@ -23902,9 +23903,10 @@ function plPainelSdrs(p, d) {
     var mAg = med(tAg), mPe = med(tPerd), rp = resp[pn];
     return '<div class="px-card">'
       + '<div class="px-head">' + plAvHtml(x.nome).replace('pl-av', 'sg-avatar') + '<div><b>' + x.nome.replace(/</g, '&lt;') + '</b><br><span>SDR</span></div></div>'
-      + '<div class="mg-linha">' + ((funil.rec.length >= 10 && x.marc <= funil.rec.length) ? mgPill('MARCAÇÃO', Math.round(x.marc / funil.rec.length * 100), MG_META.marc, false) : '<span class="mg-pill">MARCAÇÃO —<small>leads fora do formulário</small></span>') + mgPill('NO-SHOW', (x.re + x.ns) ? Math.round(x.ns / (x.re + x.ns) * 100) : null, MG_META.ns, true) + '</div>'
+      + '<div class="mg-linha">' + plMiaPill(pn) + ((funil.rec.length >= 10 && x.marc <= funil.rec.length) ? mgPill('MARCAÇÃO', Math.round(x.marc / funil.rec.length * 100), MG_META.marc, false) : '<span class="mg-pill">MARCAÇÃO —<small>leads fora do formulário</small></span>') + mgPill('NO-SHOW', (x.re + x.ns) ? Math.round(x.ns / (x.re + x.ns) * 100) : null, MG_META.ns, true) + '</div>'
       + '<div class="px-row"><div class="px-k">Reuniões marcadas ' + rotP + '<small>pela hora em que marcou · comparado com o período anterior</small></div><div class="px-v">' + plPxNum(x.marc, 'sdr', chave, 'marc', '#ffd166') + plPxAntes(x.marc, ant ? ant.marc : null) + '</div></div>'
       + '<div class="px-row" style="display:block;"><div class="px-k">Funil ' + rotP + '<small>leads que chegaram no período e são deste SDR na Clint · % em relação à etapa anterior</small></div>' + funilHtml + '</div>'
+      + plMiaLinhas(pn, rotP)   // 💬 19/10/2026: as linhas da mia
       + '<div class="px-row"><div class="px-k">Espaços × leads quentes<small>horários livres (' + closerNomes().map(function(n){ return n.split(' ')[0]; }).join(' + ') + ') · quentes deste SDR sem reunião, últimos 30 dias</small></div><div class="px-v">' + espTxt + '<br><b class="n" style="color:#3ddc97;" onclick="plPxAbrirLista(\'q_' + chave + '\')">' + quentes.length + '</b><small>quentes agora</small></div></div>'
       + '<div class="px-row"><div class="px-k">Direto × resgate<small>das marcadas ' + rotP + ' · direto = até 24 h após chegar · resgate = 48 h ou mais</small></div><div class="px-v">' + plPxNum(x.l.direto.length, 'sdr', chave, 'direto', '#6ea8ff') + '<small>direto</small> ' + plPxNum(x.l.resgate.length, 'sdr', chave, 'resgate', '#b98aff') + '<small>resgate</small>'
       +   (x.l.meio.length ? ' ' + plPxNum(x.l.meio.length, 'sdr', chave, 'meio', '#9aa3b2') + '<small>1–2 dias</small>' : '') + (semForm ? '<br><small>' + semForm + ' sem chegada conhecida</small>' : '')
@@ -24079,10 +24081,10 @@ function renderPlacar() {
     + coluna('📞 SDRs', 'ordem: reuniões marcadas · depois em que o lead apareceu', d.sdrs, 'sdr', topS, 'Nenhuma marcação neste período ainda — a primeira leva o 🥇')
     + coluna('🏆 Closers', 'ordem: valor vendido · depois nº de vendas', d.closers, 'closer', topC, 'Nenhuma reunião com o lead presente neste período ainda')
     + '</div>';
-  try { h += plSdrClintHtml(p); } catch (eCsd) {}   // 💬 19/10/2026: atendimento dos SDRs na Clint (csdr.js)
   h += plDiaADia() + plRecordes();
   try { h += plMetasGaku(p, d); } catch (eMg) { try { console.warn('metas da consultoria', eMg); } catch (e3) {} }
-  try { h += plPainelSdrs(p, d) + plPainelClosers(p, d); } catch (ePx) { try { console.warn('painéis SDR/closer', ePx); } catch (e2) {} }
+  // 19/10/2026 (Bruno: "deixe somente a do SDR"): o Acompanhamento por closer (plPainelClosers) sai por um momento
+  try { h += plPainelSdrs(p, d); } catch (ePx) { try { console.warn('painéis SDR/closer', ePx); } catch (e2) {} }
   el.innerHTML = h;
   try { plAnimarNumeros(el); } catch (eAn) {}
 }
@@ -25611,10 +25613,6 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .csd-como summary { cursor:pointer; font-weight:800; color:var(--text); }
 .csd-como p { margin:10px 0 0; } .csd-como b { color:var(--text); }
 @media (max-width:760px) { .csd-kpis { grid-template-columns:1fr; } .csd-kpi b { font-size:1.6rem; } }
-.csd-pl { margin-top:18px; } .csd-pl .csd-tab-w { margin-top:12px; border-radius:14px; border:1px solid var(--border); }
-.csd-kpis6 { grid-template-columns:repeat(6, minmax(0, 1fr)); gap:10px; } .csd-kpis6 .csd-kpi { padding:12px 14px; } .csd-kpis6 .csd-kpi b { font-size:1.45rem; }
-@media (max-width:1100px) { .csd-kpis6 { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
-@media (max-width:620px) { .csd-kpis6 { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 /* ===== fim do 📊 desempenho SDR ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35523,40 +35521,48 @@ function _csdQuemChamar(A) {
     + (vis.length > CSD.mostrar ? '<button type="button" class="btn csd-mais" onclick="CSD.mostrar+=200;renderClintSdr()">Ver mais ' + (vis.length - CSD.mostrar) + '</button>' : '');
   return h;
 }
-// 🏁 no Placar (19/10/2026 · Bruno: "coloque esses dados no placar"): os números de cada SDR no período escolhido no Placar, com as
-// mesmas contas desta tela. Sem nome nem telefone de lead (o Placar abre sem senha): a lista "Quem chamar" fica na tela Desempenho SDR.
-function plSdrClintHtml(p) {
+// 🏁 DENTRO DOS CARTÕES DOS SDRs NO PLACAR (19/10/2026 · Bruno: "coloque esses dados no placar" · "deixe somente a do SDR, misture o que
+// já construímos com a mia"): a pílula NOTA e as linhas da mia (leads novos na Clint, com mensagem, 1º contato, responderam, nova
+// tentativa, follow-ups, esperando) entram no cartão de cada SDR do "Acompanhamento por SDR", com o "antes" do período anterior.
+// Sem nome nem telefone de lead (o Placar abre sem senha): a lista "Quem chamar" fica na tela Desempenho SDR.
+var _PLMIA = null;
+function plMiaPrep(p) {
   csdCarregar();
-  var cab = '<div class="px-wrap csd-pl"><div class="px-titulo"><h3>💬 Atendimento dos SDRs na Clint</h3><span class="hint">' + _csdEsc(p.rot) + ' · mesmas contas da tela Desempenho SDR (as da mia) · "antes" = período anterior do mesmo tamanho</span></div>';
-  if (!CSD.carregado) return cab + '<div class="hint" style="padding:14px;">Lendo os leads e as conversas da Clint…</div></div>';
-  if (!CSD.rows.length) return '';
-  var n = p.fim - p.ini, A = _csdContas(p.ini, p.fim), B = _csdContas(p.ini - n, p.ini), T = A.time, Tb = B.time, bPor = {};
-  B.por.forEach(function(z) { bPor[z.nome] = z; });
-  var antes = function(v) { return '<small class="csd-antes">antes: ' + v + '</small>'; };
-  var mini = function(v, rot, ant, sub) { return '<div class="csd-kpi"><b>' + v + '</b><span>' + rot + '</span>' + (sub ? '<small>' + sub + '</small>' : '') + (ant != null ? antes(ant) : '') + '</div>'; };
-  var h = cab + '<div class="csd-kpis csd-kpis6">'
-    + mini(rkoN(T.leads), 'leads novos', rkoN(Tb.leads))
-    + mini(_csdPct(T.contact, T.novos), 'com mensagem de uma pessoa', Tb.novos ? _csdPct(Tb.contact, Tb.novos) : '—', T.contact + ' de ' + T.novos)
-    + mini(_csdTempo(T.t1Med), '1º contato (mediana)', Tb.t1Med != null ? _csdTempo(Tb.t1Med) : '—', 'quem chegou seg–sex, 8h–18h')
-    + mini(T.horario ? _csdPct(T.ate15, T.horario) : '—', 'chamados em até 15 min', Tb.horario ? _csdPct(Tb.ate15, Tb.horario) : '—')
-    + mini(T.contact ? _csdPct(T.resp, T.contact) : '—', 'responderam', Tb.contact ? _csdPct(Tb.resp, Tb.contact) : '—')
-    + mini(T.nota != null ? String(T.nota).replace('.', ',') : '—', 'nota do time (0 a 10)', Tb.nota != null ? String(Tb.nota).replace('.', ',') : '—')
-    + '</div>';
-  h += '<p class="csd-nota" style="margin:10px 2px 0;">Agora: <b>' + rkoN(T.agu1) + '</b> aguardando o 1º contato' + (T.agu1Old ? ' (o mais antigo ' + _csdHa(T.agu1Old) + ')' : '') + ' · <b>' + rkoN(T.aguEq) + '</b> esperando a equipe · <b>' + rkoN(T.aguLead) + '</b> sem resposta do lead · '
-    + '<a href="#" onclick="event.preventDefault();var it=document.querySelector(\'.nav-item[data-s=&quot;clint&quot;]\');if(it)it.click();">ver quem chamar →</a></p>';
-  var sdrs = A.por.filter(function(z) { return z.novos > 0; });
-  if (sdrs.length) {
-    var cel = function(v, ant) { return '<td>' + v + (ant != null ? antes(ant) : '') + '</td>'; };
-    h += '<div class="csd-tab-w"><table class="csd-tab"><thead><tr><th>SDR</th><th>Leads</th><th>Com mensagem</th><th>1º contato</th><th>Em até 15 min</th><th>Responderam</th><th>Nova tentativa</th><th>Follow-ups</th><th>Nota</th></tr></thead><tbody>'
-      + sdrs.map(function(z) { var b = bPor[z.nome] || {};
-        return '<tr><td><b>' + _csdEsc(z.nome) + '</b></td>' + cel(rkoN(z.leads), b.leads != null ? rkoN(b.leads) : '—')
-          + cel(_csdPct(z.contact, z.novos), b.novos ? _csdPct(b.contact, b.novos) : '—') + cel(_csdTempo(z.t1Med), b.t1Med != null ? _csdTempo(b.t1Med) : '—')
-          + cel(z.horario ? _csdPct(z.ate15, z.horario) : '—', b.horario ? _csdPct(b.ate15, b.horario) : '—') + cel(z.contact ? _csdPct(z.resp, z.contact) : '—', b.contact ? _csdPct(b.resp, b.contact) : '—')
-          + cel(z.eleg ? _csdPct(z.insist, z.eleg) : '—', b.eleg ? _csdPct(b.insist, b.eleg) : '—') + cel(rkoN(z.fu), b.fu != null ? rkoN(b.fu) : '—')
-          + cel(z.nota != null ? '<b class="csd-nota-n">' + String(z.nota).replace('.', ',') + '</b>' : '—', b.nota != null ? String(b.nota).replace('.', ',') : '—') + '</tr>'; }).join('')
-      + '</tbody></table></div>';
-  }
-  return h + '</div>';
+  if (!CSD.carregado || !CSD.rows.length) { _PLMIA = null; return; }
+  var n = p.fim - p.ini, A = _csdContas(p.ini, p.fim), B = _csdContas(p.ini - n, p.ini), m = { a: {}, b: {} };
+  A.por.forEach(function(z) { m.a[plPxPrimeiro(z.nome)] = z; });
+  B.por.forEach(function(z) { m.b[plPxPrimeiro(z.nome)] = z; });
+  _PLMIA = m;
+}
+function _plMiaSeta(a, b, menor) {
+  if (a == null || b == null) return '';
+  var bom = menor ? a < b : a > b, ruim = menor ? a > b : a < b;
+  return bom ? '<span style="color:#3ddc97;">▲</span>' : ruim ? '<span style="color:#ff6b6b;">▼</span>' : '<span style="color:#9aa3b2;">=</span>';
+}
+function plMiaPill(pn) {
+  var z = _PLMIA && _PLMIA.a[pn]; if (!z || z.nota == null) return '';
+  var b = _PLMIA.b[pn], cls = z.nota >= 7 ? 'ok' : z.nota < 4 ? 'nao' : '';
+  return '<span class="mg-pill ' + cls + '" title="Nota de 0 a 10 (como a mia): média de chamar em até 15 min, quantos leads respondem e nova tentativa com quem não respondeu">NOTA '
+    + String(z.nota).replace('.', ',') + '<small>0 a 10' + (b && b.nota != null ? ' · antes ' + String(b.nota).replace('.', ',') : '') + '</small></span>';
+}
+function plMiaLinhas(pn, rotP) {
+  if (!_PLMIA) return CSD.carregado ? '' : '<div class="px-row"><div class="px-k">Atendimento na Clint<small>lendo as conversas da Clint…</small></div></div>';
+  var z = _PLMIA.a[pn], b = _PLMIA.b[pn] || null;
+  if (!z) return '<div class="px-row"><div class="px-k">Atendimento na Clint ' + rotP + '<small>nenhum lead deste SDR no período</small></div></div>';
+  var pc = function(a, t) { return t ? Math.round(a / t * 100) : null; }, pt = function(v) { return v == null ? '—' : v + '%'; };
+  var linha = function(tit, sub, valor, extra, ant) { return '<div class="px-row"><div class="px-k">' + tit + '<small>' + sub + '</small></div><div class="px-v">' + valor + (extra ? '<br><small>' + extra + '</small>' : '') + (ant || '') + '</div></div>'; };
+  var antes = function(txt, va, vb, menor) { return (b && vb != null) ? '<small title="período anterior equivalente">' + _plMiaSeta(va, vb, menor) + ' antes ' + txt + '</small>' : ''; };
+  var cM = pc(z.contact, z.novos), cMb = b ? pc(b.contact, b.novos) : null, r15 = pc(z.ate15, z.horario), rR = pc(z.resp, z.contact), rRb = b ? pc(b.resp, b.contact) : null;
+  var rN = pc(z.insist, z.eleg), rNb = b ? pc(b.insist, b.eleg) : null;
+  var fontes = Object.keys(z.fontes).sort(function(x, y) { return z.fontes[y] - z.fontes[x]; }).map(function(k) { return _csdEsc(k) + ' ' + z.fontes[k]; }).join(' · ');
+  return linha('Leads novos na Clint ' + rotP, (fontes ? fontes + ' · ' : '') + 'um por contato, para quem fez o 1º contato (como a mia)', '<b style="color:#6ea8ff;">' + z.leads + '</b>', '', b ? plPxAntes(z.leads, b.leads) : '')
+    + linha('Com mensagem de uma pessoa', 'o lead recebeu mensagem escrita por alguém do time · IA, robô e disparo não contam', '<b style="color:#3ddc97;">' + pt(cM) + '</b>', z.contact + ' de ' + z.novos, antes(pt(cMb), cM, cMb))
+    + linha('1º contato', 'mediana entre o lead chegar e a 1ª mensagem · quem chegou seg–sex, 8h–18h', '<b style="color:#ffd166;">' + _csdTempo(z.t1Med) + '</b>', r15 != null ? r15 + '% em até 15 min' : 'ninguém chegou no horário comercial', antes(b ? _csdTempo(b.t1Med) : '—', z.t1Med, b ? b.t1Med : null, true))
+    + linha('Responderam', 'o lead escreveu depois do 1º contato', '<b style="color:#6ea8ff;">' + pt(rR) + '</b>', z.resp + ' de ' + z.contact, antes(pt(rRb), rR, rRb))
+    + linha('Nova tentativa', 'quem não respondeu em 24 h recebeu outra mensagem pelo menos 2 h depois', '<b style="color:#b98aff;">' + pt(rN) + '</b>', z.eleg ? z.insist + ' de ' + z.eleg : 'ninguém precisou ainda', antes(pt(rNb), rN, rNb))
+    + linha('Follow-ups', 'mensagem 2 h ou mais depois da anterior, sem o lead escrever no meio', '<b style="color:#f6a350;">' + z.fu + '</b>', z.fuResp + ' responderam', b ? plPxAntes(z.fu, b.fu) : '')
+    + linha('Esperando agora', 'dos leads que chegaram ' + rotP, '<b style="color:' + (z.agu1 ? '#ff6b6b' : '#3ddc97') + ';">' + z.agu1 + '</b><small> sem 1º contato</small>',
+        (z.agu1Old ? 'o mais antigo ' + _csdHa(z.agu1Old) + ' · ' : '') + z.aguEq + ' esperando a equipe · ' + z.aguLead + ' sem resposta do lead · <a href="#" onclick="event.preventDefault();var it=document.querySelector(\'.nav-item[data-s=&quot;clint&quot;]\');if(it)it.click();">quem chamar →</a>', '');
 }
 function csdPer(p) { CSD.per = p; if (p === 'pers' && !CSD.de) { var P = _csdPeriodo(); CSD.de = P.de; CSD.ate = P.ate; } renderClintSdr(); }
 // ===== fim do 📊 desempenho SDR (js) =====
