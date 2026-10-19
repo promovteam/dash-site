@@ -2919,7 +2919,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-19-0907';
+var VERSAO_DASH = '2026-10-19-0928';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -25616,6 +25616,17 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .csd-abas button { border:0; border-radius:10px; padding:8px 14px; background:transparent; color:var(--text2); font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; }
 .csd-abas button.on { background:var(--accent); color:#1a1206; } .csd-abas button:not(.on):hover { background:rgba(255,255,255,.06); color:var(--text); }
 .csd-abas button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.cso-kpis { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; margin-top:6px; }
+.cso-kpis .csd-kpi b { font-size:1.9rem; color:#e9a8c8; } .cso-kpis .csd-kpi:nth-child(2) b, .cso-kpis .csd-kpi:nth-child(5) b, .cso-kpis .csd-kpi:nth-child(6) b, .cso-kpis .csd-kpi:nth-child(7) b { color:var(--text); }
+.cso-graf { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; margin-top:14px; } .cso-graf .panel { padding:12px 14px; } .cso-graf h4 { margin:0 0 6px; font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); }
+.cso-svg { width:100%; height:auto; display:block; }
+.cso-dias th, .cso-dias td { padding:6px 6px; text-align:center; } .cso-dias td:first-child, .cso-dias th:first-child { text-align:left; white-space:nowrap; }
+.cso-motivos { padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+.cso-mot { display:grid; grid-template-columns:220px 1fr auto; align-items:center; gap:10px; font-size:.8rem; }
+.cso-mot i { display:block; height:8px; border-radius:6px; background:linear-gradient(90deg, var(--accent) var(--w), rgba(255,255,255,.06) var(--w)); }
+.cso-mot b { font-variant-numeric:tabular-nums; font-size:.76rem; color:var(--text2); }
+.csd-sel input[type=search] { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:6px 8px; font:inherit; font-size:.78rem; text-transform:none; letter-spacing:0; }
+@media (max-width:760px) { .cso-kpis, .cso-graf { grid-template-columns:1fr; } .cso-mot { grid-template-columns:1fr; } }
 /* ===== fim do 📊 desempenho SDR ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35498,6 +35509,10 @@ function plMiaSecoes(p) {
   // 19/10/2026 (Bruno: "coloque as abas como no da mia"): Operação Clint · Performance Time · Desempenho SDR · Recuperação
   var abas = [['operacao', 'Operação Clint'], ['performance', 'Performance Time'], ['sdr', 'Desempenho SDR'], ['recuperacao', 'Recuperação']];
   var barra = '<div class="csd-abas" role="tablist">' + abas.map(function(a) { return '<button type="button" role="tab" aria-selected="' + (CSD.aba === a[0]) + '" class="' + (CSD.aba === a[0] ? 'on' : '') + '" onclick="csdAba(\'' + a[0] + '\')">' + a[1] + '</button>'; }).join('') + '</div>';
+  var logado0 = true; try { logado0 = !document.documentElement.classList.contains('visitante') && !!localStorage.getItem('v2Login'); } catch (e) {}
+  if (CSD.aba === 'operacao') return cab + barra + csoOperacaoHtml() + '</div>';
+  if (CSD.aba === 'recuperacao') return cab + barra + csoRecuperacaoHtml(logado0) + '</div>';
+  if (CSD.aba === 'performance') return cab + barra + csoPerformanceHtml() + '</div>';
   if (CSD.aba !== 'sdr') {
     var oque = { operacao: 'valor ganho, negócios ganhos e ticket médio, taxa de conversão, tempo até a 1ª resposta, negócios criados, abertos e parados, perdidos, atendimentos e respondidos em até 15 min, reuniões agendadas e realizadas, gráficos por dia e a tabela por pessoa',
       performance: 'por atendente: conversas, mensagens enviadas, tempo para responder (mediana e 3 de cada 4), duração das conversas e conversas atendidas por dia',
@@ -35585,6 +35600,181 @@ function plMiaLinhas(pn, rotP) {
     + linha('Follow-ups', 'mensagem 2 h ou mais depois da anterior, sem o lead escrever no meio', '<b style="color:#f6a350;">' + z.fu + '</b>', z.fuResp + ' responderam', b ? plPxAntes(z.fu, b.fu) : '')
     + linha('Esperando agora', 'dos leads que chegaram ' + rotP, '<b style="color:' + (z.agu1 ? '#ff6b6b' : '#3ddc97') + ';">' + z.agu1 + '</b><small> sem 1º contato</small>',
         (z.agu1Old ? 'o mais antigo ' + _csdHa(z.agu1Old) + ' · ' : '') + z.aguEq + ' esperando a equipe · ' + z.aguLead + ' sem resposta do lead · <a href="#" onclick="event.preventDefault();var q=document.getElementById(\'csd-quem\');if(q)q.scrollIntoView({behavior:\'smooth\'});">quem chamar →</a>', '');
+}
+// ===== 📊 OPERAÇÃO CLINT · PERFORMANCE TIME · RECUPERAÇÃO (19/10/2026 · Bruno: "cadê?" — as outras abas da mia) =====
+// Leem 3 abas que o Robô da Clint preenche de 30 em 30 minutos: "Clint operação (base)" (por dia × tipo × funil × responsável),
+// "Clint atendimentos (base)" (uma linha por conversa: criada, cliente escreveu, time respondeu, dono, canal) e "Clint perdas (base)".
+// Regras conferidas com a mia (1–18/10): ganhos 358, valor R$ 3.177.530,42, perdidos 513/514, parados 14+ dias 48, ganhos entre os
+// fechados 41,1%; conversas em que o cliente escreveu 1.080/1.071, respondidas depois do cliente 559/553, até 15 min 46,9%/46,6%.
+var CSO = { op: [], at: [], pe: [], carregado: false, buscando: 0, erro: '', quando: 0, per: 'mes', de: '', ate: '',
+  fPessoa: '', fTipo: '', fMotivo: '', fFunil: '', fBusca: '', semComprou: true, mostrar: 150 };
+function csoCarregar(forcar) {
+  if (CSO.buscando && Date.now() - CSO.buscando < 60000) return;
+  if (CSO.carregado && !forcar && Date.now() - CSO.quando < 10 * 60000) return;
+  CSO.buscando = Date.now(); var faltam = 3, fim = function() { if (--faltam > 0) return; CSO.buscando = 0; CSO.carregado = true; CSO.quando = Date.now(); csdRedesenhar(); };
+  var V = function(r, i) { var c = r && r.c && r.c[i]; return c && c.v != null ? c.v : null; };
+  _sgdGviz('Clint operação (base)', '__gvizCsoO', function(t) {
+    CSO.op = ((t && t.rows) || []).map(function(r) { var d = V(r, 0); return { dia: String(d || '').replace(/^'/, '').slice(0, 10), tipo: V(r, 1) || '', funil: String(V(r, 2) || '').trim(), dono: V(r, 3) || 'Sem responsável', q: +V(r, 4) || 0, v: +V(r, 5) || 0, ab: +V(r, 6) || 0, p14: +V(r, 8) || 0, cr: +V(r, 10) || 0 }; })
+      .filter(function(x) { return /^\d{4}-\d{2}-\d{2}$/.test(x.dia); });
+    fim();
+  });
+  _sgdGviz('Clint atendimentos (base)', '__gvizCsoA', function(t) {
+    CSO.at = ((t && t.rows) || []).map(function(r) { return { cri: +V(r, 0) || 0, cli: +V(r, 1) || 0, resp: +V(r, 2) || 0, dono: V(r, 3) || 'Sem responsável', canal: V(r, 4) || '' }; });
+    fim();
+  });
+  _sgdGviz('Clint perdas (base)', '__gvizCsoP', function(t) {
+    CSO.pe = ((t && t.rows) || []).map(function(r) { return { id: String(V(r, 0) || ''), cid: String(V(r, 1) || ''), em: +V(r, 2) || 0, nome: V(r, 3) || '', tel: String(V(r, 4) || ''), email: V(r, 5) || '', quem: V(r, 6) || 'Sem responsável',
+      motivo: V(r, 7) || 'Sem motivo informado', tipo: V(r, 8) || '', funil: String(V(r, 9) || '').trim(), etapa: V(r, 10) || '', comprou: +V(r, 11) || 0 }; }).filter(function(x) { return x.em; });
+    fim();
+  });
+}
+// períodos da mia nestas abas: Mês atual · 30 dias · 90 dias · Ano · Período personalizado
+function _csoPeriodo() {
+  var hoje = _csdDia(Date.now()), mais = function(d, n) { return new Date(_csdIni(d) + n * 864e5 + 12 * CSD_H).toISOString().slice(0, 10); }, de, ate = hoje, rot;
+  if (CSO.per === '30') { de = mais(hoje, -29); rot = 'últimos 30 dias'; }
+  else if (CSO.per === '90') { de = mais(hoje, -89); rot = 'últimos 90 dias'; }
+  else if (CSO.per === 'ano') { de = hoje.slice(0, 4) + '-01-01'; rot = 'no ano'; }
+  else if (CSO.per === 'pers' && CSO.de && CSO.ate) { de = CSO.de <= CSO.ate ? CSO.de : CSO.ate; ate = CSO.de <= CSO.ate ? CSO.ate : CSO.de; rot = de.split('-').reverse().join('/') + ' a ' + ate.split('-').reverse().join('/'); }
+  else { de = hoje.slice(0, 8) + '01'; rot = 'no mês atual'; }
+  return { de: de, ate: ate, ini: _csdIni(de), fim: _csdIni(ate) + 864e5, rot: rot };
+}
+function csoPer(v) { CSO.per = v; if (v === 'pers' && !CSO.de) { var P = _csoPeriodo(); CSO.de = P.de; CSO.ate = P.ate; } csdRedesenhar(); }
+function _csoChips(P) {
+  var chip = function(v, rot) { return '<button type="button" class="pl-chip' + (CSO.per === v ? ' on' : '') + '" onclick="csoPer(\'' + v + '\')">' + rot + '</button>'; };
+  return '<div class="csd-filtros"><div class="pl-chips">' + chip('mes', 'Mês atual') + chip('30', '30 dias') + chip('90', '90 dias') + chip('ano', 'Ano') + chip('pers', 'Período personalizado') + '</div>'
+    + (CSO.per === 'pers' ? '<span class="csd-datas"><input type="date" value="' + (CSO.de || P.de) + '" onchange="CSO.de=this.value;csdRedesenhar()" aria-label="De"> até <input type="date" value="' + (CSO.ate || P.ate) + '" onchange="CSO.ate=this.value;csdRedesenhar()" aria-label="Até"></span>' : '') + '</div>';
+}
+function _csoReais(v) { return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
+function _csoCard(n, rot, sub) { return '<div class="csd-kpi"><b>' + n + '</b><span>' + rot + '</span>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>'; }
+function _csoBarras(dias, vals, cor, rot) {   // um palito por dia
+  var mx = Math.max.apply(null, vals.concat([1])), W = 640, H = 120, bw = W / Math.max(dias.length, 1);
+  var s = '<svg class="cso-svg" viewBox="0 0 ' + W + ' ' + (H + 18) + '" role="img" aria-label="' + _csdEsc(rot) + '">';
+  vals.forEach(function(v, i) { var h = v / mx * H; s += '<rect x="' + (i * bw + bw * .15).toFixed(1) + '" y="' + (H - h).toFixed(1) + '" width="' + Math.max(1, bw * .7).toFixed(1) + '" height="' + Math.max(v ? 1 : 0, h).toFixed(1) + '" rx="2" fill="' + cor + '"><title>' + dias[i].split('-').reverse().join('/') + ': ' + v + '</title></rect>'; });
+  var passo = Math.ceil(dias.length / 8); dias.forEach(function(d, i) { if (i % passo === 0 || i === dias.length - 1) s += '<text x="' + (i * bw + bw / 2).toFixed(1) + '" y="' + (H + 14) + '" text-anchor="middle" class="sgd-eixo">' + d.slice(8, 10) + '/' + d.slice(5, 7) + '</text>'; });
+  return s + '</svg>';
+}
+function _csoAtend(P) {   // conversas em que o cliente escreveu no período (regra conferida com a mia)
+  var por = {}, T = { n: 0, resp: 0, emp: 0, ate15: 0, mins: [] };
+  CSO.at.forEach(function(a) {
+    if (!a.cli || a.cli < P.ini || a.cli >= P.fim) return;
+    var o = por[a.dono] || (por[a.dono] = { n: 0, resp: 0, emp: 0, ate15: 0, mins: [] });
+    [o, T].forEach(function(z) { z.n++; if (a.resp && a.resp < a.cli) z.emp++; if (a.resp && a.resp >= a.cli) { z.resp++; var m = (a.resp - a.cli) / 60000; z.mins.push(m); if (m <= 15) z.ate15++; } });
+  });
+  return { por: por, T: T };
+}
+function csoOperacaoHtml() {
+  csoCarregar();
+  var P = _csoPeriodo(), h = _csoChips(P);
+  if (!CSO.carregado) return h + '<div class="panel rko-vazio"><span class="mv-brilho-txt">Lendo os negócios e as conversas da Clint…</span></div>';
+  var dP = function(d) { return d >= P.de && d <= P.ate; }, sel = CSO.op.filter(function(x) { return dP(x.dia); });
+  var S = function(tipo, k) { return sel.reduce(function(a, x) { return a + (x.tipo === tipo ? x[k] : 0); }, 0); };
+  var cri = S('criado', 'q'), gan = S('ganho', 'q'), per = S('perdido', 'q'), val = S('ganho', 'v'), ab = S('criado', 'ab'), p14 = S('criado', 'p14'), comDono = S('criado', 'cr');
+  var At = _csoAtend(P), T = At.T, med = _csdMediana(T.mins);
+  var reun = null; try { var dd = plCalcular({ ini: P.ini, fim: P.fim, per: 'datas', rot: P.rot }); reun = { re: dd.tot.re, marc: dd.tot.marc, sdrs: dd.sdrs || [], closers: dd.closers || [] }; } catch (e) {}
+  h += '<p class="csd-nota">Negócios e atendimentos da Clint · relidos de 30 em 30 minutos · negócios criados no período; vendas e perdas pela data do fechamento.</p>';
+  h += '<div class="cso-kpis">'
+    + _csoCard(_csoReais(val), 'valor ganho no período', 'valor do CRM · a receita oficial fica na planilha de vendas')
+    + _csoCard(rkoN(gan), 'negócios ganhos no período', gan ? 'ticket médio ' + _csoReais(val / gan) : '&nbsp;')
+    + _csoCard(cri ? (gan / cri * 100).toFixed(1).replace('.', ',') + '%' : '—', 'taxa de conversão', (gan + per) ? (gan / (gan + per) * 100).toFixed(1).replace('.', ',') + '% de ganhos entre os fechados' : '&nbsp;')
+    + _csoCard(_csdTempo(med), 'tempo até a 1ª resposta', 'mediana entre a mensagem do cliente e a resposta do time')
+    + _csoCard(rkoN(cri), 'negócios criados no período', rkoN(comDono) + ' com responsável')
+    + _csoCard(rkoN(ab), 'abertos', rkoN(p14) + ' parados há 14+ dias')
+    + _csoCard(rkoN(per), 'perdidos', '&nbsp;')
+    + _csoCard(rkoN(T.n), 'atendimentos recebidos', rkoN(T.n - T.resp) + ' sem resposta')
+    + _csoCard(T.n ? (T.ate15 / T.n * 100).toFixed(1).replace('.', ',') + '%' : '—', 'respondidos em até 15 min', rkoN(T.emp) + ' conversas iniciadas pela empresa ficam fora')
+    + _csoCard(reun ? rkoN(reun.re) : '—', 'reuniões realizadas', reun ? rkoN(reun.marc) + ' agendadas no mesmo período (planilha de vendas)' : '&nbsp;')
+    + '</div>';
+  var dias = []; for (var t = P.ini; t < P.fim; t += 864e5) dias.push(_csdDia(t + 12 * CSD_H));
+  var porDia = function(tipo) { var m = {}; sel.forEach(function(x) { if (x.tipo === tipo) m[x.dia] = (m[x.dia] || 0) + x.q; }); return dias.map(function(d) { return m[d] || 0; }); };
+  if (dias.length <= 400) h += '<div class="cso-graf"><div class="panel"><h4>Negócios criados no período</h4>' + _csoBarras(dias, porDia('criado'), '#6ea8ff', 'Negócios criados por dia') + '</div>'
+    + '<div class="panel"><h4>Negócios ganhos no período</h4>' + _csoBarras(dias, porDia('ganho'), '#3ddc97', 'Negócios ganhos por dia') + '</div></div>';
+  // performance do time
+  var G = {}, g = function(n) { return G[n] || (G[n] = { nome: n, cri: 0, gan: 0, val: 0 }); };
+  sel.forEach(function(x) { if (x.tipo === 'criado') g(x.dono).cri += x.q; if (x.tipo === 'ganho') { g(x.dono).gan += x.q; g(x.dono).val += x.v; } });
+  Object.keys(At.por).forEach(function(n) { g(n); });
+  var lista = Object.keys(G).map(function(k) { return G[k]; }).sort(function(a, b) { return b.gan - a.gan || b.cri - a.cri; });
+  h += '<div class="rko-sec"><h3>Performance do time</h3><span class="rko-meta">ganhos pela data da venda, creditados a quem fechou · negócios criados e atendimentos recebidos no período</span></div>'
+    + '<div class="panel csd-tab-w"><table class="csd-tab"><thead><tr><th>Responsável</th><th>Negócios</th><th>Ganhos</th><th>Conversão</th><th>Valor no CRM</th><th>Atendimentos</th><th>1ª resposta</th><th>Até 15 min</th></tr></thead><tbody>'
+    + lista.map(function(z) { var a = At.por[z.nome] || { n: 0, resp: 0, ate15: 0, mins: [] };
+      return '<tr><td><b>' + _csdEsc(z.nome) + '</b></td><td>' + rkoN(z.cri) + '</td><td>' + rkoN(z.gan) + '</td><td>' + (z.cri ? Math.round(z.gan / z.cri * 1000) / 10 + '%' : '—') + '</td><td>' + _csoReais(z.val) + '</td>'
+        + '<td>' + rkoN(a.n) + '<small>' + rkoN(a.n - a.resp) + ' sem resposta</small></td><td>' + _csdTempo(_csdMediana(a.mins)) + '</td><td>' + (a.n ? Math.round(a.ate15 / a.n * 1000) / 10 + '%' : '—') + '</td></tr>'; }).join('')
+    + '</tbody></table></div><p class="csd-nota">Conversão = ganhos ÷ negócios do período. Uma venda de card criado antes do período também conta, então um recorte curto pode passar de 100%.</p>';
+  if (reun) {
+    var pessoas = {}; (reun.sdrs || []).forEach(function(x) { var o = pessoas[x.nome] || (pessoas[x.nome] = { ag: 0, re: 0 }); o.ag += x.marc || 0; });
+    (reun.closers || []).forEach(function(x) { var o = pessoas[x.nome] || (pessoas[x.nome] = { ag: 0, re: 0 }); o.re += x.re || 0; });
+    var ps = Object.keys(pessoas).filter(function(k) { return pessoas[k].ag || pessoas[k].re; });
+    if (ps.length) h += '<div class="rko-sec"><h3>Reuniões agendadas e realizadas</h3><span class="rko-meta">da planilha de vendas: agendada = quem marcou · realizada = o closer, com o lead presente</span></div>'
+      + '<div class="panel csd-tab-w"><table class="csd-tab"><thead><tr><th>Pessoa</th><th>Reuniões agendadas</th><th>Reuniões realizadas</th></tr></thead><tbody>'
+      + ps.sort(function(a, b) { return (pessoas[b].ag + pessoas[b].re) - (pessoas[a].ag + pessoas[a].re); }).map(function(k) { return '<tr><td><b>' + _csdEsc(k) + '</b></td><td>' + rkoN(pessoas[k].ag) + '</td><td>' + rkoN(pessoas[k].re) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+  return h + '<p class="csd-nota">Os valores da Clint servem para acompanhamento comercial e não substituem a receita oficial (planilha de vendas). Ligações não aparecem: a Clint não entrega pela API.</p>';
+}
+function csoPerformanceHtml() {
+  csoCarregar();
+  if (!CSO.carregado) return '<div class="panel rko-vazio"><span class="mv-brilho-txt">Lendo as conversas da Clint…</span></div>';
+  var fim = _csdIni(_csdDia(Date.now())) + 864e5, ini = fim - 30 * 864e5, dias = []; for (var t = ini; t < fim; t += 864e5) dias.push(_csdDia(t + 12 * CSD_H));
+  var por = {};
+  CSO.at.forEach(function(a) { var base = a.cli || a.cri; if (!base || base < ini || base >= fim) return; var o = por[a.dono] || (por[a.dono] = { n: 0, mins: [], dia: {} }); o.n++; var d = _csdDia(base); o.dia[d] = (o.dia[d] || 0) + 1; if (a.cli && a.resp && a.resp >= a.cli) { var m = (a.resp - a.cli) / 60000; if (m <= 1440) o.mins.push(m); } });
+  var p75 = function(a) { if (!a.length) return null; a = a.slice().sort(function(x, y) { return x - y; }); return a[Math.min(a.length - 1, Math.floor(a.length * .75))]; };
+  var nomes = Object.keys(por).filter(function(k) { return k !== 'Sem responsável'; }).sort(function(a, b) { return por[b].n - por[a].n; });
+  var h = '<p class="csd-nota">Janela: últimos 30 dias. Conversas por atendente (dono da conversa na Clint) e o tempo da 1ª resposta do time depois que o cliente escreve (até 24 h). As mensagens enviadas e a duração das conversas ainda não entram.</p>'
+    + '<div class="rko-sec"><h3>Atendimento (últimos 30 dias)</h3></div><div class="panel csd-tab-w"><table class="csd-tab"><thead><tr><th>Atendente</th><th>Conversas</th><th>1ª resposta (mediana)</th><th>P75 (3 de 4)</th></tr></thead><tbody>'
+    + nomes.map(function(k) { var o = por[k]; return '<tr><td><b>' + _csdEsc(k) + '</b></td><td>' + rkoN(o.n) + '</td><td>' + _csdTempo(_csdMediana(o.mins)) + '</td><td>' + _csdTempo(p75(o.mins)) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  h += '<div class="rko-sec"><h3>Conversas atendidas por dia</h3></div><div class="panel csd-tab-w"><table class="csd-tab cso-dias"><thead><tr><th>Atendente</th>' + dias.map(function(d) { return '<th>' + d.slice(8, 10) + '/' + d.slice(5, 7) + '</th>'; }).join('') + '</tr></thead><tbody>'
+    + nomes.map(function(k) { return '<tr><td><b>' + _csdEsc(k) + '</b></td>' + dias.map(function(d) { var v = por[k].dia[d]; return '<td>' + (v || '—') + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+  return h;
+}
+function csoRecuperacaoHtml(logado) {
+  csoCarregar();
+  var P = _csoPeriodo(), h = _csoChips(P);
+  if (!CSO.carregado) return h + '<div class="panel rko-vazio"><span class="mv-brilho-txt">Lendo as perdas da Clint…</span></div>';
+  var noPer = CSO.pe.filter(function(x) { return x.em >= P.ini && x.em < P.fim; });
+  var opc = function(campo) { var m = {}; noPer.forEach(function(x) { if (x[campo]) m[x[campo]] = 1; }); return Object.keys(m).sort(); };
+  var sel = function(rot, campo, atual, lista) { return '<label class="csd-sel">' + rot + ' <select onchange="CSO.' + campo + '=this.value;csdRedesenhar()"><option value="">Todos</option>' + lista.map(function(v) { return '<option' + (v === atual ? ' selected' : '') + '>' + _csdEsc(v) + '</option>'; }).join('') + '</select></label>'; };
+  h += '<div class="csd-filtros">' + sel('Pessoa', 'fPessoa', CSO.fPessoa, opc('quem')) + sel('Tipo de perda', 'fTipo', CSO.fTipo, opc('tipo')) + sel('Motivo', 'fMotivo', CSO.fMotivo, opc('motivo')) + sel('Funil', 'fFunil', CSO.fFunil, opc('funil'))
+    + '<label class="csd-sel">Buscar <input type="search" value="' + _csdEsc(CSO.fBusca) + '" onchange="CSO.fBusca=this.value;csdRedesenhar()" placeholder="nome, telefone, e-mail"></label>'
+    + '<label class="csd-sel" title="Tira da lista quem tem negócio ganho na Clint a partir de 30 dias antes da perda"><input type="checkbox"' + (CSO.semComprou ? ' checked' : '') + ' onchange="CSO.semComprou=this.checked;csdRedesenhar()"> Retirar quem já comprou</label></div>';
+  var f = noPer.filter(function(x) { return (!CSO.fPessoa || x.quem === CSO.fPessoa) && (!CSO.fTipo || x.tipo === CSO.fTipo) && (!CSO.fMotivo || x.motivo === CSO.fMotivo) && (!CSO.fFunil || x.funil === CSO.fFunil); });
+  var eq = f.filter(function(x) { return x.tipo === 'Marcada pela equipe'; }), auto = f.length - eq.length, comMot = eq.filter(function(x) { return x.motivo !== 'Sem motivo informado'; }).length;
+  var porCt = {}; f.forEach(function(x) { var k = x.cid || x.id; if (!porCt[k] || x.em > porCt[k].em) porCt[k] = x; });
+  var pessoas = Object.keys(porCt).map(function(k) { return porCt[k]; }), comprou = pessoas.filter(function(x) { return x.comprou; }).length;
+  var lista = pessoas.filter(function(x) { return !(CSO.semComprou && x.comprou); });
+  var b = String(CSO.fBusca || '').toLowerCase().trim(); if (b) lista = lista.filter(function(x) { return (x.nome + ' ' + x.tel + ' ' + x.email).toLowerCase().indexOf(b) !== -1; });
+  lista.sort(function(a, c) { return c.em - a.em; });
+  h += '<div class="cso-kpis">' + _csoCard(rkoN(f.length), 'perdas no período', rkoN(eq.length) + ' marcadas pela equipe · ' + rkoN(auto) + ' automáticas')
+    + _csoCard(eq.length ? (comMot / eq.length * 100).toFixed(1).replace('.', ',') + '%' : '—', 'perdas da equipe com motivo', comMot + ' de ' + eq.length + ' com motivo escolhido na Clint')
+    + _csoCard(rkoN(lista.length), 'pessoas para recuperar', rkoN(lista.filter(function(x) { return x.tel; }).length) + ' com telefone')
+    + _csoCard(rkoN(comprou), 'compraram depois', 'fora da lista') + '</div>';
+  var P2 = {}; f.forEach(function(x) { var o = P2[x.quem] || (P2[x.quem] = { eq: 0, mot: 0, auto: 0, motivos: {} }); if (x.tipo === 'Marcada pela equipe') { o.eq++; if (x.motivo !== 'Sem motivo informado') o.mot++; o.motivos[x.motivo] = (o.motivos[x.motivo] || 0) + 1; } else o.auto++; });
+  h += '<div class="rko-sec"><h3>Perdas por pessoa</h3><span class="rko-meta">quem marcou a perda na Clint (ou o responsável do card) · as automáticas da integração ficam na última coluna</span></div>'
+    + '<div class="panel csd-tab-w"><table class="csd-tab"><thead><tr><th>Pessoa</th><th>Perdas marcadas</th><th>Com motivo</th><th>Principais motivos</th><th>Automáticas</th></tr></thead><tbody>'
+    + Object.keys(P2).sort(function(a, c) { return P2[c].eq - P2[a].eq; }).map(function(k) { var o = P2[k];
+      return '<tr><td><b>' + _csdEsc(k) + '</b></td><td>' + o.eq + '</td><td>' + (o.eq ? Math.round(o.mot / o.eq * 1000) / 10 + '%' : '—') + '</td><td>' + Object.keys(o.motivos).sort(function(a, c) { return o.motivos[c] - o.motivos[a]; }).slice(0, 3).map(function(m) { return _csdEsc(m) + ' · ' + o.motivos[m]; }).join('<br>') + '</td><td>' + o.auto + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  var M = {}; eq.forEach(function(x) { M[x.motivo] = (M[x.motivo] || 0) + 1; }); var mk = Object.keys(M).sort(function(a, c) { return M[c] - M[a]; });
+  if (mk.length) h += '<div class="rko-sec"><h3>Principais motivos</h3><span class="rko-meta">das perdas marcadas pela equipe</span></div><div class="panel cso-motivos">'
+    + mk.map(function(m) { var pc = M[m] / eq.length * 100; return '<div class="cso-mot"><span>' + _csdEsc(m) + '</span><i style="--w:' + pc.toFixed(1) + '%"></i><b>' + M[m] + ' · ' + pc.toFixed(1).replace('.', ',') + '%</b></div>'; }).join('') + '</div>';
+  if (!logado) return h + '<div class="rko-sec"><h3>Quem não comprou</h3></div><div class="panel rko-vazio">A lista com nome e telefone aparece para quem entrou com login.</div>';
+  var tels = lista.filter(function(x) { return x.tel; }).map(function(x) { return x.tel; });
+  window._csoTels = tels; window._csoLista = lista;
+  h += '<div class="rko-sec"><h3>Quem não comprou</h3><span class="rko-meta">um contato por linha, com a perda mais recente do período · telefone com DDI, pronto para disparo</span></div>'
+    + '<div class="csd-filtros"><button type="button" class="btn" onclick="csoCopiarTels(this)">📋 Copiar ' + rkoN(tels.length) + ' telefones</button><button type="button" class="btn" onclick="csoBaixarLista()">⬇ Baixar esta lista (CSV)</button></div>'
+    + '<div class="panel csd-tab-w"><table class="csd-tab csd-lista"><thead><tr><th>Pessoa</th><th>Perdido em</th><th>Quem perdeu</th><th>Motivo</th><th>Funil e etapa</th></tr></thead><tbody>'
+    + lista.slice(0, CSO.mostrar).map(function(x) { var d = _csdDia(x.em);
+      return '<tr><td><b>' + _csdEsc(x.nome || 'Nome não informado') + '</b>' + (x.tel ? '<a class="csd-wa" href="https://wa.me/' + _csdEsc(x.tel) + '" target="_blank" rel="noopener">' + _csdEsc(x.tel) + '</a>' : '') + (x.email ? '<small>' + _csdEsc(x.email) + '</small>' : '') + '</td>'
+        + '<td>' + d.split('-').reverse().join('/') + '</td><td>' + _csdEsc(x.quem) + '</td><td>' + _csdEsc(x.motivo) + '<small>' + _csdEsc(x.tipo) + '</small></td><td>' + _csdEsc(x.funil) + '<small>' + _csdEsc(x.etapa) + '</small></td></tr>'; }).join('')
+    + '</tbody></table></div>' + (lista.length > CSO.mostrar ? '<button type="button" class="btn csd-mais" onclick="CSO.mostrar+=300;csdRedesenhar()">Ver mais ' + (lista.length - CSO.mostrar) + '</button>' : '');
+  return h;
+}
+function csoCopiarTels(btn) {
+  var t = (window._csoTels || []).join('\n');
+  var ok = function() { if (btn) { var o = btn.textContent; btn.textContent = '✓ Copiados'; setTimeout(function() { btn.textContent = o; }, 2000); } };
+  try { navigator.clipboard.writeText(t).then(ok, function() { prompt('Copie os telefones:', t); }); } catch (e) { prompt('Copie os telefones:', t); }
+}
+function csoBaixarLista() {
+  var l = window._csoLista || [], q = function(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+  var csv = '﻿' + ['Nome', 'Telefone', 'E-mail', 'Perdido em', 'Quem perdeu', 'Motivo', 'Tipo', 'Funil', 'Etapa'].map(q).join(';') + '\n'
+    + l.map(function(x) { return [x.nome, x.tel, x.email, _csdDia(x.em).split('-').reverse().join('/'), x.quem, x.motivo, x.tipo, x.funil, x.etapa].map(q).join(';'); }).join('\n');
+  var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'recuperacao-clint-' + _csdDia(Date.now()) + '.csv'; document.body.appendChild(a); a.click(); setTimeout(function() { a.remove(); }, 500);
 }
 // ===== fim do 📊 desempenho SDR (js) =====
 // 📸 fotos do time de Produção de conteúdo (Bruno 10/10/2026: "com a foto de cada" — 1ª Rafa Sabino, 2ª Eduardo, 3ª Rebeca; 14/10: "foto da Lilian"), 420 px, guardadas aqui dentro
