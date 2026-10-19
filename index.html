@@ -25722,6 +25722,17 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 .vf-comp td b { color:var(--green); }
 @media (max-width:900px) { .vf-esc { grid-template-columns:1fr; } }
 @media (max-width:520px) { .vf-grp > div { grid-template-columns:1fr 1fr; } .vf-geral-v { margin-left:0; text-align:left; } }
+/* 19/10/2026 · Diagnóstico e Workshop separados; Pré / Workshop / Pós */
+.vf-geral.on { border-color:color-mix(in srgb, var(--c, #2fd4c4) 60%, transparent); box-shadow:0 0 0 1px color-mix(in srgb, var(--c, #2fd4c4) 35%, transparent), 0 10px 30px -12px color-mix(in srgb, var(--c, #2fd4c4) 45%, transparent); }
+.vf-geral-tag { color:var(--c, #2fd4c4); }
+.vf-ws .vf-geral { background:radial-gradient(120% 140% at 0% 0%, rgba(246,163,80,.16), transparent 55%), radial-gradient(120% 140% at 100% 100%, rgba(61,220,151,.14), transparent 55%), var(--panel); }
+.vf-ws .vf-geral b { font-size:1.7rem; }
+.vf-esc1 { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin:0 0 14px; }
+.vf-ws .vf-grp .vf-esc1 { margin-bottom:12px; }
+.vf-mo small { font-size:.62rem; color:var(--muted); font-weight:700; }
+.vf-op b em { font-style:normal; font-size:.72rem; color:var(--text2); font-weight:800; margin-left:4px; }
+.vf-comp td small { color:var(--muted); font-weight:600; }
+@media (max-width:620px) { .vf-esc1 { grid-template-columns:1fr; } }
 /* ===== fim do 🔻 funil completo por produto ===== */
 /* ===== fim do 🏆 ranking orgânico ===== */
 /* ===== 🎓 TREINAMENTOS (Bruno 09/10/2026: "algo moderno e bonito com salvamento de onde parou" · "bem profissional") ===== */
@@ -35893,7 +35904,7 @@ function _vfProd(produto) { var p = v2norm(produto || ''); return /legado|wld/.t
 // "coloque no meio o no-show e etc"): cada funil numa LINHA (da esquerda para a direita); em cima o Diagnóstico (HT, Legado, total), embaixo
 // o Workshop por edição; entre os passos, o que ficou pelo caminho (futuras, no-show, não vendido, na mesa…); filtros de período, origem,
 // SDR, closer e edição.
-var VF = { fun: 'geral', modo: 'coorte', per: 'visao', de: '', ate: '', origem: '', sdr: '', closer: '', ed: '' };   // modo: 'coorte' = leads que chegaram (Bruno: "quantos leads chegaram e quantos se tornaram vendas") · 'periodo' = reuniões do período
+var VF = { fun: 'tot', wfun: 'tot', mom: '', modo: 'coorte', per: 'visao', de: '', ate: '', origem: '', sdr: '', closer: '', ed: '' };   // modo: 'coorte' = leads que chegaram (Bruno: "quantos leads chegaram e quantos se tornaram vendas") · 'periodo' = reuniões do período
 var _VF_PASSOS = [['marc', 'Marcadas', 'todas as reuniões, inclusive as futuras'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado (inclui faltas)'],
   ['comp', 'Apareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['fech', 'Disse sim', 'vendido, entrada ou bloqueio'], ['pag', 'Pagou', 'status Vendido']];
 function _vfNovo() { return { leads: 0, mql: 0, insc: 0, part: 0, apl: 0, marc: 0, real: 0, comp: 0, fech: 0, pag: 0, valor: 0, fut: 0, rem: 0, ns: 0, nv: 0, mesa: 0 }; }
@@ -35955,12 +35966,12 @@ function _vfFiltrosHtml(sdrs, closers) {
   var sel = function(rot, campo, lista) { return '<label class="vf-sel">' + rot + ' <select onchange="vfFiltro(\'' + campo + '\',this.value)"><option value="">Todos</option>' + lista.map(function(v) { return '<option' + (VF[campo] === v ? ' selected' : '') + '>' + _vfEsc(v) + '</option>'; }).join('') + '</select></label>'; };
   return '<div class="vf-filtros"><div class="pl-chips">' + chip('visao', 'Como a Visão Geral') + chip('mes', 'Mês atual') + chip('mesant', 'Mês passado') + chip('30', '30 dias') + chip('90', '90 dias') + chip('pers', 'Período') + '</div>'
     + (VF.per === 'pers' ? '<span class="vf-datas"><input type="date" value="' + VF.de + '" onchange="vfFiltro(\'de\',this.value)" aria-label="De"> até <input type="date" value="' + VF.ate + '" onchange="vfFiltro(\'ate\',this.value)" aria-label="Até"></span>' : '')
-    + sel('Origem', 'origem', ['Anúncio', 'Orgânico', 'Social Selling', 'Indicação', 'Recuperação', 'Workshop', 'Outras']) + sel('SDR', 'sdr', sdrs) + sel('Closer', 'closer', closers) + '</div>';
+    + sel('Origem', 'origem', ['Anúncio', 'Orgânico', 'Social Selling', 'Indicação', 'Recuperação', 'Outras']) + sel('SDR', 'sdr', sdrs) + sel('Closer', 'closer', closers) + '</div>';
 }
 function _vfCoorte(leads, porTel) {
   var D = { ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() };
   leads.forEach(function(L) {
-    var l = L.l, rs = ((l.tel8 && porTel[l.tel8]) || []).filter(function(r) { return r.date && r.date.getTime() >= L.d - 2 * 864e5 && !_vfEhWs(r.origem); });
+    var l = L.l, rs = ((l.tel8 && porTel[l.tel8]) || []).filter(function(r) { return r.date && r.date.getTime() >= L.d - 2 * 864e5 && !/workshop/.test(v2norm(r.origem || '')); });
     var o = { marc: rs.length > 0, real: rs.some(function(r) { return isReal(r.sn); }), comp: rs.some(function(r) { return isComp(r.sn); }), fech: rs.some(function(r) { return isFechouReuniao(r.sn); }),
       pag: rs.some(function(r) { return r.sn === 'vendido'; }), valor: rs.reduce(function(a, r) { return a + (r.sn === 'vendido' ? (r.valor || 0) : 0); }, 0) };
     o.fut = o.marc && !o.real && rs.some(function(r) { return isFut(r.sn); }); o.rem = o.marc && !o.real && !o.fut && rs.some(function(r) { return r.sn === 'remarcada 2 reuniao'; });
@@ -35987,82 +35998,91 @@ function v2FunilProdutos(mesRows) {
     var k = l.faixa === 'alta' ? 'ht' : l.faixa === 'media' ? 'leg' : null;
     leadsP.push({ l: l, d: d, k: k, mql: mql });
     [D.tot].concat(k ? [D[k]] : []).forEach(function(z) { z.leads++; if (mql) z.mql++; }); if (!k) semPerfil++; });
-  rows.forEach(function(r) { if (_vfEhWs(r.origem)) return; var k = _vfProd(r.produto); _vfReuniao(D[k], r); _vfReuniao(D.tot, r); });
+  rows.forEach(function(r) { if (/workshop/.test(v2norm(r.origem || ''))) return; var k = _vfProd(r.produto); _vfReuniao(D[k], r); _vfReuniao(D.tot, r); });
   // 📥→💰 os leads que chegaram no período, seguidos até a venda (as reuniões deles em qualquer data depois de chegar)
   var porTel = {}; (V2.rows || []).forEach(function(r) { if (!okCl(r.closer)) return; var t = ldTel8(r.telefone || r.tel || ''); if (t) (porTel[t] = porTel[t] || []).push(r); });
   var C = _vfCoorte(leadsP, porTel);
   if (VF.modo === 'coorte') D = C;
-  var passosD = [['leads', 'Leads', 'base de leads do período (sem quem veio do workshop) · HT = investimento alto · Legado = perfil legado (R$ 500–1 mil)'], ['mql', 'MQL', 'nota A ou B (a mesma régua do dash)']].concat(_VF_PASSOS);
-  // ---- Workshop por edição (o período não vale aqui: cada edição é o seu período; valem origem, SDR, closer e edição) ----
+  var passosD = [['leads', 'Leads', 'base de leads do período (sem quem está no app do workshop) · HT = investimento alto · Legado = perfil legado (R$ 500–1 mil)'], ['mql', 'MQL', 'nota A ou B (a mesma régua do dash)']].concat(_VF_PASSOS);
+  // ---- 🎓 Workshop SEPARADO, com o filtro de edição (19/10/2026, Bruno: "separe o workshop e filtre por edição" · "e sobre o pré, pós e
+  // workshop?" · "tem pessoas de uma edição anterior que fecham no próximo mês"). Cada pessoa fica na edição dela no app do workshop e a
+  // reunião conta lá, mesmo que feche no mês seguinte. O momento sai da data da reunião contra o 2º dia (o pitch): Pré = antes do pitch;
+  // Workshop = do pitch até 15 dias depois; Pós = depois de 15 dias. O período de cima não vale aqui: cada edição é o seu período.
+  var JAN = typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15, dia0 = function(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+  var trio = function() { return { ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() }; }, somar = function(a, b) { Object.keys(b).forEach(function(c) { a[c] += b[c] || 0; }); };
   var E = {};
   Object.keys(wsTel).forEach(function(t8) {
-    var x = wsTel[t8], ed = _wsMes(x) || 'sem edição', o = E[ed] || (E[ed] = { ed: ed, d2: x.d2 instanceof Date ? x.d2.getTime() : 0, ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() });
-    if (!o.d2 && x.d2 instanceof Date) o.d2 = x.d2.getTime();
+    var x = wsTel[t8], ed = _wsMes(x) || 'sem edição', o = E[ed] || (E[ed] = { ed: ed, d2: 0, base: trio(), m: { pre: trio(), ws: trio(), pos: trio() } });
+    if (!o.d2 && x.d2 instanceof Date) o.d2 = dia0(x.d2);
     if (VF.sdr && !okSdr(x.sdr)) return;
     var fx = leadFaixa(_wsInvTxt(x.inv)), k = fx === 'alta' ? 'ht' : fx === 'media' ? 'leg' : null;
-    [o.tot].concat(k ? [o[k]] : []).forEach(function(z) { if (x.ing instanceof Date) z.insc++; if (x.p1 || x.p2 || x.p3) z.part++; if (x.apl instanceof Date) z.apl++; });
+    [o.base.tot].concat(k ? [o.base[k]] : []).forEach(function(z) { if (x.ing instanceof Date) z.insc++; if (x.p1 || x.p2 || x.p3) z.part++; if (x.apl instanceof Date) z.apl++; });
   });
   var semEd = 0;
   (V2.rows || []).forEach(function(r) {
     if (!/workshop/.test(v2norm(r.origem || '')) || !r.date || !okSdr(r.sdr) || !okCl(r.closer)) return;
     var x = wsTel[ldTel8(r.telefone || r.tel || '')]; if (!x) { semEd++; return; }
     var o = E[_wsMes(x) || 'sem edição']; if (!o) return;
-    _vfReuniao(o[_vfProd(r.produto)], r); _vfReuniao(o.tot, r);
+    var dd = x.d2 instanceof Date ? Math.round((dia0(r.date) - dia0(x.d2)) / 864e5) : 0, mo = dd < 0 ? 'pre' : dd <= JAN ? 'ws' : 'pos';
+    _vfReuniao(o.m[mo][_vfProd(r.produto)], r); _vfReuniao(o.m[mo].tot, r);
   });
-  var eds = Object.keys(E).map(function(k) { return E[k]; }).filter(function(o) { return o.tot.insc || o.tot.apl || o.tot.marc; }).sort(function(a, b) { return a.d2 - b.d2; });
-  // 19/10/2026 (Bruno: "que mostre o geral e eu possa trabalhar cada um escolhendo cada funil"): em cima o GERAL (Diagnóstico + Workshop);
-  // embaixo os funis para escolher (Diagnóstico total/HT/Legado · Workshop total/HT/Legado); o escolhido aparece grande. No Workshop valem
-  // as edições com o 2º dia dentro do período, ou a edição escolhida.
-  var somar = function(a, b) { Object.keys(b).forEach(function(c) { a[c] += b[c] || 0; }); };
-  var edsP = eds.filter(function(o) { return VF.ed ? o.ed === VF.ed : (o.d2 >= P.ini && o.d2 < P.fim); }), W = { ht: _vfNovo(), leg: _vfNovo(), tot: _vfNovo() };
-  if (!VF.origem || VF.origem === 'Workshop') edsP.forEach(function(o) { ['ht', 'leg', 'tot'].forEach(function(k) { somar(W[k], o[k]); }); });
-  var G = _vfNovo(); somar(G, D.tot); somar(G, W.tot); G.leads = D.tot.leads + W.tot.insc; G.mql = D.tot.mql + W.tot.apl;   // MQL do Geral (Bruno 19/10: "coloca MQL"): nota A/B no diagnóstico + quem aplicou no workshop
-  var conv = G.leads ? (G.pag / G.leads * 100).toFixed(1).replace('.', ',') + '%' : '—', co = VF.modo === 'coorte';
-  var passosW = [['insc', 'Inscritos', 'ingresso pago no app do workshop'], ['part', 'Participaram', 'presentes em pelo menos um dia'], ['apl', 'Aplicaram', 'fizeram a aplicação no app']].concat(_VF_PASSOS);
-  var passosG = [['leads', 'Leads', 'leads do diagnóstico + inscritos do workshop'], ['mql', 'MQL', 'diagnóstico: nota A ou B · workshop: quem aplicou no app']].concat(_VF_PASSOS);
-  var edRot = VF.ed ? 'edição de ' + VF.ed : edsP.length ? 'edições ' + edsP.map(function(o) { return o.ed; }).join(', ') : 'nenhuma edição no período';
-  var FUN = {
-    'geral': { rot: 'Geral', sub: 'Diagnóstico + Workshop', cor: '#2fd4c4', z: G, passos: passosG, de: 'leads' },
-    'd-tot': { rot: 'Diagnóstico · total', sub: 'todas as origens menos o workshop', cor: '#8fb0d8', z: D.tot, passos: passosD, de: 'leads' },
-    'd-ht': { rot: 'Diagnóstico · HT', sub: 'Spark / Growth', cor: '#6ea8ff', z: D.ht, passos: passosD, de: 'leads' },
-    'd-leg': { rot: 'Diagnóstico · Legado', sub: 'Legado Digital / Club', cor: '#b98aff', z: D.leg, passos: passosD, de: 'leads' },
-    'w-tot': { rot: 'Workshop · total', sub: edRot, cor: '#f6a350', z: W.tot, passos: passosW, de: 'insc' },
-    'w-ht': { rot: 'Workshop · HT', sub: edRot, cor: '#6ea8ff', z: W.ht, passos: passosW, de: 'insc' },
-    'w-leg': { rot: 'Workshop · Legado', sub: edRot, cor: '#b98aff', z: W.leg, passos: passosW, de: 'insc' }
-  };
-  var F = FUN[VF.fun] || FUN.geral, fid = FUN[VF.fun] ? VF.fun : 'geral';
+  var zW = function(lista, k, mom) { var z = _vfNovo(); lista.forEach(function(o) { somar(z, o.base[k]); (mom ? [mom] : ['pre', 'ws', 'pos']).forEach(function(m) { somar(z, o.m[m][k]); }); }); return z; };
+  var eds = Object.keys(E).map(function(k) { return E[k]; }).filter(function(o) { var z = zW([o], 'tot', ''); return z.insc || z.apl || z.marc; }).sort(function(a, b) { return a.d2 - b.d2; });
+  var hoje0 = dia0(new Date()), feitas = eds.filter(function(o) { return o.d2 && o.d2 <= hoje0; }), edPad = ((feitas[feitas.length - 1] || eds[eds.length - 1]) || {}).ed || '';
+  var edSel = VF.ed === '*' ? '*' : (VF.ed && E[VF.ed] ? VF.ed : edPad), lista = edSel === '*' ? eds : eds.filter(function(o) { return o.ed === edSel; });
+  var oSel = edSel !== '*' ? E[edSel] : null, futura = !!(oSel && oSel.d2 > hoje0);
+  // ---- telas ----
+  var pct = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }, cv = function(a, b) { return b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '—'; };
+  var co = VF.modo === 'coorte', dk = { ht: 1, leg: 1, tot: 1 }[VF.fun] ? VF.fun : 'tot', wk = { ht: 1, leg: 1, tot: 1 }[VF.wfun] ? VF.wfun : 'tot', mom = VF.mom || '';
   var modo = function(v, rot, tit) { return '<button type="button" class="pl-chip' + (VF.modo === v ? ' on' : '') + '" title="' + tit + '" onclick="vfFiltro(\'modo\',\'' + v + '\')">' + rot + '</button>'; };
-  var card = function(id, rot) { var f = FUN[id], z = f.z, cv = z[f.de] ? (z.pag / z[f.de] * 100).toFixed(1).replace('.', ',') + '%' : '—';
-    return '<button type="button" class="vf-op' + (fid === id ? ' on' : '') + '" style="--c:' + f.cor + ';" aria-pressed="' + (fid === id) + '" onclick="vfFiltro(\'fun\',\'' + id + '\')">'
-      + '<span class="vf-op-r"><i></i>' + rot + '</span><b>' + cv + '</b><span class="vf-op-n">' + rkoN(z[f.de]) + (f.de === 'insc' ? ' inscritos' : ' leads') + ' › ' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + '</span><span class="vf-op-v">' + v2moeda0(z.valor) + '</span></button>'; };
-  var h = '<div class="panel vf-wrap"><div class="vf-topo"><h3>🔻 Funil de vendas</h3><span class="hint">' + _vfEsc(P.rot) + ' · escolha o funil para trabalhar · % = quanto passou do passo anterior · passe o mouse no passo para ver o que conta</span></div>'
+  var card = function(campo, id, ativo, rot, cor, z, de) {
+    return '<button type="button" class="vf-op' + (ativo === id ? ' on' : '') + '" style="--c:' + cor + ';" aria-pressed="' + (ativo === id) + '" onclick="vfFiltro(\'' + campo + '\',\'' + id + '\')">'
+      + '<span class="vf-op-r"><i></i>' + rot + '</span><b>' + cv(z.pag, z[de]) + '</b><span class="vf-op-n">' + rkoN(z[de]) + (de === 'insc' ? ' inscritos' : ' leads') + ' › ' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + '</span><span class="vf-op-v">' + v2moeda0(z.valor) + '</span></button>'; };
+  var heroi = function(tag, campo, cor, itens, valor) {
+    return '<div class="vf-geral on" style="--c:' + cor + ';" role="button" tabindex="0" onclick="vfFiltro(\'' + campo + '\',\'tot\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();vfFiltro(\'' + campo + '\',\'tot\');}">'
+      + '<span class="vf-geral-tag">' + tag + '</span>' + itens.map(function(it, i) { return (i ? '<span class="vf-seta">›</span>' : '') + '<div><small>' + it[0] + '</small><b>' + rkoN(it[1]) + '</b>' + (it[2] ? '<em>' + it[2] + '</em>' : '') + '</div>'; }).join('')
+      + '<div class="vf-geral-v"><small>Valor</small><b>' + v2moeda0(valor) + '</b></div></div>'; };
+  // 🩺 Diagnóstico
+  var DC = { tot: { rot: 'Diagnóstico · total', sub: 'todas as origens menos o workshop', cor: '#2fd4c4' }, ht: { rot: 'Diagnóstico · HT', sub: 'Spark / Growth', cor: '#6ea8ff' }, leg: { rot: 'Diagnóstico · Legado', sub: 'Legado Digital / Club', cor: '#b98aff' } };
+  var g = D.tot, h = '<div class="panel vf-wrap"><div class="vf-topo"><h3>🔻 Funil do Diagnóstico</h3><span class="hint">' + _vfEsc(P.rot) + ' · todas as origens menos o workshop · escolha o funil para trabalhar · % = quanto passou do passo anterior · passe o mouse no passo para ver o que conta</span></div>'
     + '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Contar</span>' + modo('coorte', 'Leads que chegaram', 'cada lead que chegou no período, seguido até a venda (as reuniões dele em qualquer data depois)')
     + modo('periodo', 'Movimento do período', 'as reuniões que aconteceram no período, de leads de qualquer data') + '</div></div>'
     + _vfFiltrosHtml(Object.keys(sdrs).sort(), Object.keys(closers).sort())
     + (VF.origem === 'Social Selling' || VF.origem === 'Indicação' || VF.origem === 'Recuperação' ? '<p class="hint" style="margin:4px 0 0;">Os leads da base vêm do formulário: ' + _vfEsc(VF.origem) + ' quase não aparece nos leads, só nas reuniões.</p>' : '')
-    + '<div class="vf-geral' + (fid === 'geral' ? ' on' : '') + '" role="button" tabindex="0" aria-pressed="' + (fid === 'geral') + '" onclick="vfFiltro(\'fun\',\'geral\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();vfFiltro(\'fun\',\'geral\');}">'
-    + '<span class="vf-geral-tag">🌐 Geral · Diagnóstico + Workshop' + (fid === 'geral' ? '' : ' <u>ver o funil geral</u>') + '</span>'
-    + '<div><small>📥 Leads que chegaram</small><b>' + rkoN(G.leads) + '</b></div><span class="vf-seta">›</span><div><small>✅ MQL</small><b>' + rkoN(G.mql) + '</b><em>' + (G.leads ? Math.round(G.mql / G.leads * 100) + '% dos leads' : '—') + '</em></div><span class="vf-seta">›</span>'
-    + '<div><small>📅 ' + (co ? 'Marcaram reunião' : 'Reuniões marcadas') + '</small><b>' + rkoN(G.marc) + '</b><em>' + (G.leads ? Math.round(G.marc / G.leads * 100) + '% dos leads' : '—') + '</em></div><span class="vf-seta">›</span>'
-    + '<div><small>💰 ' + (co ? 'Viraram venda' : 'Vendas') + '</small><b>' + rkoN(G.pag) + '</b><em>' + conv + ' dos leads</em></div><div class="vf-geral-v"><small>Valor</small><b>' + v2moeda0(G.valor) + '</b></div></div>'
-    + '<div class="vf-esc"><div class="vf-grp"><small>🩺 Diagnóstico</small><div>' + card('d-tot', 'Total') + card('d-ht', 'HT') + card('d-leg', 'Legado') + '</div></div>'
-    + '<div class="vf-grp"><small>🎓 Workshop</small><div>' + card('w-tot', 'Total') + card('w-ht', 'HT') + card('w-leg', 'Legado') + '</div></div></div>'
-    + '<div class="vf-big">' + _vfLinha(F.rot, F.sub, F.cor, F.z, F.passos, F.de) + '</div>';
-  if (fid.charAt(0) === 'w') {   // as edições do workshop: escolher uma, e a comparação entre elas
-    var k = fid.slice(2), edChip = function(v, rot) { return '<button type="button" class="pl-chip' + (VF.ed === v ? ' on' : '') + '" onclick="vfFiltro(\'ed\',\'' + _vfEsc(v) + '\')">' + _vfEsc(rot) + '</button>'; };
-    h += '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Edição</span>' + edChip('', 'As do período') + eds.slice().reverse().slice(0, 10).map(function(o) { return edChip(o.ed, o.ed); }).join('') + '</div></div>';
-    if (!VF.ed && !edsP.length) h += '<p class="hint" style="margin:0 0 8px;">Nenhuma edição teve o 2º dia em ' + _vfEsc(P.rot) + '. Escolha a edição acima.</p>';
-    if (VF.origem && VF.origem !== 'Workshop') h += '<p class="hint" style="margin:0 0 8px;">Com o filtro de origem ' + _vfEsc(VF.origem) + ', o workshop fica fora. Troque a origem para Todos ou Workshop.</p>';
-    h += '<div class="vf-comp"><table><thead><tr><th>Edição</th><th>Inscritos</th><th>Aplicaram</th><th>Marcadas</th><th>Apareceu</th><th>Vendas</th><th>Inscrito → venda</th><th>Valor</th></tr></thead><tbody>'
-      + eds.slice().reverse().slice(0, 10).map(function(o) { var z = o[k];
-        return '<tr class="' + (VF.ed === o.ed ? 'on' : '') + '" onclick="vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\')"><th>' + _vfEsc(o.ed) + (o.d2 ? ' <small>' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</th><td>' + rkoN(z.insc) + '</td><td>' + rkoN(z.apl) + '</td><td>' + rkoN(z.marc) + '</td><td>' + rkoN(z.comp) + '</td><td>' + rkoN(z.pag) + '</td><td><b>' + (z.insc ? (z.pag / z.insc * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</b></td><td>' + v2moeda0(z.valor) + '</td></tr>'; }).join('')
-      + '</tbody></table></div>';
+    + heroi('🌐 Geral do Diagnóstico', 'fun', '#2fd4c4', [['📥 Leads que chegaram', g.leads], ['✅ MQL', g.mql, pct(g.mql, g.leads) + ' dos leads'], ['📅 ' + (co ? 'Marcaram reunião' : 'Reuniões marcadas'), g.marc, pct(g.marc, g.leads) + ' dos leads'],
+      ['💰 ' + (co ? 'Viraram venda' : 'Vendas'), g.pag, cv(g.pag, g.leads) + ' dos leads']], g.valor)
+    + '<div class="vf-esc1">' + card('fun', 'tot', dk, 'Total', DC.tot.cor, D.tot, 'leads') + card('fun', 'ht', dk, 'HT', DC.ht.cor, D.ht, 'leads') + card('fun', 'leg', dk, 'Legado', DC.leg.cor, D.leg, 'leads') + '</div>'
+    + '<div class="vf-big">' + _vfLinha(DC[dk].rot, DC[dk].sub, DC[dk].cor, D[dk], passosD, 'leads') + '</div>'
+    + '<div class="hint" style="margin-top:8px;">Diagnóstico = anúncio, orgânico, social selling, indicação, recuperação… (quem veio do workshop, no Pré, no Workshop ou no Pós, fica no funil do Workshop, abaixo). MQL = nota A ou B. HT = Spark / Growth; Legado = Mentoria Legado Digital e Legado Club.'
+    + (semPerfil ? ' ' + semPerfil + ' lead' + (semPerfil > 1 ? 's' : '') + ' sem perfil (investimento abaixo do Legado) entra' + (semPerfil > 1 ? 'm' : '') + ' só no total.' : '') + '</div></div>';
+  // 🎓 Workshop
+  if (eds.length) {
+    var ZW = { tot: zW(lista, 'tot', mom), ht: zW(lista, 'ht', mom), leg: zW(lista, 'leg', mom) }, zM = { pre: zW(lista, wk, 'pre'), ws: zW(lista, wk, 'ws'), pos: zW(lista, wk, 'pos') }, w = ZW[wk];
+    var WC = { tot: { rot: 'Workshop · total', cor: '#f6a350' }, ht: { rot: 'Workshop · HT', cor: '#6ea8ff' }, leg: { rot: 'Workshop · Legado', cor: '#b98aff' } };
+    var MO = { pre: ['🕐', 'Pré', 'antes do pitch (2º dia)', '#ffd166'], ws: ['🎯', 'Workshop', 'do pitch até ' + JAN + ' dias depois', '#f6a350'], pos: ['📆', 'Pós', 'depois de ' + JAN + ' dias · inclui quem fechou no mês seguinte', '#e2647a'] };
+    var edRot = edSel === '*' ? 'todas as edições' : 'edição de ' + edSel + (oSel && oSel.d2 ? ' · 2º dia ' + new Date(oSel.d2).toLocaleDateString('pt-BR') : '');
+    var edChip = function(v, rot, tit) { return '<button type="button" class="pl-chip' + (edSel === v ? ' on' : '') + '"' + (tit ? ' title="' + _vfEsc(tit) + '"' : '') + ' onclick="vfFiltro(\'ed\',\'' + _vfEsc(v) + '\')">' + _vfEsc(rot) + '</button>'; };
+    var tv = zM.pre.pag + zM.ws.pag + zM.pos.pag;
+    var moBox = function(id) { var z = zM[id], m = MO[id];
+      return '<button type="button" class="vf-op vf-mo' + (mom === id ? ' on' : '') + '" style="--c:' + m[3] + ';" aria-pressed="' + (mom === id) + '" title="clique para ver o funil só com as reuniões do ' + m[1] + '" onclick="vfFiltro(\'mom\',\'' + (mom === id ? '' : id) + '\')">'
+        + '<span class="vf-op-r"><i></i>' + m[0] + ' ' + m[1] + '</span><small>' + m[2] + '</small><b>' + rkoN(z.pag) + ' venda' + (z.pag === 1 ? '' : 's') + (tv ? ' <em>' + pct(z.pag, tv) + '</em>' : '') + '</b>'
+        + '<span class="vf-op-n">' + rkoN(z.marc) + ' reuniões · ' + rkoN(z.comp) + ' apareceram</span><span class="vf-op-v">' + v2moeda0(z.valor) + '</span></button>'; };
+    h += '<div class="panel vf-wrap vf-ws"><div class="vf-topo"><h3>🎓 Funil do Workshop</h3><span class="hint">por edição · cada pessoa fica na edição dela no app, mesmo que feche no mês seguinte · valem os filtros de SDR e closer de cima</span></div>'
+      + '<div class="vf-filtros"><div class="pl-chips"><span class="vf-sel">Edição</span>' + eds.slice().reverse().slice(0, 10).map(function(o) { return edChip(o.ed, o.ed + (o.d2 > hoje0 ? ' · vai acontecer' : ''), o.d2 ? '2º dia ' + new Date(o.d2).toLocaleDateString('pt-BR') : ''); }).join('') + edChip('*', 'Todas') + '</div></div>'
+      + (futura ? '<p class="hint" style="margin:0 0 8px;">Esta edição ainda vai acontecer (2º dia ' + new Date(oSel.d2).toLocaleDateString('pt-BR') + '): por enquanto só tem inscritos. As aplicações e o perfil (HT ou Legado) chegam no dia do workshop.</p>' : '')
+      + heroi('🎓 ' + _vfEsc(edRot), 'wfun', '#f6a350', [['🎟️ Inscritos', w.insc], ['🙋 Participaram', w.part, pct(w.part, w.insc) + ' dos inscritos'], ['✅ Aplicaram (MQL)', w.apl, pct(w.apl, w.insc) + ' dos inscritos'],
+        ['📅 Reuniões', w.marc], ['💰 Vendas', w.pag, cv(w.pag, w.insc) + ' dos inscritos']], w.valor)
+      + '<div class="vf-grp"><small>Momento da reunião' + (mom ? ' · filtrando: ' + MO[mom][1] + ' (clique de novo para tirar)' : ' · clique para filtrar') + '</small><div class="vf-esc1">' + moBox('pre') + moBox('ws') + moBox('pos') + '</div></div>'
+      + '<div class="vf-grp"><small>Perfil</small><div class="vf-esc1">' + card('wfun', 'tot', wk, 'Total', WC.tot.cor, ZW.tot, 'insc') + card('wfun', 'ht', wk, 'HT', WC.ht.cor, ZW.ht, 'insc') + card('wfun', 'leg', wk, 'Legado', WC.leg.cor, ZW.leg, 'insc') + '</div></div>'
+      + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, [['insc', 'Inscritos', 'ingresso pago no app do workshop'], ['part', 'Participaram', 'presentes em pelo menos um dia'], ['apl', 'Aplicaram', 'fizeram a aplicação no app (o MQL do workshop)']].concat(_VF_PASSOS), 'insc') + '</div>'
+      + '<div class="vf-comp"><table><thead><tr><th>Edição</th><th>Inscritos</th><th>Aplicaram</th><th>Reuniões</th><th>Vendas</th><th>🕐 Pré</th><th>🎯 Workshop</th><th>📆 Pós</th><th>Inscrito → venda</th><th>Valor</th></tr></thead><tbody>'
+      + eds.slice().reverse().slice(0, 10).map(function(o) { var z = zW([o], wk, ''), p = function(m) { var y = zW([o], wk, m); return rkoN(y.pag) + (y.marc ? ' <small>de ' + rkoN(y.marc) + '</small>' : ''); };
+        return '<tr class="' + (edSel === o.ed ? 'on' : '') + '" tabindex="0" onclick="vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\')" onkeydown="if(event.key===\'Enter\'){vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\');}"><th>' + _vfEsc(o.ed) + (o.d2 ? ' <small>' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</th><td>' + rkoN(z.insc) + '</td><td>' + rkoN(z.apl) + '</td><td>' + rkoN(z.marc) + '</td><td>' + rkoN(z.pag) + '</td><td>' + p('pre') + '</td><td>' + p('ws') + '</td><td>' + p('pos') + '</td><td><b>' + cv(z.pag, z.insc) + '</b></td><td>' + v2moeda0(z.valor) + '</td></tr>'; }).join('')
+      + '</tbody></table></div>'
+      + '<div class="hint" style="margin-top:8px;">Pré / Workshop / Pós pela data da reunião contra o 2º dia da edição da pessoa (a mesma regra dos ' + JAN + ' dias). Na tabela, "2 de 5" = 2 vendas em 5 reuniões. Aplicaram = o MQL do workshop. HT ou Legado pelo investimento que a pessoa marcou na aplicação; quem não aplicou fica só no total.'
+      + (semEd ? ' ' + semEd + ' reuniões com origem de workshop não foram achadas no app (telefone diferente).' : '') + '</div></div>';
   }
-  var nota = fid === 'geral' ? 'Leads = ' + rkoN(D.tot.leads) + ' do diagnóstico + ' + rkoN(W.tot.insc) + ' inscritos do workshop (' + _vfEsc(edRot) + '). MQL = nota A ou B no diagnóstico (' + rkoN(D.tot.mql) + ') + quem aplicou no workshop (' + rkoN(W.tot.apl) + '). Diagnóstico = todas as origens menos o workshop.'
-    : fid.charAt(0) === 'd' ? 'Diagnóstico = todas as origens menos o workshop (anúncio, orgânico, social selling, indicação, recuperação, pós workshop…). HT = Spark / Growth; Legado = Mentoria Legado Digital e Legado Club.'
-      + (semPerfil ? ' ' + semPerfil + ' lead' + (semPerfil > 1 ? 's' : '') + ' sem perfil (investimento abaixo do Legado) entra' + (semPerfil > 1 ? 'm' : '') + ' só no total.' : '')
-    : 'Workshop: cada reunião vai para a edição da pessoa no app (origem Workshop, Pré ou Pós). Sem edição escolhida, valem as edições com o 2º dia no período. Inscritos com investimento abaixo do Legado (ou sem resposta) entram só no total.' + (semEd ? ' ' + semEd + ' reuniões com origem de workshop não foram achadas no app (telefone diferente).' : '');
-  return h + '<div class="hint" style="margin-top:8px;">' + nota + '</div></div>';
+  return h;
 }
 function _vfEsc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 // ===== fim do 🔻 funil completo por produto =====
