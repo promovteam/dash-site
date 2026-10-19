@@ -35924,7 +35924,8 @@ function _vfMeio(de, para, z) {
   if (de === 'real' && z.ns) t.push([z.ns, '❌ no-show' + pc(z.ns, z.real)]);
   if (de === 'comp' && z.nv) t.push([z.nv, 'não vendido' + pc(z.nv, z.comp)]);
   if (de === 'fech' && z.mesa) t.push([z.mesa, '⏳ na mesa (bloqueio/entrada)']);
-  if (de === 'insc') t.push([Math.max(0, z.insc - z.part), 'não foram']);
+  if (de === 'insc' && para === 'part') t.push([Math.max(0, z.insc - z.part), 'não foram']);
+  if (de === 'insc' && para === 'apl') t.push([Math.max(0, z.insc - z.apl), 'não aplicaram']);
   if (de === 'part') t.push([Math.max(0, z.part - z.apl), 'não aplicaram']);
   t = t.filter(function(x) { return x[0] > 0; });
   return '<span class="vf-meio"><span class="vf-seta" aria-hidden="true">›</span>' + t.map(function(x) { return '<em class="' + (/no-show/.test(x[1]) ? 'ns' : /mesa/.test(x[1]) ? 'mesa' : '') + '">' + x[0] + ' ' + x[1] + '</em>'; }).join('') + '</span>';
@@ -36031,10 +36032,13 @@ function v2FunilProdutos(mesRows) {
     _vfReuniao(o.m[mo][_vfProd(r.produto)], r); _vfReuniao(o.m[mo].tot, r);
   });
   var zW = function(lista, k, mom) { var z = _vfNovo(); lista.forEach(function(o) { somar(z, o.base[k]); (mom ? [mom] : ['pre', 'ws', 'pos']).forEach(function(m) { somar(z, o.m[m][k]); }); }); return z; };
-  var eds = Object.keys(E).map(function(k) { return E[k]; }).filter(function(o) { var z = zW([o], 'tot', ''); return z.insc || z.apl || z.marc; }).sort(function(a, b) { return a.d2 - b.d2; });
+  var eds = Object.keys(E).map(function(k) { return E[k]; }).filter(function(o) { var z = zW([o], 'tot', ''); return o.ed !== 'sem edição' && (z.insc || z.apl || z.marc); }).sort(function(a, b) { return a.d2 - b.d2; });
   var hoje0 = dia0(new Date()), feitas = eds.filter(function(o) { return o.d2 && o.d2 <= hoje0; }), edPad = ((feitas[feitas.length - 1] || eds[eds.length - 1]) || {}).ed || '';
   var edSel = VF.ed === '*' ? '*' : (VF.ed && E[VF.ed] ? VF.ed : edPad), lista = edSel === '*' ? eds : eds.filter(function(o) { return o.ed === edSel; });
   var oSel = edSel !== '*' ? E[edSel] : null, futura = !!(oSel && oSel.d2 > hoje0);
+  // 19/10/2026 (Bruno: "participaram 2?"): o app só mandou a lista de presença na edição de julho; de agosto em diante a coluna veio vazia.
+  // Quando a edição tem menos presentes do que aplicações, a presença não foi registrada: o passo "Participaram" sai do funil.
+  var semPres = lista.some(function(o) { var b = o.base.tot; return b.apl > b.part; });
   // ---- telas ----
   var pct = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }, cv = function(a, b) { return b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '—'; };
   var co = VF.modo === 'coorte', dk = { ht: 1, leg: 1, tot: 1 }[VF.fun] ? VF.fun : 'tot', wk = { ht: 1, leg: 1, tot: 1 }[VF.wfun] ? VF.wfun : 'tot', mom = VF.mom || '';
@@ -36078,11 +36082,12 @@ function v2FunilProdutos(mesRows) {
         ['📅 Reuniões', w.marc], ['💰 Vendas', w.pag, cv(w.pag, w.insc) + ' dos inscritos']], w.valor)
       + '<div class="vf-grp"><small>Momento da reunião' + (mom ? ' · filtrando: ' + MO[mom][1] + ' (clique de novo para tirar)' : ' · clique para filtrar') + '</small><div class="vf-esc1">' + moBox('pre') + moBox('ws') + moBox('pos') + '</div></div>'
       + '<div class="vf-grp"><small>Perfil · clique para filtrar</small><div class="vf-esc1">' + card('wfun', 'tot', wk, 'Total', WC.tot.cor, ZW.tot, 'insc') + card('wfun', 'ht', wk, 'HT', WC.ht.cor, ZW.ht, 'insc') + card('wfun', 'leg', wk, 'Legado', WC.leg.cor, ZW.leg, 'insc') + '</div></div>'
-      + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, [['insc', 'Inscritos', 'ingresso pago no app do workshop'], ['part', 'Participaram', 'presentes em pelo menos um dia'], ['apl', 'Aplicaram', 'fizeram a aplicação no app'], ['mql', 'MQL', 'aplicaram e marcaram algum investimento']].concat(_VF_PASSOS), 'insc') + '</div>'
+      + '<div class="vf-big">' + _vfLinha(WC[wk].rot, edRot + (mom ? ' · só ' + MO[mom][1] : ''), WC[wk].cor, w, [['insc', 'Inscritos', 'ingresso pago no app do workshop']].concat(semPres ? [] : [['part', 'Participaram', 'presença marcada no app em pelo menos um dia']]).concat([['apl', 'Aplicaram', 'fizeram a aplicação no app'], ['mql', 'MQL', 'aplicaram e marcaram algum investimento']]).concat(_VF_PASSOS), 'insc') + '</div>'
       + '<div class="vf-comp"><table><thead><tr><th>Edição</th><th>Inscritos</th><th>Aplicaram</th><th>MQL</th><th>Reuniões</th><th>Vendas</th><th>🕐 Pré</th><th>🎯 Workshop</th><th>📆 Pós</th><th>Inscrito → venda</th><th>Valor</th></tr></thead><tbody>'
       + eds.slice().reverse().slice(0, 10).map(function(o) { var z = zW([o], wk, ''), p = function(m) { var y = zW([o], wk, m); return rkoN(y.pag) + (y.marc ? ' <small>de ' + rkoN(y.marc) + '</small>' : ''); };
         return '<tr class="' + (edSel === o.ed ? 'on' : '') + '" tabindex="0" onclick="vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\')" onkeydown="if(event.key===\'Enter\'){vfFiltro(\'ed\',\'' + _vfEsc(o.ed) + '\');}"><th>' + _vfEsc(o.ed) + (o.d2 ? ' <small>' + new Date(o.d2).toLocaleDateString('pt-BR') + '</small>' : '') + '</th><td>' + rkoN(z.insc) + '</td><td>' + rkoN(z.apl) + '</td><td>' + rkoN(z.mql) + '</td><td>' + rkoN(z.marc) + '</td><td>' + rkoN(z.pag) + '</td><td>' + p('pre') + '</td><td>' + p('ws') + '</td><td>' + p('pos') + '</td><td><b>' + cv(z.pag, z.insc) + '</b></td><td>' + v2moeda0(z.valor) + '</td></tr>'; }).join('')
       + '</tbody></table></div>'
+      + (semPres ? '<p class="hint" style="margin:0 0 8px;">⚠️ O app do workshop não registrou a lista de presença ' + (edSel === '*' ? 'em algumas edições' : 'nesta edição') + ' (só a edição de julho tem): por isso o passo "Participaram" ficou de fora.</p>' : '')
       + '<div class="hint" style="margin-top:8px;">Pré / Workshop / Pós pela data da reunião contra o 2º dia da edição da pessoa (a mesma regra dos ' + JAN + ' dias). Na tabela, "2 de 5" = 2 vendas em 5 reuniões. MQL = aplicou e marcou algum investimento. HT ou Legado pelo investimento que a pessoa marcou na aplicação; quem não aplicou fica só no total.'
       + (semEd ? ' ' + semEd + ' reuniões com origem de workshop não foram achadas no app (telefone diferente).' : '') + '</div></div>';
   }
