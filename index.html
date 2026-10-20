@@ -1438,6 +1438,11 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
   .vn-acoes { flex:1 1 100%; } .vn-acoes .btn { flex:1; justify-content:center; padding:13px 16px; font-size:.92rem; }
 }
 @media (prefers-reduced-motion:reduce) { #aviso-versao.vn-card, .vn-ico::after { animation:none; } }
+/* 20/10/2026: aviso de versão nova discreto */
+.vn-tem { position:relative; } .vn-tem::after { content:''; position:absolute; top:3px; right:3px; width:8px; height:8px; border-radius:50%; background:#3ddc97; box-shadow:0 0 0 2px #0c0e12; }
+#vn-recado { position:fixed; right:16px; bottom:16px; z-index:100000; padding:8px 14px; border-radius:99px; border:1px solid rgba(61,220,151,.35); background:rgba(16,18,24,.96); color:#e8eaee; font:600 .78rem Inter, sans-serif; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.4); transition:opacity .35s, transform .35s; }
+#vn-recado u { color:#3ddc97; text-decoration:none; font-weight:800; } #vn-recado.sai { opacity:0; transform:translateY(8px); }
+@media (max-width:900px) { #vn-recado { bottom:calc(var(--tb-h, 62px) + var(--safe-b, 0px) + 10px); } }
 </style>
 </head>
 <body>
@@ -2922,7 +2927,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-20-0953';
+var VERSAO_DASH = '2026-10-20-1001';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -3036,6 +3041,8 @@ function vnDepois() {
   _vnLembrarT = setTimeout(function() { if (_versaoNova) avisarVersaoNova(); }, 15 * 60 * 1000);
 }
 function avisarVersaoNova() {
+  // 20/10/2026 (Bruno: "fica assim o tempo todo"): nada de cartão grande — pontinho no ↻ e um recado pequeno, uma vez por versão
+  return vnDiscreto();
   if (document.getElementById('aviso-versao')) return;
   _vnVezes++;
   var d = document.createElement('div');
@@ -3048,6 +3055,16 @@ function avisarVersaoNova() {
   document.body.appendChild(d);
   // 20/10/2026 (Bruno: "essa atualização constante faz que quando saímos da página suma o que estamos fazendo"): NÃO atualiza mais
   // sozinho quando a pessoa sai da aba — só quando ela clica em "Atualizar agora" (ou na próxima vez que abrir o dash)
+}
+function vnDiscreto() {
+  document.querySelectorAll('[onclick="atualizarDash()"]').forEach(function(bt) { bt.classList.add('vn-tem'); bt.title = 'Saiu uma versão nova do dash: clique para atualizar'; });
+  var ja = ''; try { ja = sessionStorage.getItem('vnAvisou') || ''; } catch (e) {}
+  if (ja === _versaoNova || document.getElementById('vn-recado')) return;
+  try { sessionStorage.setItem('vnAvisou', _versaoNova || ''); } catch (e) {}
+  var d = document.createElement('button'); d.type = 'button'; d.id = 'vn-recado'; d.setAttribute('role', 'status');
+  d.innerHTML = '✨ Versão nova do dash · <u>atualizar</u>'; d.onclick = function() { atualizarDash(); };
+  document.body.appendChild(d);
+  setTimeout(function() { d.classList.add('sai'); setTimeout(function() { d.remove(); }, 400); }, 6000);
 }
 if (_dashNaInternet()) {
   setTimeout(conferirVersaoDash, 15000);          // pouco depois de abrir
