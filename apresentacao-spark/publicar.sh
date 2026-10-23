@@ -134,7 +134,10 @@ ADD=(apresentacao-spark/index.html apresentacao-spark/css apresentacao-spark/fon
 G add -A -- "${ADD[@]}" || parar "o git não conseguiu juntar os arquivos."
 if G diff --cached --quiet; then echo "nada mudou desde a última publicação."; else
   G commit -q -m "$MSG_COMMIT $MODO + link no menu do dash ($(date '+%d/%m/%Y %H:%M') · versão do dash $V)" || parar "o git não conseguiu gravar."
+fi
+if [ -n "$(G log --format=%h origin/main..HEAD)" ]; then   # envia também o que ficou gravado sem subir numa vez anterior
   if [ -n "${SEM_ENVIO:-}" ]; then echo "TESTE (SEM_ENVIO): gravei, mas não enviei ao GitHub."; exit 0; fi
+  echo "   enviando $(G log --format=%h origin/main..HEAD | wc -l | tr -d ' ') registro(s) para o GitHub…"
   GL push -q origin main || { echo "ATENÇÃO: gravei aqui, mas o envio para o GitHub falhou (internet?). Rode de novo: ele continua de onde parou."; exit 2; }
 fi
 echo "   esperando o site atualizar (até uns 5 minutos)…"
