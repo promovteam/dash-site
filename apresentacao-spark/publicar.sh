@@ -98,6 +98,7 @@ echo; echo "2/4 · o que vai para o site ($URL):"
 traz "$S/index.html" "$S/versao.txt" || parar "o iCloud não devolveu o index.html do dash a tempo."
 cp "$S/index.html" "$TMP/dash-index.html"
 echo "   no dash: $(python3 -I "$AQUI/remendo-dash.py" "$TMP/dash-index.html" --conferir 2>&1 | sed 's/^remendo do dash: //')"
+[ -f "$AQUI/remendo-lead.py" ] && echo "   botão do lead: $(python3 -I "$AQUI/remendo-lead.py" "$TMP/dash-index.html" --conferir 2>&1 | tail -1)"
 
 if [ -n "$ENSAIO" ]; then echo; echo "ENSAIO: tudo conferido. Parei antes de mexer no site."; exit 0; fi
 
@@ -124,13 +125,15 @@ fi
 D="$S/apresentacao-spark"; mkdir -p "$D"
 for x in index.html css fontes img video js; do rm -rf "$D/$x"; done
 for x in "$TMP/apresentacao-spark/"*; do b=$(basename "$x"); rm -rf "$D/$b"; mv "$x" "$D/" || parar "não consegui copiar $b para o site."; done
-if [ ! "$AQUI" -ef "$D" ]; then cp "$AQUI/gerar.py" "$AQUI/remendo-dash.py" "$AQUI/publicar.sh" "$D/" || parar "não consegui copiar os scripts."; fi
+if [ ! "$AQUI" -ef "$D" ]; then cp "$AQUI/gerar.py" "$AQUI/remendo-dash.py" "$AQUI/publicar.sh" "$D/"; [ -f "$AQUI/remendo-lead.py" ] && cp "$AQUI/remendo-lead.py" "$D/" || parar "não consegui copiar os scripts."; fi
 python3 -I "$AQUI/remendo-dash.py" "$S/index.html" || parar "o remendo do dash não entrou (o dash não foi mexido)."
+# 24/10: o botão "🎤 Abrir a apresentação deste lead" no dash (remendo-lead.py, idempotente)
+if [ -f "$AQUI/remendo-lead.py" ]; then python3 -I "$AQUI/remendo-lead.py" "$S/index.html" >/dev/null || parar "o remendo do botão do lead não entrou."; fi
 V=$(tr -d ' \n' < "$S/versao.txt")
 
 echo; echo "4/4 · gravando e enviando para o GitHub (os vídeos são grandes: pode levar alguns minutos)…"
 ADD=(apresentacao-spark/index.html apresentacao-spark/css apresentacao-spark/fontes apresentacao-spark/img apresentacao-spark/video
-     apresentacao-spark/gerar.py apresentacao-spark/publicar.sh apresentacao-spark/remendo-dash.py index.html versao.txt)
+     apresentacao-spark/gerar.py apresentacao-spark/publicar.sh apresentacao-spark/remendo-dash.py apresentacao-spark/remendo-lead.py index.html versao.txt)
 G add -A -- "${ADD[@]}" || parar "o git não conseguiu juntar os arquivos."
 if G diff --cached --quiet; then echo "nada mudou desde a última publicação."; else
   G commit -q -m "$MSG_COMMIT $MODO + link no menu do dash ($(date '+%d/%m/%Y %H:%M') · versão do dash $V)" || parar "o git não conseguiu gravar."
