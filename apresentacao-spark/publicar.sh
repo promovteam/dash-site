@@ -65,10 +65,14 @@ echo "   apresentação de origem: $ORIGEM"
 [ "$(livre_mb)" -gt 1000 ] || parar "o disco do Mac está quase cheio ($(livre_mb) MB livres; precisa de 1 GB). Libere espaço e rode de novo."
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/apresentacao-spark.XXXXXX") || parar "não consegui criar a pasta temporária."
 trap 'rm -rf "$TMP"' EXIT
+# 25/10: a lista do que foi montado (tamanho e nome de cada arquivo), para conferir de novo depois do "pode"
+# (numa espera longa, o Mac apagou parte da pasta temporária e a publicação subiu sem 13 vídeos e a fonte)
+manifesto(){ ( cd "$TMP/apresentacao-spark" 2>/dev/null && find . -type f -exec stat -f '%z %N' {} + | sort ); }
+monta_sem_senha(){ python3 -I "$AQUI/gerar.py" --sem-senha --origem "$ORIGEM" --destino "$TMP/apresentacao-spark" \
+    || parar "o gerador não terminou (veja a mensagem acima)."; }
 if [ -z "$COM_SENHA" ]; then
   echo; echo "1/4 · montando a apresentação (sem senha)…"
-  python3 -I "$AQUI/gerar.py" --sem-senha --origem "$ORIGEM" --destino "$TMP/apresentacao-spark" \
-    || parar "o gerador não terminou (veja a mensagem acima)."
+  monta_sem_senha
 else
 python3 -I "$AQUI/gerar.py" --autoteste >/dev/null || parar "a conferência da criptografia falhou."
 
@@ -103,9 +107,19 @@ echo "   no dash: $(python3 -I "$AQUI/remendo-dash.py" "$TMP/dash-index.html" --
 if [ -n "$ENSAIO" ]; then echo; echo "ENSAIO: tudo conferido. Parei antes de mexer no site."; exit 0; fi
 
 # 4) confirmação
+MANIF="$(manifesto)"
 echo
 read -r -p "Confirma publicar? (s/n) " R < /dev/tty
 case "$R" in s|S|sim|Sim|SIM|pode|Pode|PODE) ;; *) echo "Ok, não publiquei nada."; exit 0;; esac
+if [ "$(manifesto)" != "$MANIF" ]; then      # 25/10: a pasta montada mudou enquanto esperava o "pode"
+  if [ -z "$COM_SENHA" ]; then
+    echo "   (a pasta montada perdeu arquivos enquanto esperava: montando de novo…)"
+    rm -rf "$TMP/apresentacao-spark"; monta_sem_senha
+    [ "$(manifesto)" = "$MANIF" ] || parar "a apresentação mudou desde a conferência. Rode de novo para ver o resumo atualizado."
+  else
+    parar "a pasta montada perdeu arquivos enquanto esperava. Rode de novo."
+  fi
+fi
 
 echo; echo "3/4 · preparando o site…"
 traz "$S/.git" "$S/index.html" "$S/versao.txt" "$S/apresentacao-spark" || parar "o iCloud não devolveu os arquivos do site a tempo. Tente de novo mais tarde."
