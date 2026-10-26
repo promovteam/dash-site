@@ -249,6 +249,11 @@ def gerar_sem_senha(origem, destino, html, dados, deck, refs):
                 for suf_ in ('.jpg', '-capa.jpg'):      # a prévia do WhatsApp e a capa da página
                     im_ = os.path.join(pd, 'img', f_[:-5] + suf_)
                     if os.path.exists(im_): clonar(im_, os.path.join(destino, 'd', 'img', f_[:-5] + suf_))
+        for sub_ in (('f',), ('img', 'w')):      # 26/10: a fonte das páginas de case (d/f) e os prints com a marca "promov" (d/img/w)
+            ps_ = os.path.join(pd, *sub_)
+            if os.path.isdir(ps_):
+                for f_ in os.listdir(ps_):
+                    if f_.endswith(('.woff2', '.webp', '.jpg', '.png')): clonar(os.path.join(ps_, f_), os.path.join(destino, 'd', *sub_, f_))
 
 def logo_svg(origem):
     try:
