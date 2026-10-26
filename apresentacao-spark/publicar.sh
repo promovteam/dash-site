@@ -139,6 +139,7 @@ fi
 D="$S/apresentacao-spark"; mkdir -p "$D"
 for x in index.html css fontes img video js d; do rm -rf "$D/$x"; done      # 25/10: d = as páginas dos depoimentos (WhatsApp)
 for x in "$TMP/apresentacao-spark/"*; do b=$(basename "$x"); rm -rf "$D/$b"; mv "$x" "$D/" || parar "não consegui copiar $b para o site."; done
+if [ -d "$D/d" ]; then rm -rf "$S/d"; mv "$D/d" "$S/d" || parar "não consegui pôr os links dos depoimentos no site."; fi      # 25/10: os links dos depoimentos ficam em dash-site/d/<nome> (curtos)
 if [ ! "$AQUI" -ef "$D" ]; then cp "$AQUI/gerar.py" "$AQUI/remendo-dash.py" "$AQUI/publicar.sh" "$D/"; [ -f "$AQUI/remendo-lead.py" ] && cp "$AQUI/remendo-lead.py" "$D/" || parar "não consegui copiar os scripts."; fi
 python3 -I "$AQUI/remendo-dash.py" "$S/index.html" || parar "o remendo do dash não entrou (o dash não foi mexido)."
 # 24/10: o botão "🎤 Abrir a apresentação deste lead" no dash (remendo-lead.py, idempotente)
@@ -146,8 +147,9 @@ if [ -f "$AQUI/remendo-lead.py" ]; then python3 -I "$AQUI/remendo-lead.py" "$S/i
 V=$(tr -d ' \n' < "$S/versao.txt")
 
 echo; echo "4/4 · gravando e enviando para o GitHub (os vídeos são grandes: pode levar alguns minutos)…"
-ADD=(apresentacao-spark/index.html apresentacao-spark/css apresentacao-spark/fontes apresentacao-spark/img apresentacao-spark/video apresentacao-spark/d
+ADD=(apresentacao-spark/index.html apresentacao-spark/css apresentacao-spark/fontes apresentacao-spark/img apresentacao-spark/video
      apresentacao-spark/gerar.py apresentacao-spark/publicar.sh apresentacao-spark/remendo-dash.py apresentacao-spark/remendo-lead.py index.html versao.txt)
+for p_ in d apresentacao-spark/d; do if [ -e "$S/$p_" ] || [ -n "$(G ls-files -- "$p_" | head -1)" ]; then ADD+=("$p_"); fi; done      # 25/10: os links curtos (d/) e a saída da pasta antiga
 G add -A -- "${ADD[@]}" || parar "o git não conseguiu juntar os arquivos."
 if G diff --cached --quiet; then echo "nada mudou desde a última publicação."; else
   G commit -q -m "$MSG_COMMIT $MODO + link no menu do dash ($(date '+%d/%m/%Y %H:%M') · versão do dash $V)" || parar "o git não conseguiu gravar."

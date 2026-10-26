@@ -243,8 +243,8 @@ def gerar_sem_senha(origem, destino, html, dados, deck, refs):
         for r_, _, fs in os.walk(pd):
             for f_ in fs:
                 if not f_.endswith('.html'): continue
-                a_ = os.path.join(r_, f_); m_ = re.search(r'src="\.\./(video/[^"]+)"', ler(a_))
-                if not m_ or os.path.normpath(m_.group(1)) not in refs: continue      # o vídeo da página tem de estar publicado
+                a_ = os.path.join(r_, f_); m_ = re.search(r'src="\.\./(?:apresentacao-spark/)?(video/[^"]+)"', ler(a_))
+                if m_ and os.path.normpath(m_.group(1)) not in refs: continue      # o vídeo da página tem de estar publicado (as páginas de case não têm vídeo)
                 clonar(a_, os.path.join(destino, os.path.relpath(a_, origem)))
                 for suf_ in ('.jpg', '-capa.jpg'):      # a prévia do WhatsApp e a capa da página
                     im_ = os.path.join(pd, 'img', f_[:-5] + suf_)
