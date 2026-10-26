@@ -2934,7 +2934,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-10-26-0927';
+var VERSAO_DASH = '2026-10-26-1111';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -22542,7 +22542,13 @@ _cadaTanto(function(){ if (_visaoCarregada) carregarGptMaker(); }, 600000);   //
 _cadaTanto(function(){ if (_visaoCarregada) carregarTempos(); }, 900000);
 carregarPag();
 setTimeout(carregarAgenda, 800);
-_cadaTanto(carregarV2, 120000);
+// 26/10/2026 (Bruno: "não está atualizando no visitante as marcações · no Placar"): com o Placar na tela (TV, visitante), as vendas e
+// marcações continuam vindo de 2 em 2 minutos mesmo com a janela escondida (atrás de outra, minimizada ou com a tela apagada)
+setInterval(function() {
+  var pl = document.getElementById('s-placar'), placarNaTela = !!(pl && pl.classList.contains('active')) || (typeof PLACAR !== 'undefined' && !!PLACAR.tv);
+  if (document.hidden && !placarNaTela) { _pendenteAoVoltar = true; return; }
+  try { carregarV2(); } catch (e) {}
+}, 120000);
 _cadaTanto(carregarPag, 300000);
 setTimeout(carregarBloqueios, 2500);
 _cadaTanto(carregarBloqueios, 600000);   // v186: 5 → 10 min (quem registra bloqueio recarrega na hora)
