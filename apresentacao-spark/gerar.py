@@ -238,6 +238,17 @@ def gerar_sem_senha(origem, destino, html, dados, deck, refs):
     pagina = pagina[:m.end()] + '\n' + MARCA_SEM_SENHA + pagina[m.end():]
     with open(os.path.join(destino, 'index.html'), 'w', encoding='utf-8') as f: f.write(pagina)
     for r in sorted(refs): clonar(os.path.join(origem, r), os.path.join(destino, r))
+    pd = os.path.join(origem, 'd')      # 25/10: as páginas dos depoimentos para o WhatsApp (d/<slug>.html + d/img/<slug>.jpg)
+    if os.path.isdir(pd):
+        for r_, _, fs in os.walk(pd):
+            for f_ in fs:
+                if not f_.endswith('.html'): continue
+                a_ = os.path.join(r_, f_); m_ = re.search(r'src="\.\./(video/[^"]+)"', ler(a_))
+                if not m_ or os.path.normpath(m_.group(1)) not in refs: continue      # o vídeo da página tem de estar publicado
+                clonar(a_, os.path.join(destino, os.path.relpath(a_, origem)))
+                for suf_ in ('.jpg', '-capa.jpg'):      # a prévia do WhatsApp e a capa da página
+                    im_ = os.path.join(pd, 'img', f_[:-5] + suf_)
+                    if os.path.exists(im_): clonar(im_, os.path.join(destino, 'd', 'img', f_[:-5] + suf_))
 
 def logo_svg(origem):
     try:
