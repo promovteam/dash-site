@@ -22,6 +22,7 @@ JS_INI, JS_FIM = '<!-- 🎤 apresentacao-spark:script:inicio -->', '<!-- apresen
 
 NAV = NAV_INI + '''
   <a class="nav-item" id="nav-apres-spark" href="apresentacao-spark/" target="_blank" rel="noopener" style="display:none;text-decoration:none;" title="Abre a apresentação do closer (Spark) numa aba nova"><span class="nav-icon" aria-hidden="true">🎤</span><span class="nav-label">Apresentação do closer</span></a>
+  <a class="nav-item" id="nav-acervo-cases" href="apresentacao-spark/?acervo" target="_blank" rel="noopener" style="display:none;text-decoration:none;" title="Abre o acervo de cases (perfil, prints e depoimentos, com o link para copiar e mandar ao lead) numa aba nova"><span class="nav-icon" aria-hidden="true">📚</span><span class="nav-label">Acervo de cases</span></a>
   ''' + NAV_FIM
 
 JS = JS_INI + '''
@@ -38,10 +39,21 @@ JS = JS_INI + '''
       return typeof CLOSERS !== 'undefined' && CLOSERS.some(function (c) { return c.key === p; });
     } catch (e) { return false; }
   }
+  // 📚 ACERVO DE CASES (Bruno 26/10/2026: "coloca à disposição dos SDRs esse acervo de cases" · "só o acervo"):
+  // abre a apresentação no modo só acervo (?acervo). Para administradores, closers, SDRs e social selling (RL_FUNCOES).
+  function podeAcervo() {
+    try {
+      if (pode()) return true;
+      var lg = localStorage.getItem('v2Login'); if (!lg) return false;
+      var p = String(lg).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/)[0];
+      var f = (typeof RL_FUNCOES !== 'undefined' && RL_FUNCOES[p]) || [];
+      return f.indexOf('sdr') >= 0 || f.indexOf('ss') >= 0 || f.indexOf('closer') >= 0;
+    } catch (e) { return false; }
+  }
   function apsMenu() {
-    var it = document.getElementById('nav-apres-spark'); if (!it) return;
-    if (location.protocol === 'file:') it.href = 'https://promovteam.github.io/dash-site/apresentacao-spark/';
-    it.style.display = pode() ? '' : 'none';
+    var it = document.getElementById('nav-apres-spark'), ac = document.getElementById('nav-acervo-cases');
+    if (it) { if (location.protocol === 'file:') it.href = 'https://promovteam.github.io/dash-site/apresentacao-spark/'; it.style.display = pode() ? '' : 'none'; }
+    if (ac) { if (location.protocol === 'file:') ac.href = 'https://promovteam.github.io/dash-site/apresentacao-spark/?acervo'; ac.style.display = podeAcervo() ? '' : 'none'; }
   }
   window.apsMenu = apsMenu;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apsMenu); else apsMenu();
@@ -99,12 +111,12 @@ def main():
     if v == RX_VERSAO.search(antes).group(1): v += 'a'
     depois = RX_VERSAO.sub("var VERSAO_DASH = '%s';" % v, depois, count=1)
     if so_conferir:
-        print('remendo do dash: aplicaria o item "🎤 Apresentação do closer" e subiria a versão para %s' % v); return
+        print('remendo do dash: aplicaria os itens "🎤 Apresentação do closer" e "📚 Acervo de cases" e subiria a versão para %s' % v); return
     tmp = arq + '.tmp-aps'
     with open(tmp, 'w', encoding='utf-8') as f: f.write(depois)
     os.replace(tmp, arq)
     with open(os.path.join(os.path.dirname(os.path.abspath(arq)), 'versao.txt'), 'w') as f: f.write(v)
-    print('remendo do dash: item "🎤 Apresentação do closer" no menu · versão %s' % v)
+    print('remendo do dash: itens "🎤 Apresentação do closer" e "📚 Acervo de cases" no menu · versão %s' % v)
 
 if __name__ == '__main__':
     main()
