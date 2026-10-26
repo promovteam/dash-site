@@ -137,7 +137,7 @@ if [ "$L" != "$O" ]; then
   fi
 fi
 D="$S/apresentacao-spark"; mkdir -p "$D"
-for x in index.html css fontes img video js; do rm -rf "$D/$x"; done
+for x in index.html css fontes img video js d; do rm -rf "$D/$x"; done      # 25/10: d = as páginas dos depoimentos (WhatsApp)
 for x in "$TMP/apresentacao-spark/"*; do b=$(basename "$x"); rm -rf "$D/$b"; mv "$x" "$D/" || parar "não consegui copiar $b para o site."; done
 if [ ! "$AQUI" -ef "$D" ]; then cp "$AQUI/gerar.py" "$AQUI/remendo-dash.py" "$AQUI/publicar.sh" "$D/"; [ -f "$AQUI/remendo-lead.py" ] && cp "$AQUI/remendo-lead.py" "$D/" || parar "não consegui copiar os scripts."; fi
 python3 -I "$AQUI/remendo-dash.py" "$S/index.html" || parar "o remendo do dash não entrou (o dash não foi mexido)."
@@ -146,7 +146,7 @@ if [ -f "$AQUI/remendo-lead.py" ]; then python3 -I "$AQUI/remendo-lead.py" "$S/i
 V=$(tr -d ' \n' < "$S/versao.txt")
 
 echo; echo "4/4 · gravando e enviando para o GitHub (os vídeos são grandes: pode levar alguns minutos)…"
-ADD=(apresentacao-spark/index.html apresentacao-spark/css apresentacao-spark/fontes apresentacao-spark/img apresentacao-spark/video
+ADD=(apresentacao-spark/index.html apresentacao-spark/css apresentacao-spark/fontes apresentacao-spark/img apresentacao-spark/video apresentacao-spark/d
      apresentacao-spark/gerar.py apresentacao-spark/publicar.sh apresentacao-spark/remendo-dash.py apresentacao-spark/remendo-lead.py index.html versao.txt)
 G add -A -- "${ADD[@]}" || parar "o git não conseguiu juntar os arquivos."
 if G diff --cached --quiet; then echo "nada mudou desde a última publicação."; else
