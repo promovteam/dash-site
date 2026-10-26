@@ -444,7 +444,7 @@ def pagina_porta(cifrado, sal, iv, iteracoes, logo):
 # ======================================================================================
 def conferir_sem_segredo(destino, dados_js, html):
     """nenhum preço nem texto dos slides em arquivo de texto da pasta pronta"""
-    proibidos = {'R$', '1.997', '3.000', '87.500', '23.964', '1.084', '1.597', '299,70'}
+    proibidos = {'R$', '1.997', '3.000', '87.500', '23.964', '1.084', '1.197', '1.597', '1.697', '299,70'}
     proibidos |= set(v for v in re.findall(r'"([^"\n]*\d[^"\n]*)"', dados_js) if 'R$' in v)
     try:
         dj = json.loads(re.search(r'<script type="application/json" id="dados-slides">(.*?)</script>', html, re.S).group(1))
