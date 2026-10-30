@@ -6,6 +6,8 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>Treinamentos Promov</title>
+<meta property="og:title" content="Treinamentos Promov">
+<meta property="og:description" content="Seus treinamentos liberados pela equipe Promov.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
@@ -63,6 +65,10 @@ body{font-family:var(--corpo);color:var(--txt);min-height:100vh;
 .btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .leitor{background:var(--panel);border:1px solid var(--linha);border-radius:var(--r);overflow:hidden}
 .leitor iframe{display:block;width:100%;height:max(560px,calc(100vh - 230px));border:0;background:#fff}
+.paginas{display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px;background:#22252c;max-height:max(560px,calc(100vh - 230px));overflow:auto}
+.paginas .pag{width:100%;max-width:900px;background:#fff;border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.35);position:relative}
+.paginas canvas{display:block;width:100%;height:auto;border-radius:6px}
+.paginas .pag span{position:absolute;right:10px;bottom:8px;font-size:11px;color:#666;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px}
 .curso{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
 .palco{display:flex;flex-direction:column;gap:14px;min-width:0}
 .video{position:relative;aspect-ratio:16/9;width:100%;border-radius:var(--r);overflow:hidden;background:#000;border:1px solid var(--linha)}
@@ -92,7 +98,7 @@ body{font-family:var(--corpo);color:var(--txt);min-height:100vh;
   @keyframes entra{from{opacity:.001;transform:translateY(10px)}to{opacity:1;transform:none}}}
 @media (prefers-reduced-motion:reduce){.carregando i{animation:none}}
 @media (max-width:880px){.curso{grid-template-columns:1fr}.lista{position:static;max-height:none}}
-@media (max-width:520px){.marca span{display:none}.leitor iframe{height:calc(100vh - 200px);min-height:460px}}
+@media (max-width:520px){.marca span{display:none}.leitor iframe{height:calc(100vh - 200px);min-height:460px}.paginas{padding:10px;max-height:calc(100vh - 190px)}}
 </style>
 </head>
 <body>
@@ -110,6 +116,7 @@ body{font-family:var(--corpo);color:var(--txt);min-height:100vh;
     ok: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>'
   };
   var pg = document.getElementById('pg');
+  var PASTA = 'mentorado/';
   var D = null, K = null, SLUG = '', ANEXO = {}, ESTADO = { tela: 'inicio', aula: 0 };
 
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
@@ -127,7 +134,7 @@ body{font-family:var(--corpo);color:var(--txt);min-height:100vh;
   }
   function b64url(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
   function abrirArquivo(nome) {
-    return fetch('mentorado/' + nome, { cache: 'no-store' }).then(function (r) {
+    return fetch(PASTA + nome, { cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw new Error('fora');
       return r.arrayBuffer();
     }).then(function (buf) {
@@ -186,11 +193,11 @@ body{font-family:var(--corpo);color:var(--txt);min-height:100vh;
     var car = el('div', 'carregando'); car.style.padding = '30px'; car.append(el('i'), document.createTextNode('Abrindo o material…')); box.append(car);
     pg.append(cab, box, rodape());
     window.scrollTo(0, 0);
-    obterAnexo(t).then(function (url) {
+    obterAnexo(t).then(function (an) {
       if (ESTADO.tela !== id) return;
-      var f = el('iframe'); f.title = t.nome; f.src = url;
-      if (t.formato === 'html') f.setAttribute('sandbox', 'allow-scripts allow-popups');
-      box.replaceChildren(f);
+      var url = an.url;
+      if (t.formato === 'pdf') desenharPdf(an.buf, box);
+      else { var f = el('iframe'); f.title = t.nome; f.srcdoc = new TextDecoder().decode(an.buf); box.replaceChildren(f); }
       var a1 = el('a', 'btn forte'); a1.href = url; a1.target = '_blank'; a1.rel = 'noopener'; a1.innerHTML = IC.abrir; a1.append(document.createTextNode('Abrir em tela cheia'));
       ac.replaceChildren(a1);
       if (t.formato === 'pdf') { var a2 = el('a', 'btn'); a2.href = url; a2.download = t.nome + '.pdf'; a2.innerHTML = IC.baixar; a2.append(document.createTextNode('Baixar PDF')); ac.append(a2); }
@@ -200,7 +207,42 @@ body{font-family:var(--corpo);color:var(--txt);min-height:100vh;
     if (ANEXO[t.anexo]) return Promise.resolve(ANEXO[t.anexo]);
     return abrirArquivo(SLUG + '-' + t.anexo + '.bin').then(function (buf) {
       var tipo = t.formato === 'pdf' ? 'application/pdf' : 'text/html;charset=utf-8';
-      return (ANEXO[t.anexo] = URL.createObjectURL(new Blob([buf], { type: tipo })));
+      return (ANEXO[t.anexo] = { buf: buf, url: URL.createObjectURL(new Blob([buf], { type: tipo })) });
+    });
+  }
+  // PDF página a página com o pdf.js (o mesmo do dash): abre igual no celular, no computador e em qualquer navegador
+  var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  function pdfjs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    return new Promise(function (ok, erro) {
+      var s = document.createElement('script'); s.src = PDFJS + 'pdf.min.js';
+      s.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(window.pdfjsLib); };
+      s.onerror = erro; document.head.appendChild(s);
+    });
+  }
+  function desenharPdf(buf, box) {
+    pdfjs().then(function (lib) { return lib.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise; }).then(function (pdf) {
+      var lista = el('div', 'paginas'); box.replaceChildren(lista);
+      var feitas = {}, obs = null;
+      function desenhar(n, caixa) {
+        if (feitas[n]) return; feitas[n] = 1;
+        pdf.getPage(n).then(function (pag) {
+          var larg = Math.max(320, caixa.clientWidth || 800), v1 = pag.getViewport({ scale: 1 });
+          var esc = (larg / v1.width) * Math.min(2, window.devicePixelRatio || 1), vp = pag.getViewport({ scale: esc });
+          var c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+          caixa.style.aspectRatio = ''; caixa.prepend(c);
+          return pag.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        }).catch(function () { feitas[n] = 0; });
+      }
+      if ('IntersectionObserver' in window) obs = new IntersectionObserver(function (ents) { ents.forEach(function (e) { if (e.isIntersecting) desenhar(+e.target.dataset.n, e.target); }); }, { root: lista, rootMargin: '600px 0px' });
+      for (var n = 1; n <= pdf.numPages; n++) {
+        var caixa = el('div', 'pag'); caixa.dataset.n = n; caixa.style.aspectRatio = '210 / 297';
+        caixa.append(el('span', null, n + ' / ' + pdf.numPages));
+        lista.append(caixa);
+        if (obs) obs.observe(caixa); else desenhar(n, caixa);
+      }
+    }).catch(function () {
+      var f = el('iframe'); f.title = 'Manual'; f.src = ANEXO.closer ? ANEXO.closer.url : ''; box.replaceChildren(f);   // sem o pdf.js: o leitor do próprio navegador
     });
   }
 
@@ -261,13 +303,20 @@ body{font-family:var(--corpo);color:var(--txt);min-height:100vh;
   // ---------- entrada: o link traz #pessoa.chave ----------
   var h = (location.hash || '').slice(1);
   if (!h) { h = ler('mnt:ultimo', ''); if (h) { try { history.replaceState(null, '', '#' + h); } catch (e) {} } }
-  var partes = h.split('.');
+  var curto = h && h.indexOf('.') < 0;
+  var partes = curto ? ['', h] : h.split('.');
   SLUG = (partes[0] || '').replace(/[^a-z0-9-]/g, '');
-  if (!SLUG || !partes[1] || !window.crypto || !crypto.subtle) {
+  if ((!curto && !SLUG) || !partes[1] || !window.crypto || !crypto.subtle) {
     aviso('Link incompleto', 'Abra o link exatamente como você recebeu, com tudo o que vem depois do #. Se o problema continuar, peça um novo link para a equipe da Promov.');
     return;
   }
-  crypto.subtle.importKey('raw', b64url(partes[1]), 'AES-GCM', false, ['decrypt']).then(function (k) {
+  var bruta;
+  try { bruta = b64url(partes[1]); } catch (e) { bruta = new Uint8Array(0); }
+  (curto ? crypto.subtle.digest('SHA-256', bruta).then(function (d) {
+    SLUG = Array.prototype.map.call(new Uint8Array(d).slice(0, 5), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  }) : Promise.resolve()).then(function () {
+    return crypto.subtle.importKey('raw', bruta, 'AES-GCM', false, ['decrypt']);
+  }).then(function (k) {
     K = k;
     return abrirArquivo(SLUG + '.bin');
   }).then(function (buf) {
