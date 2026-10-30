@@ -154,6 +154,23 @@ textarea.campo{min-height:180px;resize:vertical;line-height:1.45;font-size:13px}
 .lst li small{display:block;color:var(--txt2);font-size:12.5px;margin-top:3px}
 .av-item{font:inherit;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--linha);border-radius:12px;padding:10px 12px}
 .av-item:hover{border-color:rgba(246,163,80,.45)}
+.spin{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:12px}
+.sp{background:var(--panel2);border:1px solid var(--linha);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.sp-top{display:flex;align-items:center;gap:10px}
+.sp-l{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:20px;color:#1a1206}
+.sp-top b{font-size:14px;flex:1}
+.sp-top span{font-family:var(--display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.sp small.o{color:var(--mudo);font-size:11.5px;line-height:1.35}
+.sp .tr{height:6px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden}
+.sp .tr i{display:block;height:100%;border-radius:6px}
+.sp h4{margin:4px 0 0;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);font-weight:600}
+.sp ul{margin:0;padding-left:16px;display:flex;flex-direction:column;gap:4px;font-size:13px;line-height:1.45}
+.sp ul.q li{color:var(--txt)}
+.sp ul.p li{color:var(--ambar2)}
+.sp p{margin:0;font-size:13px;color:var(--txt2);line-height:1.45}
+.dicas{border-color:rgba(246,163,80,.5);background:linear-gradient(180deg,rgba(246,163,80,.08),var(--panel))}
+.dicas ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:14.5px;line-height:1.5}
+.dicas ol li em{display:block;font-style:normal;color:var(--ambar2);margin-top:2px}
 .av-item .ir{color:var(--ambar);font-weight:600;font-size:13px}
 .av-item .nb{font-family:var(--display);font-weight:800;font-size:28px;text-align:center;font-variant-numeric:tabular-nums}
 @media (max-width:520px){.nota-box{grid-template-columns:1fr;gap:10px}.bl{grid-template-columns:1fr 34px}.bl .tr{grid-column:1/-1;grid-row:2}}
@@ -260,7 +277,7 @@ textarea.campo{min-height:180px;resize:vertical;line-height:1.45;font-size:13px}
   var TAREFAS = [
     { k: 'leads', aba: 'leads', t: function (m) { return 'Fale com ' + m + ' possíveis leads usando o método'; }, s: 'Qualifique pelo passo a passo do Manual do SDR e registre cada conversa.', conta: function (e) { return e.leads.length; } },
     { k: 'reunioes', aba: 'reunioes', t: function (m) { return m === 1 ? 'Faça 1 reunião' : 'Faça ' + m + ' reuniões'; }, s: 'Conduza pelo Manual do Closer e registre o resultado de cada uma.', conta: function (e) { return e.reunioes.filter(function (r) { return r.resultado !== 'Não apareceu'; }).length; } },
-    { k: 'avaliacoes', aba: 'avaliar', t: function (m) { return m === 1 ? 'Avalie 1 reunião' : 'Avalie ' + m + ' reuniões'; }, s: 'Cole a transcrição e receba a nota pela régua da Promov.', conta: function (e) { return e.avaliacoes.length; } }
+    { k: 'avaliacoes', aba: 'avaliar', t: function (m) { return m === 1 ? 'Avalie 1 reunião' : 'Avalie ' + m + ' reuniões'; }, s: 'Cole a transcrição e receba nota, SPIN e dicas para a próxima.', conta: function (e) { return e.avaliacoes.length; } }
   ];
   function painelTarefas() {
     var box = el('section', 'missoes entra'), lt = el('div', 'linha-t'), st = el('span', null, 'Carregando…'), g = el('div', 'mgrid');
@@ -386,7 +403,7 @@ textarea.campo{min-height:180px;resize:vertical;line-height:1.45;font-size:13px}
   function blocoAvaliar(pre) {
     var e = MNT, b = el('div', 'blk'), res = el('div'), tit = el('h2', null, 'Avaliar uma reunião · ' + e.avaliacoes.length + ' de ' + e.metas.avaliacoes);
     b.append(tit,
-      el('p', 'dica', 'Cole a transcrição inteira da reunião, com o nome de quem fala. No Google Meet, ligue a transcrição antes de começar (o texto chega no seu e-mail). No Zoom, use a gravação na nuvem com transcrição. Ferramentas como tl;dv, Tactiq e Fathom também geram o texto. A nota usa a mesma régua das reuniões da Promov.'));
+      el('p', 'dica', 'Cole a transcrição inteira da reunião, com o nome de quem fala. No Google Meet, ligue a transcrição antes de começar (o texto chega no seu e-mail). No Zoom, use a gravação na nuvem com transcrição. Ferramentas como tl;dv, Tactiq e Fathom também geram o texto. A avaliação olha as suas perguntas (SPIN), as etapas da venda e traz dicas para a próxima. Você pode avaliar até ' + (e.metas.limite || 10) + ' reuniões; já usou ' + e.avaliacoes.length + '.'));
     var f = el('div', 'form'), a = campo('Lead'), rs = campo('Resultado', 'select', e.opcoes.resultados.filter(function (r) { return r !== 'Não apareceu'; })), tx = campo('Transcrição da reunião', 'textarea', null, true);
     a.c.maxLength = 80; tx.c.placeholder = 'Cole aqui o texto da reunião…';
     if (pre) { a.c.value = pre.lead || ''; if (pre.resultado) rs.c.value = pre.resultado; }
@@ -424,23 +441,42 @@ textarea.campo{min-height:180px;resize:vertical;line-height:1.45;font-size:13px}
       var nb = el('div', 'nota-box'), big = el('div', 'nota-big'); big.append(document.createTextNode(virgula(n.fin)), el('small', null, ' /10')); big.style.color = corNota(+n.fin);
       var r = el('div', 'r'), l1 = el('div'); l1.append(document.createTextNode('Condução '), el('b', null, virgula(n.cond) + ' de 10'), document.createTextNode(' · reunião com ' + (x.lead || 'o lead') + (x.resultado ? ' · ' + x.resultado.toLowerCase() : '')));
       r.append(l1);
-      if (n.motivo) r.append(el('div', null, n.motivo));
+      if (n.resumo) r.append(el('div', null, n.resumo));
       if (n.virada) r.append(el('div', null, 'O que mais pesou para o sim: ' + n.virada));
       if (n.perdeu) r.append(el('div', null, 'Onde a venda escapou: ' + n.perdeu + (n.frase_perdeu ? ' ("' + n.frase_perdeu + '")' : '')));
       nb.append(big, r); out.append(nb);
+      function lista(tit, itens, fmt, cls) { var c = el('div', 'blk' + (cls ? ' ' + cls : '')), u = el('ul', 'lst'); c.append(el('h2', null, tit)); if (!itens || !itens.length) u.append(el('li', null, '—')); (itens || []).forEach(function (i) { u.append(fmt(i)); }); c.append(u); return c; }
+      if (n.dicas && n.dicas.length) {
+        var dc = el('div', 'blk dicas'), ol = el('ol'); dc.append(el('h2', null, 'Para a próxima reunião'));
+        n.dicas.forEach(function (d) { var li = el('li', null, d.d); if (d.f) li.append(el('em', null, '"' + d.f + '"')); ol.append(li); });
+        dc.append(ol); out.append(dc);
+      }
+      if (n.spin) {
+        var sc = el('div', 'blk'), gr = el('div', 'spin'), CORES = ['#6ea8ff', '#f6a350', '#ff6b6b', '#3ddc97'];
+        sc.append(el('h2', null, 'Perguntas · SPIN'), el('p', 'dica', 'As quatro perguntas que fazem o lead se convencer sozinho: situação, problema, implicação e necessidade de solução.'));
+        (MNT.spin || []).forEach(function (B, i) {
+          var v = n.spin[B[0]] || {}, c = el('div', 'sp'), top = el('div', 'sp-top'), L = el('div', 'sp-l', B[1].charAt(0));
+          L.style.background = CORES[i];
+          var nn = el('span', null, virgula(v.n)); nn.style.color = corNota(+v.n);
+          top.append(L, el('b', null, B[1]), nn);
+          var trk = el('div', 'tr'), fill = el('i'); fill.style.width = Math.max(3, (+v.n || 0) * 10) + '%'; fill.style.background = corNota(+v.n); trk.append(fill);
+          c.append(top, el('small', 'o', B[3]), trk);
+          c.append(el('h4', null, 'Você perguntou'));
+          if (v.q && v.q.length) { var uq = el('ul', 'q'); v.q.forEach(function (q) { uq.append(el('li', null, '"' + q + '"')); }); c.append(uq); } else c.append(el('p', null, 'Nenhuma pergunta deste tipo.'));
+          if (v.c) c.append(el('p', null, v.c));
+          if (v.p && v.p.length) { c.append(el('h4', null, 'Poderia perguntar')); var up = el('ul', 'p'); v.p.forEach(function (q) { up.append(el('li', null, q)); }); c.append(up); }
+          gr.append(c);
+        });
+        sc.append(gr); out.append(sc);
+      }
       var bls = el('div', 'bls');
-      (MNT.blocos || []).forEach(function (B) {
-        var v = (n.bl || {})[B[0]], row = el('div', 'bl'), nm = el('div', 'nm', B[1]); nm.append(el('small', null, B[3]));
+      (MNT.etapas || []).forEach(function (B) {
+        var v = ((n.et || {})[B[0]] || {}).n, cm = ((n.et || {})[B[0]] || {}).c, row = el('div', 'bl'), nm = el('div', 'nm', B[1]); nm.append(el('small', null, cm || B[3]));
         var trk = el('div', 'tr'), fill = el('i'); fill.style.width = v == null ? '0' : Math.max(3, v * 10) + '%'; fill.style.background = corNota(v); trk.append(fill);
         row.append(nm, trk, el('div', 'n', v == null ? '—' : virgula(v))); bls.append(row);
       });
-      var cb = el('div', 'blk'); cb.append(el('h2', null, 'Etapa por etapa'), bls); out.append(cb);
-      var duas = el('div', 'duas');
-      function lista(tit, itens, fmt) { var c = el('div', 'blk'), u = el('ul', 'lst'); c.append(el('h2', null, tit)); if (!itens || !itens.length) u.append(el('li', null, '—')); (itens || []).forEach(function (i) { u.append(fmt(i)); }); c.append(u); return c; }
-      duas.append(lista('O que você fez bem', n.feitos, function (i) { return el('li', null, i); }), lista('O que faltou', n.falt, function (i) { return el('li', null, i); }));
-      out.append(duas);
-      if (n.erros && n.erros.length) out.append(lista('Onde dava para fazer diferente', n.erros, function (i) { var li = el('li', null, i.f || ''); if (i.s) { var s = el('small'); s.append(document.createTextNode(i.f ? 'Poderia ter dito: ' : 'Você poderia ter dito: '), el('em', null, i.s)); li.append(s); } return li; }));
-      if (n.obj && n.obj.length) out.append(lista('Objeções', n.obj, function (o) { var li = el('li'); li.append(el('em', null, o.tp + (o.fl ? ': "' + o.fl + '"' : ''))); li.append(el('small', null, (o.ct || '') + (o.ok === true ? ' · resolveu' : o.ok === false ? ' · não resolveu' : ''))); return li; }));
+      var cb = el('div', 'blk'); cb.append(el('h2', null, 'As outras etapas'), bls); out.append(cb);
+      if (n.obj && n.obj.length) out.append(lista('Objeções', n.obj, function (o) { var li = el('li'); li.append(el('em', null, (o.tp || 'Objeção') + (o.fl ? ': "' + o.fl + '"' : ''))); li.append(el('small', null, (o.ct || '') + (o.ok === true ? ' · resolveu' : o.ok === false ? ' · não resolveu' : ''))); return li; }));
       if (n.fr && n.fr.length) out.append(lista('Frases que funcionaram', n.fr, function (f2) { var li = el('li'); li.append(el('em', null, '"' + f2.frase + '"')); if (f2.efeito) li.append(el('small', null, f2.efeito)); return li; }));
       res.replaceChildren(out);
       res.scrollIntoView({ behavior: 'smooth', block: 'start' });
