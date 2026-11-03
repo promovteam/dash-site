@@ -2937,7 +2937,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-03-0833';
+var VERSAO_DASH = '2026-11-03-1549';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -32858,19 +32858,19 @@ function _cmBotaoAtu(rot) {
 function _cmEhBonus(desc) { return /\bb[oô]nus\b|meta do time|meta de \d|meta extraordin/i.test(String(desc || '')); }
 function _cmExtrasItens(p) {
   var it = [];
-  (p.linhas || []).forEach(function(l) { if (l.t === 'extra') it.push({ d: String(l.n || l.p || 'Extra'), v: +l.c || 0 }); });
+  (p.linhas || []).forEach(function(l) { if (l.t === 'extra' && !_cmEhGestLinha(l.p || l.n)) it.push({ d: String(l.n || l.p || 'Extra'), v: +l.c || 0 }); });
   (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { it.push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
   return it.filter(function(x) { return Math.abs(x.v) >= 0.005; });
 }
 function _cmExtrasDe(p) {
-  var o = { bonus: 0, extra: 0, temLinhas: false };
-  (p.linhas || []).forEach(function(l) { if (l.t !== 'extra') return; o.temLinhas = true; var v = +l.c || 0; if (_cmEhBonus(l.n || l.p)) o.bonus += v; else o.extra += v; });
+  var o = { bonus: 0, extra: 0, gest: 0, temLinhas: false };
+  (p.linhas || []).forEach(function(l) { if (l.t !== 'extra') return; o.temLinhas = true; var v = +l.c || 0; if (_cmEhGestLinha(l.p || l.n)) o.gest += v; else if (_cmEhBonus(l.n || l.p)) o.bonus += v; else o.extra += v; });
   (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { o.temLinhas = true; var v = +x.v || 0; if (_cmEhBonus(x.d)) o.bonus += v; else o.extra += v; });
   return o;
 }
 function _cmCardCloser(p, cor, premios, mes, i, pos) {
-  var EX = _cmExtrasDe(p), comV = (+p.comissao || 0) - EX.extra - EX.bonus;
-  var GB = p._gest && !p._gestNaPlan ? p._gest : null, compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', comV, '#3ddc97'], ['Extras', EX.extra + EX.bonus, '#5eead4'], ['Prêmio', p.premio, '#ffd166']].concat(GB ? [['Gestão', GB.gest, '#b98aff'], ['Bônus do time', GB.bonus, '#ffb347']] : []).filter(function(x){ return x[1] > 0; });
+  var EX = _cmExtrasDe(p), comV = (+p.comissao || 0) - EX.extra - EX.bonus - EX.gest;
+  var GB = p._gest && !p._gestNaPlan ? p._gest : null, compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', comV, '#3ddc97'], ['Extras', EX.extra + EX.bonus, '#5eead4'], ['Gestão', EX.gest, '#ffb347'], ['Prêmio', p.premio, '#ffd166']].concat(GB ? [['Gestão', GB.gest, '#b98aff'], ['Bônus do time', GB.bonus, '#ffb347']] : []).filter(function(x){ return x[1] > 0; });
   var lider = pos === 1 && p.total > 0, pm = p.recebido ? p.comissao / p.recebido : 0;
   var h = '<div class="cm-card cm-clica cm-entra' + (lider ? ' cm-lider' : '') + '" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'closers\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as vendas do mês">'
     + _cmBotaoAtu()
@@ -32892,12 +32892,12 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
       + '<div class="cm-marcas">' + vis.map(function(t){ return '<span class="' + (p.meta >= t[0] ? 'ok' : '') + '" style="left:' + _cmPct(t[0] / topo) + '">' + cmMil(t[0]) + '</span>'; }).join('') + '</div>'
       + '<div class="cm-dica">' + (prox ? 'Faltam <b>' + cmR(prox[0] - p.meta, false) + '</b> para o prêmio de <b>' + cmR(prox[1], false) + '</b>.' : '🎉 Bateu a faixa mais alta do prêmio.') + '</div></div>';
   }
-  var partes = (p.partes || []).filter(function(q){ return Math.abs(q.comissao) >= 0.005 && !(EX.temLinhas && /^extras/i.test(q.nome || '')); });
+  var partes = (p.partes || []).filter(function(q){ return Math.abs(q.comissao) >= 0.005 && !(EX.temLinhas && /^(extras|gestão do time)/i.test(q.nome || '')); });
   // 03/10/2026 (Bruno: "por que não está na discriminação?"): a lista fecha com o prêmio, o fixo e o total a receber,
   // igual ao quadro "Como é a conta do mês" da planilha (antes ela só listava as partes da comissão)
   if (partes.length || p.premio > 0 || p.fixo > 0) {
     var somaP = partes.reduce(function(s, q){ return s + (+q.comissao || 0); }, 0), outros = (EX.temLinhas ? comV : (+p.comissao || 0)) - somaP;
-    var mx = Math.max.apply(null, partes.map(function(q){ return Math.abs(q.comissao); }).concat([+p.premio || 0, +p.fixo || 0, Math.abs(outros), EX.extra, EX.bonus, GB ? GB.gest : 0, GB ? GB.bonus : 0])) || 1;
+    var mx = Math.max.apply(null, partes.map(function(q){ return Math.abs(q.comissao); }).concat([+p.premio || 0, +p.fixo || 0, Math.abs(outros), EX.extra, EX.bonus, EX.gest, GB ? GB.gest : 0, GB ? GB.bonus : 0])) || 1;
     var soma = function(rot, v) { return '<div class="cm-parte cm-soma"><span>' + rot + '</span><span></span><b>' + cmR(v, false) + '</b></div>'; };
     h += '<div class="cm-bloco"><div class="cm-bloco-t"><span>De onde veio o total</span><span>valor</span></div><div class="cm-partes">'
       + partes.map(function(q){ return '<div class="cm-parte" title="Recebido ' + cmR(q.recebido) + (q.pct ? ' · ' + (q.pct * 100).toFixed(2).replace('.', ',') + '% médio' : '') + '"><span>' + dspEsc(q.nome) + '</span>' + _cmTrilho(Math.abs(q.comissao) / mx, cor) + '<b>' + cmR(q.comissao, false) + '</b></div>'; }).join('')
@@ -32905,6 +32905,7 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
       + soma(EX.temLinhas ? 'Comissões das vendas' : 'Total das comissões', EX.temLinhas ? comV : (+p.comissao || 0))
       + (EX.extra + EX.bonus > 0 ? '<div class="cm-parte"><span>⭐ Extras</span>' + _cmTrilho((EX.extra + EX.bonus) / mx, '#5eead4') + '<b>' + cmR(EX.extra + EX.bonus, false) + '</b></div>'
           + _cmExtrasItens(p).map(function(x) { return '<div class="cm-parte cm-item"><span>' + dspEsc(x.d) + '</span><span></span><b>' + cmR(x.v, false) + '</b></div>'; }).join('') : '')
+      + (EX.gest > 0 ? '<div class="cm-parte"><span>🧭 Gestão do time (1,2% + 0,6% + bônus de atingimento)</span>' + _cmTrilho(EX.gest / mx, '#ffb347') + '<b>' + cmR(EX.gest, false) + '</b></div>' : '')
       + (p.premio > 0 ? '<div class="cm-parte"><span>🏆 Prêmio pela meta</span>' + _cmTrilho(p.premio / mx, '#ffd166') + '<b>' + cmR(p.premio, false) + '</b></div>' : '')
       + (GB ? '<div class="cm-parte"><span>🧭 Gestão (1,2% diag. + 0,6% workshop)</span>' + _cmTrilho(GB.gest / mx, '#b98aff') + '<b>' + cmR(GB.gest, false) + '</b></div>' + (GB.bonus > 0 ? '<div class="cm-parte"><span>🏆 Bônus da meta do time (' + GB.tier + ')</span>' + _cmTrilho(GB.bonus / mx, '#ffb347') + '<b>' + cmR(GB.bonus, false) + '</b></div>' : '') : '')
       + (p.fixo > 0 ? '<div class="cm-parte"><span>Fixo</span>' + _cmTrilho(p.fixo / mx, '#6ea8ff') + '<b>' + cmR(p.fixo, false) + '</b></div>' : '')
@@ -32964,7 +32965,8 @@ function _cmRosca(grupos, total) {
     h += '<circle cx="59" cy="59" r="' + R + '" stroke="' + (CM_GRUPO_COR[g.k] || '#9aa3b2') + '" stroke-dasharray="0 ' + C.toFixed(1) + '" data-da="' + len.toFixed(1) + ' ' + C.toFixed(1) + '" stroke-dashoffset="' + (-ini).toFixed(1) + '"><title>' + dspEsc(g.nome) + ': ' + cmR(t) + '</title></circle>';
     ini += fr * C;
   });
-  var n = grupos.reduce(function(s, g){ return s + g.pessoas.length; }, 0);
+  var vistos = {}; grupos.forEach(function(g){ g.pessoas.forEach(function(p){ vistos[String(p.nome || '').replace(/\s*\(.*\)$/, '').toLowerCase()] = 1; }); });
+  var n = Object.keys(vistos).length;
   return h + '</svg><div class="cm-rosca-mio"><b>' + n + '</b>pessoas</div></div>';
 }
 // ===== 🧭 PAGAMENTO DO BRUNO — regra a partir de outubro/2026 (combinada em 17/10/2026) =====
@@ -33043,6 +33045,82 @@ function _cmGestaoHtml(p, cor) {
     + (p._gestNaPlan ? '✅ A planilha de comissões já tem essas linhas (o robô refaz a cada hora); esta conta do dash é a conferência.' : 'Conta feita no dash: a planilha de comissões ainda mostra a regra antiga (' + cmR(p._plan ? p._plan.total : 0) + ').') + (G.wsOk ? '' : ' ⏳ lendo o app do workshop…') + '</div></div>';
   return h;
 }
+// ===== 🧭⭐ FOLHA EM PARTES (03/11/2026) =====
+// Bruno: "sobre o meu divida gestão em um, closer e extras" · "coloque um somente de extras" · "diferentes: gestor — closers junto
+// com outros — extras junto com outros". Na visão do adm: 🧭 Gestão (fixo do Bruno + 1,2% + 0,6% + bônus do time), 🤝 Closers (só
+// as vendas; o cartão do Bruno mostra só a comissão das vendas dele), 📞 SDR, 📱 Social Selling e ⭐ Extras (dias de workshop,
+// plantões, encontros e bônus de todo mundo junto, fora do cartão de cada um). O total da folha não muda.
+CM_GRUPO_COR.gestao = '#ffb347'; CM_GRUPO_COR.extras = '#5eead4';
+var CM_GRUPO_ICO = { closers: '🤝', sdr: '📞', ss: '📱', gestao: '🧭', extras: '⭐' };
+function _cmEhGestLinha(desc) { return /^(Gestão do time|Bônus de atingimento do time)/i.test(String(desc || '')); }
+function _cmVisaoAdm(d) {
+  var gest = [], ext = [], soma = function(L) { return L.reduce(function(s, x) { return s + (+x.v || 0); }, 0); };
+  var copia = function(o) { var c = {}; Object.keys(o).forEach(function(k) { c[k] = o[k]; }); return c; };
+  var grupos = d.grupos.map(function(g) {
+    var g2 = copia(g);
+    g2.pessoas = g.pessoas.map(function(p) {
+      var q = copia(p), itens = [], gl = [];
+      if (g.k === 'closers') {
+        (p.linhas || []).forEach(function(l) {
+          if (l.t !== 'extra') return;
+          var ds = String(l.p || l.n || 'Extra');
+          if (_cmEhGestLinha(ds)) gl.push({ d: ds, v: +l.c || 0 }); else itens.push({ d: String(l.n || l.p || 'Extra'), v: +l.c || 0 });
+        });
+        (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { itens.push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
+        var sx = soma(itens), sg = soma(gl);
+        q.linhas = (p.linhas || []).filter(function(l) { return l.t !== 'extra'; }); q.extras = [];
+        q.partes = (p.partes || []).filter(function(x) { return !/^(extras|gestão do time)/i.test(x.nome || ''); });
+        q.comissao = (+p.comissao || 0) - sx - sg;
+        if (p._plan) {   // o Bruno: o cartão de closer fica só com as vendas dele; o resto vai para Gestão e Extras
+          q._plan = null; q._gest = null; q._soVendas = true; q.fixo = 0; q.premio = 0; q.ganhaPremio = false; q.total = q.comissao;
+          gest.push({ nome: p.nome, aba: p.aba, _src: p, fixo: +p.fixo || 0, linhas: gl, total: (+p.total || 0) - q.comissao - sx });
+        } else q.total = (+p.total || 0) - sx;
+      } else {
+        (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { itens.push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
+        if (!itens.length && +p.bonus > 0) itens.push({ d: 'Bônus', v: +p.bonus });
+        var sp = soma(itens);
+        q.extras = []; q.bonus = 0; q.variavel = (+p.variavel || 0) - sp; q.total = (+p.total || 0) - sp;
+      }
+      itens = itens.filter(function(x) { return Math.abs(x.v) >= 0.005; });
+      if (itens.length) ext.push({ nome: p.nome, aba: p.aba, papel: p._plan ? 'Gestor' : g.k === 'closers' ? 'Closer' : g.nome, itens: itens, total: soma(itens) });
+      return q;
+    });
+    return g2;
+  });
+  var out = [];
+  if (gest.length) out.push({ k: 'gestao', nome: 'Gestão', pessoas: gest });
+  out = out.concat(grupos);
+  if (ext.length) out.push({ k: 'extras', nome: 'Extras', pessoas: ext });
+  return out;
+}
+function _cmCardGestor(x, cor, i) {
+  var p = x._src, G = p._gest, naPlan = !!p._gestNaPlan;
+  var val = function(re) { return x.linhas.filter(function(l) { return re.test(l.d); }).reduce(function(s, l) { return s + l.v; }, 0); };
+  var vN = naPlan ? val(/1,2%/) : (G ? G.gD : 0), vW = naPlan ? val(/0,6%/) : (G ? G.gW : 0), vB = naPlan ? val(/^Bônus de atingimento/i) : (G ? G.bonus : 0);
+  var compo = [['Fixo', x.fixo, '#6ea8ff'], ['1,2% vendas normais', vN, '#b98aff'], ['0,6% workshop e ILD', vW, '#8c6bff'], ['Bônus do time', vB, '#ffb347']].filter(function(c) { return c[1] > 0; });
+  var mx = Math.max(x.fixo, vN, vW, vB) || 1;
+  var par = function(rot, v, c) { return '<div class="cm-parte"><span>' + rot + '</span>' + _cmTrilho(v / mx, c) + '<b>' + cmR(v, false) + '</b></div>'; };
+  return '<div class="cm-card cm-entra" style="--i:' + i + ';--cm-cor:' + cor + ';">'
+    + _cmBotaoAtu()
+    + '<div class="cm-pessoa">' + _cmAvatar(p.nome, cor, 52, '') + '<div class="cm-nome"><b>' + dspEsc(p.nome) + '</b><small>gestor do time</small></div>'
+    + '<div class="cm-valor"><b>' + _cmNum(x.total) + '</b><small>a receber como gestor</small></div></div>'
+    + _cmCompo(compo)
+    + _cmGestaoHtml(p, cor)
+    + '<div class="cm-bloco"><div class="cm-bloco-t"><span>De onde veio o total</span><span>valor</span></div><div class="cm-partes">'
+    + par('🩺 1,2% das vendas normais', vN, '#b98aff') + par('🎓 0,6% do workshop e ILD', vW, '#8c6bff')
+    + (vB > 0 ? par('🏆 Bônus de atingimento do time' + (G && G.tier ? ' (' + G.tier + ')' : ''), vB, '#ffb347') : '')
+    + (x.fixo > 0 ? par('Fixo', x.fixo, '#6ea8ff') : '')
+    + '<div class="cm-parte cm-soma"><span>Total como gestor</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div></div>';
+}
+function _cmCardExtras(x, cor, i) {
+  var mx = Math.max.apply(null, x.itens.map(function(it) { return Math.abs(it.v); })) || 1;
+  return '<div class="cm-card cm-entra" style="--i:' + i + ';--cm-cor:' + cor + ';">'
+    + '<div class="cm-pessoa">' + _cmAvatar(x.nome, cor, 52, '') + '<div class="cm-nome"><b>' + dspEsc(String(x.nome || '').replace(/\s*\(.*\)$/, '')) + '</b><small>' + dspEsc(x.papel) + '</small></div>'
+    + '<div class="cm-valor"><b>' + _cmNum(x.total) + '</b><small>em extras</small></div></div>'
+    + '<div class="cm-bloco"><div class="cm-partes">'
+    + x.itens.map(function(it) { var b = _cmEhBonus(it.d); return '<div class="cm-parte"><span>' + (b ? '🏆 ' : '⭐ ') + dspEsc(it.d) + '</span>' + _cmTrilho(Math.abs(it.v) / mx, b ? '#ffb347' : '#5eead4') + '<b>' + cmR(it.v, false) + '</b></div>'; }).join('')
+    + '<div class="cm-parte cm-soma"><span>Total de extras</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div></div>';
+}
 function renderComissoes() {
   var el = document.getElementById('cm-corpo'); if (!el) return;
   if (!_cmPode()) { el.innerHTML = '<div class="hint" style="padding:30px;text-align:center;">Esta tela não está liberada para o seu acesso.</div>'; return; }
@@ -33075,9 +33153,9 @@ function renderComissoes() {
   try { _cmAplicarRegraBruno(CM.dados); } catch (eRb) {}   // 03/11/2026: o pagamento do Bruno pela regra de outubro
   document.documentElement.classList.toggle('cm-so-ler', CM.dados.papel === 'dono');   // v226: o dono só olha (o robô também recusa)
   if (CM.dados.papel === 'dono') { _cmRenderDono(el, CM.dados); return; }
-  var d = CM.dados, todas = [];
-  d.grupos.forEach(function(g){ g.pessoas.forEach(function(p){ todas.push({ g: g, p: p }); }); });
-  todas.forEach(function(x, i){ x.cor = _cmPessoaCor(i); });
+  var d = CM.dados, todas = [], VG = _cmVisaoAdm(d);   // 03/11/2026: Gestão · Closers · SDR · Social Selling · Extras
+  VG.forEach(function(g){ g.pessoas.forEach(function(p){ todas.push({ g: g, p: p }); }); });
+  var corNome = {}, nCor = 0; todas.forEach(function(x){ var k = String(x.p.nome || '').replace(/\s*\(.*\)$/, '').toLowerCase(); if (!corNome[k]) corNome[k] = _cmPessoaCor(nCor++); x.cor = corNome[k]; });   // a mesma pessoa tem a mesma cor nas partes
   var corDe = function(p){ return (todas.filter(function(x){ return x.p === p; })[0] || {}).cor || '#3ddc97'; };
   window._cmCorAba = {}; todas.forEach(function(x){ window._cmCorAba[x.g.k + '|' + x.p.aba] = x.cor; });
   var aberto = !d.fechado || d.fechado < d.mes, mesHoje = new Date().toISOString().slice(0, 7);
@@ -33091,19 +33169,22 @@ function renderComissoes() {
   var selo = CM.carregando ? '<span class="cm-sync"><i></i>atualizando…</span>' : CM.aviso ? '<span class="cm-sync aviso">' + dspEsc(CM.aviso) + '</span>' : '';
   var h = '<div class="cm-topo-barra">' + seletor + selo + '</div>' + _cmAvisosHtml() + _cmContListaHtml() + '<div class="panel cm-hero cm-entra"><div class="cm-topo"><div><div class="cm-olho">Folha de comissões</div><div class="cm-mes">' + dspEsc((d.mesTxt || d.mes).replace(/^\w/, function(c){ return c.toUpperCase(); })) + '</div>' + status
     + '<div class="cm-resumo"><b>' + nVendas + '</b> vendas pagando comissão · <b>' + nReu + '</b> reuniões em que o lead apareceu (SDRs e Social Selling)</div></div>'
-    + '<div class="cm-lado">' + _cmRosca(d.grupos, d.totalFolha) + '<div class="cm-total"><small>Total a pagar</small><b>' + _cmNum(d.totalFolha) + '</b><small>fixo + comissão + prêmio</small></div></div></div>'
+    + '<div class="cm-lado">' + _cmRosca(VG, d.totalFolha) + '<div class="cm-total"><small>Total a pagar</small><b>' + _cmNum(d.totalFolha) + '</b><small>fixos + comissões + gestão + extras</small></div></div></div>'
     + '<div class="cm-folha">' + todas.map(function(x){ return '<i style="background:' + x.cor + ';" data-w="' + (x.p.total / (d.totalFolha || 1) * 100).toFixed(2) + '%" title="' + dspEsc(x.p.nome) + ': ' + cmR(x.p.total) + '"></i>'; }).join('') + '</div>'
     + '<div class="cm-leg">' + todas.map(function(x){ return '<span><em style="background:' + x.cor + ';"></em>' + dspEsc(x.p.nome.replace(/\s*\(.*\)$/, '')) + (x.g.k !== 'closers' ? ' <span class="hint">(' + x.g.nome + ')</span>' : '') + ' <b>' + cmR(x.p.total, false) + '</b></span>'; }).join('') + '</div>'
-    + '<div class="cm-grupos">' + d.grupos.map(function(g){ var t = g.pessoas.reduce(function(s, p){ return s + p.total; }, 0), c = CM_GRUPO_COR[g.k] || '#9aa3b2';
+    + '<div class="cm-grupos">' + VG.map(function(g){ var t = g.pessoas.reduce(function(s, p){ return s + p.total; }, 0), c = CM_GRUPO_COR[g.k] || '#9aa3b2';
         return '<div class="cm-grupo"><small><span style="color:' + c + ';">●</span> ' + dspEsc(g.nome) + ' · ' + g.pessoas.length + ' pessoa' + (g.pessoas.length === 1 ? '' : 's') + '</small><b>' + _cmNum(t) + '</b>' + _cmTrilho(d.totalFolha ? t / d.totalFolha : 0, c) + '</div>'; }).join('') + '</div></div>';
   var i = 0;
-  d.grupos.forEach(function(g) {
+  VG.forEach(function(g) {
     var t = g.pessoas.reduce(function(s, p){ return s + p.total; }, 0);
     var verTodas = g.k === 'closers' ? '<button class="cm-todas" onclick="cmAbrir(\'todos\',\'\')">📋 Ver todas as vendas</button>' : g.k === 'sdr' ? '<button class="cm-todas" onclick="cmAbrir(\'todospre\',\'\')">📋 Ver todas as reuniões</button>' : '';
-    h += '<div class="cm-h">' + (g.k === 'closers' ? '🤝' : g.k === 'sdr' ? '📞' : '📱') + ' ' + dspEsc(g.nome) + ' <small>' + cmR(t) + '</small>' + verTodas + '</div><div class="cm-grade">';
+    h += '<div class="cm-h">' + (CM_GRUPO_ICO[g.k] || '•') + ' ' + dspEsc(g.nome) + ' <small>' + cmR(t) + '</small>' + verTodas + '</div>'
+      + (g.k === 'gestao' ? '<div class="hint" style="margin:-4px 0 10px;">O que o Bruno recebe como gestor: fixo, 1,2% e 0,6% das vendas do time e o bônus de atingimento. As vendas dele ficam em Closers.</div>'
+        : g.k === 'extras' ? '<div class="hint" style="margin:-4px 0 10px;">Dias de workshop, plantões, encontros e bônus de todo mundo. Ficam só aqui, fora do cartão de cada um.</div>' : '')
+      + '<div class="cm-grade">';
     g.pessoas.slice().sort(function(a, b){ return b.total - a.total; }).forEach(function(p, k) {
-      p._ant = _cmAnterior(g, p, d.mes);
-      h += g.k === 'closers' ? _cmCardCloser(p, corDe(p), d.premios || [], d.mes, i++, k + 1) : _cmCardPre(p, corDe(p), g.faixas, g.workshopContaFaixa, g.k, i++);
+      p._ant = g.k === 'gestao' || g.k === 'extras' || p._soVendas ? null : _cmAnterior(g, p, d.mes);
+      h += g.k === 'closers' ? _cmCardCloser(p, corDe(p), d.premios || [], d.mes, i++, k + 1) : g.k === 'gestao' ? _cmCardGestor(p, corDe(p), i++) : g.k === 'extras' ? _cmCardExtras(p, corDe(p), i++) : _cmCardPre(p, corDe(p), g.faixas, g.workshopContaFaixa, g.k, i++);
     });
     h += '</div>';
   });
