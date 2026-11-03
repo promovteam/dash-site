@@ -2937,7 +2937,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-03-1549';
+var VERSAO_DASH = '2026-11-03-1655';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -29446,7 +29446,8 @@ function _rlWsLead(x) {
   return { nome: x.nome, tel: x.tel || x.t8, tel8: x.t8, insta: String(x.ig || '').replace(/^@+/, ''), email: '', origem: 'Workshop ' + _wsMes(x), fonte: 'workshop', utm: '', campanha: '',
     faixa: leadFaixa(_wsInvTxt(x.inv)), seg: '', renda: '', obj: '', invest: _wsInvTxt(x.inv), score: 0, date: d, dataTxt: d ? d.toLocaleDateString('pt-BR') : '', i: 'ws', _ws: true, dono: x.sdr || '' };
 }
-function _rlRegLista(t, rows, tipo, sub) { var k = 'l' + (++RL.nL); RL_L[k] = { t: t, rows: rows || [], tipo: tipo || 'v2', sub: sub || '' }; return k; }
+function _rlRegLista(t, rows, tipo, sub) { var k = 'l' + (window._rlRegN = (window._rlRegN || 0) + 1);   // 03/11/2026: antes ++RL.nL (NaN fora do Relatório: Diagnóstico abria a lista do Workshop)
+  RL_L[k] = { t: t, rows: rows || [], tipo: tipo || 'v2', sub: sub || '' }; return k; }
 function rlAbrirFunil(tipo) {
   var C = RL._C, p = RL._p; if (!C || !p) return;
   if (document.documentElement.classList.contains('rl-show')) { try { rlSair(); } catch (e) {} }
@@ -32858,7 +32859,7 @@ function _cmBotaoAtu(rot) {
 function _cmEhBonus(desc) { return /\bb[oô]nus\b|meta do time|meta de \d|meta extraordin/i.test(String(desc || '')); }
 function _cmExtrasItens(p) {
   var it = [];
-  (p.linhas || []).forEach(function(l) { if (l.t === 'extra' && !_cmEhGestLinha(l.p || l.n)) it.push({ d: String(l.n || l.p || 'Extra'), v: +l.c || 0 }); });
+  (p.linhas || []).forEach(function(l) { if (l.t === 'extra' && !_cmEhGestLinha(l.p || l.n)) it.push({ d: _cmExtraNome(l), v: +l.c || 0 }); });
   (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { it.push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
   return it.filter(function(x) { return Math.abs(x.v) >= 0.005; });
 }
@@ -33052,6 +33053,7 @@ function _cmGestaoHtml(p, cor) {
 // plantões, encontros e bônus de todo mundo junto, fora do cartão de cada um). O total da folha não muda.
 CM_GRUPO_COR.gestao = '#ffb347'; CM_GRUPO_COR.extras = '#5eead4';
 var CM_GRUPO_ICO = { closers: '🤝', sdr: '📞', ss: '📱', gestao: '🧭', extras: '⭐' };
+function _cmExtraNome(l) { var r = String(l.p || '').split(' · ').slice(1).join(' · '); return l.n ? String(l.n) + (r ? ' · ' + r : '') : String(l.p || 'Extra'); }
 function _cmEhGestLinha(desc) { return /^(Gestão do time|Bônus de atingimento do time)/i.test(String(desc || '')); }
 function _cmVisaoAdm(d) {
   var gest = [], ext = [], soma = function(L) { return L.reduce(function(s, x) { return s + (+x.v || 0); }, 0); };
@@ -33064,7 +33066,7 @@ function _cmVisaoAdm(d) {
         (p.linhas || []).forEach(function(l) {
           if (l.t !== 'extra') return;
           var ds = String(l.p || l.n || 'Extra');
-          if (_cmEhGestLinha(ds)) gl.push({ d: ds, v: +l.c || 0 }); else itens.push({ d: String(l.n || l.p || 'Extra'), v: +l.c || 0 });
+          if (_cmEhGestLinha(ds)) gl.push({ d: ds, v: +l.c || 0 }); else itens.push({ d: _cmExtraNome(l), v: +l.c || 0 });
         });
         (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { itens.push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
         var sx = soma(itens), sg = soma(gl);
@@ -33082,7 +33084,7 @@ function _cmVisaoAdm(d) {
         q.extras = []; q.bonus = 0; q.variavel = (+p.variavel || 0) - sp; q.total = (+p.total || 0) - sp;
       }
       itens = itens.filter(function(x) { return Math.abs(x.v) >= 0.005; });
-      if (itens.length) ext.push({ nome: p.nome, aba: p.aba, papel: p._plan ? 'Gestor' : g.k === 'closers' ? 'Closer' : g.nome, itens: itens, total: soma(itens) });
+      if (itens.length) ext.push({ nome: p.nome, aba: p.aba, gk: g.k, papel: p._plan ? 'Gestor' : g.k === 'closers' ? 'Closer' : g.nome, itens: itens, total: soma(itens) });
       return q;
     });
     return g2;
@@ -33100,7 +33102,7 @@ function _cmCardGestor(x, cor, i) {
   var compo = [['Fixo', x.fixo, '#6ea8ff'], ['1,2% vendas normais', vN, '#b98aff'], ['0,6% workshop e ILD', vW, '#8c6bff'], ['Bônus do time', vB, '#ffb347']].filter(function(c) { return c[1] > 0; });
   var mx = Math.max(x.fixo, vN, vW, vB) || 1;
   var par = function(rot, v, c) { return '<div class="cm-parte"><span>' + rot + '</span>' + _cmTrilho(v / mx, c) + '<b>' + cmR(v, false) + '</b></div>'; };
-  return '<div class="cm-card cm-entra" style="--i:' + i + ';--cm-cor:' + cor + ';">'
+  return '<div class="cm-card cm-entra cm-clica" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" title="Ver as linhas de gestão" onclick="cmAbrir(\'closers\',\'' + dspEsc(x.aba) + '\',\'gestao\')" onkeydown="if(event.key===\'Enter\')this.click()">'
     + _cmBotaoAtu()
     + '<div class="cm-pessoa">' + _cmAvatar(p.nome, cor, 52, '') + '<div class="cm-nome"><b>' + dspEsc(p.nome) + '</b><small>gestor do time</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(x.total) + '</b><small>a receber como gestor</small></div></div>'
@@ -33110,16 +33112,26 @@ function _cmCardGestor(x, cor, i) {
     + par('🩺 1,2% das vendas normais', vN, '#b98aff') + par('🎓 0,6% do workshop e ILD', vW, '#8c6bff')
     + (vB > 0 ? par('🏆 Bônus de atingimento do time' + (G && G.tier ? ' (' + G.tier + ')' : ''), vB, '#ffb347') : '')
     + (x.fixo > 0 ? par('Fixo', x.fixo, '#6ea8ff') : '')
-    + '<div class="cm-parte cm-soma"><span>Total como gestor</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div></div>';
+    + '<div class="cm-parte cm-soma"><span>Total como gestor</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div>'
+    + '<div class="cm-ver">Ver as linhas de gestão →</div></div>';
 }
 function _cmCardExtras(x, cor, i) {
   var mx = Math.max.apply(null, x.itens.map(function(it) { return Math.abs(it.v); })) || 1;
-  return '<div class="cm-card cm-entra" style="--i:' + i + ';--cm-cor:' + cor + ';">'
+  var clic = x.gk === 'closers';
+  return '<div class="cm-card cm-entra' + (clic ? ' cm-clica' : '') + '" style="--i:' + i + ';--cm-cor:' + cor + ';"'
+    + (clic ? ' tabindex="0" role="button" title="Ver os extras" onclick="cmAbrir(\'closers\',\'' + dspEsc(x.aba) + '\',\'extras\')" onkeydown="if(event.key===\'Enter\')this.click()"' : '') + '>'
     + '<div class="cm-pessoa">' + _cmAvatar(x.nome, cor, 52, '') + '<div class="cm-nome"><b>' + dspEsc(String(x.nome || '').replace(/\s*\(.*\)$/, '')) + '</b><small>' + dspEsc(x.papel) + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(x.total) + '</b><small>em extras</small></div></div>'
     + '<div class="cm-bloco"><div class="cm-partes">'
     + x.itens.map(function(it) { var b = _cmEhBonus(it.d); return '<div class="cm-parte"><span>' + (b ? '🏆 ' : '⭐ ') + dspEsc(it.d) + '</span>' + _cmTrilho(Math.abs(it.v) / mx, b ? '#ffb347' : '#5eead4') + '<b>' + cmR(it.v, false) + '</b></div>'; }).join('')
-    + '<div class="cm-parte cm-soma"><span>Total de extras</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div></div>';
+    + '<div class="cm-parte cm-soma"><span>Total de extras</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div>'
+    + (clic ? '<div class="cm-ver">Ver os extras →</div>' : '') + '</div>';
+}
+function cmFiltroTopo(t, v) {
+  if (t === 'x') { CM.fPessoa = ''; CM.fOrigem = ''; }
+  else if (t === 'p') CM.fPessoa = v === '' ? '' : ((CM._fPessoas || [])[v] || {}).k || '';
+  else CM.fOrigem = v || '';
+  CM.semAnim = true; renderComissoes();
 }
 function renderComissoes() {
   var el = document.getElementById('cm-corpo'); if (!el) return;
@@ -33154,8 +33166,20 @@ function renderComissoes() {
   document.documentElement.classList.toggle('cm-so-ler', CM.dados.papel === 'dono');   // v226: o dono só olha (o robô também recusa)
   if (CM.dados.papel === 'dono') { _cmRenderDono(el, CM.dados); return; }
   var d = CM.dados, todas = [], VG = _cmVisaoAdm(d);   // 03/11/2026: Gestão · Closers · SDR · Social Selling · Extras
+  // 03/11/2026 (Bruno: "lá em cima a Suellen deve filtrar por pessoa ou por origem"): filtros no topo da folha
+  var VGtudo = VG, fP = CM.fPessoa || '', fO = CM.fOrigem || '', nk = function(q){ return String(q.nome || '').replace(/\s*\(.*\)$/, '').trim().toLowerCase(); };
+  if (fO && !VGtudo.some(function(g){ return g.k === fO; })) fO = CM.fOrigem = '';
+  VG = VG.filter(function(g){ return !fO || g.k === fO; }).map(function(g){ var c = {}; Object.keys(g).forEach(function(k){ c[k] = g[k]; }); c.pessoas = g.pessoas.filter(function(q){ return !fP || nk(q) === fP; }); return c; }).filter(function(g){ return g.pessoas.length; });
+  var filtrado = !!(fP || fO), TF = filtrado ? VG.reduce(function(s2, g){ return s2 + g.pessoas.reduce(function(a, q){ return a + (+q.total || 0); }, 0); }, 0) : d.totalFolha;
+  var pessoasF = []; VGtudo.forEach(function(g){ g.pessoas.forEach(function(q){ var k = nk(q); if (pessoasF.every(function(x){ return x.k !== k; })) pessoasF.push({ k: k, n: String(q.nome || '').replace(/\s*\(.*\)$/, '').trim() }); }); });
+  CM._fPessoas = pessoasF;
+  var chipF = function(on, rot, js){ return '<button class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="' + js + '">' + rot + '</button>'; };
+  var barraF = '<div class="panel cm-ftopo cm-entra"><div class="cm-filtros"><span class="cm-ft-rot">Pessoa</span>' + chipF(!fP, 'Todas', "cmFiltroTopo('p','')")
+      + pessoasF.map(function(x, j){ return chipF(fP === x.k, dspEsc(x.n.split(' ')[0]), "cmFiltroTopo('p'," + j + ")"); }).join('') + '</div>'
+    + '<div class="cm-filtros"><span class="cm-ft-rot">Origem</span>' + chipF(!fO, 'Tudo', "cmFiltroTopo('o','')")
+      + VGtudo.map(function(g){ return chipF(fO === g.k, (CM_GRUPO_ICO[g.k] || '') + ' ' + dspEsc(g.k === 'closers' ? 'Vendas (closers)' : g.nome), "cmFiltroTopo('o','" + g.k + "')"); }).join('') + '</div></div>';
   VG.forEach(function(g){ g.pessoas.forEach(function(p){ todas.push({ g: g, p: p }); }); });
-  var corNome = {}, nCor = 0; todas.forEach(function(x){ var k = String(x.p.nome || '').replace(/\s*\(.*\)$/, '').toLowerCase(); if (!corNome[k]) corNome[k] = _cmPessoaCor(nCor++); x.cor = corNome[k]; });   // a mesma pessoa tem a mesma cor nas partes
+  var corNome = {}, nCor = 0; VGtudo.forEach(function(g){ g.pessoas.forEach(function(q){ var k = nk(q); if (!corNome[k]) corNome[k] = _cmPessoaCor(nCor++); }); }); todas.forEach(function(x){ x.cor = corNome[nk(x.p)] || '#3ddc97'; });   // a mesma pessoa tem a mesma cor nas partes
   var corDe = function(p){ return (todas.filter(function(x){ return x.p === p; })[0] || {}).cor || '#3ddc97'; };
   window._cmCorAba = {}; todas.forEach(function(x){ window._cmCorAba[x.g.k + '|' + x.p.aba] = x.cor; });
   var aberto = !d.fechado || d.fechado < d.mes, mesHoje = new Date().toISOString().slice(0, 7);
@@ -33167,14 +33191,15 @@ function renderComissoes() {
   var NM = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   var seletor = (d.meses && d.meses.length > 1) ? '<div class="cm-meses" role="tablist" aria-label="Mês">' + d.meses.map(function(m){ return '<button role="tab" aria-selected="' + (m === d.mes) + '" class="' + (m === d.mes ? 'on' : '') + '" onclick="cmMes(\'' + m + '\')">' + NM[+m.slice(5, 7) - 1] + '/' + m.slice(2, 4) + '</button>'; }).join('') + '</div>' : '';
   var selo = CM.carregando ? '<span class="cm-sync"><i></i>atualizando…</span>' : CM.aviso ? '<span class="cm-sync aviso">' + dspEsc(CM.aviso) + '</span>' : '';
-  var h = '<div class="cm-topo-barra">' + seletor + selo + '</div>' + _cmAvisosHtml() + _cmContListaHtml() + '<div class="panel cm-hero cm-entra"><div class="cm-topo"><div><div class="cm-olho">Folha de comissões</div><div class="cm-mes">' + dspEsc((d.mesTxt || d.mes).replace(/^\w/, function(c){ return c.toUpperCase(); })) + '</div>' + status
+  var h = '<div class="cm-topo-barra">' + seletor + selo + '</div>' + _cmAvisosHtml() + _cmContListaHtml() + barraF + '<div class="panel cm-hero cm-entra"><div class="cm-topo"><div><div class="cm-olho">Folha de comissões</div><div class="cm-mes">' + dspEsc((d.mesTxt || d.mes).replace(/^\w/, function(c){ return c.toUpperCase(); })) + '</div>' + status
     + '<div class="cm-resumo"><b>' + nVendas + '</b> vendas pagando comissão · <b>' + nReu + '</b> reuniões em que o lead apareceu (SDRs e Social Selling)</div></div>'
-    + '<div class="cm-lado">' + _cmRosca(VG, d.totalFolha) + '<div class="cm-total"><small>Total a pagar</small><b>' + _cmNum(d.totalFolha) + '</b><small>fixos + comissões + gestão + extras</small></div></div></div>'
-    + '<div class="cm-folha">' + todas.map(function(x){ return '<i style="background:' + x.cor + ';" data-w="' + (x.p.total / (d.totalFolha || 1) * 100).toFixed(2) + '%" title="' + dspEsc(x.p.nome) + ': ' + cmR(x.p.total) + '"></i>'; }).join('') + '</div>'
+    + '<div class="cm-lado">' + _cmRosca(VG, TF) + '<div class="cm-total"><small>' + (filtrado ? 'Total do filtro' : 'Total a pagar') + '</small><b>' + _cmNum(TF) + '</b><small>' + (filtrado ? 'de ' + cmR(d.totalFolha, false) + ' da folha' : 'fixos + comissões + gestão + extras') + '</small></div></div></div>'
+    + '<div class="cm-folha">' + todas.map(function(x){ return '<i style="background:' + x.cor + ';" data-w="' + (x.p.total / (TF || 1) * 100).toFixed(2) + '%" title="' + dspEsc(x.p.nome) + ': ' + cmR(x.p.total) + '"></i>'; }).join('') + '</div>'
     + '<div class="cm-leg">' + todas.map(function(x){ return '<span><em style="background:' + x.cor + ';"></em>' + dspEsc(x.p.nome.replace(/\s*\(.*\)$/, '')) + (x.g.k !== 'closers' ? ' <span class="hint">(' + x.g.nome + ')</span>' : '') + ' <b>' + cmR(x.p.total, false) + '</b></span>'; }).join('') + '</div>'
     + '<div class="cm-grupos">' + VG.map(function(g){ var t = g.pessoas.reduce(function(s, p){ return s + p.total; }, 0), c = CM_GRUPO_COR[g.k] || '#9aa3b2';
-        return '<div class="cm-grupo"><small><span style="color:' + c + ';">●</span> ' + dspEsc(g.nome) + ' · ' + g.pessoas.length + ' pessoa' + (g.pessoas.length === 1 ? '' : 's') + '</small><b>' + _cmNum(t) + '</b>' + _cmTrilho(d.totalFolha ? t / d.totalFolha : 0, c) + '</div>'; }).join('') + '</div></div>';
+        return '<div class="cm-grupo"><small><span style="color:' + c + ';">●</span> ' + dspEsc(g.nome) + ' · ' + g.pessoas.length + ' pessoa' + (g.pessoas.length === 1 ? '' : 's') + '</small><b>' + _cmNum(t) + '</b>' + _cmTrilho(TF ? t / TF : 0, c) + '</div>'; }).join('') + '</div></div>';
   var i = 0;
+  if (!VG.length) h += '<div class="panel hint" style="padding:22px;text-align:center;">Nada com esse filtro. <button class="btn" onclick="cmFiltroTopo(\'x\')">Limpar filtros</button></div>';
   VG.forEach(function(g) {
     var t = g.pessoas.reduce(function(s, p){ return s + p.total; }, 0);
     var verTodas = g.k === 'closers' ? '<button class="cm-todas" onclick="cmAbrir(\'todos\',\'\')">📋 Ver todas as vendas</button>' : g.k === 'sdr' ? '<button class="cm-todas" onclick="cmAbrir(\'todospre\',\'\')">📋 Ver todas as reuniões</button>' : '';
@@ -33232,6 +33257,11 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-det-x { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:inherit; border-radius:10px; width:36px; height:36px; font-size:1rem; cursor:pointer; }
 .cm-det-x:focus-visible { outline:2px solid #b084ff; }
 .cm-filtros { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 12px; }
+.cm-ftopo { padding:10px 14px; margin-bottom:14px; display:grid; gap:6px; }
+.cm-ftopo .cm-filtros { margin:0; align-items:center; }
+.cm-ft-rot { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:#9aa3b2; min-width:64px; }
+.cm-det-abas { border-bottom:1px solid rgba(255,255,255,.08); padding-bottom:10px; margin-bottom:10px; }
+.cm-det-abas button { font-size:.86rem; padding:7px 15px; }
 .cm-filtros button { font-size:.76rem; font-weight:800; padding:5px 11px; border-radius:999px; cursor:pointer; background:rgba(255,255,255,.05); color:#c9cfdb; border:1px solid rgba(255,255,255,.12); }
 .cm-filtros button.on { background:rgba(176,132,255,.22); color:#e2d6ff; border-color:rgba(176,132,255,.6); }
 .cm-tab-wrap { overflow-x:auto; border-radius:12px; border:1px solid rgba(255,255,255,.07); }
@@ -33453,7 +33483,8 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 <script>
 // clique no cartão → lista do mês da pessoa (Bruno 02/10/2026: "ao entrar conseguimos ver quais as vendas, suas origens e etc?")
 var CMD = { gk: '', aba: '', filtro: 'tudo' };
-function cmAbrir(gk, aba) { CMD.gk = gk; CMD.aba = aba; CMD.filtro = 'tudo'; CMD.busca = ''; cmDetRender(); }
+function cmAbrir(gk, aba, so) { CMD.gk = gk; CMD.aba = aba; CMD.so = so || 'vendas'; CMD.filtro = 'tudo'; CMD.busca = ''; cmDetRender(); }
+function cmDetSo(k) { CMD.so = k; CMD.filtro = 'tudo'; CMD.busca = ''; cmDetRender(); }
 function cmFechar() { var f = document.getElementById('cm-det-fundo'); if (f) f.remove(); document.removeEventListener('keydown', _cmEsc); }
 function _cmEsc(e) { if (e.key === 'Escape') cmFechar(); }
 function cmDetFiltro(f) { CMD.filtro = f; cmDetRender(); }
@@ -33488,6 +33519,25 @@ function cmDetRender() {
     g = d.grupos.filter(function(x){ return x.k === CMD.gk; })[0]; if (!g) return;
     p = g.pessoas.filter(function(x){ return x.aba === CMD.aba; })[0]; if (!p) return;
   }
+  // 03/11/2026 (Bruno, na janela das vendas: "esse deve ser um somente de extras"): a janela dos closers tem abas — 🤝 Vendas (sem
+  // os extras), ⭐ Extras (só os extras, com o "+ Lançar extra") e 🧭 Gestão (as linhas de gestão do time, só do gestor)
+  var so = CMD.so || 'vendas', abas = '', pOrig = p, cab = null;
+  if (g.k === 'closers' && p.linhas) {
+    var ehG = function(l) { return l.t === 'extra' && _cmEhGestLinha(l.p || l.n); }, ehE = function(l) { return l.t === 'extra' && !ehG(l); };
+    var LE = p.linhas.filter(ehE), LG = p.linhas.filter(ehG), somaL = function(L) { return L.reduce(function(s2, l) { return s2 + (+l.c || 0); }, 0); };
+    if (so === 'gestao' && !LG.length) so = 'vendas';
+    var p2 = {}; Object.keys(p).forEach(function(k) { p2[k] = p[k]; });
+    p2.linhas = p.linhas.filter(so === 'extras' ? ehE : so === 'gestao' ? ehG : function(l) { return l.t !== 'extra'; });
+    if (so !== 'vendas') p2.fora = [];
+    if (!todos) {
+      var VGj = _cmVisaoAdm(d), achar = function(k) { var x = VGj.filter(function(y) { return y.k === k; })[0]; return x ? x.pessoas.filter(function(y) { return y.aba === p.aba; })[0] : null; };
+      var pVj = achar('closers'), pGj = achar('gestao');
+      cab = so === 'extras' ? { v: somaL(LE), t: 'em extras' } : so === 'gestao' ? { v: pGj ? pGj.total : somaL(LG), t: 'como gestor' } : { v: pVj ? pVj.total : p.total, t: 'a receber pelas vendas' };
+    }
+    var abJ = function(k, rot, n) { return '<button class="' + (so === k ? 'on' : '') + '" onclick="cmDetSo(\'' + k + '\')">' + rot + (n != null ? ' · ' + n : '') + '</button>'; };
+    abas = '<div class="cm-filtros cm-det-abas" role="tablist">' + abJ('vendas', '🤝 Vendas', p.linhas.filter(function(l) { return l.t !== 'extra'; }).length) + abJ('extras', '⭐ Extras', LE.length) + (LG.length ? abJ('gestao', '🧭 Gestão', LG.length) : '') + '</div>';
+    CMD.so = so; p = p2;
+  }
   var f = document.getElementById('cm-det-fundo'), jaAberta = !!f;
   if (!f) {
     f = document.createElement('div'); f.id = 'cm-det-fundo'; f.className = 'cm-det-fundo';
@@ -33498,10 +33548,10 @@ function cmDetRender() {
   var h = '<div class="cm-det' + (!todos && _cmAprFechado(_cmApr(g, p)) ? ' cm-fechado' : '') + '"' + (jaAberta ? ' style="animation:none"' : '') + ' role="dialog" aria-modal="true" aria-label="Detalhe de ' + dspEsc(p.nome) + '"><div class="cm-det-topo">'
     + (todos ? '<div class="avatar" style="background:linear-gradient(135deg,#b084ff,#6ea8ff);">📋</div>' : _cmAvatar(p.nome, (window._cmCorAba || {})[g.k + '|' + p.aba] || '#b084ff', 52, ''))
     + '<div class="cm-nome"><b style="font-size:1.08rem;">' + dspEsc(p.nome) + '</b><small>' + dspEsc((d.mesTxt || d.mes)) + ' · ' + dspEsc(g.nome)
-    + (!todos ? ' · ' + (function(){ var E = _cmExtrasDe(p); return [['fixo', p.fixo], [g.k === 'closers' ? 'comissão' : 'variável', (g.k === 'closers' ? p.comissao : p.variavel) - E.extra - E.bonus], ['extras', E.extra + E.bonus], ['prêmio', p.premio]]; })().filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') : '') + '</small></div>'
-    + '<div class="cm-valor"><b>' + _cmNum(p.total) + '</b><small>a receber</small></div>'
+    + (!todos ? ' · ' + (function(){ var E = _cmExtrasDe(pOrig); return [['fixo', p.fixo], [g.k === 'closers' ? 'comissão' : 'variável', (g.k === 'closers' ? p.comissao : p.variavel) - E.extra - E.bonus - (E.gest || 0)], ['gestão', E.gest || 0], ['extras', E.extra + E.bonus], ['prêmio', p.premio]]; })().filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') : '') + '</small></div>'
+    + '<div class="cm-valor"><b>' + _cmNum(cab ? cab.v : p.total) + '</b><small>' + (cab ? cab.t : 'a receber') + '</small></div>'
     + _cmBotaoAtu('Atualizar') + '<button class="cm-det-x" onclick="cmFechar()" aria-label="Fechar">✕</button></div>';
-  h += _cmValidaBarra(g, p, todos);   // v226: quanto falta revisar · validar o mês (financeiro) · contestar (dono)
+  h += _cmValidaBarra(g, pOrig, todos) + abas;   // v226: quanto falta revisar · validar o mês (financeiro) · contestar (dono)
   if ((g.k === 'closers' && !p.linhas) || (g.k !== 'closers' && !p.reunioes)) {
     f.innerHTML = h + '<div class="hint" style="padding:18px;">A lista do mês chega com o robô novo. Depois de instalar, clique em ↻ Atualizar.</div></div>'; return;
   }
@@ -33531,8 +33581,9 @@ function _cmDetCloser(p, todos, bt) {
   V.forEach(function(l){ sr += l.r; sc += l.c; var fo = l.t === 'extra' ? 'Extra' : (l.f || '—').replace(/ \(.*\)$/, ''); porForma[fo] = (porForma[fo] || 0) + l.c; var o = /^Workshop/.test(l.o || '') ? 'Workshop' : (l.t === 'extra' ? 'Extra' : 'Outras origens'); porOrig[o] = (porOrig[o] || 0) + l.c; });
   var grupos = {}, ordem = [], raiz = _cmMesmaPessoa(V);
   V.forEach(function(l){ var k = (todos ? l.aba + '|' : '') + (l.t === 'extra' ? 'extra|' + l.ln : raiz(_cmChaveCliente(l.n))); if (!grupos[k]) { grupos[k] = []; ordem.push(k); } grupos[k].push(l); });
-  var h = '<div class="cm-filtros">' + bt('tudo', 'Tudo', L.length) + bt('venda', 'Vendas', cont.venda) + bt('parcela', 'Parcelas (Lia/Guru)', cont.parcela) + bt('extra', 'Extras', cont.extra) + bt('workshop', '🎓 Workshop', L.filter(function(l){ return /^Workshop/.test(l.o || ''); }).length) + bt('fora', 'Não contou', F.length)
-    + (!todos ? '<button class="cm-extra-bt" onclick="cmExtraAbrir()">+ Lançar extra</button>' : '') + '</div>'
+  var soV = !CMD.so || CMD.so === 'vendas';
+  var h = '<div class="cm-filtros">' + bt('tudo', 'Tudo', L.length) + (soV ? bt('venda', 'Vendas', cont.venda) + bt('parcela', 'Parcelas (Lia/Guru)', cont.parcela) + bt('workshop', '🎓 Workshop', L.filter(function(l){ return /^Workshop/.test(l.o || ''); }).length) + bt('fora', 'Não contou', F.length) : '')
+    + (!todos && CMD.so === 'extras' ? '<button class="cm-extra-bt" onclick="cmExtraAbrir()">+ Lançar extra</button>' : '') + '</div>'
     + '<div id="cm-extra-form"></div>';
   if (CMD.filtro === 'fora') {
     return h + (F.length ? '<div class="cm-cards">' + F.map(function(l){ return '<div class="cm-cli fora"><div class="cm-cli-topo"><div class="cm-cli-nome"><b>' + dspEsc(l.n) + '</b>' + (todos ? ' <span class="cm-quem">' + dspEsc(l.q || '') + '</span>' : '') + '<small>' + dspEsc(l.p || '') + ' · ' + dspEsc(l.o || '—') + '</small></div><div class="cm-cli-valor"><small>recebido</small><b style="color:#c9cfdb;">' + cmR(l.r) + '</b></div></div><div class="cm-motivo">🚫 ' + dspEsc(l.u || 'sem motivo anotado') + '</div></div>'; }).join('') + '</div>'
