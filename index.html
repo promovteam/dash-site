@@ -2937,7 +2937,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-03-0754';
+var VERSAO_DASH = '2026-11-03-0810';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -29154,8 +29154,8 @@ function rlPeriodo(k, de, ate) {
 // "cada mês deve estar com seu participante, não com o que fechou no mês" · "veio do funil mas caiu para diagnóstico normal" ·
 // "se for pós cai em recuperação de workshop; antes cai como antecipação".
 // Reunião com origem de workshop só é Workshop do 2º dia (pitch) da edição DA PESSOA (app do workshop, pelo telefone) até
-// WS_JANELA_DIAS (15) dias depois, e conta no MÊS DA EDIÇÃO, mesmo que feche no mês seguinte. Antes do pitch = "Antecipação de
-// workshop"; depois dos 15 dias = "Recuperação de workshop": as duas contam no Diagnóstico, no mês em que aconteceram.
+// WS_JANELA_DIAS (15) dias depois. Antes do pitch = "Antecipação de workshop"; depois dos 15 dias = "Recuperação de workshop": as
+// duas contam no Diagnóstico. Toda venda conta no mês em que fechou (03/11: o mês só muda no pagamento de bloqueio).
 // Sem a pessoa no app: pelas datas das edições (a última com 2º dia até a reunião).
 var RL_WS_ANT = 'Antecipação de workshop', RL_WS_REC = 'Recuperação de workshop';
 function _rlDia0(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
@@ -29180,6 +29180,7 @@ function rlWsInfo(r) {
     via = 'data';
     var L = _rlWsD2s(), pas = L.filter(function(v) { return v <= dia; }), fut = L.filter(function(v) { return v > dia; }), ult = pas.length ? pas[pas.length - 1] : null;
     if (ult != null && Math.round((dia - ult) / 864e5) <= JAN) d2 = ult;
+    else if (ult == null && fut.length && dia < fut[0] - 20 * 864e5) d2 = null;   // edição antiga, de antes do app: fica Workshop
     else if (/\bpre\b/.test(v2norm(r.origem)) && fut.length) d2 = fut[0];
     else d2 = ult != null ? ult : (fut.length ? fut[0] : null);
   }
@@ -29191,19 +29192,15 @@ function rlGrupoR(r) {
   var w = rlWsInfo(r); return !w || w.m === 'ws' ? 'Workshop' : w.m === 'ant' ? RL_WS_ANT : RL_WS_REC;
 }
 function rlEhWs(r) { return rlGrupoR(r) === 'Workshop'; }
-// o momento em que a linha conta no período: venda dentro da janela do workshop conta no mês da edição da pessoa
-function rlDataConta(r) {
-  var w = rlWsInfo(r);
-  if (w && w.m === 'ws' && w.d2 != null) { var e = new Date(w.d2); if (r.date.getMonth() !== e.getMonth() || r.date.getFullYear() !== e.getFullYear()) return new Date(e.getFullYear(), e.getMonth() + 1, 1).getTime() - 1; }
-  return r.date.getTime();
-}
+// o momento em que a linha conta no período: o dia da reunião, como a Visão Geral (Bruno 03/11/2026: "isso vale para o pagamento
+// quando fez bloqueio, não para o relatório de vendas" — a venda não muda de mês; a edição da pessoa só decide Workshop × Diagnóstico)
+function rlDataConta(r) { return r.date.getTime(); }
 var RL_MES_NOME = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 function rlWsTag(r) {
   var w = rlWsInfo(r); if (!w || w.d2 == null) return '';
   var e = new Date(w.d2), dm = ('0' + e.getDate()).slice(-2) + '/' + ('0' + (e.getMonth() + 1)).slice(-2);
-  if (w.m === 'ant') return ' <span class="rl-wstag ant" title="Veio do funil do workshop, mas comprou antes do pitch (2º dia ' + dm + '). Caiu para o diagnóstico normal.">⏩ Antecipação de workshop</span>';
-  if (w.m === 'rec') return ' <span class="rl-wstag rec" title="Veio do funil do workshop, mas comprou ' + w.k + ' dias depois do pitch (2º dia ' + dm + '), fora dos 15 dias. Caiu para o diagnóstico normal.">🔁 Recuperação de workshop</span>';
-  if (rlDataConta(r) !== r.date.getTime()) return ' <span class="rl-wstag ws" title="Fez o workshop de ' + RL_MES_NOME[e.getMonth()] + ' (pitch ' + dm + ') e comprou dentro dos 15 dias: conta em ' + RL_MES_NOME[e.getMonth()] + ', o mês da edição.">🎓 conta em ' + RL_MES_NOME[e.getMonth()] + '</span>';
+  if (w.m === 'ant') return ' <span class="rl-wstag ant" title="Veio do funil do workshop de ' + RL_MES_NOME[e.getMonth()] + ', mas comprou antes do pitch (2º dia ' + dm + '). Caiu para o diagnóstico normal.">⏩ Antecipação · workshop de ' + RL_MES_NOME[e.getMonth()] + '</span>';
+  if (w.m === 'rec') return ' <span class="rl-wstag rec" title="Veio do funil do workshop de ' + RL_MES_NOME[e.getMonth()] + ', mas comprou ' + w.k + ' dias depois do pitch (2º dia ' + dm + '), fora dos 15 dias. Caiu para o diagnóstico normal.">🔁 Recuperação · workshop de ' + RL_MES_NOME[e.getMonth()] + ' (' + w.k + ' dias)</span>';
   return '';
 }
 // 🧭 a explicação que vai no relatório
@@ -29213,10 +29210,11 @@ function rlWsComoConta(p) {
   var e = ex != null ? new Date(ex) : null, fim = e ? new Date(ex + (typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15) * 864e5) : null;
   var dm = function(d) { return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2); };
   return '<div class="rl-wscomo rl-st"><b>📌 Como o workshop é contado</b>'
-    + '<p><b>🎓 Workshop:</b> cada mês fica com os participantes da edição daquele mês, não com o que fechou no mês. Conta a venda de quem fez o workshop do 2º dia (o pitch) da edição dele até 15 dias depois, mesmo que feche no mês seguinte.'
-    + (e ? ' Ex.: a edição de ' + RL_MES_NOME[e.getMonth()] + ' teve o pitch em ' + dm(e) + '; quem comprou até ' + dm(fim) + ' conta em ' + RL_MES_NOME[e.getMonth()] + '.' : '') + '</p>'
-    + '<p><b>🩺 Diagnóstico:</b> todas as outras vendas, no mês em que aconteceram. Quem veio do funil do workshop mas comprou fora da janela cai para o diagnóstico normal, com a marca:</p>'
-    + '<p><span class="rl-wstag ant">⏩ Antecipação de workshop</span> comprou antes do pitch &nbsp; <span class="rl-wstag rec">🔁 Recuperação de workshop</span> comprou depois dos 15 dias</p></div>';
+    + '<p><b>🎓 Workshop:</b> a venda de quem fez o workshop, do 2º dia (o pitch) da edição dele até 15 dias depois.'
+    + (e ? ' Ex.: a edição de ' + RL_MES_NOME[e.getMonth()] + ' teve o pitch em ' + dm(e) + '; quem é dessa edição e comprou até ' + dm(fim) + ' é Workshop.' : '') + '</p>'
+    + '<p><b>🩺 Diagnóstico:</b> todas as outras vendas. Quem veio do funil do workshop mas comprou fora dos 15 dias cai para o diagnóstico normal, com a marca:</p>'
+    + '<p><span class="rl-wstag ant">⏩ Antecipação de workshop</span> comprou antes do pitch &nbsp; <span class="rl-wstag rec">🔁 Recuperação de workshop</span> comprou depois dos 15 dias</p>'
+    + '<p><b>📅 Mês:</b> toda venda conta no mês em que fechou, igual à Visão Geral. Em <b>Por edição do Workshop</b>, cada edição fica com os seus participantes, mesmo que comprem no mês seguinte, e o <b>*</b> mostra quantos compraram dentro e fora dos 15 dias.</p></div>';
 }
 function rlGrupo(o) {
   var s = v2norm(o || '');
@@ -29238,7 +29236,7 @@ function rlValor(r) { return r.valor || r._valorDoForm || 0; }
 // com base na Visão Geral, não com base na planilha de vendas"): as contas saem das MESMAS linhas da Visão Geral — a reunião entra
 // pelo dia em que aconteceu e a venda é o status "Vendido" (o valor da própria linha).
 function rlPessoaNome(n) { n = String(n || '').trim(); if (!n) return ''; try { if (typeof plPessoa === 'function') return plPessoa(n) || n; } catch (e) {} return n; }
-function rlLinhas(p) { return (V2.rows || []).filter(function(r) { if (!r.date) return false; var tt = rlDataConta(r); return tt >= p.ini && tt < p.fim; }); }   // 03/11/2026: workshop no mês da edição da pessoa
+function rlLinhas(p) { return (V2.rows || []).filter(function(r) { if (!r.date) return false; var tt = rlDataConta(r); return tt >= p.ini && tt < p.fim; }); }   // 03/11/2026: o dia da reunião (rlDataConta)
 function rlCalc(p, filtro) {
   var rows = rlLinhas(p), agora = Date.now();
   if (filtro) rows = rows.filter(filtro);   // 03/10/2026: relatório de uma pessoa (closer, SDR ou Social Selling)
@@ -29821,7 +29819,7 @@ function rlFunil(A, B) {
   var spV = V === 'tudo' ? '<small class="rl-fe-sp">🩺 ' + rlMil(a.D.fat) + ' · 🎓 ' + rlMil(a.W.fat) + '</small>' : '';
   h += '<div class="rl-fe rl-st" style="--i:20"' + rlL(V === 'dg' ? 'Diagnóstico · vendas' : V === 'ws' ? 'Workshop · vendas' : 'Vendas do período', vend[2]) + '><span>Vendido' + spV + '</span><div class="rl-fe-b"><i style="--w:100%;--c1:#f6a350;--c2:#ffd166;">' + rlMoeda(vend[0]) + '</i></div><b>' + rlDelta(vend[0], vend[1]) + '</b></div></div>';
   var sub = V === 'dg' ? 'Só o Diagnóstico: leads do formulário e as reuniões que não são da janela do workshop (inclui ⏩ antecipação e 🔁 recuperação de workshop).'
-    : V === 'ws' ? 'Só o Workshop: participantes das edições com o pitch no período e as reuniões do pitch até 15 dias depois (mesmo que fechem no mês seguinte).'
+    : V === 'ws' ? 'Só o Workshop: inscritos e aplicações das edições com o pitch no período; reuniões e vendas do período de quem estava até 15 dias depois do pitch da edição dele.'
     : 'Quantos passaram de uma etapa para a outra. Leads = formulário do diagnóstico; reuniões e vendas = planilha (Visão Geral). Embaixo de cada etapa, 🩺 diagnóstico · 🎓 workshop.';
   return rlSec('funil', 'Funil', 'Do lead à venda', sub, h);
 }
@@ -30107,6 +30105,9 @@ function rlWsEdicoes() {
   var agora = Date.now(), d2s = _rlWsD2s(), prox = d2s.filter(function(v) { return v > agora; })[0];
   var eds = d2s.filter(function(v) { return v <= agora || v === prox; }).map(function(v) { var d = new Date(v - 864e5); return { d: d, ini: v }; });   // 03/11/2026: as edições do app (antes, lista fixa)
   var ws = (V2.rows || []).filter(function(r) { return r.date && rlEhWs(r); });
+  // 03/11/2026 (Bruno: "quantos foram dentro do período de 15 dias e quais foram fora… esse lead veio daquele workshop, mas foi
+  // para o diagnóstico porque passou dos 15 dias"): as vendas de quem fez a edição e comprou fora da janela
+  var fora = (V2.rows || []).filter(function(r) { return r.date && r.sn === 'vendido' && rlWsInfo(r) && !rlEhWs(r); });
   var L = eds.map(function(e, i) {
     var fim = e.ini + ((typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15) + 1) * 864e5;
     var o = { e: e, rot: mesesN[e.d.getMonth()].replace(/^./, function(c) { return c.toUpperCase(); }) + ' ' + e.d.getFullYear(), dias: e.d.getDate() + ' a ' + (e.d.getDate() + 2) + ' de ' + mesesN[e.d.getMonth()],
@@ -30146,7 +30147,11 @@ function rlWsEdicoes() {
       +   st('Fecha', rlPct(o.conv), rlL(nm + ' · lead apareceu (vendas primeiro)', rlOrdemStatus(o.re)), a ? rlDelta(o.conv, a.conv, false, 100) : '')
       +   st('No-show', rlPct(o.nsp), rlL(nm + ' · no-show', o.ns), a ? rlDelta(o.nsp, a.nsp, true, 100) : '')
       +   st('Ticket', o.ticket ? rlMil(o.ticket) : '—', rlL(nm + ' · vendas', o.vd), a && a.ticket ? rlDelta(o.ticket, a.ticket) : '')
-      + '</div></div>';
+      + '</div>' + (function() {
+          var F = fora.filter(function(r) { return rlWsInfo(r).d2 === o.e.ini; }); if (!F.length) return '';
+          var an = F.filter(function(r) { return rlWsInfo(r).m === 'ant'; }), rc = F.filter(function(r) { return rlWsInfo(r).m === 'rec'; }), fv = F.reduce(function(s2, r) { return s2 + (r.valor || 0); }, 0);
+          return '<div class="rl-wed-fora"' + rlL(nm + ' · compraram fora dos 15 dias (contaram no Diagnóstico)', F) + '>* <b>' + o.vd.length + '</b> dentro dos 15 dias · <b>' + F.length + '</b> fora (' + [an.length ? '⏩ ' + an.length + ' antes do pitch' : '', rc.length ? '🔁 ' + rc.length + ' depois dos 15 dias' : ''].filter(Boolean).join(' · ') + ', ' + rlMil(fv) + ') foram para o Diagnóstico</div>';
+        })() + '</div>';
   }).join('') + '</div>';
   return h;
 }
@@ -30200,14 +30205,14 @@ function rlWorkshop(A, B) {
   var h = '<div class="rl-wd">' + card('Workshop', '🎓', '#f6a350', W, Wb, leadsW, 0) + card('Diagnóstico', '🩺', '#6ea8ff', D, Db, leadsD, 1) + '</div>';
   // 03/11/2026: quem veio do funil do workshop e caiu para o diagnóstico
   var cai = function(g) { var L = D.vd.filter(function(r) { return rlGrupoR(r) === g; }); return { L: L, fat: L.reduce(function(s2, r) { return s2 + (r.valor || 0); }, 0) }; }, an = cai(RL_WS_ANT), rc = cai(RL_WS_REC);
-  if (an.L.length || rc.L.length) h += '<div class="rl-wfr rl-st">No Diagnóstico estão ' + [an.L.length ? '<span' + rlL('Antecipação de workshop · vendas', an.L) + ' class="rl-wscai"><span class="rl-wstag ant">⏩ ' + an.L.length + ' antecipação' + (an.L.length === 1 ? '' : 'ões') + '</span> ' + rlMil(an.fat) + '</span>' : '', rc.L.length ? '<span' + rlL('Recuperação de workshop · vendas', rc.L) + ' class="rl-wscai"><span class="rl-wstag rec">🔁 ' + rc.L.length + ' recuperaç' + (rc.L.length === 1 ? 'ão' : 'ões') + ' de workshop</span> ' + rlMil(rc.fat) + '</span>' : ''].filter(Boolean).join(' e ') + ': vieram do funil do workshop, mas compraram fora da janela.</div>';
+  if (an.L.length || rc.L.length) h += '<div class="rl-wfr rl-st">* No Diagnóstico estão ' + [an.L.length ? '<span' + rlL('Antecipação de workshop · vendas', an.L) + ' class="rl-wscai"><span class="rl-wstag ant">⏩ ' + an.L.length + ' antecipação' + (an.L.length === 1 ? '' : 'ões') + '</span> ' + rlMil(an.fat) + '</span>' : '', rc.L.length ? '<span' + rlL('Recuperação de workshop · vendas', rc.L) + ' class="rl-wscai"><span class="rl-wstag rec">🔁 ' + rc.L.length + ' recuperaç' + (rc.L.length === 1 ? 'ão' : 'ões') + ' de workshop</span> ' + rlMil(rc.fat) + '</span>' : ''].filter(Boolean).join(' e ') + ': vieram do funil do workshop, mas compraram fora da janela.</div>';
   h += rlWsComoConta();
   var frase = [];
   if (W.re.length && D.re.length) frase.push('O <b>Workshop fecha ' + rlPct(W.conv) + '</b> das reuniões em que o lead apareceu; o <b>Diagnóstico, ' + rlPct(D.conv) + '</b>.');
   if (W.porRe && D.porRe) frase.push('Cada reunião em que o lead apareceu rende <b>' + rlMil(W.porRe) + '</b> no Workshop e <b>' + rlMil(D.porRe) + '</b> no Diagnóstico.');
   if (frase.length) h += '<div class="rl-wfr rl-st">' + frase.join(' ') + '</div>';
   try { h += rlWsEdicoes(); } catch (eE) {}
-  return rlSec('workshop', 'Funis', 'Workshop × Diagnóstico', 'Os dois funis separados. Workshop = participantes da edição do mês que compraram do pitch até 15 dias depois; Diagnóstico = todo o resto, inclusive quem veio do workshop e comprou fora da janela (explicação embaixo). As setas comparam com <b>' + rlE(RL._antRot || 'o período anterior') + '</b> — troque em “comparar com”, lá no alto.', h);
+  return rlSec('workshop', 'Funis', 'Workshop × Diagnóstico', 'Os dois funis separados. Workshop = quem fez o workshop e comprou do pitch da edição dele até 15 dias depois; Diagnóstico = todo o resto, inclusive quem veio do workshop e comprou fora da janela (explicação embaixo). As setas comparam com <b>' + rlE(RL._antRot || 'o período anterior') + '</b> — troque em “comparar com”, lá no alto.', h);
 }
 // 📣 DISPAROS (Bruno 27/09/2026: "coloque os disparos também na jogada"): os disparos cuja janela de DSP_JANELA dias encosta
 // no período — mesma conta da aba Disparos (cruzado pelo telefone: respondeu, veio pelo link, agendou, compareceu, comprou)
@@ -32611,6 +32616,8 @@ setInterval(function(){ try { carregarWS(); } catch (e) {} }, 30 * 60000);
 .rl-wstag.rec { background:rgba(229,143,208,.16); color:#e58fd0; }
 .rl-wstag.ws { background:rgba(246,163,80,.16); color:#f6a350; }
 .rl-wscai { cursor:pointer; white-space:nowrap; }
+.rl-wed-fora { margin-top:8px; padding:7px 9px; border-radius:10px; background:rgba(229,143,208,.08); border:1px dashed rgba(229,143,208,.4); font-size:.7rem; line-height:1.4; cursor:pointer; }
+.rl-wed-fora b { color:#e58fd0; }
 .rl-wscomo { margin-top:14px; padding:14px 16px; border-radius:14px; border:1px solid rgba(246,163,80,.28); background:rgba(246,163,80,.06); font-size:.8rem; line-height:1.5; }
 .rl-wscomo p { margin:6px 0 0; }
 .cm-bloco-t { display:flex; justify-content:space-between; gap:8px; font-size:.78rem; font-weight:800; margin-bottom:9px; }
@@ -32863,7 +32870,7 @@ function _cmExtrasDe(p) {
 }
 function _cmCardCloser(p, cor, premios, mes, i, pos) {
   var EX = _cmExtrasDe(p), comV = (+p.comissao || 0) - EX.extra - EX.bonus;
-  var GB = p._gest, compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', comV, '#3ddc97'], ['Extras', EX.extra + EX.bonus, '#5eead4'], ['Prêmio', p.premio, '#ffd166']].concat(GB ? [['Gestão', GB.gest, '#b98aff'], ['Bônus do time', GB.bonus, '#ffb347']] : []).filter(function(x){ return x[1] > 0; });
+  var GB = p._gest && !p._gestNaPlan ? p._gest : null, compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', comV, '#3ddc97'], ['Extras', EX.extra + EX.bonus, '#5eead4'], ['Prêmio', p.premio, '#ffd166']].concat(GB ? [['Gestão', GB.gest, '#b98aff'], ['Bônus do time', GB.bonus, '#ffb347']] : []).filter(function(x){ return x[1] > 0; });
   var lider = pos === 1 && p.total > 0, pm = p.recebido ? p.comissao / p.recebido : 0;
   var h = '<div class="cm-card cm-clica cm-entra' + (lider ? ' cm-lider' : '') + '" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'closers\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as vendas do mês">'
     + _cmBotaoAtu()
@@ -32964,15 +32971,20 @@ function _cmRosca(grupos, total) {
 // "para mim é 0,6% em cima do faturamento total do workshop e 1,2% em cima do faturamento do diagnóstico" · bônus da meta do time
 // só o maior (M 500 · G 1.000 · GG 1.500) · fixo 4.000 · "ganho em cima das comissões das minhas vendas, sem bônus, só a porcentagem".
 // 03/11/2026: "pré e pós devem contar como diagnóstico no mês, no meu pagamento" · "o cara deve estar vinculado ao mês que ele fez
-// o workshop": as mesmas linhas do Relatório (rlLinhas/rlEhWs) — workshop = do pitch da edição da pessoa até 15 dias, no mês da
-// edição; antecipação e recuperação de workshop entram no diagnóstico. Vendido = status "Vendido" da Visão Geral.
+// o workshop": workshop = do pitch da edição da pessoa até 15 dias (rlEhWs); antecipação e recuperação de workshop entram no
+// diagnóstico. A venda conta no mês em que fechou ("isso vale para o pagamento quando fez bloqueio, não para o relatório"). Vendido = status "Vendido" da Visão Geral.
 // Calculado no dash: a planilha de comissões continua com a regra antiga até ser trocada.
 var CM_BRUNO_REGRA = { de: '2026-10', diag: 0.012, ws: 0.006, bonus: { M: 500, G: 1000, GG: 1500 } };
 function _cmGestaoBruno(mes) {
   if (typeof V2 === 'undefined' || !(V2.rows || []).length || typeof rlLinhas !== 'function') return null;
   var a = new Date(+mes.slice(0, 4), +mes.slice(5, 7) - 1, 1), b = new Date(a.getFullYear(), a.getMonth() + 1, 1);
-  var D = { L: [], v: 0 }, W = { L: [], v: 0 };
-  rlLinhas({ ini: a.getTime(), fim: b.getTime() }).forEach(function(r) { if (r.sn !== 'vendido') return; var o = rlEhWs(r) ? W : D; o.L.push(r); o.v += r.valor || 0; });
+  var D = { L: [], v: 0 }, W = { L: [], v: 0, ild: [] }, ini = a.getTime(), fim = b.getTime();
+  // 03/11/2026 (Bruno: "0,6% workshop e ILD (leads até 15 dias do pitch)"): ILD = pessoa da imersão no app, do 2º dia até 15 dias depois
+  (V2.rows || []).forEach(function(r) {
+    if (r.sn !== 'vendido' || !(r.date instanceof Date)) return;
+    var c = _cmGestaoClasse(r); if (c.t < ini || c.t >= fim) return;
+    var o = c.b === 'dg' ? D : W; o.L.push(r); o.v += r.valor || 0; if (c.b === 'ild') W.ild.push(r);
+  });
   var base = D.v + W.v, MT = metasDoMes(a), tier = null, prox = null;
   ['M', 'G', 'GG'].forEach(function(t) { if (!MT[t]) return; if (base >= MT[t]) tier = t; else if (!prox) prox = t; });
   var g = { mes: mes, D: D, W: W, base: base, MT: MT, tier: tier, prox: prox, bonus: tier ? CM_BRUNO_REGRA.bonus[tier] : 0, gD: D.v * CM_BRUNO_REGRA.diag, gW: W.v * CM_BRUNO_REGRA.ws, wsOk: typeof WSL !== 'undefined' && WSL.carregado };
@@ -32980,6 +32992,16 @@ function _cmGestaoBruno(mes) {
   g.ant = D.L.filter(function(r) { return rlGrupoR(r) === RL_WS_ANT; }); g.rec = D.L.filter(function(r) { return rlGrupoR(r) === RL_WS_REC; });
   return g;
 }
+function _cmGestaoClasse(r) {
+  if (rlWsInfo(r)) return rlEhWs(r) ? { b: 'ws', t: rlDataConta(r) } : { b: 'dg', t: r.date.getTime() };
+  var x = null; try { x = wsDoTel(r.telefone); } catch (e) {}
+  if (x && /ILD/i.test(x.prog || '') && x.d2 instanceof Date) {
+    var d2 = _rlDia0(x.d2), k = Math.round((_rlDia0(r.date) - d2) / 864e5);
+    if (k >= 0 && k <= (typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15)) return { b: 'ild', t: r.date.getTime() };
+  }
+  return { b: 'dg', t: r.date.getTime() };
+}
+function _cmGestNaPlan(p) { return (p.linhas || []).some(function(l) { return l.t === 'extra' && /^(Gestão do time|Bônus de atingimento do time)/i.test(String(l.p || l.n || '')); }); }
 function _cmAplicarRegraBruno(d) {
   if (!d || !d.mes || d.mes < CM_BRUNO_REGRA.de || !d.grupos) return;
   var falta = false;
@@ -32988,6 +33010,8 @@ function _cmAplicarRegraBruno(d) {
     if (!p._plan) p._plan = { total: +p.total || 0, premio: +p.premio || 0, ganhaPremio: p.ganhaPremio };
     var G = _cmGestaoBruno(d.mes); p._gest = G;
     if (!G || !G.wsOk) falta = true;
+    p._gestNaPlan = _cmGestNaPlan(p);
+    if (p._gestNaPlan) { p.total = p._plan.total; p.premio = p._plan.premio; p.ganhaPremio = false; return; }
     if (!G) { p.total = p._plan.total; p.premio = p._plan.premio; p.ganhaPremio = p._plan.ganhaPremio; return; }
     p.premio = 0; p.ganhaPremio = false;
     p.total = (+p.fixo || 0) + (+p.comissao || 0) + G.gest + G.bonus;
@@ -33008,14 +33032,15 @@ function _cmGestaoHtml(p, cor) {
   var lst = function(t, L) { return 'onclick="event.stopPropagation();rlAbrirLista(\'' + _rlRegLista(t, L) + '\')" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();this.click();}" tabindex="0" role="button"'; };
   var lin = function(rot, sub, o, pct, v, t) { return '<div class="cm-gl" ' + lst(t, o.L) + ' title="Ver as vendas"><span><b>' + rot + '</b><small>' + sub + '</small></span><span class="cm-gl-n">' + o.L.length + ' · ' + cmR(o.v, false) + ' × ' + pct + '</span><b>' + cmR(v) + '</b></div>'; };
   var ts = ['M', 'G', 'GG'].filter(function(t) { return G.MT[t]; }), topo = G.prox ? G.MT[G.prox] : G.MT[ts[ts.length - 1]] * 1.1;
-  var h = '<div class="cm-bloco cm-gest"><div class="cm-bloco-t"><span>🧭 Gestão do time · ' + nm + '</span><span>' + cmR(G.gest + G.bonus, false) + '</span></div>'
+  var h = '<div class="cm-bloco cm-gest"><div class="cm-bloco-t"><span>🧭 Gestor · gestão do time em ' + nm + '</span><span>' + cmR(G.gest + G.bonus, false) + '</span></div>'
     + lin('🩺 Diagnóstico', 'vendido no mês · inclui ⏩ antecipação e 🔁 recuperação de workshop' + (G.ant.length + G.rec.length ? ' (' + (G.ant.length + G.rec.length) + ')' : ''), G.D, '1,2%', G.gD, 'Diagnóstico de ' + nm + ' · vendas')
-    + lin('🎓 Workshop', 'participantes da edição de ' + nm + ', do pitch até 15 dias depois', G.W, '0,6%', G.gW, 'Workshop da edição de ' + nm + ' · vendas')
+    + lin('🎓 Workshop e 🏟️ ILD', 'vendidos em ' + nm + ' até 15 dias do pitch da edição da pessoa' + (G.W.ild.length ? ' · ' + G.W.ild.length + ' de ILD' : ''), G.W, '0,6%', G.gW, 'Workshop e ILD de ' + nm + ' · vendas')
     + '<div class="cm-bloco-t" style="margin-top:12px;"><span>🏆 Meta do time ' + cmR(G.base, false) + '</span><span>' + (G.tier ? 'bônus ' + cmR(G.bonus, false) + ' (' + G.tier + ')' : 'ainda sem bônus') + '</span></div>'
     + _cmTrilho(G.base / topo, '#ffd166', ts.filter(function(t) { return G.MT[t] <= topo; }).map(function(t) { return G.MT[t] / topo; }), true)
     + '<div class="cm-marcas">' + ts.filter(function(t) { return G.MT[t] <= topo; }).map(function(t) { return '<span class="' + (G.base >= G.MT[t] ? 'ok' : '') + '" style="left:' + _cmPct(G.MT[t] / topo) + '">' + t + ' ' + cmMil(G.MT[t]) + '</span>'; }).join('') + '</div>'
     + '<div class="cm-dica">' + (G.prox ? 'Faltam <b>' + cmR(G.MT[G.prox] - G.base, false) + '</b> para a ' + G.prox + ' (bônus de <b>' + cmR(CM_BRUNO_REGRA.bonus[G.prox], false) + '</b>).' : '🎉 Bateu a GG.') + '</div>'
-    + '<div class="cm-gest-nota">Suas vendas entram só pela % (sem o prêmio individual). Conta feita no dash: a planilha de comissões ainda mostra a regra antiga (' + cmR(p._plan ? p._plan.total : 0) + ').' + (G.wsOk ? '' : ' ⏳ lendo o app do workshop…') + '</div></div>';
+    + '<div class="cm-gest-nota">Você recebe como gestor: fixo + 1,2% das vendas normais + 0,6% do workshop e ILD + bônus de atingimento do time + a % das suas vendas (sem prêmio de closer). '
+    + (p._gestNaPlan ? '✅ A planilha de comissões já tem essas linhas (o robô refaz a cada hora); esta conta do dash é a conferência.' : 'Conta feita no dash: a planilha de comissões ainda mostra a regra antiga (' + cmR(p._plan ? p._plan.total : 0) + ').') + (G.wsOk ? '' : ' ⏳ lendo o app do workshop…') + '</div></div>';
   return h;
 }
 function renderComissoes() {
@@ -33353,6 +33378,7 @@ function _cmEsc(e) { if (e.key === 'Escape') cmFechar(); }
 function cmDetFiltro(f) { CMD.filtro = f; cmDetRender(); }
 function _cmTagOrigem(l) {
   // 50% do workshop só para quem fez aplicação (Bruno 02/10/2026) — o robô marca "Workshop (sem aplicação)" e paga normal
+  if (/^(Recupera|Antecipa)[^ ]* de workshop/i.test(l.o || '')) return dspEsc(l.o) + ' <span class="cm-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;" title="Veio do workshop, mas fora dos 15 dias do pitch da edição dela: comissão normal">fora dos 15 dias · normal</span>';
   if (/^Workshop \(sem aplica/.test(l.o || '')) return 'Workshop <span class="cm-tag" style="background:rgba(255,255,255,.06);color:#9aa3b2;" title="Veio do workshop mas não fez aplicação no app: comissão normal">sem aplicação · normal</span>';
   var o = dspEsc(l.o || '—');
   if (l.o === 'Workshop' && l.wd != null) {
