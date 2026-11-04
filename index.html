@@ -2937,7 +2937,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-03-1825';
+var VERSAO_DASH = '2026-11-04-0805';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -32885,12 +32885,19 @@ function _cmBEde(p) {
   return be;
 }
 // fim do cartão: o que é à parte da comissão (bônus e extras, fixo) e o total do mês
-function _cmAParte(be, itens, fx, com) {
-  if (!(be > 0.004) && !(fx > 0)) return '';
-  return (be > 0.004 ? '<div class="cm-fixo-lado cm-be-lado"><span>⭐ Bônus e extras (à parte da comissão)</span><b>' + cmR(be, false) + '</b></div>'
-      + itens.map(function(x) { return '<div class="cm-parte cm-item"><span>' + (_cmEhBonus(x.d) ? '🏆 ' : '⭐ ') + dspEsc(x.d) + '</span><span></span><b>' + cmR(x.v, false) + '</b></div>'; }).join('') : '')
+function _cmAParte(bn, itBn, ex, itEx, fx, com) {   // 04/11/2026: 🏆 bônus · ⭐ extras · 💼 fixo, cada um à parte da comissão
+  if (!(bn > 0.004) && !(ex > 0.004) && !(fx > 0)) return '';
+  var lista = function(L, ic) { return L.map(function(x) { return '<div class="cm-parte cm-item"><span>' + ic + ' ' + dspEsc(x.d) + '</span><span></span><b>' + cmR(x.v, false) + '</b></div>'; }).join(''); };
+  return (bn > 0.004 ? '<div class="cm-fixo-lado cm-bn-lado"><span>🏆 Bônus (à parte da comissão)</span><b>' + cmR(bn, false) + '</b></div>' + lista(itBn, '🏆') : '')
+    + (ex > 0.004 ? '<div class="cm-fixo-lado cm-be-lado"><span>⭐ Extras (à parte da comissão)</span><b>' + cmR(ex, false) + '</b></div>' + lista(itEx, '⭐') : '')
     + (fx > 0 ? '<div class="cm-fixo-lado"><span>💼 Fixo (salário, à parte da comissão)</span><b>' + cmR(fx, false) + '</b></div>' : '')
-    + '<div class="cm-fixo-lado cm-fixo-folha"><span>A receber no mês (comissões' + (be > 0.004 ? ' + bônus e extras' : '') + (fx > 0 ? ' + fixo' : '') + ')</span><b>' + cmR(com + be + fx, false) + '</b></div>';
+    + '<div class="cm-fixo-lado cm-fixo-folha"><span>A receber no mês (comissões' + (bn > 0.004 ? ' + bônus' : '') + (ex > 0.004 ? ' + extras' : '') + (fx > 0 ? ' + fixo' : '') + ')</span><b>' + cmR(com + bn + ex + fx, false) + '</b></div>';
+}
+// quanto é bônus de uma pessoa (prêmio, bônus de atingimento, bônus de meta)
+function _cmBnDe(p) {
+  var E = _cmExtrasDe(p), gb = (p._gest && !p._gestNaPlan && +p._gest.bonus) || 0, bn = E.bonus + (+p.premio || 0) + gb;
+  if (!E.temLinhas && +p.bonus > 0) bn += +p.bonus;
+  return bn;
 }
 function _cmCardCloser(p, cor, premios, mes, i, pos) {
   var fxAp = +p.fixo || 0;   // 03/11/2026 (Bruno: "separa o fixo" · "deixe claro" · "mude em todos"): o fixo fica à parte, fora da conta de comissão
@@ -32933,7 +32940,7 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
       + (EX.gest > 0 ? '<div class="cm-parte"><span>🧭 Gestão do time (1,2% + 0,6%)</span>' + _cmTrilho(EX.gest / mx, '#ffb347') + '<b>' + cmR(EX.gest, false) + '</b></div>' : '')
       + (GB ? '<div class="cm-parte"><span>🧭 Gestão (1,2% diag. + 0,6% workshop)</span>' + _cmTrilho(GB.gest / mx, '#b98aff') + '<b>' + cmR(GB.gest, false) + '</b></div>' : '')
       + soma('Total de comissões', totC)
-      + _cmAParte(be, _cmExtrasItens(p).concat(_cmBonusItens(p)), fxAp, totC)
+      + _cmAParte(be - EX.extra, _cmBonusItens(p), EX.extra, _cmExtrasItens(p), fxAp, totC)
       + '</div></div>';
   }
   return h + _cmRevCard({ k: 'closers' }, p) + '<div class="cm-ver">Ver as vendas do mês →</div></div>';
@@ -32985,7 +32992,7 @@ function _cmCardPre(p, cor, faixas, wkConta, tipo, i) {
     + escada + '</div>'
     + (R ? _cmFunil(marc, apar, vds, cor) : '')
     + '<div class="cm-stats">' + [['Lead apareceu', p.realizadas], ['Workshop', p.workshop], ['Vendas', p.vendas], ['Spark', p.spark], ['Growth', p.growth]].map(function(s){ return '<div class="cm-stat"><b>' + s[1] + '</b><small>' + s[0] + '</small></div>'; }).join('') + '</div>'
-    + ((be > 0.004 || fxAp > 0) ? '<div class="cm-bloco">' + _cmAParte(be, itBE, fxAp, totC) + '</div>' : '')
+    + ((be > 0.004 || fxAp > 0) ? '<div class="cm-bloco">' + _cmAParte(EXp.bonus, itBE.filter(function(x){ return _cmEhBonus(x.d); }), be - EXp.bonus, itBE.filter(function(x){ return !_cmEhBonus(x.d); }), fxAp, totC) + '</div>' : '')
     + _cmRevCard({ k: tipo }, p) + '<div class="cm-ver">Ver as reuniões do mês →</div></div>';
 }
 function _cmRosca(grupos, total) {
@@ -33080,25 +33087,25 @@ function _cmGestaoHtml(p, cor) {
 // com outros — extras junto com outros". Na visão do adm: 🧭 Gestão (fixo do Bruno + 1,2% + 0,6% + bônus do time), 🤝 Closers (só
 // as vendas; o cartão do Bruno mostra só a comissão das vendas dele), 📞 SDR, 📱 Social Selling e ⭐ Extras (dias de workshop,
 // plantões, encontros e bônus de todo mundo junto, fora do cartão de cada um). O total da folha não muda.
-CM_GRUPO_COR.gestao = '#ffb347'; CM_GRUPO_COR.extras = '#5eead4'; CM_GRUPO_COR.fixo = '#6ea8ff';
-var CM_GRUPO_ICO = { closers: '🤝', sdr: '📞', ss: '📱', gestao: '🧭', extras: '⭐', fixo: '💼' };
+CM_GRUPO_COR.gestao = '#ffb347'; CM_GRUPO_COR.extras = '#5eead4'; CM_GRUPO_COR.fixo = '#6ea8ff'; CM_GRUPO_COR.bonus = '#ffd166';
+var CM_GRUPO_ICO = { closers: '🤝', sdr: '📞', ss: '📱', gestao: '🧭', extras: '⭐', fixo: '💼', bonus: '🏆' };
 function _cmExtraNome(l) { var r = String(l.p || '').split(' · ').slice(1).join(' · '); return l.n ? String(l.n) + (r ? ' · ' + r : '') : String(l.p || 'Extra'); }
 function _cmEhGestLinha(desc) { return /^(Gestão do time|Bônus de atingimento do time)/i.test(String(desc || '')); }
 function _cmVisaoAdm(d) {
-  var gest = [], ext = [], fixos = [], soma = function(L) { return L.reduce(function(s, x) { return s + (+x.v || 0); }, 0); };
+  var gest = [], ext = [], bons = [], fixos = [], soma = function(L) { return L.reduce(function(s, x) { return s + (+x.v || 0); }, 0); };
   var copia = function(o) { var c = {}; Object.keys(o).forEach(function(k) { c[k] = o[k]; }); return c; };
   var grupos = d.grupos.map(function(g) {
     var g2 = copia(g);
     g2.pessoas = g.pessoas.map(function(p) {
-      var q = copia(p), itens = [], gl = [];
+      var q = copia(p), itens = [], gl = [], bn = [];   // itens = extras · bn = bônus
       if (g.k === 'closers') {
         (p.linhas || []).forEach(function(l) {
           if (l.t !== 'extra') return;
           var ds = String(l.p || l.n || 'Extra');
-          if (_cmEhGestLinha(ds) && !/^Bônus de atingimento/i.test(ds)) gl.push({ d: ds, v: +l.c || 0 }); else itens.push({ d: _cmExtraNome(l), v: +l.c || 0 });   // bônus de atingimento → Bônus e extras
+          if (_cmEhGestLinha(ds) && !/^Bônus de atingimento/i.test(ds)) gl.push({ d: ds, v: +l.c || 0 }); else (/^Bônus de atingimento/i.test(ds) || _cmEhBonus(l.n || l.p) ? bn : itens).push({ d: _cmExtraNome(l), v: +l.c || 0 });   // bônus → Bônus; o resto → Extras
         });
-        (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { itens.push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
-        var sx = soma(itens), sg = soma(gl), prA = +p.premio || 0, gbA = (p._gest && !p._gestNaPlan && +p._gest.bonus) || 0;
+        (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { (_cmEhBonus(x.d) ? bn : itens).push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
+        var sx = soma(itens) + soma(bn), sg = soma(gl), prA = +p.premio || 0, gbA = (p._gest && !p._gestNaPlan && +p._gest.bonus) || 0;
         q.linhas = (p.linhas || []).filter(function(l) { return l.t !== 'extra'; }); q.extras = [];
         q.partes = (p.partes || []).filter(function(x) { return !/^(extras|gestão do time)/i.test(x.nome || ''); });
         q.comissao = (+p.comissao || 0) - sx - sg;
@@ -33107,15 +33114,16 @@ function _cmVisaoAdm(d) {
           gest.push({ nome: p.nome, aba: p.aba, _src: p, fixo: 0, linhas: gl, total: (+p.total || 0) - q.comissao - sx - (+p.fixo || 0) - prA - gbA });   // fixo, bônus e extras ficam à parte
         } else { q.total = (+p.total || 0) - sx - (+p.fixo || 0) - prA; q.fixo = 0; }
         q.premio = 0;
-        if (prA > 0) itens.push({ d: 'Prêmio pela meta', v: prA });
-        if (gbA > 0) itens.push({ d: 'Bônus de atingimento do time (' + p._gest.tier + ')', v: gbA });
+        if (prA > 0) bn.push({ d: 'Prêmio pela meta', v: prA });
+        if (gbA > 0) bn.push({ d: 'Bônus de atingimento do time (' + p._gest.tier + ')', v: gbA });
       } else {
-        (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { itens.push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
-        if (!itens.length && +p.bonus > 0) itens.push({ d: 'Bônus e extras', v: +p.bonus });
-        var sp = soma(itens);
+        (Array.isArray(p.extras) ? p.extras : []).forEach(function(x) { (_cmEhBonus(x.d) ? bn : itens).push({ d: String(x.d || 'Extra'), v: +x.v || 0 }); });
+        if (!itens.length && !bn.length && +p.bonus > 0) bn.push({ d: 'Bônus e extras (aba Extras)', v: +p.bonus });
+        var sp = soma(itens) + soma(bn);
         q.extras = []; q.bonus = 0; q.variavel = (+p.variavel || 0) - sp; q.total = (+p.total || 0) - sp - (+p.fixo || 0); q.fixo = 0;
       }
-      itens = itens.filter(function(x) { return Math.abs(x.v) >= 0.005; });
+      itens = itens.filter(function(x) { return Math.abs(x.v) >= 0.005; }); bn = bn.filter(function(x) { return Math.abs(x.v) >= 0.005; });
+      if (bn.length) bons.push({ nome: p.nome, aba: p.aba, gk: g.k, tipo: 'bonus', papel: p._plan ? 'Gestor' : g.k === 'closers' ? 'Closer' : g.nome, itens: bn, total: soma(bn) });
       if (+p.fixo > 0) fixos.push({ nome: p.nome, aba: p.aba, gk: g.k, papel: p._plan ? 'Gestor' : g.k === 'closers' ? 'Closer' : g.nome, total: +p.fixo });
       if (itens.length) ext.push({ nome: p.nome, aba: p.aba, gk: g.k, papel: p._plan ? 'Gestor' : g.k === 'closers' ? 'Closer' : g.nome, itens: itens, total: soma(itens) });
       return q;
@@ -33125,7 +33133,8 @@ function _cmVisaoAdm(d) {
   var out = [];
   if (gest.length) out.push({ k: 'gestao', nome: 'Gestão', pessoas: gest });
   out = out.concat(grupos);
-  if (ext.length) out.push({ k: 'extras', nome: 'Bônus e extras', pessoas: ext });
+  if (bons.length) out.push({ k: 'bonus', nome: 'Bônus', pessoas: bons });
+  if (ext.length) out.push({ k: 'extras', nome: 'Extras', pessoas: ext });
   if (fixos.length) out.push({ k: 'fixo', nome: 'Fixo', pessoas: fixos });
   return out;
 }
@@ -33151,14 +33160,14 @@ function _cmCardGestor(x, cor, i) {
 }
 function _cmCardExtras(x, cor, i) {
   var mx = Math.max.apply(null, x.itens.map(function(it) { return Math.abs(it.v); })) || 1;
-  var clic = x.gk === 'closers';
+  var clic = x.gk === 'closers' && x.tipo !== 'bonus', bon = x.tipo === 'bonus';
   return '<div class="cm-card cm-entra' + (clic ? ' cm-clica' : '') + '" style="--i:' + i + ';--cm-cor:' + cor + ';"'
     + (clic ? ' tabindex="0" role="button" title="Ver os extras" onclick="cmAbrir(\'closers\',\'' + dspEsc(x.aba) + '\',\'extras\')" onkeydown="if(event.key===\'Enter\')this.click()"' : '') + '>'
     + '<div class="cm-pessoa">' + _cmAvatar(x.nome, cor, 52, '') + '<div class="cm-nome"><b>' + dspEsc(String(x.nome || '').replace(/\s*\(.*\)$/, '')) + '</b><small>' + dspEsc(x.papel) + '</small></div>'
-    + '<div class="cm-valor"><b>' + _cmNum(x.total) + '</b><small>em bônus e extras</small></div></div>'
+    + '<div class="cm-valor"><b>' + _cmNum(x.total) + '</b><small>' + (bon ? 'em bônus' : 'em extras') + '</small></div></div>'
     + '<div class="cm-bloco"><div class="cm-partes">'
     + x.itens.map(function(it) { var b = _cmEhBonus(it.d); return '<div class="cm-parte"><span>' + (b ? '🏆 ' : '⭐ ') + dspEsc(it.d) + '</span>' + _cmTrilho(Math.abs(it.v) / mx, b ? '#ffb347' : '#5eead4') + '<b>' + cmR(it.v, false) + '</b></div>'; }).join('')
-    + '<div class="cm-parte cm-soma"><span>Total de bônus e extras</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div>'
+    + '<div class="cm-parte cm-soma"><span>Total de ' + (bon ? 'bônus' : 'extras') + '</span><span></span><b>' + cmR(x.total, false) + '</b></div></div></div>'
     + (clic ? '<div class="cm-ver">Ver os extras →</div>' : '') + '</div>';
 }
 function cmFiltroTopo(t, v) {
@@ -33207,8 +33216,8 @@ function renderComissoes() {
   // 03/11/2026 (Bruno: "tem como tirar o fixo de cada um do considerar comissão" · "ou separa o fixo" · "deixe claro"): o total é só de
   // comissão; o fixo é somado à parte (FX) e a folha = comissões + fixo
   var somaG = function(L){ return L.reduce(function(s2, g){ return s2 + g.pessoas.reduce(function(a, q){ return a + (+q.total || 0); }, 0); }, 0); };
-  var ehFx = function(g){ return g.k === 'fixo'; }, ehBE = function(g){ return g.k === 'extras'; }, semFx = function(g){ return g.k !== 'fixo' && g.k !== 'extras'; };   // comissões = sem fixo, bônus e extras
-  var filtrado = !!(fP || fO), VGc = VG.filter(semFx), TF = somaG(VGc), FX = somaG(VG.filter(ehFx)), TFtudo = somaG(VGtudo.filter(semFx)), FXtudo = somaG(VGtudo.filter(ehFx)), BE = somaG(VG.filter(ehBE)), BEtudo = somaG(VGtudo.filter(ehBE));
+  var ehFx = function(g){ return g.k === 'fixo'; }, ehBE = function(g){ return g.k === 'extras'; }, ehBn = function(g){ return g.k === 'bonus'; }, semFx = function(g){ return g.k !== 'fixo' && g.k !== 'extras' && g.k !== 'bonus'; };   // comissões = sem fixo, bônus e extras
+  var filtrado = !!(fP || fO), VGc = VG.filter(semFx), TF = somaG(VGc), FX = somaG(VG.filter(ehFx)), TFtudo = somaG(VGtudo.filter(semFx)), FXtudo = somaG(VGtudo.filter(ehFx)), BE = somaG(VG.filter(ehBE)), BEtudo = somaG(VGtudo.filter(ehBE)), BN = somaG(VG.filter(ehBn)), BNtudo = somaG(VGtudo.filter(ehBn));
   var pessoasF = []; VGtudo.forEach(function(g){ g.pessoas.forEach(function(q){ var k = nk(q); if (pessoasF.every(function(x){ return x.k !== k; })) pessoasF.push({ k: k, n: String(q.nome || '').replace(/\s*\(.*\)$/, '').trim() }); }); });
   CM._fPessoas = pessoasF;
   var chipF = function(on, rot, js){ return '<button class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="' + js + '">' + rot + '</button>'; };
@@ -33233,9 +33242,11 @@ function renderComissoes() {
     + '<div class="cm-resumo"><b>' + nVendas + '</b> vendas pagando comissão · <b>' + nReu + '</b> reuniões em que o lead apareceu (SDRs e Social Selling)</div></div>'
     + '<div class="cm-lado">' + _cmRosca(VGc, TF) + '<div class="cm-total"><small>' + (filtrado ? 'Comissões do filtro' : 'Total de comissões') + '</small><b>' + _cmNum(TF) + '</b>'
       + '<small>' + (filtrado ? 'de ' + cmR(TFtudo, false) + ' de comissões' : 'vendas e gestão · sem bônus, extras e fixo') + '</small>'
-      + (function(){ var be = filtrado ? BE : BEtudo, fx = filtrado ? FX : FXtudo; return (be > 0 ? '<div class="cm-fixo-lado cm-be-lado"><span>⭐ Bônus e extras (à parte)</span><b>' + cmR(be, false) + '</b></div>' : '')
+      + (function(){ var bn = filtrado ? BN : BNtudo, be = filtrado ? BE : BEtudo, fx = filtrado ? FX : FXtudo;
+          return (bn > 0 ? '<div class="cm-fixo-lado cm-bn-lado"><span>🏆 Bônus (à parte)</span><b>' + cmR(bn, false) + '</b></div>' : '')
+          + (be > 0 ? '<div class="cm-fixo-lado cm-be-lado"><span>⭐ Extras (à parte)</span><b>' + cmR(be, false) + '</b></div>' : '')
           + (fx > 0 ? '<div class="cm-fixo-lado"><span>💼 Fixo (salário, à parte)</span><b>' + cmR(fx, false) + '</b></div>' : '')
-          + (be + fx > 0 ? '<div class="cm-fixo-lado cm-fixo-folha"><span>Folha = comissões' + (be > 0 ? ' + bônus e extras' : '') + (fx > 0 ? ' + fixo' : '') + '</span><b>' + cmR((filtrado ? TF : TFtudo) + be + fx, false) + '</b></div>' : ''); })()
+          + (bn + be + fx > 0 ? '<div class="cm-fixo-lado cm-fixo-folha"><span>Folha = comissões' + (bn > 0 ? ' + bônus' : '') + (be > 0 ? ' + extras' : '') + (fx > 0 ? ' + fixo' : '') + '</span><b>' + cmR((filtrado ? TF : TFtudo) + bn + be + fx, false) + '</b></div>' : ''); })()
       + '</div></div></div>'
     + '<div class="cm-folha">' + todas.map(function(x){ return '<i style="background:' + x.cor + ';" data-w="' + (x.p.total / (TF || 1) * 100).toFixed(2) + '%" title="' + dspEsc(x.p.nome) + ': ' + cmR(x.p.total) + '"></i>'; }).join('') + '</div>'
     + '<div class="cm-leg">' + todas.map(function(x){ return '<span><em style="background:' + x.cor + ';"></em>' + dspEsc(x.p.nome.replace(/\s*\(.*\)$/, '')) + (x.g.k !== 'closers' ? ' <span class="hint">(' + x.g.nome + ')</span>' : '') + ' <b>' + cmR(x.p.total, false) + '</b></span>'; }).join('') + '</div>'
@@ -33255,12 +33266,13 @@ function renderComissoes() {
     }
     var verTodas = g.k === 'closers' ? '<button class="cm-todas" onclick="cmAbrir(\'todos\',\'\')">📋 Ver todas as vendas</button>' : g.k === 'sdr' ? '<button class="cm-todas" onclick="cmAbrir(\'todospre\',\'\')">📋 Ver todas as reuniões</button>' : '';
     h += '<div class="cm-h">' + (CM_GRUPO_ICO[g.k] || '•') + ' ' + dspEsc(g.nome) + ' <small>' + cmR(t) + '</small>' + verTodas + '</div>'
-      + (g.k === 'gestao' ? '<div class="hint" style="margin:-4px 0 10px;">O que o Bruno recebe como gestor: 1,2% e 0,6% das vendas do time. O bônus de atingimento fica em ⭐ Bônus e extras; as vendas dele, em Closers; o fixo, em 💼 Fixo.</div>'
-        : g.k === 'extras' ? '<div class="hint" style="margin:-4px 0 10px;">Bônus (prêmio pela meta, bônus de atingimento do time, bônus de meta) e extras (dias de workshop, plantões, encontros, boletos antigos) de todo mundo. Ficam só aqui, fora das comissões.</div>' : '')
+      + (g.k === 'gestao' ? '<div class="hint" style="margin:-4px 0 10px;">O que o Bruno recebe como gestor: 1,2% e 0,6% das vendas do time. O bônus de atingimento fica em 🏆 Bônus; as vendas dele, em Closers; o fixo, em 💼 Fixo.</div>'
+        : g.k === 'bonus' ? '<div class="hint" style="margin:-4px 0 10px;">Prêmio pela meta dos closers, bônus de atingimento do time e bônus de meta. Ficam só aqui, fora das comissões.</div>'
+        : g.k === 'extras' ? '<div class="hint" style="margin:-4px 0 10px;">Dias de workshop, plantões, encontros e outros extras de todo mundo. Ficam só aqui, fora das comissões.</div>' : '')
       + '<div class="cm-grade">';
     g.pessoas.slice().sort(function(a, b){ return b.total - a.total; }).forEach(function(p, k) {
-      p._ant = g.k === 'gestao' || g.k === 'extras' || p._soVendas ? null : _cmAnterior(g, p, d.mes);
-      h += g.k === 'closers' ? _cmCardCloser(p, corDe(p), d.premios || [], d.mes, i++, k + 1) : g.k === 'gestao' ? _cmCardGestor(p, corDe(p), i++) : g.k === 'extras' ? _cmCardExtras(p, corDe(p), i++) : _cmCardPre(p, corDe(p), g.faixas, g.workshopContaFaixa, g.k, i++);
+      p._ant = g.k === 'gestao' || g.k === 'extras' || g.k === 'bonus' || p._soVendas ? null : _cmAnterior(g, p, d.mes);
+      h += g.k === 'closers' ? _cmCardCloser(p, corDe(p), d.premios || [], d.mes, i++, k + 1) : g.k === 'gestao' ? _cmCardGestor(p, corDe(p), i++) : g.k === 'extras' || g.k === 'bonus' ? _cmCardExtras(p, corDe(p), i++) : _cmCardPre(p, corDe(p), g.faixas, g.workshopContaFaixa, g.k, i++);
     });
     h += '</div>';
   });
@@ -33312,6 +33324,8 @@ setTimeout(function(){ try { if (_cmPode() && _cmTok() && !CM.carregando && !CM.
 .cm-fixo-lado { display:flex; justify-content:space-between; gap:12px; margin-top:8px; padding-top:6px; border-top:1px dashed rgba(110,168,255,.35); font-size:.78rem; color:#9fbfff; }
 .cm-fixo-lado b { color:#cfe0ff; font-variant-numeric:tabular-nums; }
 .cm-be-lado { border-top-color:rgba(94,234,212,.35); color:#8ff0dc; }
+.cm-bn-lado { border-top-color:rgba(255,209,102,.4); color:#ffd98a; }
+.cm-bn-lado b { color:#fff1c9; }
 .cm-be-lado b { color:#d6fff6; }
 .cm-total .cm-fixo-lado { text-align:left; }
 .cm-total .cm-fixo-lado b { display:inline; font-size:1rem; line-height:1.25; letter-spacing:0; text-shadow:none; background:none; -webkit-text-fill-color:currentColor; }
@@ -33609,7 +33623,7 @@ function cmDetRender() {
   var h = '<div class="cm-det' + (!todos && _cmAprFechado(_cmApr(g, p)) ? ' cm-fechado' : '') + '"' + (jaAberta ? ' style="animation:none"' : '') + ' role="dialog" aria-modal="true" aria-label="Detalhe de ' + dspEsc(p.nome) + '"><div class="cm-det-topo">'
     + (todos ? '<div class="avatar" style="background:linear-gradient(135deg,#b084ff,#6ea8ff);">📋</div>' : _cmAvatar(p.nome, (window._cmCorAba || {})[g.k + '|' + p.aba] || '#b084ff', 52, ''))
     + '<div class="cm-nome"><b style="font-size:1.08rem;">' + dspEsc(p.nome) + '</b><small>' + dspEsc((d.mesTxt || d.mes)) + ' · ' + dspEsc(g.nome)
-    + (!todos ? ' · ' + (function(){ var E = _cmExtrasDe(pOrig); return [[g.k === 'closers' ? 'comissão' : 'variável', (g.k === 'closers' ? p.comissao : p.variavel) - E.extra - E.bonus - (E.gest || 0)], ['gestão', E.gest || 0]]; })().filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') + (_cmBEde(pOrig) > 0.004 ? ' · bônus e extras ' + cmR(_cmBEde(pOrig), false) + ' à parte' : '') + (+pOrig.fixo > 0 ? ' · fixo ' + cmR(pOrig.fixo, false) + ' à parte' : '') : '') + '</small></div>'
+    + (!todos ? ' · ' + (function(){ var E = _cmExtrasDe(pOrig); return [[g.k === 'closers' ? 'comissão' : 'variável', (g.k === 'closers' ? p.comissao : p.variavel) - E.extra - E.bonus - (E.gest || 0)], ['gestão', E.gest || 0]]; })().filter(function(x){ return x[1] > 0; }).map(function(x){ return x[0] + ' ' + cmR(x[1], false); }).join(' + ') + (_cmBnDe(pOrig) > 0.004 ? ' · bônus ' + cmR(_cmBnDe(pOrig), false) + ' à parte' : '') + (_cmBEde(pOrig) - _cmBnDe(pOrig) > 0.004 ? ' · extras ' + cmR(_cmBEde(pOrig) - _cmBnDe(pOrig), false) + ' à parte' : '') + (+pOrig.fixo > 0 ? ' · fixo ' + cmR(pOrig.fixo, false) + ' à parte' : '') : '') + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(cab ? cab.v : (+p.total || 0) - (todos ? 0 : (+pOrig.fixo || 0) + _cmBEde(pOrig))) + '</b><small>' + (cab ? cab.t : todos ? 'a receber' : 'de comissão (sem o fixo)') + '</small></div>'
     + _cmBotaoAtu('Atualizar') + '<button class="cm-det-x" onclick="cmFechar()" aria-label="Fechar">✕</button></div>';
   h += _cmValidaBarra(g, pOrig, todos) + abas;   // v226: quanto falta revisar · validar o mês (financeiro) · contestar (dono)
