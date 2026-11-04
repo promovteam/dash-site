@@ -2937,7 +2937,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-04-0805';
+var VERSAO_DASH = '2026-11-04-1728';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -32731,7 +32731,7 @@ function cmCarregar(forcar, auto) {
   var tok = _cmTok(); if (!tok) { CM.etapa = 'pedir'; renderComissoes(); return; }
   if (CM.carregando) return;
   var mk = CM.mes || 'atual';
-  if (!CM.dados || CM.dadosMes !== mk) { CM.dados = _cmGuardado(mk); CM.dadosMes = mk; }
+  if (!CM.dados || CM.dadosMes !== mk) { CM.dados = _cmAntigas(_cmGuardado(mk)); CM.dadosMes = mk; }
   CM.carregando = true; CM.erro = ''; CM.ultimaBusca = Date.now(); if (!auto) renderComissoes();   // automática: busca quieta, sem redesenhar
   try { if (!auto && CM.dados && document.getElementById('cm-det-fundo')) cmDetRender(); } catch (eD) {}   // a janela aberta mostra "Atualizando…" (só no ↻)
   gasPedir({ action: 'comissoesPainel', token: tok, mes: CM.mes || '', forcar: !!forcar }, function(d) {
@@ -32740,7 +32740,7 @@ function cmCarregar(forcar, auto) {
     if (!d) { if (!tinha) CM.erro = 'O robô não respondeu. Tente de novo em instantes.'; else CM.aviso = 'Não consegui atualizar agora — mostrando o que estava guardado.'; }
     else if (d.precisaCodigo) { try { localStorage.removeItem('comPainelTok'); localStorage.removeItem('comPainelCache'); } catch (e) {} CM.etapa = 'pedir'; CM.dados = null; }
     else if (!d.success) { if (!tinha) CM.erro = d.error || 'erro ao ler as planilhas'; else CM.aviso = d.error || 'erro ao ler as planilhas'; }
-    else { CM.dados = d; CM.dadosMes = mk; CM.etapa = ''; CM.aviso = ''; CM.semAnim = tinha; _cmGuardar(mk, d); }
+    else { CM.dados = _cmAntigas(d); CM.dadosMes = mk; CM.etapa = ''; CM.aviso = ''; CM.semAnim = tinha; _cmGuardar(mk, d); }
     var _igual = auto && d && d.success && d.gerado === geradoAntes;   // nada mudou: não redesenha (sem piscar)
     if (!_igual) renderComissoes(); else { CM.semAnim = false; var _sl = document.querySelector('#cm-corpo .cm-sync'); if (_sl) _sl.remove(); }
     if (CMD) {
@@ -32905,7 +32905,8 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
   var EX = _cmExtrasDe(p), comV = (+p.comissao || 0) - EX.extra - EX.bonus - EX.gest;
   var gbB = (p._gest && !p._gestNaPlan && +p._gest.bonus) || 0, be = EX.extra + EX.bonus + (+p.premio || 0) + gbB, totC = (+p.total || 0) - be;   // comissão = sem bônus e extras
   var GB = p._gest && !p._gestNaPlan ? p._gest : null, compo = [['Fixo', p.fixo, '#6ea8ff'], ['Comissões', comV, '#3ddc97'], ['Gestão', EX.gest, '#ffb347']].concat(GB ? [['Gestão', GB.gest, '#b98aff']] : []).filter(function(x){ return x[1] > 0; });
-  var lider = pos === 1 && totC > 0, pm = p.recebido ? p.comissao / p.recebido : 0;
+  var VT = _cmValorTotal(p), comVen = EX.temLinhas ? comV : (+p.comissao || 0);   // 04/11/2026: valor total (de outubro em diante)
+  var lider = pos === 1 && totC > 0, pm = VT ? (VT.v ? comVen / VT.v : 0) : (p.recebido ? p.comissao / p.recebido : 0);
   var h = '<div class="cm-card cm-clica cm-entra' + (lider ? ' cm-lider' : '') + '" style="--i:' + i + ';--cm-cor:' + cor + ';" tabindex="0" role="button" onclick="cmAbrir(\'closers\',\'' + dspEsc(p.aba) + '\')" onkeydown="if(event.key===\'Enter\')this.click()" title="Ver as vendas do mês">'
     + _cmBotaoAtu()
     + (lider ? '<div class="cm-coroa">👑 líder do mês</div>' : '')
@@ -32913,7 +32914,8 @@ function _cmCardCloser(p, cor, premios, mes, i, pos) {
     + '<div class="cm-nome"><b>' + dspEsc(p.nome) + '</b><small>' + (pos ? pos + 'º lugar' : 'seu mês') + (p._ant ? ' ' + _cmDelta(p._ant, totC) : '') + '</small></div>'
     + '<div class="cm-valor"><b>' + _cmNum(totC) + '</b><small>de comissão</small></div></div>'
     + _cmCompo(compo)
-    + '<div class="cm-stats cm-stats4">' + [['Recebido', cmMil(p.recebido)], ['% médio', (pm * 100).toFixed(2).replace('.', ',') + '%'], ['Vendas', p.vendas || 0], ['Parcelas', p.parcelas || 0]]
+    + '<div class="cm-stats cm-stats4">' + (VT ? [['Valor das vendas', cmMil(VT.v)], ['% médio', (pm * 100).toFixed(2).replace('.', ',') + '%'], ['Vendas', p.vendas || 0], ['No boleto/recorrente', VT.b]]
+      : [['Recebido', cmMil(p.recebido)], ['% médio', (pm * 100).toFixed(2).replace('.', ',') + '%'], ['Vendas', p.vendas || 0], ['Parcelas', p.parcelas || 0]])
       .map(function(s){ return '<div class="cm-stat"><b>' + s[1] + '</b><small>' + s[0] + '</small></div>'; }).join('') + '</div>';
   if (p._plan) h += _cmGestaoHtml(p, cor);   // 03/11/2026: só o Bruno, de outubro em diante
   if (p.ganhaPremio && premios.length) {
@@ -33089,6 +33091,48 @@ function _cmGestaoHtml(p, cor) {
 // plantões, encontros e bônus de todo mundo junto, fora do cartão de cada um). O total da folha não muda.
 CM_GRUPO_COR.gestao = '#ffb347'; CM_GRUPO_COR.extras = '#5eead4'; CM_GRUPO_COR.fixo = '#6ea8ff'; CM_GRUPO_COR.bonus = '#ffd166';
 var CM_GRUPO_ICO = { closers: '🤝', sdr: '📞', ss: '📱', gestao: '🧭', extras: '⭐', fixo: '💼', bonus: '🏆' };
+// 04/11/2026 (Bruno: "tudo considera o valor total, não mais o que entrou" · "os antigos têm que ir para os extras"): de outubro/2026
+// em diante a comissão das vendas é pelo valor total (boleto/recorrente pela linha do 1%). Boleto da Lia ou cobrança da Guru que
+// ainda conta no mês é de venda antiga (até setembro, caso a caso) → vai para ⭐ Extras, fora da comissão das vendas.
+var CM_VALOR_TOTAL_DE = '2026-10';
+function _cmMesDe(d) { return d && /^\d{4}-\d{2}$/.test(String(d.mes || '')) ? String(d.mes) : ''; }
+function _cmAntigas(d) {
+  var mes = _cmMesDe(d);
+  if (!d || d._antOk || !mes || mes < CM_VALOR_TOTAL_DE || !Array.isArray(d.grupos)) return d;
+  d.grupos.forEach(function(g) {
+    if (g.k !== 'closers') return;
+    (g.pessoas || []).forEach(function(p) {
+      var tira = { lia: { r: 0, c: 0, n: 0 }, guru: { r: 0, c: 0, n: 0 } };
+      (p.linhas || []).forEach(function(l) {
+        if ((l.t !== 'lia' && l.t !== 'guru') || /\|1pct\|/.test(String(l.k || '')) || l.e === 'Não') return;
+        tira[l.t].r += +l.r || 0; tira[l.t].c += +l.c || 0; tira[l.t].n++;
+        l.t0 = l.t; l.t = 'extra'; l.ant = 1; l.p = String(l.p || '') + ' · venda antiga (até setembro)';
+      });
+      (p.partes || []).forEach(function(q) {
+        var t = /^Boletos da Lia/i.test(q.nome || '') ? 'lia' : /^Guru/i.test(q.nome || '') ? 'guru' : '';
+        if (!t) return;
+        q.recebido = (+q.recebido || 0) - tira[t].r; q.comissao = (+q.comissao || 0) - tira[t].c;
+        q.nome = t === 'lia' ? 'Boleto pela Lia (valor total da venda)' : 'Recorrente pela Guru (valor total da venda)';
+      });
+      p.parcelas = Math.max(0, (+p.parcelas || 0) - tira.lia.n - tira.guru.n);
+      p.recebido = (+p.recebido || 0) - tira.lia.r - tira.guru.r;
+    });
+  });
+  d._antOk = 1;
+  return d;
+}
+// valor total das vendas do mês (a base da comissão de outubro em diante) e quantas vendas foram no boleto/recorrente
+function _cmValorTotal(p) {
+  var mes = _cmMesDe(CM.dados);
+  if (!mes || mes < CM_VALOR_TOTAL_DE) return null;
+  var o = { v: 0, b: 0 };
+  (p.linhas || []).forEach(function(l) {
+    if (l.e === 'Não') return;
+    if (l.t === 'venda' && String(l.x || '') === mes) o.v += +l.v || 0;
+    else if (l.t !== 'extra' && /\|1pct\|/.test(String(l.k || ''))) o.b++;
+  });
+  return o;
+}
 function _cmExtraNome(l) { var r = String(l.p || '').split(' · ').slice(1).join(' · '); return l.n ? String(l.n) + (r ? ' · ' + r : '') : String(l.p || 'Extra'); }
 function _cmEhGestLinha(desc) { return /^(Gestão do time|Bônus de atingimento do time)/i.test(String(desc || '')); }
 function _cmVisaoAdm(d) {
@@ -33664,8 +33708,10 @@ function _cmDetCloser(p, todos, bt) {
     return h + (F.length ? '<div class="cm-cards">' + F.map(function(l){ return '<div class="cm-cli fora"><div class="cm-cli-topo"><div class="cm-cli-nome"><b>' + dspEsc(l.n) + '</b>' + (todos ? ' <span class="cm-quem">' + dspEsc(l.q || '') + '</span>' : '') + '<small>' + dspEsc(l.p || '') + ' · ' + dspEsc(l.o || '—') + '</small></div><div class="cm-cli-valor"><small>recebido</small><b style="color:#c9cfdb;">' + cmR(l.r) + '</b></div></div><div class="cm-motivo">🚫 ' + dspEsc(l.u || 'sem motivo anotado') + '</div></div>'; }).join('') + '</div>'
       : '<div class="hint" style="padding:16px;">Nada ficou de fora neste mês. 🎉</div>');
   }
-  var pct = sr ? sc / sr : 0;
-  h += '<div class="cm-kpis"><div><i>👥</i><small>Clientes</small><b>' + ordem.length + '</b></div><div><i>💵</i><small>Recebido</small><b>' + _cmNum(sr, false) + '</b></div><div><i>💰</i><small>Comissão</small><b style="color:#3ddc97;">' + _cmNum(sc) + '</b></div><div><i>📊</i><small>% médio</small><b>' + (pct * 100).toFixed(2).replace('.', ',') + '%</b></div></div>'
+  var mesVT = _cmMesDe(CM.dados), ehVT = !!mesVT && mesVT >= CM_VALOR_TOTAL_DE, vtV = 0, vtC = 0;   // 04/11/2026: valor total
+  if (ehVT) V.forEach(function(l){ if (l.e === 'Não' || l.t === 'extra') return; vtC += +l.c || 0; if (l.t === 'venda' && String(l.x || '') === mesVT) vtV += +l.v || 0; });
+  var pct = ehVT ? (vtV ? vtC / vtV : 0) : (sr ? sc / sr : 0);
+  h += '<div class="cm-kpis"><div><i>👥</i><small>Clientes</small><b>' + ordem.length + '</b></div><div><i>💵</i><small>' + (ehVT ? 'Valor das vendas' : 'Recebido') + '</small><b>' + _cmNum(ehVT ? vtV : sr, false) + '</b></div><div><i>💰</i><small>Comissão</small><b style="color:#3ddc97;">' + _cmNum(sc) + '</b></div><div><i>📊</i><small>% médio</small><b>' + (pct * 100).toFixed(2).replace('.', ',') + '%</b></div></div>'
     + '<div class="cm-quebras"><div><small>Comissão por forma de pagamento</small>' + _cmQuebra(porForma, sc) + '</div><div><small>Comissão por origem</small>' + _cmQuebra(porOrig, sc) + '</div></div>';
   if (!V.length) return h + '<div class="hint" style="padding:16px;">Nada nesse filtro.</div>';
   var TIPO = { venda: ['🤝 Venda', '#3ddc97'], lia: ['🧾 Boleto Lia', '#6ea8ff'], guru: ['🔁 Guru', '#b084ff'], extra: ['⭐ Extra', '#ffd166'] };
@@ -33689,18 +33735,18 @@ function _cmDetCloser(p, todos, bt) {
     var ls = grupos[k], venda = ls.filter(function(l){ return l.t === 'venda'; })[0], prim = venda || ls[0];
     var com = ls.reduce(function(s, l){ return s + l.c; }, 0), rec = ls.reduce(function(s, l){ return s + l.r; }, 0);
     var busca = v2norm(ls.map(function(l){ return l.n + ' ' + (l.p || '') + ' ' + (l.q || ''); }).join(' '));
-    var sub = prim.t === 'extra' ? 'Extra lançado no mês' : [dspEsc((venda || prim).p || ''), venda && venda.v ? 'venda ' + cmR(venda.v, false) : '', venda && venda.fe ? 'fechou ' + dspEsc(venda.fe) : ''].filter(Boolean).join(' · ');
+    var sub = prim.t === 'extra' ? (prim.ant ? 'Boleto de venda antiga (até setembro) — fica nos extras' : 'Extra lançado no mês') : [dspEsc((venda || prim).p || ''), venda && venda.v ? 'venda ' + cmR(venda.v, false) : '', venda && venda.fe ? 'fechou ' + dspEsc(venda.fe) : ''].filter(Boolean).join(' · ');
     h += '<div class="cm-cli' + (CMD.primeira ? ' cm-cli-entra' : '') + '" style="--i:' + Math.min(ik, 14) + ';" data-busca="' + dspEsc(busca) + '"><div class="cm-cli-topo">'
       + (prim.t !== 'extra' ? '<div class="cm-cli-av" style="background:linear-gradient(135deg,' + v2grad(prim.n) + ');">' + v2ini(prim.n) + '</div>' : '<div class="cm-cli-av" style="background:linear-gradient(135deg,#ffd166,#f6a350);">⭐</div>')
       + '<div class="cm-cli-nome"><b>' + dspEsc(prim.n) + '</b>' + (todos ? ' <span class="cm-quem">' + dspEsc(prim.q || '') + '</span>' : '') + '<small>' + sub + '</small>'
       + '<div class="cm-cli-tags">' + (prim.t !== 'extra' ? _cmTagOrigem(prim) : '')
       + (prim.t !== 'extra' && (prim.tp === 'Legado' || /legado|club/i.test(prim.p || '')) ? ' <span class="cm-tag" style="background:rgba(185,138,255,.14);color:#b98aff;" title="Legado Club e Legado Digital entram juntos na escada do Legado">🏛️ Legado · escada</span>' : '')
       + (prim.t !== 'extra' ? _cmSeloReuniao(ls, window._cmCards.length) + _cmClintDoCliente(ls, window._cmCards.length) : '') + '</div></div>'
-      + '<div class="cm-cli-valor"><small>comissão</small><b>' + cmR(com) + '</b><small>de ' + cmR(rec, false) + ' recebido</small></div></div>'
+      + '<div class="cm-cli-valor"><small>comissão</small><b>' + cmR(com) + '</b><small>' + (ehVT && venda && venda.v && String(venda.x || '') === mesVT ? 'sobre ' + cmR(venda.v, false) + ' (valor total)' : 'de ' + cmR(rec, false) + ' recebido') + '</small></div></div>'
       + '<div class="cm-cli-parte" title="' + (sc ? (com / sc * 100).toFixed(1).replace('.', ',') : '0') + '% da comissão na tela"><i data-w="' + (sc ? Math.max(0, Math.min(100, com / sc * 100)) : 0).toFixed(1) + '%"></i></div>'
       + '<div class="cm-pags">';
     ls.forEach(function(l) {
-      var tp = TIPO[l.t] || ['', '#9aa3b2'], soRegistro = l.t === 'venda' && !l.r && !l.c && ls.length > 1, id = 'cme-' + (l.k || 'l' + l.ln).replace(/[^a-z0-9]/gi, '');
+      var tp = TIPO[l.ant ? l.t0 : l.t] || ['', '#9aa3b2'], soRegistro = l.t === 'venda' && !l.r && !l.c && ls.length > 1, id = 'cme-' + (l.k || 'l' + l.ln).replace(/[^a-z0-9]/gi, '');
       h += '<div class="cm-pag' + (soRegistro ? ' muda' : '') + (l.e === 'Não' ? ' fora' : '') + '">'
         + '<span class="cm-pag-data">' + dspEsc(l.pg || l.fe || '—') + '</span>'
         + '<span class="cm-tag" style="background:' + tp[1] + '1f;color:' + tp[1] + ';">' + tp[0] + '</span>'
@@ -34280,7 +34326,7 @@ function cmPessoaCriar() {
 function _cmRevChave(grupo, aba, l) { return grupo + '|' + aba + '|' + (l.k || ('ln' + l.ln)); }
 function _cmRevEstado(grupo, aba, l, valor) {
   var d = CM.dados || {}, r = (d.rev || {})[_cmRevChave(grupo, aba, l)];
-  if (l.t === 'extra') return { e: 'mao', r: r };
+  if (l.t === 'extra' && !l.ant) return { e: 'mao', r: r };
   if (!r) return { e: 'auto' };
   var v = Array.isArray(r.v) ? r.v[0] : r.v;
   return { e: (v == null || Math.abs((+v || 0) - (+valor || 0)) < 0.005) ? 'ok' : 'mudou', r: r };
