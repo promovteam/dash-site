@@ -39785,6 +39785,22 @@ html.ild .tb-it.tb-ild { display:flex; }
 .ild-ag-dias button em { color:#3ddc97; }
 @media (max-width:760px) { .ild-ag-grade { grid-template-columns:1fr 1fr; } .ild-slot { padding:8px 7px; font-size:.7rem; } }
 @media (max-width:380px) { .ild-ag-grade { grid-template-columns:1fr; } }
+/* 06/11/2026: o acervo de cases da apresentação dentro da aba Cases */
+.ild-acervo .ild-bloco-t .btn { padding:7px 12px; font-size:.7rem; text-decoration:none; }
+.ild-acervo-if { width:100%; height:min(80vh, 780px); border:0; border-radius:14px; background:#f4f5f7; display:block; }
+@media (max-width:760px) { .ild-acervo-if { height:72vh; } }
+.ild-contents { display:contents; }
+/* 06/11/2026: funil compacto da Visão Geral */
+.ild-fun2 { display:flex; flex-direction:column; gap:2px; }
+.ild-f2 { display:grid; grid-template-columns:minmax(120px, 190px) 1fr 52px minmax(54px, auto); align-items:center; gap:12px; padding:7px 8px; border-radius:10px; border:0; background:transparent; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+.ild-f2:hover { background:rgba(255,255,255,.04); }
+.ild-f2:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.ild-f2 .rot { font-size:.76rem; font-weight:700; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ild-f2 .bar { height:8px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; }
+.ild-f2 .bar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg, #f6a350, #ffd166); }
+.ild-f2 b { text-align:right; font-size:.95rem; font-weight:900; font-variant-numeric:tabular-nums; }
+.ild-f2 small { font-size:.66rem; font-weight:700; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+@media (max-width:760px) { .ild-f2 { grid-template-columns:104px 1fr 34px auto; gap:8px; padding:6px 4px; } .ild-f2 small { font-size:.6rem; } }
 
 </style>
 <script>
@@ -39837,30 +39853,65 @@ function _ildTab(resp) {
 }
 function _ildIx(T, re) { for (var i = 0; i < T.cols.length; i++) if (re.test(T.cols[i].l)) return i; return -1; }
 function _ildT8(v) { return String(v || '').replace(/\D/g, '').slice(-8); }
-// lê só as linhas em que a coluna (achada pelo nome) bate com o filtro
-function _ildGvFiltro(qs, reCol, cond, cb) {
-  _ildGv(qs, 'select * limit 0', function(r0) {
-    var T0 = _ildTab(r0); if (!T0) { cb(null); return; }
-    var i = _ildIx(T0, reCol); if (i < 0) { cb({ cols: T0.cols, rows: [] }); return; }
-    _ildGv(qs, 'select * where ' + T0.cols[i].id + ' ' + cond, function(r) { cb(_ildTab(r)); });
+// lê só as linhas em que a coluna (achada pelo nome) bate com o filtro. 06/11/2026 (Bruno: "demora muito"): a letra da coluna fica
+// guardada no aparelho, assim a 2ª abertura já faz a consulta direto (uma ida ao Google em vez de duas)
+function _ildGvFiltro(qs, reCol, cond, cb, chave) {
+  var k = 'ildCol_' + (chave || qs), id = ''; try { id = localStorage.getItem(k) || ''; } catch (e) {}
+  var doisPassos = function() {
+    _ildGv(qs, 'select * limit 0', function(r0) {
+      var T0 = _ildTab(r0); if (!T0) { cb(null); return; }
+      var i = _ildIx(T0, reCol); if (i < 0) { cb({ cols: T0.cols, rows: [] }); return; }
+      try { localStorage.setItem(k, T0.cols[i].id); } catch (e) {}
+      _ildGv(qs, 'select * where ' + T0.cols[i].id + ' ' + cond, function(r) { cb(_ildTab(r)); });
+    });
+  };
+  if (!/^[A-Z]{1,3}$/.test(id)) { doisPassos(); return; }
+  _ildGv(qs, 'select * where ' + id + ' ' + cond, function(r) {
+    var T = _ildTab(r), i = T ? _ildIx(T, reCol) : -1;
+    if (T && i >= 0 && T.cols[i].id === id) { cb(T); return; }
+    try { localStorage.removeItem(k); } catch (e) {} doisPassos();   // a coluna mudou de lugar: acha de novo
   });
 }
+// ⚡ a base de leads é enorme (~26 mil linhas): o Google leva ~25 s para filtrar. O dash já baixa essa base inteira (e guarda uma
+// cópia no aparelho, que abre na hora): o evento pega as linhas dela. A consulta ao Google só vai se a cópia não chegar em 12 s.
+function _ildBaseDasLinhas(L) {
+  if (!L || L.length < 2) return;
+  var cols = L[0].map(function(h, i) { return { id: String(i), l: v2norm(h || '') }; }), T0 = { cols: cols, rows: [] }, iEv = _ildIx(T0, /^evento$/);
+  if (iEv < 0) return;
+  for (var r = 1; r < L.length; r++) { var x = L[r]; if (x && /imers/.test(v2norm(x[iEv] || ''))) T0.rows.push(x); }
+  ILDV.base = T0; ILDV.baseOk = true; ILDV.baseDash = Date.now();
+  try { if (_ildAbaAtual()) renderIld(); } catch (e) {}
+}
+(function() {
+  if (typeof ldCSV !== 'function' || ldCSV._ild) return;
+  var orig = ldCSV;
+  ldCSV = function(txt) { var L = orig.apply(this, arguments); try { if (L && L.length > 500) _ildBaseDasLinhas(L); } catch (e) {} return L; };
+  ldCSV._ild = true;
+})();
 function ildCarregar(forcar) {
   if (forcar) { try { _ildAgCarregar(true); } catch (eAg) {} }
   if (ILDV.carregando) return;
   if (!forcar && ILDV.quando && Date.now() - ILDV.quando < 60000) return;
   ILDV.carregando = true; ILDV.erro = ''; try { renderIld(); } catch (e0) {}
-  var falta = 3, pronto = function() { if (--falta > 0) return; ILDV.carregando = false; ILDV.quando = Date.now(); try { renderIld(); } catch (e) {} };
+  // cada parte que chega já aparece na tela (antes esperava as 3)
+  var falta = 2, mostra = function() { try { renderIld(); } catch (e) {} }, pronto = function() { if (--falta > 0) { mostra(); return; } ILDV.carregando = false; ILDV.quando = Date.now(); mostra(); };
   _ildGvFiltro('sheet=' + encodeURIComponent('Workshop (Lovable)'), /^programa$/, "= '" + ILD_EVT.prog + "'", function(T) {
     if (!T) ILDV.erro = 'não consegui ler o app do evento'; else ILDV.app = T; pronto();
-  });
-  _ildGvFiltro('gid=' + ILD_EVT.baseGid, /^evento$/, "contains 'Imers'", function(T) {
-    if (!T) ILDV.erro = 'não consegui ler a base de leads'; else ILDV.base = T; pronto();
-  });
+  }, 'app');
   _ildGv('sheet=' + encodeURIComponent(ILD_EVT.abordagens), '', function(r) {
     var T = _ildTab(r);   // a aba só nasce no 1º "Abordei"; sem ela o Google devolve outra aba: confere o cabeçalho
     ILDV.ab = T && T.cols.length >= 5 && T.cols[0].l === 'quando' && T.cols[1].l === 'tel8' ? T : { cols: [], rows: [] }; pronto();
   });
+  // a base: a do dash (recarrega com ele); se ainda não veio, consulta o Google depois de 12 s
+  if (!ILDV.baseOk && !ILDV._baseGv) {
+    ILDV._baseGv = setTimeout(function() {
+      if (ILDV.baseOk) return;
+      _ildGvFiltro('gid=' + ILD_EVT.baseGid, /^evento$/, "contains 'Imers'", function(T) {
+        ILDV._baseGv = null; if (ILDV.baseOk && ILDV.baseDash) return;
+        if (T) { ILDV.base = T; ILDV.baseOk = true; } mostra();
+      }, 'base');
+    }, 12000);
+  }
 }
 
 // ---------- as pessoas do evento (app + base + abordagens + reuniões com origem ILD) ----------
@@ -39955,6 +40006,17 @@ function renderIld() {
     + '<div class="ild-topo-d">' + _ildQuemHtml() + '<button class="btn ild-atu" onclick="ildCarregar(true)"' + (ILDV.carregando ? ' disabled' : '') + '>' + (ILDV.carregando ? '⏳ Lendo…' : '↻ Atualizar') + '</button></div></div>';
   h += '<nav class="ild-abas" aria-label="Partes do evento">' + ILD_ABAS.map(function(b) { return '<button class="' + (b[1] === A[1] ? 'on' : '') + '" onclick="ildAba(\'' + b[1] + '\')"><i>' + b[3] + '</i>' + b[2] + '</button>'; }).join('') + '</nav>';
   if (ILDV.erro) h += '<div class="ild-aviso">⚠️ ' + dspEsc(ILDV.erro) + ' — toque em ↻ Atualizar.</div>';
+  if ((ILDV.app || ILDV.base) && !ILDV.baseOk) h += '<div class="hint" style="margin:0;">⏳ Completando com a base de leads (tipo, perfil, temperatura)…</div>';
+  if (A[1] === 'cases') {
+    if (!el.querySelector('.ild-acervo-if')) el.innerHTML = '<div id="ild-cases-cima" class="ild-contents"></div>'
+      + '<div class="ild-bloco ild-acervo"><div class="ild-bloco-t"><span>📚 Acervo de cases · perfil, prints e depoimentos</span><a class="btn" href="apresentacao-spark/?acervo" target="_blank" rel="noopener">⛶ Tela cheia</a></div>'
+      + '<iframe class="ild-acervo-if" src="apresentacao-spark/?acervo" title="Acervo de cases" allow="autoplay; fullscreen; clipboard-write"></iframe></div>'
+      + '<div id="ild-cases-baixo" class="ild-contents"></div>';
+    document.getElementById('ild-cases-cima').innerHTML = h;
+    var hb = ''; try { hb = _ildCases(); } catch (eC) { hb = '<div class="ild-aviso">⚠️ ' + dspEsc(eC.message) + '</div>'; }
+    document.getElementById('ild-cases-baixo').innerHTML = hb;
+    return;
+  }
   var P = (ILDV.app || ILDV.base) ? ildPessoas() : [];
   try {
     h += A[1] === 'geral' ? _ildGeral(P) : A[1] === 'leads' ? _ildLeads(P) : A[1] === 'agenda' ? _ildAgenda(P) : A[1] === 'cases' ? _ildCases() : _ildComp();
@@ -40072,22 +40134,16 @@ function _ildGeral(P) {
     + '<div class="ild-chips"><b>Público</b>' + [['todos', 'Todos'], ['comprador', 'Compradores'], ['acompanhante', 'Acompanhantes'], ['mentorado', 'Mentorados'], ['cortesia', 'Cortesias']].map(function(o) {
       var q = o[0] === 'todos' ? T.length : (cont[o[0]] || 0);
       return '<button class="' + (ILDV.pub === o[0] ? 'on' : '') + '" onclick="ILDV.pub=\'' + o[0] + '\';renderIld()">' + o[1] + ' <em>' + q + '</em></button>'; }).join('') + '</div>';
+  // 06/11/2026 (Bruno: "coloque um funil menor"): uma linha fina por passo — barra, número e % do passo anterior; tocou, abre os nomes
   var ant = null, ini = null;
-  h += '<div class="ild-funil">';
-  ILD_PASSOS.forEach(function(s, i) {
-    var L = pub.filter(s[3]), q = L.length; if (i === 0) ini = q;
-    var rot = i === 0 ? (ILDV.pub === 'comprador' ? 'Compraram ingresso' : ILDV.pub === 'todos' ? 'Ingressos (público do evento)' : 'Ingressos · ' + ILD_TIPO_TXT[ILDV.pub] + 's') : s[1];
-    var pa = ant != null && ant > 0 ? Math.round(q / ant * 100) : null, pi = i > 0 && ini ? (q / ini * 100) : null;
-    var extra = '';
-    if (s[0] === 'ing' && ILDV.pub === 'todos') extra = '<small>' + ['comprador', 'acompanhante', 'mentorado', 'cortesia'].filter(function(k) { return cont[k]; }).map(function(k) { return cont[k] + ' ' + ILD_TIPO_TXT[k].toLowerCase() + (cont[k] > 1 ? 's' : ''); }).join(' · ') + '</small>';
-    if (s[0] === 'pres') extra = '<small>pelo check-in do app do evento</small>';
-    if (s[0] === 'abd') { var qq = {}; L.forEach(function(p) { var k = (p.ab.quem || '—').split(' ')[0]; qq[k] = (qq[k] || 0) + 1; }); var ks = Object.keys(qq).sort(function(a, b) { return qq[b] - qq[a]; }); extra = ks.length ? '<small>' + ks.slice(0, 4).map(function(k) { return dspEsc(k) + ' ' + qq[k]; }).join(' · ') + '</small>' : '<small>toque em 🗣️ Abordei na ficha</small>'; }
-    if (s[0] === 'ent') { var ag2 = pub.filter(function(p) { return p.agd && !p.ent; }).length, ns2 = pub.filter(function(p) { return p.ns; }).length; extra = '<small>' + ag2 + ' agendada' + (ag2 === 1 ? '' : 's') + (ns2 ? ' · ' + ns2 + ' no-show' : '') + '</small>'; }
-    if (s[0] === 'vend') { var vt2 = L.reduce(function(a, p) { return a + p.valor; }, 0), me = pub.filter(function(p) { return p.mesa; }).length; extra = '<small>' + (vt2 ? v2fmtR(vt2) : 'R$ 0') + (me ? ' · ' + me + ' na mesa' : '') + '</small>'; }
-    h += '<button class="ild-passo" style="--i:' + i + '" onclick="ildLista(\'' + s[0] + '\')"><span class="ild-p-ic">' + s[2] + '</span><span class="ild-p-rot">' + rot + '</span><b>' + q + '</b>'
-      + (pa != null ? '<span class="ild-p-pct">' + pa + '% do passo anterior</span>' : '<span class="ild-p-pct">&nbsp;</span>') + extra
-      + (pi != null && i > 1 ? '<i class="ild-p-bar"><i style="width:' + Math.min(100, pi).toFixed(1) + '%"></i></i>' : '') + '</button>';
-    if (i < ILD_PASSOS.length - 1) h += '<span class="ild-seta" aria-hidden="true">›</span>';
+  h += '<div class="ild-fun2">';
+  ILD_PASSOS.forEach(function(s2, i2) {
+    var L = pub.filter(s2[3]), q = L.length; if (i2 === 0) ini = q;
+    var rot = i2 === 0 ? (ILDV.pub === 'todos' ? 'Ingressos' : ILDV.pub === 'comprador' ? 'Compraram ingresso' : ILD_TIPO_TXT[ILDV.pub] + 's') : s2[1].replace(' para entrevista', '').replace(' no evento', '').replace(' realizadas', '');
+    var pa = ant != null && ant > 0 ? Math.round(q / ant * 100) + '%' : (i2 === 0 ? '' : '—');
+    var w = ini ? Math.max(q ? 1.5 : 0, q / ini * 100) : 0;
+    var extra = s2[0] === 'vend' ? (function() { var vt2 = L.reduce(function(a, p) { return a + p.valor; }, 0); return vt2 ? ' · ' + v2fmtR(vt2) : ''; })() : '';
+    h += '<button class="ild-f2" onclick="ildLista(\'' + s2[0] + '\')" title="ver os nomes"><span class="rot">' + s2[2] + ' ' + rot + '</span><span class="bar"><i style="width:' + Math.min(100, w).toFixed(1) + '%"></i></span><b>' + q + '</b><small>' + pa + extra + '</small></button>';
     ant = q;
   });
   h += '</div></div>';
@@ -40206,7 +40262,7 @@ function ildMarcar(t8) { ILDV.agLead = t8 || ''; ildFechar(); ildAba('agenda'); 
 function ildMarcarEm(dia, hora, ck) {
   var p = ILDV.agLead ? ildPessoas().filter(function(x) { return x.t8 === ILDV.agLead; })[0] : null;
   ILDV.agLead = ''; ildFechar();
-  window._agTipoReuniao = 'entrevista';
+  window._agTipoReuniao = 'entrevista'; window._ildAgendando = true;
   try { abrirAgendarCom(50, dia, hora, ck, 'entrevista'); } catch (e) { try { avisoRapido('Não consegui abrir a agenda: ' + e.message); } catch (e2) {} return; }
   var $ = function(id) { return document.getElementById(id); };
   var semSdr = function() { var sd = $('ag-sdr'); if (sd) sd.selectedIndex = 0; };   // a 1ª opção é "—"
@@ -40228,6 +40284,34 @@ function ildMarcarEm(dia, hora, ck) {
   }, 80);
   setTimeout(semSdr, 1200); setTimeout(semSdr, 3000);   // a busca do lead pode trazer um SDR antigo: aqui não tem SDR dono
 }
+// 🔎 06/11/2026 (Bruno: "aqui deve buscar somente os do evento"): no "Procurar o lead" do Agendar, quem está no acesso do evento
+// (ou marcando pela agenda do evento) só vê as pessoas do evento — sem os outros leads da base e sem os contatos só da Clint
+function _ildBuscaSoEvento() { try { return ehIld() || (!!window._ildAgendando && document.getElementById('modal-agendar').classList.contains('open')); } catch (e) { return false; } }
+(function() {
+  if (typeof agProcurar !== 'function' || agProcurar._ild) return;
+  var orig = agProcurar;
+  agProcurar = function(txt) {
+    if (!_ildBuscaSoEvento()) return orig.apply(this, arguments);
+    var LD0 = LD.rows, set = {};
+    try { ildPessoas().forEach(function(p) { if (p.tipo !== 'staff') set[p.t8] = 1; }); } catch (e) {}
+    LD.rows = (LD0 || []).filter(function(l) { return l && set[l.tel8]; });
+    window._ildSemClint = true;
+    try { orig.apply(this, arguments); } finally { LD.rows = LD0; window._ildSemClint = false; }
+    var cx = document.getElementById('ag-result'), hd = cx && cx.querySelector('.hint');
+    if (hd && /últimos que chegaram/i.test(hd.textContent)) hd.textContent = '🎟️ Só as pessoas do evento — digite telefone, e-mail ou @ para procurar';
+  };
+  agProcurar._ild = true;
+  if (typeof clintProcurar === 'function' && !clintProcurar._ild) {
+    var oc = clintProcurar;
+    clintProcurar = function() { if (window._ildSemClint) return []; return oc.apply(this, arguments); };
+    clintProcurar._ild = true;
+  }
+  if (typeof fecharAgendar === 'function' && !fecharAgendar._ild) {
+    var of = fecharAgendar;
+    fecharAgendar = function() { window._ildAgendando = false; return of.apply(this, arguments); };
+    fecharAgendar._ild = true;
+  }
+})();
 // a agenda dos 4 closers, de sábado a sexta, em espaços de 50 minutos (a grade de cada closer; Tony e Bruno: 2 entrevistas por bloco)
 var ILD_AG_DE = new Date(2026, 10, 7), ILD_AG_DIAS = 7;   // sábado 07/11 → sexta 13/11
 function _ildAgDias() { var L = []; for (var i = 0; i < ILD_AG_DIAS; i++) L.push(new Date(ILD_AG_DE.getFullYear(), ILD_AG_DE.getMonth(), ILD_AG_DE.getDate() + i)); return L; }
@@ -40245,7 +40329,10 @@ function _ildAgCarregar(forcar) {
 }
 function _ildAgSlots(key, d) {
   var out = [];
-  slotsDo(key, d).forEach(function(sl) {
+  // 06/11/2026 (Bruno: "sarah abre a agenda dia todo" · "pelo menos até terça"): até terça 10/11 a Sarah usa a grade do dia inteiro
+  // (a mesma da Wesllene); da quarta em diante, a grade normal dela (a partir das 16h)
+  var grade = (key === 'sarah' && typeof SLOTS_HORA !== 'undefined' && d <= new Date(2026, 10, 10)) ? SLOTS_HORA : slotsDo(key, d);
+  grade.forEach(function(sl) {
     if (!sl.end || sl.fixo || sl.extra || sl.start === 'LUNCH') return;
     var ini = agMin(sl.start), fim = agMin(sl.end);
     for (var t = ini; t + 50 <= fim; t += 50) out.push(t);
@@ -40310,7 +40397,9 @@ function _ildCases() {
   var C = window.ILD_CASES || [], cont = {};
   C.forEach(function(c) { (c.o || []).forEach(function(o) { cont[o] = (cont[o] || 0) + 1; }); });
   var L = C.filter(function(c) { return !ILDV.obj || (c.o || []).indexOf(ILDV.obj) !== -1; });
-  var h = '<div class="ild-chips"><b>Objeção</b><button class="' + (!ILDV.obj ? 'on' : '') + '" onclick="ILDV.obj=\'\';renderIld()">Todas <em>' + C.length + '</em></button>'
+  // 06/11/2026 (Bruno: "cadê o acervo de cases?"): o acervo da apresentação (perfil, prints e depoimentos, com o link para mandar ao lead) vem primeiro
+  var h = '<div class="ild-bloco-t ild-sep"><span>🎬 Depoimentos por objeção</span></div>'
+    + '<div class="ild-chips"><b>Objeção</b><button class="' + (!ILDV.obj ? 'on' : '') + '" onclick="ILDV.obj=\'\';renderIld()">Todas <em>' + C.length + '</em></button>'
     + Object.keys(cont).sort(function(a, b) { return cont[b] - cont[a]; }).map(function(o) { return '<button class="' + (ILDV.obj === o ? 'on' : '') + '" onclick="ILDV.obj=\'' + o + '\';renderIld()">' + dspEsc(ILD_OBJ[o] || o) + ' <em>' + cont[o] + '</em></button>'; }).join('') + '</div>'
     + '<div class="ild-vids">' + L.map(function(c) { var i = C.indexOf(c); return '<button class="ild-vid" onclick="ildVer(' + i + ')"><span class="cap" style="background-image:url(\'apresentacao-spark/' + dspEsc(c.c) + '\')"><i>▶</i></span><b>' + dspEsc(c.n) + '</b><span class="fr">“' + dspEsc(c.f.length > 110 ? c.f.slice(0, 110) + '…' : c.f) + '”</span></button>'; }).join('') + '</div>'
     + '<div class="ild-bloco-t ild-sep"><span>📈 Antes e depois · seguidores</span></div>'
