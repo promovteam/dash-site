@@ -39861,6 +39861,12 @@ html.ild .tb-it.tb-ild { display:flex; }
 .ild-ck.largo b { font-size:.8rem; font-weight:700; color:var(--text); }
 @media (max-width:760px) { .ild-c-kpis { grid-template-columns:1fr 1fr; gap:7px; } .ild-ck { padding:9px 10px; } }
 .ild-ck.longo b { font-size:.74rem; }
+/* 06/11/2026: ficha completa do lead */
+.ild-fc-sec { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+.ild-ck-txt { color:var(--text) !important; font-weight:800 !important; white-space:pre-line; }
+.ild-voltar { margin-bottom:10px; padding:7px 12px; font-size:.72rem; }
+.ild-c-cab.ild-clic { margin:-6px; padding:6px; }
+.ild-fc-sec .ild-ck small { text-transform:none; letter-spacing:0; font-size:.64rem; font-weight:700; line-height:1.3; }
 
 </style>
 <script>
@@ -39908,7 +39914,7 @@ function _ildGv(qs, tq, cb) {
 }
 function _ildTab(resp) {
   if (!resp || resp.status === 'error' || !resp.table) return null;
-  return { cols: resp.table.cols.map(function(c) { return { id: c.id, l: v2norm(c.label || '') }; }),
+  return { cols: resp.table.cols.map(function(c) { return { id: c.id, l: v2norm(c.label || ''), o: String(c.label || '') }; }),
     rows: (resp.table.rows || []).map(function(r) { return (r.c || []).map(function(c) { return _wsCel(c); }); }) };
 }
 function _ildIx(T, re) { for (var i = 0; i < T.cols.length; i++) if (re.test(T.cols[i].l)) return i; return -1; }
@@ -39936,7 +39942,7 @@ function _ildGvFiltro(qs, reCol, cond, cb, chave) {
 // cópia no aparelho, que abre na hora): o evento pega as linhas dela. A consulta ao Google só vai se a cópia não chegar em 12 s.
 function _ildBaseDasLinhas(L) {
   if (!L || L.length < 2) return;
-  var cols = L[0].map(function(h, i) { return { id: String(i), l: v2norm(h || '') }; }), T0 = { cols: cols, rows: [] }, iEv = _ildIx(T0, /^evento$/);
+  var cols = L[0].map(function(h, i) { return { id: String(i), l: v2norm(h || ''), o: String(h || '') }; }), T0 = { cols: cols, rows: [] }, iEv = _ildIx(T0, /^evento$/);
   if (iEv < 0) return;
   for (var r = 1; r < L.length; r++) { var x = L[r]; if (x && /imers/.test(v2norm(x[iEv] || ''))) T0.rows.push(x); }
   ILDV.base = T0; ILDV.baseOk = true; ILDV.baseDash = Date.now();
@@ -39991,6 +39997,7 @@ function ildPessoas() {
       var p = add(t8);
       ['nome', 'tel', 'ig', 'perfil', 'temp', 'faixa', 'fat', 'inv', 'exp', 'acomp', 'conf', 'seg'].forEach(function(k) { var x = v(k); if (x) p[k] = x; });
       if (v('tipo')) p.tipoTxt = v('tipo');
+      p.bRow = r;
     });
   }
   if (A && A.rows.length) {
@@ -40001,6 +40008,7 @@ function ildPessoas() {
       var v = function(k) { return D[k] >= 0 ? r[D[k]] : ''; };
       var t8 = _ildT8(v('t8') || v('tel')); if (t8.length < 8) return;
       var p = add(t8);
+      p.aRow = r;
       if (!p.nome) p.nome = String(v('nome') || ''); if (!p.tel) p.tel = String(v('tel') || ''); if (!p.ig) p.ig = String(v('ig') || '');
       if (v('ing') instanceof Date) p.ing = v('ing');
       if (v('apl') instanceof Date) { p.apl = v('apl'); p.aplInv = String(v('inv') || '').replace(/_/g, ' '); p.aplSt = String(v('aplSt') || ''); }
@@ -40224,6 +40232,7 @@ var ILD_EXTRA_PASSOS = { fila: ['fila', 'Chegaram e ainda não foram abordados',
   aplsem: ['aplsem', 'Aplicaram e ainda não têm entrevista', '⏳', function(p) { return !!p.apl && !p.reun.length && !p.vend; }] };
 function _ildConta(L, f) { var c = {}; L.forEach(function(p) { var k = f(p); if (k) c[k] = (c[k] || 0) + 1; }); return Object.keys(c).sort(function(a, b) { return c[b] - c[a]; }).map(function(k) { return [k, c[k]]; }); }
 function ildLista(passo) {
+  ILDV._ultLista = passo;
   var s = ILD_PASSOS.filter(function(x) { return x[0] === passo; })[0] || ILD_EXTRA_PASSOS[passo]; if (!s) return;
   var todos = ildPessoas().filter(_ildNoPublico), L = _ildOrdenar(todos.filter(s[3]));
   var i = ILD_PASSOS.indexOf(s), ant = i > 0 ? todos.filter(ILD_PASSOS[i - 1][3]).length : null, cor = ILD_COR[passo] || ILD_COR.ing;
@@ -40317,12 +40326,13 @@ function _ildCard(p) {
     + (p.exp ? k('Expectativa do evento', '“' + dspEsc(p.exp.length > 220 ? p.exp.slice(0, 220) + '…' : p.exp) + '”', '', 'var(--text)', false, true) : '');
   var tel = String(p.tel || '').replace(/\D/g, ''), zap = tel ? 'https://wa.me/' + (tel.length <= 11 ? '55' + tel : tel) : '';
   return '<div class="ild-card' + (p.pres ? ' pres' : '') + (p.vend ? ' vend' : '') + '">'
-    + '<div class="ild-c-cab">' + _ildAvatar(p, 46) + '<div class="ild-c-topo"><b>' + dspEsc(_ildNome(p)) + (p.ig ? ' <small>@' + dspEsc(_ildIg(p)) + '</small>' : '') + '</b>' + tg(p.tipoTxt, 'tp-' + p.tipo) + tg(p.perfil, 'pf') + tg(p.temp, 'tm-' + tp) + tg(p.faixa ? 'Faixa ' + p.faixa : '', 'fx') + _ildSelos(p) + '</div></div>'
+    + '<div class="ild-c-cab ild-clic" onclick="ildFichaCompleta(\'' + p.t8 + '\')" title="ver tudo desta pessoa">' + _ildAvatar(p, 46) + '<div class="ild-c-topo"><b>' + dspEsc(_ildNome(p)) + (p.ig ? ' <small>@' + dspEsc(_ildIg(p)) + '</small>' : '') + '</b>' + tg(p.tipoTxt, 'tp-' + p.tipo) + tg(p.perfil, 'pf') + tg(p.temp, 'tm-' + tp) + tg(p.faixa ? 'Faixa ' + p.faixa : '', 'fx') + _ildSelos(p) + '</div></div>'
     + '<div class="ild-c-kpis">' + est + '</div>'
     + (inf ? '<div class="ild-c-kpis ild-c-inf">' + inf + '</div>' : '')
     + '<div class="ild-c-bts">'
     + (p.abd ? '<button class="btn" onclick="ildAbordar(\'' + p.t8 + '\',true)">↩︎ Desfazer abordagem</button>' : '<button class="btn primary" onclick="ildAbordar(\'' + p.t8 + '\')">🗣️ Abordei</button>')
     + '<button class="btn" onclick="ildMarcar(\'' + p.t8 + '\')">📅 Marcar entrevista</button>'
+    + '<button class="btn" onclick="ildFichaCompleta(\'' + p.t8 + '\')">🔎 Ver tudo</button>'
     + (zap ? '<a class="btn" href="' + zap + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '')
     + (p.ig ? '<a class="btn" href="https://instagram.com/' + encodeURIComponent(String(p.ig).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '')) + '" target="_blank" rel="noopener">📷 Instagram</a>' : '')
     + '</div></div>';
@@ -40345,6 +40355,42 @@ function ildPuxarFotos(bt) {
       setTimeout(function() { try { renderIld(); } catch (e5) {} }, 8000); setTimeout(function() { try { renderIld(); } catch (e6) {} }, 20000);
     } else { try { avisoRapido('⚠️ Não consegui: ' + ((d && d.error) || 'o robô não respondeu')); } catch (e7) {} try { renderIld(); } catch (e8) {} }
   }, 350000);
+}
+// 🔎 06/11/2026 (Bruno: "que ao clicar veja mais informações"): a ficha completa — o evento, o app do evento, o formulário da base e as reuniões
+var ILD_FORA = /cpf|\brg\b|senha|cartao|cnpj|token|^tel8$|^t8$/;
+function _ildFmt(v) {
+  if (v == null || v === '') return '';
+  if (v instanceof Date) { var hh = v.getHours() || v.getMinutes() ? ' ' + v.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''; return v.toLocaleDateString('pt-BR') + hh; }
+  if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+  return String(v).trim();
+}
+function _ildCampos(T, row) {
+  if (!T || !row) return [];
+  var vistos = {};
+  return T.cols.map(function(c, i) { return [c.o || c.l, _ildFmt(row[i]), c.l]; }).filter(function(x) {
+    if (!x[1] || ILD_FORA.test(x[2]) || vistos[x[2]]) return false; vistos[x[2]] = 1; return true;
+  });
+}
+function ildFichaCompleta(t8) {
+  var p = ildPessoas().filter(function(x) { return x.t8 === t8; })[0]; if (!p) return;
+  var k = function(rot, val, largo) { var t = String(val); return '<div class="ild-ck' + (largo || t.length > 60 ? ' largo' : '') + (t.length > 28 && !(largo || t.length > 60) ? ' longo' : '') + '"><small>' + dspEsc(rot) + '</small><b class="ild-ck-txt">' + dspEsc(t) + '</b></div>'; };
+  var sec = function(tit, corpo) { return corpo ? '<div class="ild-fc-sec"><div class="ild-bloco-t"><span>' + tit + '</span></div><div class="ild-c-kpis">' + corpo + '</div></div>' : ''; };
+  var app = _ildCampos(ILDV.app, p.aRow).filter(function(x) { return !/^(nome|telefone|instagram|programa)$/.test(x[2]); });
+  var base = _ildCampos(ILDV.base, p.bRow).filter(function(x) { return !/^(evento)$/.test(x[2]); });
+  var ab = ((ILDV.ab && ILDV.ab.rows) || []).filter(function(r) { return _ildT8(r[1]) === t8; }).map(function(r) {
+    return '<div class="ild-ag-l"><span class="d">' + _ildFmt(r[0]) + '</span><b>' + dspEsc(String(r[4] || '')) + '</b><span>' + dspEsc(String(r[3] || '')) + '</span><span class="st">' + dspEsc(String(r[5] || '')) + '</span></div>'; }).join('');
+  var re = p.reun.map(function(r) {
+    return '<div class="ild-ag-l"><span class="d">' + (r.date ? r.date.toLocaleDateString('pt-BR') : '—') + '</span><b>' + dspEsc(r.status || '') + '</b><span>' + dspEsc((r.closer || '').split(' ')[0]) + '</span><span class="st">' + dspEsc([r.produto, r.valor ? v2fmtR(r.valor) : '', r.origem].filter(Boolean).join(' · ')) + '</span></div>'; }).join('');
+  var volta = ILDV._ultLista ? '<button class="btn ild-voltar" onclick="ildLista(ILDV._ultLista)">← voltar para a lista</button>' : '';
+  var m = document.getElementById('ild-modal') || _ildModal();
+  m.querySelector('.ild-m-corpo').innerHTML = volta + '<div class="ild-cards">' + _ildCard(p) + '</div>'
+    + sec('🎟️ App do evento', app.map(function(x) { return k(x[0], x[1]); }).join(''))
+    + sec('📝 Formulário da base de leads', base.map(function(x) { return k(x[0], x[1]); }).join(''))
+    + (ab ? '<div class="ild-fc-sec"><div class="ild-bloco-t"><span>🗣️ Abordagens no evento</span></div><div class="ild-bloco">' + ab + '</div></div>' : '')
+    + (re ? '<div class="ild-fc-sec"><div class="ild-bloco-t"><span>📅 Reuniões na planilha de vendas</span></div><div class="ild-bloco">' + re + '</div></div>' : '')
+    + (!app.length && !base.length ? '<p class="hint">Sem mais informações desta pessoa no app nem na base.</p>' : '');
+  m.classList.add('on');
+  try { m.querySelector('.ild-m-caixa').scrollTop = 0; } catch (e) {}
 }
 function ildFicha(t8) {
   var p = ildPessoas().filter(function(x) { return x.t8 === t8; })[0]; if (!p) return;
