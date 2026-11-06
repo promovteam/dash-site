@@ -2948,7 +2948,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-06-0823';
+var VERSAO_DASH = '2026-11-06-2016';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -40202,8 +40202,15 @@ function ildPessoas() {
   return Object.keys(P).map(function(k) {
     var p = P[k]; p.tipo = _ildTipo(p.tipoTxt) || (p.ing ? 'comprador' : ''); if (!p.tipoTxt) p.tipoTxt = ILD_TIPO_TXT[p.tipo] || '';
     if (p.aplReg && !p.apl) { p.apl = p.aplReg.quando || new Date(); p.aplPeloDash = true; }   // 06/11/2026: aplicação registrada no dash (R$ 297 + fotos)
+    // 06/11/2026 (Bruno: "todo mundo que marcou reunião fez aplicação"): entrevista com origem ILD marcada a partir do dia do evento = aplicou (os R$ 297 pagos lá)
+    var rApl = p.reun.filter(function(r) { return r.date && r.date >= ILD_DIA0; })[0];
+    if (rApl && !p.apl) { p.apl = rApl.carimboT ? new Date(rApl.carimboT) : ILD_DIA0; p.aplPelaReuniao = true; }
     p.presApp = !!p.pres; p.presManual = !p.pres && !!(p.presM && p.presM.sit === 'presente'); if (p.presManual) p.pres = true;   // 06/11/2026: presença = check-in do app OU confirmada à mão
+    // 06/11/2026 (Bruno: "e as presenças?"): o check-in de hoje ficou na Central e não chega aqui; quem aplicou no evento estava lá
+    p.presApl = !p.pres && !!p.apl; if (p.presApl) p.pres = true;
     p.abd = !!(p.ab && p.ab.sit === 'abordado');
+    // quem marcou a entrevista já tem dono: o closer da reunião (quando ninguém marcou 🗣️ Abordei)
+    if (!p.abd && rApl && rApl.closer) { p.ab = { quando: p.apl, quem: rApl.closer, sit: 'abordado', pelaReuniao: true }; p.abd = true; }
     p.reun.sort(function(a, b) { return (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0); });
     p.ent = p.reun.some(function(r) { return isComp(r.sn); });
     p.agd = p.reun.some(function(r) { return isFut(r.sn); });
@@ -40315,7 +40322,7 @@ function _ildGeral(P) {
   h += '<div class="ild-seg ild-vg-tabs">' + [['evento', '🎟️ No evento'], ['pos', '📅 Pós-evento e geral']].map(function(o) { return '<button class="' + ((ILDV.vg || 'evento') === o[0] ? 'on' : '') + '" onclick="ILDV.vg=\'' + o[0] + '\';renderIld()">' + o[1] + '</button>'; }).join('') + '</div>';
   h += '<div class="ild-vg" data-vg="evento"' + (ILDV.vg === 'pos' ? ' hidden' : '') + '>';
   h += _ildAviso('fila', '🙋', fila.length, (fila.length === 1 ? 'pessoa chegou e ainda não foi abordada' : 'pessoas chegaram e ainda não foram abordadas'),
-    'Fizeram check-in no app e ninguém marcou 🗣️ Abordei. Os mais quentes primeiro; toque num nome para abrir a ficha.', fila,
+    'Estão como presentes e ninguém marcou 🗣️ Abordei. Os mais quentes primeiro; toque num nome para abrir a ficha.', fila,
     'background:rgba(246,163,80,.2);color:#f6a350;border:1px solid rgba(246,163,80,.5);', '', '', 'Ver a fila →', "ILDV.sit='fila';ildAba('leads')");
   h += _ildAviso('apl', '⚠️', aplSem.length, (aplSem.length === 1 ? 'aplicou e ainda não tem entrevista marcada' : 'aplicaram e ainda não têm entrevista marcada'),
     'Aplicaram para a entrevista no app e não têm reunião na planilha. Toque num nome e use 📅 Marcar entrevista.', aplSem,
@@ -40328,9 +40335,9 @@ function _ildGeral(P) {
     + '<span class="pl-linha-abrir">abrir leads →</span></div>';
   // faixa da presença (no lugar do "dia útil")
   var pp = function(t) { return '<span class="v2-vs eq">' + t + '</span>'; };
-  h += '<div class="v2-du" title="Presença = check-in no app do evento">'
+  h += '<div class="v2-du" title="Presença = check-in no app, ✅ Confirmar presença ou aplicou no evento">'
     + '<div class="v2-du-t ild-clic" onclick="ildLista(\'pres\')" title="ver quem chegou"><small>Presença</small><b>' + pres + ' <span>de ' + ing + '</span></b></div>'
-    + '<div class="v2-du-m"><div class="v2-du-bar"><i style="width:' + (ing ? Math.min(100, pres / ing * 100) : 0).toFixed(1) + '%;"></i></div><span><b>' + pres + ' de ' + ing + ' pessoas</b> já fizeram check-in no app do evento (<b>' + _ildPct(pres, ing) + '</b>). O check-in vem do app; abordagem, entrevista e venda aparecem aqui assim que alguém marca.</span></div>'
+    + '<div class="v2-du-m"><div class="v2-du-bar"><i style="width:' + (ing ? Math.min(100, pres / ing * 100) : 0).toFixed(1) + '%;"></i></div><span><b>' + pres + ' de ' + ing + ' pessoas</b> estão como presentes (<b>' + _ildPct(pres, ing) + '</b>): ' + n(function(p) { return p.presApp; }) + ' pelo check-in do app, ' + n(function(p) { return p.presManual; }) + ' com ✅ Confirmar presença e ' + n(function(p) { return p.presApl; }) + ' porque aplicaram (marcaram entrevista). O check-in de hoje ficou na Central e não chega aqui: confirme na ficha de quem chegou.</span></div>'
     + '<div class="v2-du-c ild-clic" onclick="ildLista(\'abd\')" title="ver os abordados"><small>Abordados</small><b>' + abd + '</b>' + pp(_ildPct(abd, pres) + ' de quem chegou') + '<em>faltam ' + fila.length + '</em></div>'
     + '<div class="v2-du-c ild-clic" onclick="ildLista(\'apl\')" title="ver quem aplicou"><small>Aplicaram</small><b>' + apl + '</b>' + pp(_ildPct(apl, ing) + ' do público') + '<em>' + aplSem.length + ' sem entrevista</em></div>'
     + '<div class="v2-du-c ild-clic" onclick="ildLista(\'vend\')" title="ver as vendas"><small>Vendeu de quem chegou</small><b>' + _ildPct(vend, pres) + '</b>' + pp(vend + ' venda' + (vend === 1 ? '' : 's')) + '<em>' + ent + ' entrevista' + (ent === 1 ? '' : 's') + ' feita' + (ent === 1 ? '' : 's') + '</em></div>'
@@ -40573,11 +40580,11 @@ function _ildCard(p) {
   var k = function(rot, val, sub, cor, on, largo) {
     return '<div class="ild-ck' + (on ? ' on' : '') + (largo ? ' largo' : '') + (!largo && String(val).length > 28 ? ' longo' : '') + '" style="--c:' + (cor || 'var(--text)') + '"><small>' + rot + '</small><b>' + val + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
   };
-  var chSub = p.presApp ? 'check-in no app' : p.presManual ? 'confirmado' + (p.presM.quem ? ' por ' + dspEsc(p.presM.quem.split(' ')[0]) : '') + (p.presM.quando ? ' às ' + hm(p.presM.quando) : '') + ' · <a href="#" onclick="event.stopPropagation();ildConfirmar(\'' + p.t8 + '\',true);return false;">desfazer</a>'
+  var chSub = p.presApp ? 'check-in no app' : p.presApl ? 'aplicou no evento' : p.presManual ? 'confirmado' + (p.presM.quem ? ' por ' + dspEsc(p.presM.quem.split(' ')[0]) : '') + (p.presM.quando ? ' às ' + hm(p.presM.quando) : '') + ' · <a href="#" onclick="event.stopPropagation();ildConfirmar(\'' + p.t8 + '\',true);return false;">desfazer</a>'
     : '<button class="btn ild-ck-bt" onclick="event.stopPropagation();ildConfirmar(\'' + p.t8 + '\')">✅ Confirmar presença</button>';
   var est = k('Chegada', p.pres ? '✅ Chegou' : '⏳ Ainda não', chSub, p.pres ? '#3ddc97' : 'var(--muted)', p.pres)
-    + k('Responsável', p.abd ? '🗣️ ' + dspEsc(p.ab.quem ? p.ab.quem.split(' ')[0] : 'Abordado') : '—', p.abd ? ['abordou', p.ab.quando ? 'às ' + hm(p.ab.quando) : ''].filter(Boolean).join(' ') : 'ninguém marcou ainda', p.abd ? '#b98aff' : 'var(--muted)', p.abd)
-    + k('Aplicação', p.apl ? '💳 Pagou R$ 297' : p.aplPend ? '⏳ Falta pagar' : '—', p.aplPeloDash ? 'registrada' + (p.aplReg.quem ? ' por ' + dspEsc(p.aplReg.quem.split(' ')[0]) : '') + (p.aplReg.dados && p.aplReg.dados.forma ? ' · ' + dspEsc(p.aplReg.dados.forma) : '') : p.apl || p.aplPend ? dspEsc(p.aplInv || '') : 'não aplicou no evento', p.apl ? '#ffd166' : p.aplPend ? '#ff8f8f' : 'var(--muted)', !!(p.apl || p.aplPend))
+    + k('Responsável', p.abd ? '🗣️ ' + dspEsc(p.ab.quem ? p.ab.quem.split(' ')[0] : 'Abordado') : '—', p.abd ? (p.ab.pelaReuniao ? 'closer da entrevista' : ['abordou', p.ab.quando ? 'às ' + hm(p.ab.quando) : ''].filter(Boolean).join(' ')) : 'ninguém marcou ainda', p.abd ? '#b98aff' : 'var(--muted)', p.abd)
+    + k('Aplicação', p.apl ? '💳 Pagou R$ 297' : p.aplPend ? '⏳ Falta pagar' : '—', p.aplPeloDash ? 'registrada' + (p.aplReg.quem ? ' por ' + dspEsc(p.aplReg.quem.split(' ')[0]) : '') + (p.aplReg.dados && p.aplReg.dados.forma ? ' · ' + dspEsc(p.aplReg.dados.forma) : '') : p.aplPelaReuniao ? 'marcou a entrevista' + (p.aplInv ? ' · ' + dspEsc(p.aplInv) : '') : p.apl || p.aplPend ? dspEsc(p.aplInv || '') : 'não aplicou no evento', p.apl ? '#ffd166' : p.aplPend ? '#ff8f8f' : 'var(--muted)', !!(p.apl || p.aplPend))
     + k('Entrevista', p.vend ? '💰 ' + v2fmtR(p.valor) : ur ? '📅 ' + dspEsc(ur.status || '') : '—', p.vend ? 'comprou' + (ur && ur.closer ? ' com ' + dspEsc(ur.closer.split(' ')[0]) : '') : ur ? [ur.date ? ur.date.toLocaleDateString('pt-BR') : '', ur.closer ? dspEsc(ur.closer.split(' ')[0]) : ''].filter(Boolean).join(' · ') : 'sem reunião marcada', p.vend ? '#3ddc97' : ur ? '#5eead4' : 'var(--muted)', !!ur);
   var inf = (p.fat ? k('Faturamento', dspEsc(p.fat), '', '#f6a350') : '')
     + (p.inv && !p.aplInv ? k('Quer investir', dspEsc(p.inv), '', '#f6a350') : '')
