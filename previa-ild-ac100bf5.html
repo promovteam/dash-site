@@ -39825,6 +39825,29 @@ html.ild .tb-it.tb-ild { display:flex; }
 .ild-rl b { font-size:.62rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--muted); min-width:84px; }
 .ild-rl span { font-size:.72rem; font-weight:700; padding:4px 10px; border-radius:99px; background:rgba(255,255,255,.06); border:1px solid var(--border); }
 .ild-rl span em { font-style:normal; color:var(--accent); font-weight:900; margin-left:3px; }
+/* 06/11/2026: foto na ficha do evento (a do Instagram que o dash já tem; sem foto, as iniciais) */
+.ild-c-cab { display:flex; gap:12px; align-items:flex-start; }
+.ild-c-cab .ild-c-topo { flex:1; min-width:0; }
+.ild-c-topo b small { font-size:.7rem; font-weight:700; color:var(--text2); margin-left:4px; }
+.ild-av { position:relative; display:inline-grid; place-items:center; border-radius:50%; overflow:hidden; color:#fff; font-weight:900; font-size:.78rem; letter-spacing:.02em; box-shadow:0 0 0 2px rgba(255,255,255,.08); }
+.ild-av img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.ild-pill-av { display:inline-flex; align-items:center; gap:6px; padding-left:4px !important; }
+.ild-pill-av .ild-av { font-size:.5rem; box-shadow:none; }
+.ild-fotos { padding:5px 10px; font-size:.68rem; }
+/* 06/11/2026: Visão Geral em cards (os passos do funil no padrão dos cards do dash geral) */
+.ild-pub { margin:0; }
+.ild-kpis { grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); margin:0; }
+.ild-kp .g-value { font-size:1.9rem; line-height:1.05; }
+.ild-kp .ild-kp-sub { margin:4px 0 10px; color:var(--text2); min-height:1.2em; }
+.ild-kbar { height:6px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; }
+.ild-kbar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg, rgba(var(--cb), .5), var(--c)); box-shadow:0 0 10px rgba(var(--cb), .45); }
+.ild-kp-ver { margin-top:10px; font-size:.64rem; font-weight:800; color:var(--c); opacity:.85; }
+.ild-kp:hover .ild-kp-ver { opacity:1; }
+@media (max-width:760px) { .ild-kpis { grid-template-columns:1fr 1fr; gap:10px; } .ild-kp { padding:14px; } .ild-kp .g-value { font-size:1.6rem; } .ild-kp .g-label { font-size:.58rem; } }
+.ild-kp-num { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.ild-kp .kp-canto.kp-conv { position:static; display:inline-flex; flex-direction:row; align-items:baseline; gap:4px; margin:0; cursor:help; }
+.ild-kp .kp-conv b { font-size:.95rem; } .ild-kp .kp-conv small { font-size:.58rem; max-width:none; text-align:left; }
+.kpis.ild-kpis > .glass .g-label { padding-right:0 !important; }
 
 </style>
 <script>
@@ -40085,7 +40108,7 @@ var ILD_COR = { ing: ['#f6a350', '246,163,80'], pres: ['#6ea8ff', '110,168,255']
 function _ildPct(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }
 function _ildPills(L, cor) {
   return '<div class="nb-pills">' + _ildOrdenar(L).slice(0, 60).map(function(p) {
-    return '<span class="nb-pill" style="' + cor + '" onclick="ildFicha(\'' + p.t8 + '\')" title="abrir a ficha">' + dspEsc(_ildNome(p).split(' ').slice(0, 2).join(' ')) + (p.temp ? ' · ' + dspEsc(p.temp) : '') + '</span>';
+    return '<span class="nb-pill ild-pill-av" style="' + cor + '" onclick="ildFicha(\'' + p.t8 + '\')" title="abrir a ficha">' + _ildAvatar(p, 20) + dspEsc(_ildNome(p).split(' ').slice(0, 2).join(' ')) + (p.temp ? ' · ' + dspEsc(p.temp) : '') + '</span>';
   }).join('') + '</div>';
 }
 function _ildAviso(k, ico, n, txt, sub, L, cor, borda, fundo, btTxt, btAcao) {
@@ -40152,24 +40175,34 @@ function _ildGeral(P) {
   // o funil (tocou num passo, abre a lista) com o filtro de público
   var pub = P.filter(_ildNoPublico), cont = {};
   P.forEach(function(p) { if (p.tipo !== 'staff') cont[p.tipo] = (cont[p.tipo] || 0) + 1; });
-  h += '<div class="ild-bloco"><div class="ild-bloco-t"><span>🪜 Funil do evento · toque num passo para ver os nomes</span></div>'
-    + '<div class="ild-chips"><b>Público</b>' + [['todos', 'Todos'], ['comprador', 'Compradores'], ['acompanhante', 'Acompanhantes'], ['mentorado', 'Mentorados'], ['cortesia', 'Cortesias']].map(function(o) {
+  // 06/11/2026 (Bruno: "coloque a visão geral em formato de cards"): o funil vira os cards do dash geral — um por passo, com o número
+  // grande, a conversão no canto e a barrinha; tocou, abre a janela com os detalhes e as fichas
+  h += '<div class="ild-chips ild-pub"><b>Funil · público</b>' + [['todos', 'Todos'], ['comprador', 'Compradores'], ['acompanhante', 'Acompanhantes'], ['mentorado', 'Mentorados'], ['cortesia', 'Cortesias']].map(function(o) {
       var q = o[0] === 'todos' ? T.length : (cont[o[0]] || 0);
       return '<button class="' + (ILDV.pub === o[0] ? 'on' : '') + '" onclick="ILDV.pub=\'' + o[0] + '\';renderIld()">' + o[1] + ' <em>' + q + '</em></button>'; }).join('') + '</div>';
-  // 06/11/2026 (Bruno: "coloque um funil menor"): uma linha fina por passo — barra, número e % do passo anterior; tocou, abre os nomes
   var ant = null, ini = null;
-  h += '<div class="ild-fun2">';
+  h += '<div class="kpis ild-kpis">';
   ILD_PASSOS.forEach(function(s2, i2) {
     var L = pub.filter(s2[3]), q = L.length; if (i2 === 0) ini = q;
     var rot = i2 === 0 ? (ILDV.pub === 'todos' ? 'Ingressos' : ILDV.pub === 'comprador' ? 'Compraram ingresso' : ILD_TIPO_TXT[ILDV.pub] + 's') : s2[1].replace(' para entrevista', '').replace(' no evento', '').replace(' realizadas', '');
-    var pa = ant != null && ant > 0 ? Math.round(q / ant * 100) + '%' : (i2 === 0 ? '' : '—');
-    var w = ini ? Math.max(q ? 1.5 : 0, q / ini * 100) : 0;
-    var extra = s2[0] === 'vend' ? (function() { var vt2 = L.reduce(function(a, p) { return a + p.valor; }, 0); return vt2 ? ' · ' + v2fmtR(vt2) : ''; })() : '';
-    var cor = ILD_COR[s2[0]] || ILD_COR.ing;
-    h += '<button class="ild-f2" style="--c:' + cor[0] + ';--cb:' + cor[1] + '" onclick="ildLista(\'' + s2[0] + '\')" title="ver os nomes e os detalhes"><span class="ic">' + s2[2] + '</span><span class="rot">' + rot + (extra ? '<em>' + extra.replace(' · ', '') + '</em>' : '') + '</span><span class="trilho"><i style="width:' + Math.min(100, w).toFixed(1) + '%"></i></span><b>' + q + '</b><small>' + (pa ? pa + (i2 ? ' do anterior' : '') : 'base') + '</small><span class="seta" aria-hidden="true">›</span></button>';
+    var cor = ILD_COR[s2[0]] || ILD_COR.ing, w = ini ? Math.max(q ? 2 : 0, q / ini * 100) : 0;
+    var sub = '';
+    if (s2[0] === 'ing') sub = ILDV.pub === 'todos' ? ['comprador', 'acompanhante', 'mentorado', 'cortesia'].filter(function(k) { return cont[k]; }).map(function(k) { return cont[k] + ' ' + ILD_TIPO_TXT[k].toLowerCase() + (cont[k] > 1 ? 's' : ''); }).join(' · ') : 'do público escolhido';
+    if (s2[0] === 'pres') sub = 'pelo check-in do app do evento';
+    if (s2[0] === 'abd') { var qq = {}; L.forEach(function(p) { var k = (p.ab.quem || '—').split(' ')[0]; qq[k] = (qq[k] || 0) + 1; }); var ks = Object.keys(qq).sort(function(a, b) { return qq[b] - qq[a]; }); sub = ks.length ? ks.slice(0, 3).map(function(k) { return dspEsc(k) + ' ' + qq[k]; }).join(' · ') : 'toque em 🗣️ Abordei na ficha'; }
+    if (s2[0] === 'apl') { var se = L.filter(function(p) { return !p.reun.length && !p.vend; }).length; sub = se + ' sem entrevista marcada'; }
+    if (s2[0] === 'ent') { var ag2 = pub.filter(function(p) { return p.agd && !p.ent; }).length, ns2 = pub.filter(function(p) { return p.ns; }).length; sub = ag2 + ' agendada' + (ag2 === 1 ? '' : 's') + (ns2 ? ' · ' + ns2 + ' no-show' : ''); }
+    if (s2[0] === 'vend') { var vt2 = L.reduce(function(a, p) { return a + p.valor; }, 0), me = pub.filter(function(p) { return p.mesa; }).length; sub = (vt2 ? v2fmtR(vt2) : 'R$ 0') + (me ? ' · ' + me + ' na mesa' : ''); }
+    var conv = ant != null ? '<span class="kp-canto kp-conv" title="' + q + ' de ' + ant + ' do passo anterior"><b>' + (ant ? Math.round(q / ant * 100) + '%' : '—') + '</b><small>do anterior</small></span>' : '';
+    h += '<div class="glass click ild-kp" style="--halo:rgba(' + cor[1] + ',.2);--tint:' + cor[0] + ';--c:' + cor[0] + ';--cb:' + cor[1] + ';" onclick="ildLista(\'' + s2[0] + '\')" title="ver os nomes e os detalhes">'
+      + '<div class="g-label">' + s2[2] + ' ' + rot + '</div>'
+      + '<div class="ild-kp-num"><div class="g-value" style="color:' + cor[0] + ';">' + q + '</div>' + conv + '</div>'
+      + '<div class="hint ild-kp-sub">' + sub + '</div>'
+      + '<div class="ild-kbar"><i style="width:' + Math.min(100, w).toFixed(1) + '%"></i></div>'
+      + '<div class="ild-kp-ver">ver nomes →</div></div>';
     ant = q;
   });
-  h += '</div></div>';
+  h += '</div>';
   h += '<div class="hint ild-pe">Atualizado ' + (ILDV.quando ? 'às ' + new Date(ILDV.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—') + ' · ingresso, check-in e aplicação vêm do app do evento; entrevistas e vendas, das reuniões com origem "' + ILD_EVT.origem + '".</div>';
   return h;
 }
@@ -40225,10 +40258,29 @@ function _ildLeads(P) {
     + '<div class="ild-chips"><b>Público</b>' + chips('pub', [['todos', 'Todos'], ['comprador', 'Compradores'], ['acompanhante', 'Acompanhantes'], ['mentorado', 'Mentorados'], ['cortesia', 'Cortesias']]) + '</div>'
     + '<div class="ild-chips"><b>Situação</b>' + chips('sit', ILD_SIT) + '</div>'
     + '<div class="ild-chips"><b>Temperatura</b>' + chips('temp', [['', 'Todas'], ['quente', '🔥 Quente'], ['morno', '🌤️ Morno'], ['frio', '❄️ Frio']]) + '<b>Perfil</b>' + chips('perfil', [['', 'Todos'], ['spark', 'Spark'], ['growth', 'Growth'], ['legado', 'Legado']]) + '</div>'
-    + '<div class="ild-conta">' + L.length + ' pessoa' + (L.length === 1 ? '' : 's') + '</div>';
+    + '<div class="ild-conta">' + L.length + ' pessoa' + (L.length === 1 ? '' : 's') + _ildBtFotos(P) + '</div>';
   if (ILDV.carregando && !P.length) return h + '<div class="ild-vazio">Lendo…</div>';
   h += '<div class="ild-cards">' + L.slice(0, ILDV.mostrar).map(_ildCard).join('') + '</div>';
   if (L.length > ILDV.mostrar) h += '<button class="btn ild-mais" onclick="ILDV.mostrar+=60;renderIld()">Mostrar mais ' + Math.min(60, L.length - ILDV.mostrar) + '</button>';
+  return h;
+}
+// 📸 06/11/2026 (Bruno: "se conseguir puxar a foto e etc"): a foto do Instagram (a mesma que o dash usa na busca) e os selos do dash geral
+function _ildIg(p) { return String(p.ig || '').trim().toLowerCase().replace(/^@+/, '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/^(?:m\.)?instagram\.com\//, '').split('?')[0].split('/')[0]; }
+function _ildFoto(p) { try { var u = _ildIg(p); return u && typeof igFotoDe === 'function' ? igFotoDe(u) : ''; } catch (e) { return ''; } }
+function _ildAvatar(p, tam) {
+  var nome = String(p.nome || p.ig || '?'), f = _ildFoto(p), t = tam || 46;
+  var g = ''; try { g = 'background:linear-gradient(135deg,' + v2grad(nome) + ');'; } catch (e) {}
+  return '<span class="ild-av" style="width:' + t + 'px;height:' + t + 'px;flex:0 0 ' + t + 'px;' + g + '">' + dspEsc(typeof v2ini === 'function' ? v2ini(nome) : nome.charAt(0))
+    + (f ? '<img loading="lazy" decoding="async" src="' + dspEsc(f) + '" alt="" onerror="this.remove()">' : '') + '</span>';
+}
+var _ildLdMapa = null, _ildLdN = -1;
+function _ildLdDe(t8) {
+  try { var R = LD.rows || []; if (R.length !== _ildLdN) { _ildLdMapa = {}; R.forEach(function(l) { if (l && l.tel8 && !_ildLdMapa[l.tel8]) _ildLdMapa[l.tel8] = l; }); _ildLdN = R.length; } return _ildLdMapa[t8] || null; } catch (e) { return null; }
+}
+function _ildSelos(p) {
+  var l = _ildLdDe(p.t8), h = '';
+  if (l) { try { h += seloChance(l, true); } catch (e) {} try { h += ' ' + igSeloLead(l, true); } catch (e2) {} }
+  try { var pf = IGO && IGO.perfil && IGO.perfil[_ildIg(p)]; if (pf && pf.seg != null && !p.seg) h += ' <span class="ild-tag">👥 ' + Number(pf.seg).toLocaleString('pt-BR') + ' seguidores</span>'; } catch (e3) {}
   return h;
 }
 function _ildCard(p) {
@@ -40243,7 +40295,7 @@ function _ildCard(p) {
     .filter(function(x) { return x[1]; }).map(function(x) { return '<div><i>' + x[0] + '</i>' + dspEsc(x[1]) + '</div>'; }).join('');
   var tel = String(p.tel || '').replace(/\D/g, ''), zap = tel ? 'https://wa.me/' + (tel.length <= 11 ? '55' + tel : tel) : '';
   return '<div class="ild-card' + (p.pres ? ' pres' : '') + (p.vend ? ' vend' : '') + '">'
-    + '<div class="ild-c-topo"><b>' + dspEsc(_ildNome(p)) + '</b>' + tg(p.tipoTxt, 'tp-' + p.tipo) + tg(p.perfil, 'pf') + tg(p.temp, 'tm-' + tp) + tg(p.faixa ? 'Faixa ' + p.faixa : '', 'fx') + '</div>'
+    + '<div class="ild-c-cab">' + _ildAvatar(p, 46) + '<div class="ild-c-topo"><b>' + dspEsc(_ildNome(p)) + (p.ig ? ' <small>@' + dspEsc(_ildIg(p)) + '</small>' : '') + '</b>' + tg(p.tipoTxt, 'tp-' + p.tipo) + tg(p.perfil, 'pf') + tg(p.temp, 'tm-' + tp) + tg(p.faixa ? 'Faixa ' + p.faixa : '', 'fx') + _ildSelos(p) + '</div></div>'
     + '<div class="ild-c-st">' + st.join('') + '</div>'
     + (info ? '<div class="ild-c-info">' + info + '</div>' : '')
     + '<div class="ild-c-bts">'
@@ -40252,6 +40304,25 @@ function _ildCard(p) {
     + (zap ? '<a class="btn" href="' + zap + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '')
     + (p.ig ? '<a class="btn" href="https://instagram.com/' + encodeURIComponent(String(p.ig).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '')) + '" target="_blank" rel="noopener">📷 Instagram</a>' : '')
     + '</div></div>';
+}
+function _ildSemFoto(P) { return P.filter(function(p) { return p.tipo !== 'staff' && _ildIg(p) && !_ildFoto(p); }); }
+function _ildBtFotos(P) {
+  var ok = false; try { ok = ehAdm(); } catch (e) {} if (!ok) return '';
+  var n = _ildSemFoto(P).length; if (!n) return ' · <span class="hint" style="margin:0;">📸 todos com @ já têm foto</span>';
+  return ' · <button class="btn ild-fotos" onclick="ildPuxarFotos(this)" title="Baixa do Instagram a foto de quem tem @ e ainda não tem foto (gasta a cota diária do Instagram)">📸 Puxar fotos (' + n + ' sem foto)</button>';
+}
+function ildPuxarFotos(bt) {
+  var ok = false; try { ok = ehAdm(); } catch (e) {} if (!ok) { try { avisoRapido('Só o Bruno e o Adm podem puxar fotos (gasta a cota do Instagram).'); } catch (e2) {} return; }
+  var alvos = []; _ildSemFoto(ildPessoas()).forEach(function(p) { var u = _ildIg(p); if (u && alvos.indexOf(u) === -1) alvos.push(u); });
+  if (!alvos.length) { try { avisoRapido('📸 Todo mundo com @ já tem foto'); } catch (e3) {} return; }
+  if (bt) { bt.disabled = true; bt.textContent = '⏳ buscando ' + Math.min(100, alvos.length) + ' fotos…'; }
+  gasPedir({ action: 'igFotos', perfis: alvos.slice(0, 100) }, function(d) {
+    if (d && d.success) {
+      try { avisoRapido('📸 ' + (d.fotosSalvas || 0) + ' fotos baixadas' + (d.parou ? ' · o Instagram pediu pausa, o resto entra depois' : '') + ' — atualizando…'); } catch (e) {}
+      try { IGO.carregado = false; IGO.buscando = false; carregarIGOrganico(); } catch (e4) {}
+      setTimeout(function() { try { renderIld(); } catch (e5) {} }, 8000); setTimeout(function() { try { renderIld(); } catch (e6) {} }, 20000);
+    } else { try { avisoRapido('⚠️ Não consegui: ' + ((d && d.error) || 'o robô não respondeu')); } catch (e7) {} try { renderIld(); } catch (e8) {} }
+  }, 350000);
 }
 function ildFicha(t8) {
   var p = ildPessoas().filter(function(x) { return x.t8 === t8; })[0]; if (!p) return;
