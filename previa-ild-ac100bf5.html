@@ -39848,6 +39848,19 @@ html.ild .tb-it.tb-ild { display:flex; }
 .ild-kp .kp-canto.kp-conv { position:static; display:inline-flex; flex-direction:row; align-items:baseline; gap:4px; margin:0; cursor:help; }
 .ild-kp .kp-conv b { font-size:.95rem; } .ild-kp .kp-conv small { font-size:.58rem; max-width:none; text-align:left; }
 .kpis.ild-kpis > .glass .g-label { padding-right:0 !important; }
+/* 06/11/2026: as informações do lead em cards (como os da Visão Geral do dash geral) */
+.ild-c-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); gap:8px; }
+.ild-ck { position:relative; overflow:hidden; padding:10px 12px; border-radius:14px; min-width:0;
+  background:linear-gradient(150deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.025) 50%, rgba(255,255,255,.01) 100%); border:1px solid rgba(255,255,255,.1);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1); }
+.ild-ck.on { border-color:color-mix(in srgb, var(--c) 45%, transparent); background:linear-gradient(150deg, color-mix(in srgb, var(--c) 16%, transparent), rgba(255,255,255,.02) 70%); }
+.ild-ck small { display:block; font-size:.56rem; font-weight:800; letter-spacing:1.1px; text-transform:uppercase; color:var(--text2); margin-bottom:4px; }
+.ild-ck b { display:block; font-size:.86rem; font-weight:900; color:var(--c); line-height:1.25; overflow-wrap:anywhere; }
+.ild-ck em { display:block; font-style:normal; font-size:.64rem; font-weight:700; color:var(--muted); margin-top:3px; overflow-wrap:anywhere; }
+.ild-ck.largo { grid-column:1 / -1; }
+.ild-ck.largo b { font-size:.8rem; font-weight:700; color:var(--text); }
+@media (max-width:760px) { .ild-c-kpis { grid-template-columns:1fr 1fr; gap:7px; } .ild-ck { padding:9px 10px; } }
+.ild-ck.longo b { font-size:.74rem; }
 
 </style>
 <script>
@@ -40285,19 +40298,28 @@ function _ildSelos(p) {
 }
 function _ildCard(p) {
   var tg = function(t, c) { return t ? '<span class="ild-tag ' + (c || '') + '">' + dspEsc(t) + '</span>' : ''; };
-  var tp = v2norm(p.temp), st = [];
-  st.push(p.pres ? '<span class="ok">✅ Chegou</span>' : '<span class="mu">⏳ Ainda não chegou</span>');
-  if (p.abd) st.push('<span class="ok">🗣️ Abordado' + (p.ab.quem ? ' por ' + dspEsc(p.ab.quem.split(' ')[0]) : '') + (p.ab.quando ? ' às ' + p.ab.quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') + '</span>');
-  if (p.apl) st.push('<span class="ok">📝 Aplicou' + (p.aplInv ? ' · ' + dspEsc(p.aplInv) : '') + '</span>');
-  var ur = p.reun[p.reun.length - 1];
-  if (ur) st.push('<span class="' + (p.vend ? 'ok' : '') + '">' + (p.vend ? '💰 Comprou ' + v2fmtR(p.valor) : '📅 ' + dspEsc(ur.status || '') + (ur.date ? ' · ' + ur.date.toLocaleDateString('pt-BR') : '') + (ur.closer ? ' · ' + dspEsc(ur.closer.split(' ')[0]) : '')) + '</span>');
-  var info = [['💰', p.fat], ['🎯', p.inv && !p.aplInv ? p.inv : ''], ['👥', p.seg ? p.seg + ' seguidores' : ''], ['🤝', p.acomp ? 'acompanhante de ' + p.acomp : ''], ['💬', p.exp ? '“' + (p.exp.length > 140 ? p.exp.slice(0, 140) + '…' : p.exp) + '”' : '']]
-    .filter(function(x) { return x[1]; }).map(function(x) { return '<div><i>' + x[0] + '</i>' + dspEsc(x[1]) + '</div>'; }).join('');
+  // 06/11/2026 (Bruno: "coloque as informações do lead em formato de card parecido com a visão geral do principal"):
+  // cada informação num card pequeno (rótulo em cima, valor embaixo), como os cards da Visão Geral do dash geral
+  var tp = v2norm(p.temp), ur = p.reun[p.reun.length - 1];
+  var hm = function(d) { return d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''; };
+  var segIg = ''; try { var pf = IGO && IGO.perfil && IGO.perfil[_ildIg(p)]; if (pf && pf.seg != null) segIg = Number(pf.seg).toLocaleString('pt-BR'); } catch (eS) {}
+  var k = function(rot, val, sub, cor, on, largo) {
+    return '<div class="ild-ck' + (on ? ' on' : '') + (largo ? ' largo' : '') + (!largo && String(val).length > 28 ? ' longo' : '') + '" style="--c:' + (cor || 'var(--text)') + '"><small>' + rot + '</small><b>' + val + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
+  };
+  var est = k('Chegada', p.pres ? '✅ Chegou' : '⏳ Ainda não', p.pres ? 'check-in no app' : '', p.pres ? '#3ddc97' : 'var(--muted)', p.pres)
+    + k('Abordagem', p.abd ? '🗣️ Abordado' : '—', p.abd ? [p.ab.quem ? 'por ' + dspEsc(p.ab.quem.split(' ')[0]) : '', p.ab.quando ? 'às ' + hm(p.ab.quando) : ''].filter(Boolean).join(' ') : 'ninguém marcou ainda', p.abd ? '#b98aff' : 'var(--muted)', p.abd)
+    + k('Aplicação', p.apl ? '📝 Aplicou' : '—', p.apl ? dspEsc(p.aplInv || '') : 'não aplicou no app', p.apl ? '#ffd166' : 'var(--muted)', !!p.apl)
+    + k('Entrevista', p.vend ? '💰 ' + v2fmtR(p.valor) : ur ? '📅 ' + dspEsc(ur.status || '') : '—', p.vend ? 'comprou' + (ur && ur.closer ? ' com ' + dspEsc(ur.closer.split(' ')[0]) : '') : ur ? [ur.date ? ur.date.toLocaleDateString('pt-BR') : '', ur.closer ? dspEsc(ur.closer.split(' ')[0]) : ''].filter(Boolean).join(' · ') : 'sem reunião marcada', p.vend ? '#3ddc97' : ur ? '#5eead4' : 'var(--muted)', !!ur);
+  var inf = (p.fat ? k('Faturamento', dspEsc(p.fat), '', '#f6a350') : '')
+    + (p.inv && !p.aplInv ? k('Quer investir', dspEsc(p.inv), '', '#f6a350') : '')
+    + (p.seg || segIg ? k('Seguidores', dspEsc(p.seg || segIg), p.seg && segIg ? segIg + ' no Instagram' : '', '#6ea8ff') : '')
+    + (p.acomp ? k('Acompanhante de', dspEsc(p.acomp), '', 'var(--text)') : '')
+    + (p.exp ? k('Expectativa do evento', '“' + dspEsc(p.exp.length > 220 ? p.exp.slice(0, 220) + '…' : p.exp) + '”', '', 'var(--text)', false, true) : '');
   var tel = String(p.tel || '').replace(/\D/g, ''), zap = tel ? 'https://wa.me/' + (tel.length <= 11 ? '55' + tel : tel) : '';
   return '<div class="ild-card' + (p.pres ? ' pres' : '') + (p.vend ? ' vend' : '') + '">'
     + '<div class="ild-c-cab">' + _ildAvatar(p, 46) + '<div class="ild-c-topo"><b>' + dspEsc(_ildNome(p)) + (p.ig ? ' <small>@' + dspEsc(_ildIg(p)) + '</small>' : '') + '</b>' + tg(p.tipoTxt, 'tp-' + p.tipo) + tg(p.perfil, 'pf') + tg(p.temp, 'tm-' + tp) + tg(p.faixa ? 'Faixa ' + p.faixa : '', 'fx') + _ildSelos(p) + '</div></div>'
-    + '<div class="ild-c-st">' + st.join('') + '</div>'
-    + (info ? '<div class="ild-c-info">' + info + '</div>' : '')
+    + '<div class="ild-c-kpis">' + est + '</div>'
+    + (inf ? '<div class="ild-c-kpis ild-c-inf">' + inf + '</div>' : '')
     + '<div class="ild-c-bts">'
     + (p.abd ? '<button class="btn" onclick="ildAbordar(\'' + p.t8 + '\',true)">↩︎ Desfazer abordagem</button>' : '<button class="btn primary" onclick="ildAbordar(\'' + p.t8 + '\')">🗣️ Abordei</button>')
     + '<button class="btn" onclick="ildMarcar(\'' + p.t8 + '\')">📅 Marcar entrevista</button>'
