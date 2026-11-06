@@ -39880,6 +39880,26 @@ html.ild .tb-it.tb-ild { display:flex; }
 .ild-f2 .rot em.gg { color:#ff8f8f; font-weight:900; }
 @media (max-width:760px) { .ild-lado { grid-template-columns:1fr 1fr; } }
 .ild-kp .kp-conv b { color:var(--c) !important; }
+/* 06/11/2026: botão de confirmar presença dentro do card Chegada; funis de 4 passos */
+.ild-ck-bt { margin-top:6px; padding:6px 10px; font-size:.68rem; border-color:rgba(61,220,151,.5); color:#3ddc97; }
+.ild-ck em a { color:var(--accent); font-weight:800; }
+@media (min-width:761px) { .ild-kpis.ild-4 { grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+/* 06/11/2026: 🎯 Onde agir — uma linha por buraco do funil, agrupadas por momento */
+.ild-acoes { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; }
+.ild-ac-g { display:flex; flex-direction:column; gap:6px; }
+.ild-ac-g > small { font-size:.6rem; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); }
+.ild-acao { --c:#f6a350; --cb:246,163,80; display:grid; grid-template-columns:32px 1fr auto 12px; align-items:center; gap:10px; padding:9px 11px; border-radius:13px; text-align:left;
+  border:1px solid rgba(var(--cb), .28); background:linear-gradient(90deg, rgba(var(--cb), .12), rgba(255,255,255,.015) 75%); color:var(--text); font:inherit; cursor:pointer; transition:transform .15s ease, border-color .15s ease; }
+.ild-acao:hover { transform:translateX(3px); border-color:rgba(var(--cb), .6); }
+.ild-acao:focus-visible { outline:2px solid var(--c); outline-offset:2px; }
+.ild-acao .ic { width:32px; height:32px; border-radius:10px; display:grid; place-items:center; background:rgba(var(--cb), .16); }
+.ild-acao .t { display:flex; flex-direction:column; min-width:0; }
+.ild-acao .t b { font-size:.78rem; font-weight:800; }
+.ild-acao .t em { font-style:normal; font-size:.64rem; font-weight:600; color:var(--text2); }
+.ild-acao .n { font-family:'Barlow Condensed', Inter, sans-serif; font-size:1.5rem; font-weight:900; color:var(--c); font-variant-numeric:tabular-nums; }
+.ild-acao .seta { color:var(--muted); font-weight:900; }
+.ild-acao.zero { opacity:.55; }
+@media (prefers-reduced-motion: reduce) { .ild-acao { transition:none; } .ild-acao:hover { transform:none; } }
 
 </style>
 <script>
@@ -40034,6 +40054,8 @@ function ildPessoas() {
   if (AB && AB.rows.length) AB.rows.forEach(function(r) {
     var t8 = _ildT8(r[1]); if (t8.length < 8) return;
     var p = P[t8] || add(t8); if (!p.nome) p.nome = String(r[2] || '');
+    var sN = v2norm(String(r[4] || ''));
+    if (sN === 'presente' || sN === 'sem presenca') { p.presM = { quando: r[0] instanceof Date ? r[0] : null, quem: String(r[3] || ''), sit: sN === 'presente' ? 'presente' : 'sem' }; return; }
     p.ab = { quando: r[0] instanceof Date ? r[0] : null, quem: String(r[3] || ''), sit: v2norm(String(r[4] || '')) === 'desfeito' ? 'desfeito' : 'abordado' };
   });
   (typeof V2 !== 'undefined' && V2.rows || []).forEach(function(r) {
@@ -40052,6 +40074,7 @@ function ildPessoas() {
   });
   return Object.keys(P).map(function(k) {
     var p = P[k]; p.tipo = _ildTipo(p.tipoTxt) || (p.ing ? 'comprador' : ''); if (!p.tipoTxt) p.tipoTxt = ILD_TIPO_TXT[p.tipo] || '';
+    p.presApp = !!p.pres; p.presManual = !p.pres && !!(p.presM && p.presM.sit === 'presente'); if (p.presManual) p.pres = true;   // 06/11/2026: presença = check-in do app OU confirmada à mão
     p.abd = !!(p.ab && p.ab.sit === 'abordado');
     p.reun.sort(function(a, b) { return (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0); });
     p.ent = p.reun.some(function(r) { return isComp(r.sn); });
@@ -40138,7 +40161,7 @@ var ILD_PASSOS = [
   ['apl', 'Aplicaram para entrevista', '📝', function(p) { return !!p.apl; }],
   ['ent', 'Entrevistas realizadas', '🎙️', function(p) { return p.ent; }],
   ['vend', 'Vendas realizadas', '💰', function(p) { return p.vend; }]];
-var ILD_COR = { entA: ['#5eead4', '94,234,212'], vendA: ['#3ddc97', '61,220,151'], ns: ['#ff6b6b', '255,107,107'], abdp: ['#b98aff', '185,138,255'], aplp: ['#ffd166', '255,209,102'], entp: ['#5eead4', '94,234,212'], vendp: ['#3ddc97', '61,220,151'], ing: ['#f6a350', '246,163,80'], pres: ['#6ea8ff', '110,168,255'], abd: ['#b98aff', '185,138,255'], apl: ['#ffd166', '255,209,102'], ent: ['#5eead4', '94,234,212'], vend: ['#3ddc97', '61,220,151'], aplsem: ['#ff8f8f', '255,107,107'], fila: ['#f6a350', '246,163,80'] };
+var ILD_COR = { gAbdNapl: ['#b98aff', '185,138,255'], gPresNapl: ['#ffd166', '255,209,102'], gMarcNs: ['#ff6b6b', '255,107,107'], gEntNv: ['#f6a350', '246,163,80'], gMesa: ['#6ea8ff', '110,168,255'], marc: ['#6ea8ff', '110,168,255'], aplab: ['#ffd166', '255,209,102'], aplg: ['#ffd166', '255,209,102'], marcg: ['#6ea8ff', '110,168,255'], entA: ['#5eead4', '94,234,212'], vendA: ['#3ddc97', '61,220,151'], ns: ['#ff6b6b', '255,107,107'], abdp: ['#b98aff', '185,138,255'], aplp: ['#ffd166', '255,209,102'], entp: ['#5eead4', '94,234,212'], vendp: ['#3ddc97', '61,220,151'], ing: ['#f6a350', '246,163,80'], pres: ['#6ea8ff', '110,168,255'], abd: ['#b98aff', '185,138,255'], apl: ['#ffd166', '255,209,102'], ent: ['#5eead4', '94,234,212'], vend: ['#3ddc97', '61,220,151'], aplsem: ['#ff8f8f', '255,107,107'], fila: ['#f6a350', '246,163,80'] };
 function _ildPct(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }
 function _ildPills(L, cor) {
   return '<div class="nb-pills">' + _ildOrdenar(L).slice(0, 60).map(function(p) {
@@ -40216,7 +40239,7 @@ function _ildGeral(P) {
       return '<button class="' + (ILDV.pub === o[0] ? 'on' : '') + '" onclick="ILDV.pub=\'' + o[0] + '\';renderIld()">' + o[1] + ' <em>' + q + '</em></button>'; }).join('') + '</div>';
   var kc = function(k, rot, q, ant, sub, cls) {
     var cor = ILD_COR[k] || ILD_COR.ing, ps = _ildPasso(k), w = ant ? Math.max(q ? 2 : 0, q / ant * 100) : (ant === null ? 100 : 0);
-    var conv = ant != null ? '<span class="kp-canto kp-conv" title="' + q + ' de ' + ant + '"><b>' + (ant ? Math.round(q / ant * 100) + '%' : '—') + '</b><small>' + (cls === 'fora' ? 'de quem chegou' : 'do anterior') + '</small></span>' : '';
+    var conv = ant != null ? '<span class="kp-canto kp-conv" title="' + q + ' de ' + ant + '"><b>' + (ant ? Math.round(q / ant * 100) + '%' : '—') + '</b><small>' + (String(cls || '').indexOf('fora') !== -1 ? (k === 'ns' ? 'dos ingressos' : 'de quem chegou') : 'do anterior') + '</small></span>' : '';
     return '<div class="glass click ild-kp' + (cls ? ' ' + cls : '') + '" style="--halo:rgba(' + cor[1] + ',.2);--tint:' + cor[0] + ';--c:' + cor[0] + ';--cb:' + cor[1] + ';" onclick="ildLista(\'' + k + '\')" title="ver os nomes e os detalhes">'
       + '<div class="g-label">' + (ps ? ps[2] : '') + ' ' + rot + '</div>'
       + '<div class="ild-kp-num"><div class="g-value" style="color:' + cor[0] + ';">' + q + '</div>' + conv + '</div>'
@@ -40238,24 +40261,29 @@ function _ildGeral(P) {
   var qApl = nf(function(p) { return !!p.apl; }), qEntA = nf(function(p) { return !!p.apl && p.ent; }), qAgA = nf(function(p) { return !!p.apl && p.agd && !p.ent; });
   var qNsA = nf(function(p) { return !!p.apl && p.ns; }), qVendA = nf(function(p) { return !!p.apl && p.vend; });
   var vtA = pub.filter(function(p) { return !!p.apl && p.vend; }).reduce(function(a, p) { return a + p.valor; }, 0);
-  h += '<div class="ild-bloco-t ild-sep"><span>🎟️ Funil do evento · comprou › compareceu › aplicou</span></div>'
-    + '<div class="kpis ild-kpis">'
+  // 06/11/2026 (Bruno: "4 passos no pré e 4 no pós, parecido com o que a gente tem no geral"):
+  // evento: comprou › compareceu › abordado (o responsável) › aplicou · pós: aplicou › marcou a entrevista › compareceu › comprou
+  var qAplAb = nf(function(p) { return p.pres && p.abd && !!p.apl; }), qMarc = nf(function(p) { return !!p.apl && p.reun.length > 0; });
+  h += '<div class="ild-bloco-t ild-sep"><span>🎟️ Funil do evento · comprou › compareceu › abordado › aplicou</span></div>'
+    + '<div class="kpis ild-kpis ild-4">'
     + kc('ing', rotIng, qIng, null, subIng)
     + kc('pres', 'Compareceram', qPres, qIng, qNs + ' no-show até agora')
-    + kc('aplp', 'Aplicaram', qAplP, qPres, qAplAbd + ' abordado' + (qAplAbd === 1 ? '' : 's') + ' · ' + (qAplP - qAplAbd) + ' sem abordagem' + (qAplFora ? ' · +' + qAplFora + ' aplicaram sem vir' : ''))
+    + kc('abdp', 'Abordados', qAbdP, qPres, (qFila ? 'faltam ' + qFila : 'todo mundo que chegou foi abordado') + ' · quem abordou é o responsável')
+    + kc('aplab', 'Aplicaram', qAplAb, qAbdP, (qAplP - qAplAb ? '+' + (qAplP - qAplAb) + ' aplicaram sem abordagem' : 'aplicaram: ' + _ildPct(qAplAb, qAbdP) + ' dos abordados') + (qAplFora ? ' · +' + qAplFora + ' sem vir' : ''))
     + '</div>'
     + '<div class="ild-lado">'
     + kc('ns', 'No-show', qNs, qIng, 'compraram e não fizeram check-in', 'fora mini')
-    + kc('abdp', 'Abordagem do time', qAbdP, qPres, (qFila ? 'faltam ' + qFila + ' · ' : '') + 'aplicaram: <b>' + _ildPct(qAplAbd, qAbdP) + '</b> dos abordados × <b>' + _ildPct(qAplP - qAplAbd, qPres - qAbdP) + '</b> dos não abordados', 'fora mini')
     + '</div>'
-    + '<div class="ild-bloco-t ild-sep"><span>📅 Funil pós-evento · aplicou › entrevista › comprou</span></div>'
-    + '<div class="kpis ild-kpis">'
+    + '<div class="ild-bloco-t ild-sep"><span>📅 Funil pós-evento · aplicou › marcou › compareceu › comprou</span></div>'
+    + '<div class="kpis ild-kpis ild-4">'
     + kc('apl', 'Aplicaram', qApl, null, qAplP + ' vieram ao evento' + (qAplFora ? ' · ' + qAplFora + ' não vieram' : ''))
-    + kc('entA', 'Fizeram entrevista', qEntA, qApl, qAgA + ' agendada' + (qAgA === 1 ? '' : 's') + (qNsA ? ' · ' + qNsA + ' no-show' : ''))
+    + kc('marc', 'Marcaram a entrevista', qMarc, qApl, (qApl - qMarc) + ' ainda sem entrevista marcada')
+    + kc('entA', 'Compareceram na entrevista', qEntA, qMarc, qAgA + ' para acontecer' + (qNsA ? ' · ' + qNsA + ' no-show' : ''))
     + kc('vendA', 'Compraram', qVendA, qEntA, vtA ? v2fmtR(vtA) : 'R$ 0')
     + '</div>';
   // 3) o funil geral: uma linha por etapa (barra sobre os ingressos), % da etapa anterior, % do total e o gargalo
-  var G = [['ing', rotIng, qIng], ['pres', 'Compareceram', qPres], ['aplp', 'Aplicaram', qAplP], ['entp', 'Fizeram entrevista', qEntP], ['vendp', 'Compraram no final', qVendP]];
+  var qMarcG = nf(function(p) { return p.pres && !!p.apl && p.reun.length > 0; });
+  var G = [['ing', rotIng, qIng], ['pres', 'Compareceram', qPres], ['aplg', 'Aplicaram', qAplP], ['marcg', 'Marcaram a entrevista', qMarcG], ['entp', 'Compareceram na entrevista', qEntP], ['vendp', 'Compraram no final', qVendP]];
   var pior = -1, piorTx = 2;
   G.forEach(function(x, i2) { if (i2 && G[i2 - 1][2] > 0) { var tx = x[2] / G[i2 - 1][2]; if (tx < piorTx) { piorTx = tx; pior = i2; } } });
   h += '<div class="ild-bloco"><div class="ild-bloco-t"><span>🧭 Funil geral do evento · de quem comprou ingresso a quem comprou no final</span></div><div class="ild-fun2">'
@@ -40267,6 +40295,17 @@ function _ildGeral(P) {
           + '<span class="ic">' + (ps ? ps[2] : '') + '</span><span class="rot">' + x[1] + (pt ? '<em>' + pt + '</em>' : '') + (i2 === pior ? '<em class="gg">⚠️ gargalo</em>' : '') + '</span>'
           + '<span class="trilho"><i style="width:' + Math.min(100, w).toFixed(1) + '%"></i></span><b>' + x[2] + '</b><small>' + pa + '</small><span class="seta" aria-hidden="true">›</span></button>';
       }).join('') + '</div></div>';
+  // 🎯 onde agir: cada buraco do funil vira uma lista de gente para ir atrás (antes/chegada · durante · depois)
+  var ac = function(k, q, txt) { var cor = ILD_COR[k] || ILD_COR.ing, ps = _ildPasso(k);
+    return '<button class="ild-acao' + (q ? '' : ' zero') + '" style="--c:' + cor[0] + ';--cb:' + cor[1] + '" onclick="ildLista(\'' + k + '\')"><span class="ic">' + (ps ? ps[2] : '') + '</span><span class="t"><b>' + (ps ? ps[1] : k) + '</b><em>' + txt + '</em></span><span class="n">' + q + '</span><span class="seta" aria-hidden="true">›</span></button>'; };
+  var nG = function(k) { var ps = _ildPasso(k); return ps ? pub.filter(ps[3]).length : 0; };
+  h += '<div class="ild-bloco"><div class="ild-bloco-t"><span>🎯 Onde agir · ninguém fica para trás</span></div>'
+    + '<div class="ild-acoes"><div class="ild-ac-g"><small>Chegada</small>' + ac('ns', nG('ns'), 'compraram e não chegaram — ligar / chamar no WhatsApp') + '</div>'
+    + '<div class="ild-ac-g"><small>Durante o evento</small>' + ac('fila', nG('fila'), 'chegaram e ninguém abordou — abordar e ficar responsável')
+    + ac('gAbdNapl', nG('gAbdNapl'), 'já foram abordados — convidar para aplicar') + ac('gPresNapl', nG('gPresNapl'), 'vieram e não aplicaram — o total, abordados ou não') + '</div>'
+    + '<div class="ild-ac-g"><small>Depois do evento</small>' + ac('aplsem', nG('aplsem'), 'aplicaram e não têm entrevista — marcar')
+    + ac('gMarcNs', nG('gMarcNs'), 'faltaram na entrevista — remarcar') + ac('gEntNv', nG('gEntNv'), 'entrevista sem compra — retomar a conversa')
+    + ac('gMesa', nG('gMesa'), 'em negociação — fechar') + '</div></div></div>';
   h += '<div class="hint ild-pe">Atualizado ' + (ILDV.quando ? 'às ' + new Date(ILDV.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—') + ' · ingresso, check-in e aplicação vêm do app do evento; entrevistas e vendas, das reuniões com origem "' + ILD_EVT.origem + '".</div>';
   return h;
 }
@@ -40280,8 +40319,18 @@ var ILD_EXTRA_PASSOS = { fila: ['fila', 'Chegaram e ainda não foram abordados',
   entp: ['entp', 'Entrevistas (de quem compareceu)', '🎙️', function(p) { return p.pres && p.ent; }, 'aplp'],
   vendp: ['vendp', 'Vendas (de quem compareceu)', '💰', function(p) { return p.pres && p.vend; }, 'entp'],
   // funil pós-evento: de quem aplicou (veio ou não)
-  entA: ['entA', 'Fizeram entrevista (de quem aplicou)', '🎙️', function(p) { return !!p.apl && p.ent; }, 'apl'],
-  vendA: ['vendA', 'Compraram (de quem aplicou)', '💰', function(p) { return !!p.apl && p.vend; }, 'entA'] };
+  marc: ['marc', 'Marcaram a entrevista (de quem aplicou)', '📅', function(p) { return !!p.apl && p.reun.length > 0; }, 'apl'],
+  aplab: ['aplab', 'Aplicaram (dos abordados que compareceram)', '📝', function(p) { return p.pres && p.abd && !!p.apl; }, 'abdp'],
+  aplg: ['aplg', 'Aplicaram (de quem compareceu)', '📝', function(p) { return p.pres && !!p.apl; }, 'pres'],
+  marcg: ['marcg', 'Marcaram a entrevista (de quem compareceu e aplicou)', '📅', function(p) { return p.pres && !!p.apl && p.reun.length > 0; }, 'aplg'],
+  entA: ['entA', 'Compareceram na entrevista (de quem aplicou)', '🎙️', function(p) { return !!p.apl && p.ent; }, 'marc'],
+  vendA: ['vendA', 'Compraram (de quem aplicou)', '💰', function(p) { return !!p.apl && p.vend; }, 'entA'],
+  // 🎯 onde agir (06/11/2026, Bruno: "não perder ninguém… ir atrás de quem não compareceu, de quem veio e não aplicou, de quem aplicou e não fez a reunião")
+  gAbdNapl: ['gAbdNapl', 'Abordados que ainda não aplicaram', '🗣️', function(p) { return p.pres && p.abd && !p.apl && !p.vend; }],
+  gPresNapl: ['gPresNapl', 'Vieram e ainda não aplicaram', '🙋', function(p) { return p.pres && !p.apl && !p.vend && p.tipo !== 'mentorado'; }],
+  gMarcNs: ['gMarcNs', 'Marcaram e faltaram na entrevista', '🚫', function(p) { return !!p.apl && p.ns && !p.agd; }],
+  gEntNv: ['gEntNv', 'Fizeram a entrevista e não compraram', '🔁', function(p) { return p.ent && !p.vend && !p.mesa; }],
+  gMesa: ['gMesa', 'Na mesa (bloqueio ou entrada)', '🧾', function(p) { return p.mesa; }] };
 function _ildPasso(k) { return ILD_PASSOS.filter(function(x) { return x[0] === k; })[0] || ILD_EXTRA_PASSOS[k] || null; }
 function _ildConta(L, f) { var c = {}; L.forEach(function(p) { var k = f(p); if (k) c[k] = (c[k] || 0) + 1; }); return Object.keys(c).sort(function(a, b) { return c[b] - c[a]; }).map(function(k) { return [k, c[k]]; }); }
 function ildLista(passo) {
@@ -40297,9 +40346,9 @@ function ildLista(passo) {
     + '<div><small>Quentes</small><b>' + L.filter(function(p) { return v2norm(p.temp) === 'quente'; }).length + '</b></div></div>';
   var res = linha('Tipo', _ildConta(L, function(p) { return p.tipoTxt; })) + linha('Temperatura', _ildConta(L, function(p) { return p.temp; })) + linha('Perfil', _ildConta(L, function(p) { return p.perfil; }))
     + (passo === 'abd' || passo === 'abdp' ? linha('Quem abordou', _ildConta(L, function(p) { return p.ab && p.ab.quem ? p.ab.quem.split(' ')[0] : ''; })) : '')
-    + (passo === 'aplp' ? linha('Abordagem', _ildConta(L, function(p) { return p.abd ? 'Foi abordado' : 'Aplicou sem abordagem'; })) : '')
-    + (passo === 'apl' || passo === 'aplsem' || passo === 'aplp' ? linha('Investimento', _ildConta(L, function(p) { return p.aplInv; })) : '')
-    + (/^(ent|vend)(p|A)?$/.test(passo) ? linha('Closer', _ildConta(L, function(p) { var r = p.reun[p.reun.length - 1]; return r && r.closer ? r.closer.split(' ')[0] : ''; })) : '');
+    + (/^apl(p|g)$/.test(passo) ? linha('Abordagem', _ildConta(L, function(p) { return p.abd ? 'Foi abordado' : 'Aplicou sem abordagem'; })) : '')
+    + (/^apl(sem|p|g|ab)?$/.test(passo) ? linha('Investimento', _ildConta(L, function(p) { return p.aplInv; })) : '')
+    + (/^(ent|vend|marc)(p|A|g)?$/.test(passo) ? linha('Closer', _ildConta(L, function(p) { var r = p.reun[p.reun.length - 1]; return r && r.closer ? r.closer.split(' ')[0] : ''; })) : '');
   var m = document.getElementById('ild-modal') || _ildModal();
   m.querySelector('.ild-m-corpo').innerHTML = '<h3 style="color:' + cor[0] + '">' + s[2] + ' ' + s[1] + ' <em>' + L.length + '</em></h3>' + kp + (res ? '<div class="ild-res">' + res + '</div>' : '')
     + (L.length ? '<div class="ild-cards">' + L.slice(0, 120).map(_ildCard).join('') + '</div>' + (L.length > 120 ? '<p class="hint">Mostrando 120 de ' + L.length + '. Na aba Leads dá para filtrar.</p>' : '') : '<p class="hint">Ninguém ainda.</p>');
@@ -40316,9 +40365,10 @@ function _ildMini(p) { return '<button class="ild-mini-it" onclick="ildFicha(\''
 function _ildNome(p) { var n = String(p.nome || '').trim(); return n ? n.replace(/\s+/g, ' ').split(' ').slice(0, 3).join(' ') : '(sem nome)'; }
 
 // 2) LEADS DO EVENTO — pesquisa + ficha com Abordei / Marcar entrevista / WhatsApp
-var ILD_SIT = [['', 'Todos'], ['fila', '🔥 Chegou e não abordado'], ['pres', '✅ Chegou'], ['naopres', '⏳ Não chegou'], ['abd', '🗣️ Abordados'], ['apl', '📝 Aplicou'], ['aplsem', '⏳ Aplicou, sem entrevista'], ['ent', '🎙️ Com entrevista'], ['vend', '💰 Comprou']];
+var ILD_SIT = [['', 'Todos'], ['meus', '👤 Sou responsável'], ['fila', '🔥 Chegou e não abordado'], ['pres', '✅ Chegou'], ['naopres', '⏳ Não chegou'], ['abd', '🗣️ Abordados'], ['apl', '📝 Aplicou'], ['aplsem', '⏳ Aplicou, sem entrevista'], ['ent', '🎙️ Com entrevista'], ['vend', '💰 Comprou']];
 function _ildSitOk(p) {
-  var s = ILDV.sit; return !s || (s === 'fila' ? p.pres && !p.abd && !p.vend : s === 'pres' ? p.pres : s === 'naopres' ? !p.pres : s === 'abd' ? p.abd : s === 'apl' ? !!p.apl : s === 'aplsem' ? (!!p.apl && !p.reun.length && !p.vend) : s === 'ent' ? (p.ent || p.agd) : s === 'vend' ? p.vend : true);
+  var s = ILDV.sit, eu = ''; try { eu = v2norm(localStorage.getItem('ildQuem') || ''); } catch (e) {}
+  return !s || (s === 'meus' ? !!(p.abd && eu && v2norm(p.ab.quem) === eu) : s === 'fila' ? p.pres && !p.abd && !p.vend : s === 'pres' ? p.pres : s === 'naopres' ? !p.pres : s === 'abd' ? p.abd : s === 'apl' ? !!p.apl : s === 'aplsem' ? (!!p.apl && !p.reun.length && !p.vend) : s === 'ent' ? (p.ent || p.agd) : s === 'vend' ? p.vend : true);
 }
 function _ildLeads(P) {
   var q = v2norm(ILDV.q || ''), qd = String(ILDV.q || '').replace(/\D/g, '');
@@ -40369,8 +40419,10 @@ function _ildCard(p) {
   var k = function(rot, val, sub, cor, on, largo) {
     return '<div class="ild-ck' + (on ? ' on' : '') + (largo ? ' largo' : '') + (!largo && String(val).length > 28 ? ' longo' : '') + '" style="--c:' + (cor || 'var(--text)') + '"><small>' + rot + '</small><b>' + val + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
   };
-  var est = k('Chegada', p.pres ? '✅ Chegou' : '⏳ Ainda não', p.pres ? 'check-in no app' : '', p.pres ? '#3ddc97' : 'var(--muted)', p.pres)
-    + k('Abordagem', p.abd ? '🗣️ Abordado' : '—', p.abd ? [p.ab.quem ? 'por ' + dspEsc(p.ab.quem.split(' ')[0]) : '', p.ab.quando ? 'às ' + hm(p.ab.quando) : ''].filter(Boolean).join(' ') : 'ninguém marcou ainda', p.abd ? '#b98aff' : 'var(--muted)', p.abd)
+  var chSub = p.presApp ? 'check-in no app' : p.presManual ? 'confirmado' + (p.presM.quem ? ' por ' + dspEsc(p.presM.quem.split(' ')[0]) : '') + (p.presM.quando ? ' às ' + hm(p.presM.quando) : '') + ' · <a href="#" onclick="event.stopPropagation();ildConfirmar(\'' + p.t8 + '\',true);return false;">desfazer</a>'
+    : '<button class="btn ild-ck-bt" onclick="event.stopPropagation();ildConfirmar(\'' + p.t8 + '\')">✅ Confirmar presença</button>';
+  var est = k('Chegada', p.pres ? '✅ Chegou' : '⏳ Ainda não', chSub, p.pres ? '#3ddc97' : 'var(--muted)', p.pres)
+    + k('Responsável', p.abd ? '🗣️ ' + dspEsc(p.ab.quem ? p.ab.quem.split(' ')[0] : 'Abordado') : '—', p.abd ? ['abordou', p.ab.quando ? 'às ' + hm(p.ab.quando) : ''].filter(Boolean).join(' ') : 'ninguém marcou ainda', p.abd ? '#b98aff' : 'var(--muted)', p.abd)
     + k('Aplicação', p.apl ? '📝 Aplicou' : '—', p.apl ? dspEsc(p.aplInv || '') : 'não aplicou no app', p.apl ? '#ffd166' : 'var(--muted)', !!p.apl)
     + k('Entrevista', p.vend ? '💰 ' + v2fmtR(p.valor) : ur ? '📅 ' + dspEsc(ur.status || '') : '—', p.vend ? 'comprou' + (ur && ur.closer ? ' com ' + dspEsc(ur.closer.split(' ')[0]) : '') : ur ? [ur.date ? ur.date.toLocaleDateString('pt-BR') : '', ur.closer ? dspEsc(ur.closer.split(' ')[0]) : ''].filter(Boolean).join(' · ') : 'sem reunião marcada', p.vend ? '#3ddc97' : ur ? '#5eead4' : 'var(--muted)', !!ur);
   var inf = (p.fat ? k('Faturamento', dspEsc(p.fat), '', '#f6a350') : '')
@@ -40384,7 +40436,7 @@ function _ildCard(p) {
     + '<div class="ild-c-kpis">' + est + '</div>'
     + (inf ? '<div class="ild-c-kpis ild-c-inf">' + inf + '</div>' : '')
     + '<div class="ild-c-bts">'
-    + (p.abd ? '<button class="btn" onclick="ildAbordar(\'' + p.t8 + '\',true)">↩︎ Desfazer abordagem</button>' : '<button class="btn primary" onclick="ildAbordar(\'' + p.t8 + '\')">🗣️ Abordei</button>')
+    + (p.abd ? '<button class="btn" onclick="ildAbordar(\'' + p.t8 + '\',true)">↩︎ Desfazer abordagem</button>' : '<button class="btn primary" onclick="ildAbordar(\'' + p.t8 + '\')" title="quem abordou fica responsável por esta pessoa">🗣️ Abordei · fico responsável</button>')
     + '<button class="btn" onclick="ildMarcar(\'' + p.t8 + '\')">📅 Marcar entrevista</button>'
     + '<button class="btn" onclick="ildFichaCompleta(\'' + p.t8 + '\')">🔎 Ver tudo</button>'
     + (zap ? '<a class="btn" href="' + zap + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '')
@@ -40467,6 +40519,30 @@ function ildAbordar(t8, desfazer) {
     if (d && d.success) { try { avisoRapido(desfazer ? '↩︎ Abordagem desfeita' : '🗣️ ' + _ildNome(p) + ' marcado como abordado'); } catch (e) {} return; }
     var i = ILDV.ab.rows.indexOf(linha); if (i >= 0) ILDV.ab.rows.splice(i, 1); renderIld();
     if (d && d.sair) { try { localStorage.removeItem('ildTok'); } catch (e) {} ildPedirSenha(function() { ildAbordar(t8, desfazer); }); return; }
+    try { avisoRapido('❌ Não gravou: ' + ((d && d.error) || 'o robô não respondeu — tente de novo')); } catch (e) {}
+  });
+}
+// ✅ 06/11/2026 (Bruno: "não queria que fazer alguma coisa na pessoa considerasse que ela compareceu… no máximo um lugar onde eu
+// pudesse confirmar o comparecimento"): presença só pelo check-in do app ou por este botão (grava "presente" na aba ILD Abordagens)
+function ildConfirmar(t8, desfazer) {
+  var p = ildPessoas().filter(function(x) { return x.t8 === t8; })[0]; if (!p) return;
+  if (!desfazer && !confirm('Confirmar que ' + _ildNome(p) + ' está no evento?')) return;
+  var quem = ''; try { quem = localStorage.getItem('ildQuem') || ''; } catch (e) {}
+  if (!quem) { ildQuemEscolher(); try { avisoRapido('Primeiro diga quem é você 👤'); } catch (e2) {} return; }
+  if (!_ildTok()) { ildPedirSenha(function() { ildConfirmar(t8, desfazer); }); return; }
+  var linha = [new Date(), t8, p.nome, quem, desfazer ? 'sem presença' : 'presente'];
+  if (ILDV.ab) ILDV.ab.rows.push(linha); else ILDV.ab = { cols: [], rows: [linha] };
+  var reabre = document.getElementById('ild-modal') && document.getElementById('ild-modal').classList.contains('on');
+  try { renderIld(); if (reabre) ildFichaCompleta(t8); } catch (e3) {}
+  ctdPedir({ action: 'ildAbordar', tipo: 'presenca', tok: _ildTok(), t8: t8, nome: p.nome, quem: quem, desfazer: !!desfazer }, function(d) {
+    var esperado = desfazer ? 'sem presença' : 'presente';
+    if (d && d.success && d.situacao === esperado) { try { avisoRapido(desfazer ? '↩︎ Presença desfeita' : '✅ Presença de ' + _ildNome(p) + ' confirmada'); } catch (e) {} return; }
+    var i = ILDV.ab.rows.indexOf(linha); if (i >= 0) ILDV.ab.rows.splice(i, 1); try { renderIld(); if (reabre) ildFichaCompleta(t8); } catch (e4) {}
+    if (d && d.success && d.situacao !== esperado) {   // robô antigo: gravou como "abordado" — desfaz na hora e avisa
+      ctdPedir({ action: 'ildAbordar', tok: _ildTok(), t8: t8, nome: p.nome, quem: quem, desfazer: !p.abd }, function() {});
+      try { avisoRapido('⚠️ O robô ainda não tem a confirmação de presença: fale com o Bruno'); } catch (e5) {} return;
+    }
+    if (d && d.sair) { try { localStorage.removeItem('ildTok'); } catch (e) {} ildPedirSenha(function() { ildConfirmar(t8, desfazer); }); return; }
     try { avisoRapido('❌ Não gravou: ' + ((d && d.error) || 'o robô não respondeu — tente de novo')); } catch (e) {}
   });
 }
