@@ -2948,7 +2948,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-06-0712';
+var VERSAO_DASH = '2026-11-06-0801';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -40544,7 +40544,7 @@ function _ildCard(p) {
     : '<button class="btn ild-ck-bt" onclick="event.stopPropagation();ildConfirmar(\'' + p.t8 + '\')">✅ Confirmar presença</button>';
   var est = k('Chegada', p.pres ? '✅ Chegou' : '⏳ Ainda não', chSub, p.pres ? '#3ddc97' : 'var(--muted)', p.pres)
     + k('Responsável', p.abd ? '🗣️ ' + dspEsc(p.ab.quem ? p.ab.quem.split(' ')[0] : 'Abordado') : '—', p.abd ? ['abordou', p.ab.quando ? 'às ' + hm(p.ab.quando) : ''].filter(Boolean).join(' ') : 'ninguém marcou ainda', p.abd ? '#b98aff' : 'var(--muted)', p.abd)
-    + k('Aplicação', p.apl ? '💳 Pagou R$ 297' : p.aplPend ? '⏳ Falta pagar' : '—', p.aplPeloDash ? 'registrada' + (p.aplReg.quem ? ' por ' + dspEsc(p.aplReg.quem.split(' ')[0]) : '') + (p.aplReg.dados && p.aplReg.dados.forma ? ' · ' + dspEsc(p.aplReg.dados.forma) : '') : p.apl || p.aplPend ? dspEsc(p.aplInv || '') : (p.aplAntiga ? 'aplicou em ' + p.aplAntiga.toLocaleDateString('pt-BR') + ' (outro workshop)' : 'não aplicou no evento'), p.apl ? '#ffd166' : p.aplPend ? '#ff8f8f' : 'var(--muted)', !!(p.apl || p.aplPend))
+    + k('Aplicação', p.apl ? '💳 Pagou R$ 297' : p.aplPend ? '⏳ Falta pagar' : '—', p.aplPeloDash ? 'registrada' + (p.aplReg.quem ? ' por ' + dspEsc(p.aplReg.quem.split(' ')[0]) : '') + (p.aplReg.dados && p.aplReg.dados.forma ? ' · ' + dspEsc(p.aplReg.dados.forma) : '') : p.apl || p.aplPend ? dspEsc(p.aplInv || '') : 'não aplicou no evento', p.apl ? '#ffd166' : p.aplPend ? '#ff8f8f' : 'var(--muted)', !!(p.apl || p.aplPend))
     + k('Entrevista', p.vend ? '💰 ' + v2fmtR(p.valor) : ur ? '📅 ' + dspEsc(ur.status || '') : '—', p.vend ? 'comprou' + (ur && ur.closer ? ' com ' + dspEsc(ur.closer.split(' ')[0]) : '') : ur ? [ur.date ? ur.date.toLocaleDateString('pt-BR') : '', ur.closer ? dspEsc(ur.closer.split(' ')[0]) : ''].filter(Boolean).join(' · ') : 'sem reunião marcada', p.vend ? '#3ddc97' : ur ? '#5eead4' : 'var(--muted)', !!ur);
   var inf = (p.fat ? k('Faturamento', dspEsc(p.fat), '', '#f6a350') : '')
     + (p.inv && !p.aplInv ? k('Quer investir', dspEsc(p.inv), '', '#f6a350') : '')
@@ -40605,7 +40605,8 @@ function ildFichaCompleta(t8) {
   var p = ildPessoas().filter(function(x) { return x.t8 === t8; })[0]; if (!p) return;
   var k = function(rot, val, largo) { var t = String(val); return '<div class="ild-ck' + (largo || t.length > 60 ? ' largo' : '') + (t.length > 28 && !(largo || t.length > 60) ? ' longo' : '') + '"><small>' + dspEsc(rot) + '</small><b class="ild-ck-txt">' + dspEsc(t) + '</b></div>'; };
   var sec = function(tit, corpo) { return corpo ? '<div class="ild-fc-sec"><div class="ild-bloco-t"><span>' + tit + '</span></div><div class="ild-c-kpis">' + corpo + '</div></div>' : ''; };
-  var app = _ildCampos(ILDV.app, p.aRow).filter(function(x) { return !/^(nome|telefone|instagram|programa)$/.test(x[2]); });
+  // 06/11/2026 (Bruno: "tire todos da aplicação"): aplicação antiga (de outro workshop) não aparece em lugar nenhum
+  var app = _ildCampos(ILDV.app, p.aRow).filter(function(x) { return !/^(nome|telefone|instagram|programa)$/.test(x[2]) && (p.apl || p.aplPend || !/aplic|^crm do workshop$/.test(x[2])); });
   var base = _ildCampos(ILDV.base, p.bRow).filter(function(x) { return !/^(evento)$/.test(x[2]); });
   var ab = ((ILDV.ab && ILDV.ab.rows) || []).filter(function(r) { return _ildT8(r[1]) === t8; }).map(function(r) {
     return '<div class="ild-ag-l"><span class="d">' + _ildFmt(r[0]) + '</span><b>' + dspEsc(String(r[4] || '')) + '</b><span>' + dspEsc(String(r[3] || '')) + '</span><span class="st">' + dspEsc(String(r[5] || '')) + '</span></div>'; }).join('');
