@@ -39770,6 +39770,21 @@ html.ild .tb-it.tb-ild { display:flex; }
   .ild-sec-v { font-size:0; margin-top:10px; } .ild-sec-v::after { content:'›'; font-size:1.3rem; font-weight:900; display:inline-block; transition:transform .2s; }
   .ild-sec.aberta .ild-sec-v::after { transform:rotate(90deg); }
 }
+/* 06/11/2026: Agenda do evento — horários livres de 50 min dos 4 closers, de sábado a sexta */
+.ild-ag-grade { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:10px; }
+.ild-ag-col { padding:12px; border-radius:16px; background:var(--panel); border:1px solid var(--border); display:flex; flex-direction:column; gap:10px; min-width:0; }
+.ild-ag-cab { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.ild-ag-cab b { font-size:.95rem; font-weight:900; }
+.ild-ag-cab span { font-size:.7rem; font-weight:800; color:#3ddc97; }
+.ild-ag-slots { display:flex; flex-wrap:wrap; gap:6px; }
+.ild-slot { font:inherit; font-size:.74rem; font-weight:800; font-variant-numeric:tabular-nums; padding:8px 10px; border-radius:10px; border:1px solid rgba(61,220,151,.45); background:rgba(61,220,151,.12); color:#3ddc97; cursor:pointer; }
+.ild-slot:hover { background:rgba(61,220,151,.22); }
+.ild-slot:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.ild-slot.oc { border-color:var(--border); background:transparent; color:var(--muted); text-decoration:line-through; cursor:default; }
+.ild-slot.pas { border-color:transparent; background:transparent; color:var(--muted); opacity:.5; cursor:default; }
+.ild-ag-dias button em { color:#3ddc97; }
+@media (max-width:760px) { .ild-ag-grade { grid-template-columns:1fr 1fr; } .ild-slot { padding:8px 7px; font-size:.7rem; } }
+@media (max-width:380px) { .ild-ag-grade { grid-template-columns:1fr; } }
 
 </style>
 <script>
@@ -39831,6 +39846,7 @@ function _ildGvFiltro(qs, reCol, cond, cb) {
   });
 }
 function ildCarregar(forcar) {
+  if (forcar) { try { _ildAgCarregar(true); } catch (eAg) {} }
   if (ILDV.carregando) return;
   if (!forcar && ILDV.quando && Date.now() - ILDV.quando < 60000) return;
   ILDV.carregando = true; ILDV.erro = ''; try { renderIld(); } catch (e0) {}
@@ -39947,7 +39963,7 @@ function renderIld() {
 }
 function _ildQuemHtml() {
   var q = ''; try { q = localStorage.getItem('ildQuem') || ''; } catch (e) {}
-  return '<button class="btn ild-quem" onclick="ildQuemEscolher()" title="Quem está usando este celular (vai no Abordei e no SDR da entrevista)">👤 ' + (q ? dspEsc(q.split(' ')[0]) : 'Quem é você?') + '</button>';
+  return '<button class="btn ild-quem" onclick="ildQuemEscolher()" title="Quem está usando este celular (vai junto no Abordei)">👤 ' + (q ? dspEsc(q.split(' ')[0]) : 'Quem é você?') + '</button>';
 }
 function _ildNomesTime() {
   var n = {}, add = function(x) { x = String(x || '').trim(); if (x && x !== '—') n[x] = 1; };
@@ -39958,7 +39974,7 @@ function _ildNomesTime() {
 function ildQuemEscolher() {
   var nomes = _ildNomesTime(), atual = ''; try { atual = localStorage.getItem('ildQuem') || ''; } catch (e) {}
   var m = document.getElementById('ild-modal') || _ildModal();
-  m.querySelector('.ild-m-corpo').innerHTML = '<h3>👤 Quem é você?</h3><p class="hint">Vai junto no 🗣️ Abordei e como SDR quando você marcar uma entrevista. Fica guardado neste celular.</p>'
+  m.querySelector('.ild-m-corpo').innerHTML = '<h3>👤 Quem é você?</h3><p class="hint">Vai junto no 🗣️ Abordei. Fica guardado neste celular.</p>'
     + '<div class="ild-quem-lista">' + nomes.map(function(x) { return '<button class="' + (x === atual ? 'on' : '') + '" onclick="ildQuemSalvar(this.textContent)">' + dspEsc(x) + '</button>'; }).join('') + '</div>'
     + '<div class="ild-linha"><input id="ild-quem-outro" class="edit-in" placeholder="Outro nome" value=""><button class="btn primary" onclick="ildQuemSalvar(document.getElementById(\'ild-quem-outro\').value)">Salvar</button></div>';
   m.classList.add('on');
@@ -40182,14 +40198,19 @@ function ildEntrar() {
     if (msg) msg.textContent = '❌ ' + ((d && d.error) || 'o robô não respondeu — tente de novo');
   });
 }
-// 📅 Marcar entrevista: abre o "Agendar reunião" do dash já como Entrevista ILD de 50 min, origem ILD Goiânia e o lead preenchido
-function ildMarcar(t8) {
-  var p = t8 ? ildPessoas().filter(function(x) { return x.t8 === t8; })[0] : null;
-  ildFechar();
+// 📅 Marcar entrevista (06/11/2026, Bruno: "visibilidade da agenda sábado, domingo, segunda… sexta com espaço de 50 minutos" ·
+// "acesso a todas as agendas: Tony, Bruno, Wesllene, Sarah" · "não tem SDR dono neste caso, somente closer"):
+// a ficha leva para a aba Agenda com a pessoa escolhida; tocou num horário livre, abre o "Agendar reunião" do dash já como
+// Entrevista ILD de 50 min, com o closer, o dia, a hora, o lead, a origem ILD Goiânia e SEM SDR.
+function ildMarcar(t8) { ILDV.agLead = t8 || ''; ildFechar(); ildAba('agenda'); }
+function ildMarcarEm(dia, hora, ck) {
+  var p = ILDV.agLead ? ildPessoas().filter(function(x) { return x.t8 === ILDV.agLead; })[0] : null;
+  ILDV.agLead = ''; ildFechar();
   window._agTipoReuniao = 'entrevista';
-  try { abrirAgendar(50); } catch (e) { try { avisoRapido('Não consegui abrir a agenda: ' + e.message); } catch (e2) {} return; }
+  try { abrirAgendarCom(50, dia, hora, ck, 'entrevista'); } catch (e) { try { avisoRapido('Não consegui abrir a agenda: ' + e.message); } catch (e2) {} return; }
+  var $ = function(id) { return document.getElementById(id); };
+  var semSdr = function() { var sd = $('ag-sdr'); if (sd) sd.selectedIndex = 0; };   // a 1ª opção é "—"
   setTimeout(function() {
-    var $ = function(id) { return document.getElementById(id); };
     if (p) {
       if ($('ag-tel')) { $('ag-tel').value = p.tel || p.t8; try { agAcharPor('tel'); } catch (eA) {} }
       if ($('ag-nome') && !$('ag-nome').value) $('ag-nome').value = p.nome || '';
@@ -40202,23 +40223,81 @@ function ildMarcar(t8) {
     if ($('ag-duracao')) { $('ag-duracao').value = '50'; try { atualizarHorarios(); } catch (eH) {} }
     try { agOrigemEscolher(ILD_EVT.origem); window._agOriAuto = ''; } catch (eO) {}
     var lbl = $('ag-tipo-lbl'); if (lbl) lbl.textContent = '· Entrevista ILD (50 min)';
-    var dica = $('ag-origem-dica'); if (dica) dica.innerHTML = '🎟️ Lead do Evento ILD → origem <b style="color:#f6a350;">' + ILD_EVT.origem + '</b>';
-    var quem = ''; try { quem = localStorage.getItem('ildQuem') || ''; } catch (eQ) {}
-    var sd = $('ag-sdr'); if (sd && quem) { var pq = v2norm(quem).split(' ')[0]; for (var k = 0; k < sd.options.length; k++) { var o = v2norm(sd.options[k].text); if (o === v2norm(quem) || o.split(' ').indexOf(pq) !== -1) { sd.selectedIndex = k; break; } } }
+    var dica = $('ag-origem-dica'); if (dica) dica.innerHTML = '🎟️ Lead do Evento ILD → origem <b style="color:#f6a350;">' + ILD_EVT.origem + '</b> · sem SDR, só o closer';
+    semSdr();
   }, 80);
+  setTimeout(semSdr, 1200); setTimeout(semSdr, 3000);   // a busca do lead pode trazer um SDR antigo: aqui não tem SDR dono
 }
-
-// 3) AGENDA — as entrevistas ILD marcadas e feitas
+// a agenda dos 4 closers, de sábado a sexta, em espaços de 50 minutos (a grade de cada closer; Tony e Bruno: 2 entrevistas por bloco)
+var ILD_AG_DE = new Date(2026, 10, 7), ILD_AG_DIAS = 7;   // sábado 07/11 → sexta 13/11
+function _ildAgDias() { var L = []; for (var i = 0; i < ILD_AG_DIAS; i++) L.push(new Date(ILD_AG_DE.getFullYear(), ILD_AG_DE.getMonth(), ILD_AG_DE.getDate() + i)); return L; }
+function _ildAgSemanas() { var w = {}; _ildAgDias().forEach(function(d) { w[agDataStr(agSegunda(d))] = 1; }); return Object.keys(w); }
+function _ildAgCarregar(forcar) {
+  var wks = _ildAgSemanas();
+  if (ILDV.agLendo) return;
+  if (!forcar && ILDV.agQuando && Date.now() - ILDV.agQuando < 60000 && wks.every(function(w) { return AG.cache[w]; })) return;
+  ILDV.agLendo = true; var falta = wks.length;
+  wks.forEach(function(w) {
+    fetch(APPS_SCRIPT_URL + '?action=getCalendarEvents&weekStart=' + w + '&_t=' + Date.now(), { redirect: 'follow' })
+      .then(function(r) { return r.json(); }).then(function(d) { if (d && d.success) AG.cache[w] = d; }).catch(function() {})
+      .then(function() { if (--falta > 0) return; ILDV.agLendo = false; ILDV.agQuando = Date.now(); var A = _ildAbaAtual(); if (A && A[1] === 'agenda') renderIld(); });
+  });
+}
+function _ildAgSlots(key, d) {
+  var out = [];
+  slotsDo(key, d).forEach(function(sl) {
+    if (!sl.end || sl.fixo || sl.extra || sl.start === 'LUNCH') return;
+    var ini = agMin(sl.start), fim = agMin(sl.end);
+    for (var t = ini; t + 50 <= fim; t += 50) out.push(t);
+  });
+  return out;
+}
+function _ildHm(m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); }
+function _ildAgDia(d, key) {
+  var ds = agDataStr(d), cache = AG.cache[agDataStr(agSegunda(d))], agora = new Date();
+  var ev = ((cache && cache[key]) || []).filter(function(e) { return e.date === ds && !/no.?show|remarcada/i.test(String(e.status || '')); });
+  return _ildAgSlots(key, d).map(function(t) {
+    var oc = ev.some(function(e) { var bi = agMin(e.startTime), bf = agMin(e.endTime); return t < bf && t + 50 > bi; });
+    var passou = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60) < agora;
+    return { t: t, oc: oc, passou: passou, carregado: !!cache };
+  });
+}
+// 3) AGENDA — os horários livres dos 4 closers (sábado a sexta) + as entrevistas ILD marcadas e feitas
+var ILD_DSEM = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 function _ildAgenda(P) {
+  _ildAgCarregar(false);
+  var dias = _ildAgDias(), CL = (typeof CLOSERS !== 'undefined' ? CLOSERS : []).filter(function(c) { return ['tony', 'bruno', 'wesllene', 'sarah'].indexOf(c.key) !== -1; });
+  if (ILDV.agDia == null || ILDV.agDia >= dias.length) ILDV.agDia = 0;
+  var livres = function(d, k) { return _ildAgDia(d, k).filter(function(x) { return !x.oc && !x.passou; }).length; };
+  var lead = ILDV.agLead ? P.filter(function(p) { return p.t8 === ILDV.agLead; })[0] : null;
+  var h = lead
+    ? '<div class="novo-box"><span class="nb-ico">📅</span><div class="nb-txt"><b>Marcando a entrevista de ' + dspEsc(_ildNome(lead)) + '</b><span>Toque num horário livre (verde) de qualquer closer. Entrevista ILD · 50 min · origem ' + ILD_EVT.origem + ' · sem SDR.</span></div>'
+      + '<button class="close-x" title="Cancelar" onclick="ILDV.agLead=\'\';renderIld()">✕</button></div>'
+    : '<div class="ild-bloco ild-ag-cta"><div><b>Entrevista ILD · 50 minutos</b><p class="hint">Toque num horário livre (verde) para marcar. Abre o "Agendar reunião" do dash com o closer, o dia e a hora; origem <b>' + ILD_EVT.origem + '</b>, sem SDR — só o closer. Na ficha do lead, 📅 Marcar entrevista traz a pessoa para cá.</p></div></div>';
+  h += '<div class="ild-chips ild-ag-dias"><b>Dia</b>' + dias.map(function(d, i) {
+    var n = CL.reduce(function(a, c) { return a + livres(d, c.key); }, 0);
+    return '<button class="' + (ILDV.agDia === i ? 'on' : '') + '" onclick="ILDV.agDia=' + i + ';renderIld()">' + ILD_DSEM[d.getDay()] + ' ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' <em>' + n + '</em></button>';
+  }).join('') + '</div>';
+  var d = dias[ILDV.agDia], ds = agDataStr(d), carregou = !!AG.cache[agDataStr(agSegunda(d))];
+  h += '<div class="ild-ag-grade">' + CL.map(function(c) {
+    var L = _ildAgDia(d, c.key), nl = L.filter(function(x) { return !x.oc && !x.passou; }).length;
+    return '<div class="ild-ag-col"><div class="ild-ag-cab"><b>' + dspEsc(c.nome.split(' ')[0]) + '</b><span>' + (carregou ? nl + ' livre' + (nl === 1 ? '' : 's') : 'lendo…') + '</span></div><div class="ild-ag-slots">'
+      + (L.length ? L.map(function(x) {
+          var rot = _ildHm(x.t) + '–' + _ildHm(x.t + 50);
+          if (x.passou) return '<span class="ild-slot pas">' + rot + '</span>';
+          if (x.oc) return '<span class="ild-slot oc" title="já tem reunião">' + rot + '</span>';
+          return '<button class="ild-slot" onclick="ildMarcarEm(\'' + ds + '\',\'' + _ildHm(x.t) + '\',\'' + c.key + '\')">' + rot + '</button>';
+        }).join('') : '<span class="hint">sem horários na grade</span>')
+      + '</div></div>';
+  }).join('') + '</div>'
+    + '<div class="hint ild-pe">Verde = livre · riscado = já tem reunião na agenda do closer' + (ILDV.agQuando ? ' · agendas lidas às ' + new Date(ILDV.agQuando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') + ' · <a href="#" onclick="_ildAgCarregar(true);renderIld();return false;">ler de novo</a></div>';
   var R = [];
   P.forEach(function(p) { p.reun.forEach(function(r) { R.push({ r: r, p: p }); }); });
   R.sort(function(a, b) { return (a.r.date ? a.r.date.getTime() : 0) - (b.r.date ? b.r.date.getTime() : 0); });
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   var prox = R.filter(function(x) { return isFut(x.r.sn) || (x.r.date && x.r.date >= hoje && !isReal(x.r.sn)); }), feitas = R.filter(function(x) { return prox.indexOf(x) === -1; });
-  var linha = function(x) { var r = x.r; return '<div class="ild-ag-l"><span class="d">' + (r.date ? r.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + (r.carimbo && /\d{2}:\d{2}/.test(r.carimbo) ? '' : '') : '—') + '</span><b>' + dspEsc(_ildNome(x.p)) + '</b><span>' + dspEsc((r.closer || '').split(' ')[0]) + '</span><span class="st">' + dspEsc(r.status || '') + '</span></div>'; };
-  var h = '<div class="ild-bloco ild-ag-cta"><div><b>Entrevista ILD · 50 minutos</b><p class="hint">Abre o "Agendar reunião" do dash já com a origem <b>' + ILD_EVT.origem + '</b>: escolha o closer, o dia e o horário livre na agenda dele. Grava na planilha de vendas e na agenda do closer.</p></div>'
-    + '<button class="btn primary" onclick="ildMarcar(\'\')">📅 Marcar entrevista</button></div>'
-    + '<div class="ild-bloco"><div class="ild-bloco-t"><span>📅 Próximas entrevistas</span><b>' + prox.length + '</b></div>' + (prox.length ? prox.map(linha).join('') : '<div class="hint">Nenhuma marcada ainda. Na aba 🔎 Leads, cada ficha tem o botão 📅 Marcar entrevista.</div>') + '</div>'
+  var linha = function(x) { var r = x.r; return '<div class="ild-ag-l"><span class="d">' + (r.date ? r.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—') + '</span><b>' + dspEsc(_ildNome(x.p)) + '</b><span>' + dspEsc((r.closer || '').split(' ')[0]) + '</span><span class="st">' + dspEsc(r.status || '') + '</span></div>'; };
+  h += '<div class="ild-bloco"><div class="ild-bloco-t"><span>📅 Entrevistas ILD marcadas</span><b>' + prox.length + '</b></div>' + (prox.length ? prox.map(linha).join('') : '<div class="hint">Nenhuma marcada ainda.</div>') + '</div>'
     + '<div class="ild-bloco"><div class="ild-bloco-t"><span>🎙️ Já aconteceram</span><b>' + feitas.length + '</b></div>' + (feitas.length ? feitas.map(linha).join('') : '<div class="hint">—</div>') + '</div>';
   return h;
 }
