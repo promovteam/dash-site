@@ -2948,7 +2948,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-06-0801';
+var VERSAO_DASH = '2026-11-06-0814';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -22346,7 +22346,7 @@ function _loginFinMostrar(ov, a, codigo) {
   _lgMostrarEscolhido(a.nome);
   var pin = ov.querySelector('#lg-pin'); pin.style.display = 'flex';
   if (codigo) { window._lgEtapa = 1; window._lgFinal = ''; window._lgCodigo = ''; window._lgCodManual = false; _lgCriarRender(); return; }
-  pin.innerHTML = '<input id="lg-fsenha" type="password" placeholder="' + (_lgTime() ? 'senha do time' : 'sua senha') + '" autocomplete="current-password" style="' + LG_EST + '">'
+  pin.innerHTML = (_lgIld() ? _lgIldQuemSel() : '') + '<input id="lg-fsenha" type="password" placeholder="' + (_lgTime() ? 'senha do time' : 'sua senha') + '" autocomplete="current-password" style="' + LG_EST + '">'
     + '<button class="btn primary" style="padding:11px 26px;width:100%;" onclick="_loginFinEntrar()">Entrar</button>'
     + '<span id="lg-fmsg" class="hint" style="text-align:center;"></span>'
     + '<span class="hint" style="cursor:pointer;" onclick="_loginFinMostrar(document.getElementById(\'tela-login\'),{nome:window._lgEscolhido},true)">Primeira vez ou esqueceu a senha?</span>';
@@ -22356,6 +22356,9 @@ function _loginFinMostrar(ov, a, codigo) {
 // O pedido vai por POST (a senha no corpo, não no endereço) para as rotas conteudoCodigo/Criar/Entrar do robô.
 function _lgTime() { return !!(ACESSOS.filter(function(x){ return x.nome === window._lgEscolhido; })[0] || {}).senhaTime; }
 function _lgIld() { return !!(ACESSOS.filter(function(x){ return x.nome === window._lgEscolhido; })[0] || {}).ild; }   // 05/11/2026: Evento ILD
+// 06/11/2026 (Bruno: "na entrada a pessoa já diz quem é antes de entrar"): a lista de nomes na tela da senha do Evento ILD
+function _lgIldQuemSel() { var eu = ''; try { eu = localStorage.getItem('ildQuem') || ''; } catch (e) {} var G = (typeof ILD_EQUIPE !== 'undefined') ? ILD_EQUIPE : [];
+  return '<select id="lg-ild-quem" style="' + LG_EST + '"><option value="">👤 Quem é você?</option>' + G.map(function(g) { return '<optgroup label="' + g[0] + '">' + g[1].map(function(n) { return '<option' + (n === eu ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</optgroup>'; }).join('') + '</select>'; }
 function ctdPedir(pl, cb) {   // XMLHttpRequest de propósito: o fetch do dash é embrulhado (guarda respostas) e não serve para POST
   var feito = false, fim = function(d) { if (feito) return; feito = true; cb(d); };
   try {
@@ -22411,6 +22414,7 @@ function _loginFinEntrar() {
     pl.codigo = window._lgCodigo || '';
     if (!_lgSenhas()) { if (m) m.textContent = 'Crie a senha (6+ caracteres) e repita igual embaixo.'; return; }
   } else if (!senha) return;
+  if (_lgIld() && !cod) { var qS = (document.getElementById('lg-ild-quem') || {}).value || ''; if (!qS) { if (m) m.textContent = '👤 Escolha o seu nome antes de entrar'; return; } try { localStorage.setItem('ildQuem', qS); } catch (eQ) {} }   // 06/11/2026: Evento ILD
   if (m) m.textContent = cod ? '⏳ Criando a sua senha…' : 'Conferindo…';
   (time ? ctdPedir : gasPedir)(pl, function(d) {
     var esp = time ? (_lgIld() ? 'ild' : 'conteudo') : (ACESSOS.filter(function(x){ return x.nome === window._lgEscolhido; })[0] || {}).financeiro ? 'financeiro' : 'admin';
@@ -40062,6 +40066,9 @@ function _ildBaseDasLinhas(L) {
   ldCSV = function(txt) { var L = orig.apply(this, arguments); try { if (L && L.length > 500) _ildBaseDasLinhas(L); } catch (e) {} return L; };
   ldCSV._ild = true;
 })();
+function _ildRelerApp() {
+  _ildGvFiltro('sheet=' + encodeURIComponent('Workshop (Lovable)'), /^programa$/, "= '" + ILD_EVT.prog + "'", function(T) { if (T) ILDV.app = T; try { renderIld(); } catch (e) {} }, 'app');
+}
 function ildCarregar(forcar) {
   if (forcar) { try { _ildAgCarregar(true); } catch (eAg) {} }
   if (ILDV.carregando) return;
@@ -40072,6 +40079,9 @@ function ildCarregar(forcar) {
   _ildGvFiltro('sheet=' + encodeURIComponent('Workshop (Lovable)'), /^programa$/, "= '" + ILD_EVT.prog + "'", function(T) {
     if (!T) ILDV.erro = 'não consegui ler o app do evento'; else ILDV.app = T; pronto();
   }, 'app');
+  // ⏱️ 06/11/2026 (Bruno: "a atualização de dados não está sendo na hora?"): pede ao robô a cópia do app do evento (no máximo 1 por minuto
+  // lá); se ele copiou, relê só o app
+  try { ctdPedir({ action: 'ildAbordar', tipo: 'sinc' }, function(d) { if (!d || !d.success || d.situacao !== 'sinc') return; if (d.quando) ILDV.appCopiaEm = d.quando; if (d.copiou) _ildRelerApp(); else mostra(); }); } catch (eSc) {}
   _ildGv('sheet=' + encodeURIComponent(ILD_EVT.abordagens), '', function(r) {
     var T = _ildTab(r);   // a aba só nasce no 1º "Abordei"; sem ela o Google devolve outra aba: confere o cabeçalho
     ILDV.ab = T && T.cols.length >= 5 && T.cols[0].l === 'quando' && T.cols[1].l === 'tel8' ? T : { cols: [], rows: [] }; pronto();
@@ -40401,7 +40411,7 @@ function _ildGeral(P) {
     + '<div class="ild-ac-g"><small>Depois do evento</small>' + ac('aplsem', nG('aplsem'), 'aplicaram e não têm entrevista — marcar')
     + ac('gMarcNs', nG('gMarcNs'), 'faltaram na entrevista — remarcar') + ac('gEntNv', nG('gEntNv'), 'entrevista sem compra — retomar a conversa')
     + ac('gMesa', nG('gMesa'), 'em negociação — fechar') + '</div></div></div></div>';
-  h += '<div class="hint ild-pe">Atualizado ' + (ILDV.quando ? 'às ' + new Date(ILDV.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—') + ' · ingresso, check-in e aplicação vêm do app do evento; entrevistas e vendas, das reuniões com origem "' + ILD_EVT.origem + '".</div>';
+  h += '<div class="hint ild-pe">Atualizado ' + (ILDV.quando ? 'às ' + new Date(ILDV.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—') + (ILDV.appCopiaEm ? ' · app do evento copiado às ' + new Date(ILDV.appCopiaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') + ' · ingresso, check-in e aplicação vêm do app do evento; entrevistas e vendas, das reuniões com origem "' + ILD_EVT.origem + '".</div>';
   return h;
 }
 function v2fmtR(v) { return 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
