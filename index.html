@@ -2948,7 +2948,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-06-2028';
+var VERSAO_DASH = '2026-11-07-0914';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -39887,6 +39887,7 @@ html.ild .tb-it.tb-ild { display:flex; }
 .ild-ck-bt { margin-top:6px; padding:6px 10px; font-size:.68rem; border-color:rgba(61,220,151,.5); color:#3ddc97; }
 .ild-ck em a { color:var(--accent); font-weight:800; }
 @media (min-width:761px) { .ild-kpis.ild-4 { grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+@media (min-width:761px) { .ild-kpis.ild-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
 /* 06/11/2026: 🎯 Onde agir — uma linha por buraco do funil, agrupadas por momento */
 .ild-acoes { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; }
 .ild-ac-g { display:flex; flex-direction:column; gap:6px; }
@@ -40321,16 +40322,14 @@ function _ildGeral(P) {
   // 06/11/2026 (Bruno: "a visão geral do evento com os 4 passos… e uma aba dentro com o pós-evento e a visão geral de todos os funis")
   h += '<div class="ild-seg ild-vg-tabs">' + [['evento', '🎟️ No evento'], ['pos', '📅 Pós-evento e geral']].map(function(o) { return '<button class="' + ((ILDV.vg || 'evento') === o[0] ? 'on' : '') + '" onclick="ILDV.vg=\'' + o[0] + '\';renderIld()">' + o[1] + '</button>'; }).join('') + '</div>';
   h += '<div class="ild-vg" data-vg="evento"' + (ILDV.vg === 'pos' ? ' hidden' : '') + '>';
-  h += _ildAviso('fila', '🙋', fila.length, (fila.length === 1 ? 'pessoa chegou e ainda não foi abordada' : 'pessoas chegaram e ainda não foram abordadas'),
-    'Estão como presentes e ninguém marcou 🗣️ Abordei. Os mais quentes primeiro; toque num nome para abrir a ficha.', fila,
-    'background:rgba(246,163,80,.2);color:#f6a350;border:1px solid rgba(246,163,80,.5);', '', '', 'Ver a fila →', "ILDV.sit='fila';ildAba('leads')");
+  // 07/11/2026 (Bruno: "tire a aba de abordados… tirar essa etapa"): sem o aviso "chegaram e não foram abordadas"
   h += _ildAviso('apl', '⚠️', aplSem.length, (aplSem.length === 1 ? 'aplicou e ainda não tem entrevista marcada' : 'aplicaram e ainda não têm entrevista marcada'),
     'Aplicaram para a entrevista no app e não têm reunião na planilha. Toque num nome e use 📅 Marcar entrevista.', aplSem,
     'background:rgba(255,107,107,.14);color:#ff8f8f;border:1px solid rgba(255,107,107,.45);', 'rgba(255,107,107,.5)', 'rgba(255,107,107,.07)', 'Marcar →', "ILDV.sit='aplsem';ildAba('leads')");
   // placar do evento (a linha fina do topo do dash geral)
   var pl = function(k, cor, n, txt) { return '<span class="ild-pl" onclick="event.stopPropagation();ildLista(\'' + k + '\')" title="ver os nomes"><i style="color:' + cor + ';">' + n + '</i> ' + txt + '</span>'; };
   h += '<div class="pl-linha" onclick="ildAba(\'leads\')" title="Abrir os leads do evento"><b>🏁 Placar do evento</b>'
-    + pl('ing', '#f6a350', ing, 'ingressos') + pl('pres', '#6ea8ff', pres, 'chegaram') + pl('abd', '#b98aff', abd, 'abordados') + pl('apl', '#ffd166', apl, 'aplicaram')
+    + pl('ing', '#f6a350', ing, 'ingressos') + pl('pres', '#6ea8ff', pres, 'chegaram') + pl('apl', '#ffd166', apl, 'aplicaram')
     + pl('ent', '#5eead4', ent, 'entrevista' + (ent === 1 ? '' : 's')) + pl('vend', '#3ddc97', vend, 'venda' + (vend === 1 ? '' : 's'))
     + '<span class="pl-linha-abrir">abrir leads →</span></div>';
   // faixa da presença (no lugar do "dia útil")
@@ -40338,7 +40337,6 @@ function _ildGeral(P) {
   h += '<div class="v2-du" title="Presença = check-in no app, ✅ Confirmar presença ou aplicou no evento">'
     + '<div class="v2-du-t ild-clic" onclick="ildLista(\'pres\')" title="ver quem chegou"><small>Presença</small><b>' + pres + ' <span>de ' + ing + '</span></b></div>'
     + '<div class="v2-du-m"><div class="v2-du-bar"><i style="width:' + (ing ? Math.min(100, pres / ing * 100) : 0).toFixed(1) + '%;"></i></div><span><b>' + pres + ' de ' + ing + ' pessoas</b> estão como presentes (<b>' + _ildPct(pres, ing) + '</b>): ' + n(function(p) { return p.presApp; }) + ' pelo check-in do app, ' + n(function(p) { return p.presManual; }) + ' com ✅ Confirmar presença e ' + n(function(p) { return p.presApl; }) + ' porque aplicaram (marcaram entrevista). O check-in de hoje ficou na Central e não chega aqui: confirme na ficha de quem chegou ou use <a href="#" onclick="ildLote();return false;"><b>📥 Marcar presença em lote</b></a> com a lista da Central.</span></div>'
-    + '<div class="v2-du-c ild-clic" onclick="ildLista(\'abd\')" title="ver os abordados"><small>Abordados</small><b>' + abd + '</b>' + pp(_ildPct(abd, pres) + ' de quem chegou') + '<em>faltam ' + fila.length + '</em></div>'
     + '<div class="v2-du-c ild-clic" onclick="ildLista(\'apl\')" title="ver quem aplicou"><small>Aplicaram</small><b>' + apl + '</b>' + pp(_ildPct(apl, ing) + ' do público') + '<em>' + aplSem.length + ' sem entrevista</em></div>'
     + '<div class="v2-du-c ild-clic" onclick="ildLista(\'vend\')" title="ver as vendas"><small>Vendeu de quem chegou</small><b>' + _ildPct(vend, pres) + '</b>' + pp(vend + ' venda' + (vend === 1 ? '' : 's')) + '<em>' + ent + ' entrevista' + (ent === 1 ? '' : 's') + ' feita' + (ent === 1 ? '' : 's') + '</em></div>'
     + '</div>';
@@ -40399,12 +40397,11 @@ function _ildGeral(P) {
   // 06/11/2026 (Bruno: "4 passos no pré e 4 no pós, parecido com o que a gente tem no geral"):
   // evento: comprou › compareceu › abordado (o responsável) › aplicou · pós: aplicou › marcou a entrevista › compareceu › comprou
   var qAplAb = nf(function(p) { return p.pres && p.abd && !!p.apl; }), qMarc = nf(function(p) { return !!p.apl && p.reun.length > 0; });
-  h += '<div class="ild-vg" data-vg="evento"' + (ILDV.vg === 'pos' ? ' hidden' : '') + '>' + '<div class="ild-bloco-t ild-sep"><span>🎟️ Funil do evento · comprou › compareceu › abordado › aplicou</span></div>'
-    + '<div class="kpis ild-kpis ild-4">'
+  h += '<div class="ild-vg" data-vg="evento"' + (ILDV.vg === 'pos' ? ' hidden' : '') + '>' + '<div class="ild-bloco-t ild-sep"><span>🎟️ Funil do evento · comprou › compareceu › aplicou</span></div>'
+    + '<div class="kpis ild-kpis ild-3">'
     + kc('ing', rotIng, qIng, null, subIng)
     + kc('pres', 'Compareceram', qPres, qIng, qNs + ' no-show até agora')
-    + kc('abdp', 'Abordados', qAbdP, qPres, (qFila ? 'faltam ' + qFila : 'todo mundo que chegou foi abordado') + ' · quem abordou é o responsável')
-    + kc('aplab', 'Aplicaram', qAplAb, qAbdP, (qAplP - qAplAb ? '+' + (qAplP - qAplAb) + ' aplicaram sem abordagem' : 'aplicaram: ' + _ildPct(qAplAb, qAbdP) + ' dos abordados') + (qAplFora ? ' · +' + qAplFora + ' sem vir' : ''))
+    + kc('aplp', 'Aplicaram', qAplP, qPres, 'pagaram os R$ 297 no evento' + (qAplFora ? ' · +' + qAplFora + ' sem vir' : ''))
     + '</div>'
     + '<div class="ild-lado">'
     + kc('ns', 'No-show', qNs, qIng, 'compraram e não fizeram check-in', 'fora mini')
@@ -40435,8 +40432,8 @@ function _ildGeral(P) {
     return '<button class="ild-acao' + (q ? '' : ' zero') + '" style="--c:' + cor[0] + ';--cb:' + cor[1] + '" onclick="ildLista(\'' + k + '\')"><span class="ic">' + (ps ? ps[2] : '') + '</span><span class="t"><b>' + (ps ? ps[1] : k) + '</b><em>' + txt + '</em></span><span class="n">' + q + '</span><span class="seta" aria-hidden="true">›</span></button>'; };
   h += '<div class="ild-vg" data-vg="evento"' + (ILDV.vg === 'pos' ? ' hidden' : '') + '>' + '<div class="ild-bloco"><div class="ild-bloco-t"><span>🎯 Onde agir no evento · ninguém fica para trás</span></div>'
     + '<div class="ild-acoes"><div class="ild-ac-g"><small>Chegada</small>' + ac('ns', nG('ns'), 'compraram e não chegaram — ligar / chamar no WhatsApp') + '</div>'
-    + '<div class="ild-ac-g"><small>Durante o evento</small>' + ac('fila', nG('fila'), 'chegaram e ninguém abordou — abordar e ficar responsável')
-    + ac('gAbdNapl', nG('gAbdNapl'), 'já foram abordados — convidar para aplicar') + ac('gAplPend', nG('gAplPend'), 'começaram a aplicação e o pagamento não entrou — ajudar a pagar') + ac('gPresNapl', nG('gPresNapl'), 'vieram e não aplicaram — o total, abordados ou não') + '</div>'
+    + '<div class="ild-ac-g"><small>Durante o evento</small>'
+    + ac('gAplPend', nG('gAplPend'), 'começaram a aplicação e o pagamento não entrou — ajudar a pagar') + ac('gPresNapl', nG('gPresNapl'), 'vieram e não aplicaram — convidar para aplicar') + '</div>'
     + '</div></div></div>' + '<div class="ild-vg" data-vg="pos"' + (ILDV.vg === 'pos' ? '' : ' hidden') + '>' + '<div class="ild-bloco"><div class="ild-bloco-t"><span>🎯 Onde agir depois do evento</span></div><div class="ild-acoes">'
     + '<div class="ild-ac-g"><small>Depois do evento</small>' + ac('aplsem', nG('aplsem'), 'aplicaram e não têm entrevista — marcar')
     + ac('gMarcNs', nG('gMarcNs'), 'faltaram na entrevista — remarcar') + ac('gEntNv', nG('gEntNv'), 'entrevista sem compra — retomar a conversa')
@@ -40501,7 +40498,7 @@ function _ildMini(p) { return '<button class="ild-mini-it" onclick="ildFicha(\''
 function _ildNome(p) { var n = String(p.nome || '').trim(); return n ? n.replace(/\s+/g, ' ').split(' ').slice(0, 3).join(' ') : '(sem nome)'; }
 
 // 2) LEADS DO EVENTO — pesquisa + ficha com Abordei / Marcar entrevista / WhatsApp
-var ILD_SIT = [['', 'Todos'], ['meus', '👤 Sou responsável'], ['fila', '🔥 Chegou e não abordado'], ['pres', '✅ Chegou'], ['naopres', '⏳ Não chegou'], ['abd', '🗣️ Abordados'], ['apl', '📝 Aplicou'], ['aplsem', '⏳ Aplicou, sem entrevista'], ['ent', '🎙️ Com entrevista'], ['vend', '💰 Comprou']];
+var ILD_SIT = [['', 'Todos'], ['meus', '👤 Sou responsável'], ['fila', '🔥 Chegou e não abordado'], ['pres', '✅ Chegou'], ['naopres', '⏳ Não chegou'], ['apl', '📝 Aplicou'], ['aplsem', '⏳ Aplicou, sem entrevista'], ['ent', '🎙️ Com entrevista'], ['vend', '💰 Comprou']];
 function _ildSitOk(p) {
   var s = ILDV.sit, eu = ''; try { eu = v2norm(localStorage.getItem('ildQuem') || ''); } catch (e) {}
   return !s || (s === 'meus' ? !!(p.abd && eu && v2norm(p.ab.quem) === eu) : s === 'fila' ? p.pres && !p.abd && !p.vend : s === 'pres' ? p.pres : s === 'naopres' ? !p.pres : s === 'abd' ? p.abd : s === 'apl' ? !!p.apl : s === 'aplsem' ? (!!p.apl && !p.reun.length && !p.vend) : s === 'ent' ? (p.ent || p.agd) : s === 'vend' ? p.vend : true);
@@ -40600,7 +40597,7 @@ function _ildCard(p) {
     + (!p.abd ? '<button class="btn primary" onclick="ildAbordar(\'' + p.t8 + '\')" title="quem abordou fica responsável por esta pessoa">🗣️ Abordei · fico responsável</button>'
       : _ildSouDono(p) ? '<button class="btn" onclick="ildAbordar(\'' + p.t8 + '\',true)">↩︎ Deixar de ser responsável</button>'
       : '<button class="btn primary" onclick="ildAssumir(\'' + p.t8 + '\')" title="hoje o responsável é ' + dspEsc(p.ab.quem || '') + '">🙋 Assumir · passar para mim</button>')
-    + '<button class="btn" onclick="ildMarcar(\'' + p.t8 + '\')">📅 Marcar entrevista</button>'
+    + (_ildReuAtual(p) ? '<button class="btn ild-bt-rm" style="background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;" onclick="ildRemarcar(\'' + p.t8 + '\')">🗓 Remarcar entrevista</button>' : '<button class="btn" onclick="ildMarcar(\'' + p.t8 + '\')">📅 Marcar entrevista</button>')
     + (p.apl ? '' : '<button class="btn ild-bt-apl" onclick="ildAplicar(\'' + p.t8 + '\')">📝 Registrar aplicação</button>')
     + '<button class="btn" onclick="ildObs(\'' + p.t8 + '\')">🗒️ Observação</button>'
     + '<button class="btn" onclick="ildFichaCompleta(\'' + p.t8 + '\')">🔎 Ver tudo</button>'
@@ -40892,6 +40889,73 @@ function ildEntrar() {
 // "acesso a todas as agendas: Tony, Bruno, Wesllene, Sarah" · "não tem SDR dono neste caso, somente closer"):
 // a ficha leva para a aba Agenda com a pessoa escolhida; tocou num horário livre, abre o "Agendar reunião" do dash já como
 // Entrevista ILD de 50 min, com o closer, o dia, a hora, o lead, a origem ILD Goiânia e SEM SDR.
+// 🗓 07/11/2026 (Bruno: "coloca nesta aba a opção de remarcar"): o mesmo remarcar do dash geral, dentro do acesso do evento —
+// na ficha ou na lista de entrevistas: abre a agenda do evento em modo remarcação; o horário verde escolhido move a MESMA reunião
+// (mesma linha na planilha; dá para trocar de closer na confirmação), sem criar entrevista nova
+// 07/11/2026: "remarcada" na agenda pode ser a reunião nova (o mesmo closer, só mudou a data) ou a antiga (passou para outro closer):
+// vale a que bate com a linha da planilha (mesmo dia e mesmo closer); sem linha na planilha, conta como ocupada (mais seguro)
+function _ildEvVivo(e, key) {
+  var st = String(e.status || '');
+  if (/no.?show|cancel/i.test(st)) return false;
+  if (!/remarcada/i.test(st)) return true;
+  var t8 = String(e.tel8 || '').slice(-8); if (t8.length < 8) return true;
+  var R = (typeof V2 !== 'undefined' && V2.rows || []).filter(function(r) { return _ildT8(r.telefone) === t8 && /agendada|remarcada/.test(r.sn || ''); });
+  if (!R.length) return true;
+  return R.some(function(r) { var ck = ''; try { ck = closerChaveDe(r.closer); } catch (e2) {} return r.date && agDataStr(r.date) === e.date && (!ck || ck === key); });
+}
+function _ildReuAtual(p) {
+  var L = (p && p.reun || []).filter(function(r) { return /agendada|remarcada|no show/.test(r.sn || '') && !/cancel/.test(r.sn || ''); });
+  return L.length ? L[L.length - 1] : null;
+}
+function _ildEvDe(p, r) {
+  var ds = r && r.date ? agDataStr(r.date) : '', achou = null, nn = v2norm(p.nome || '').trim();
+  Object.keys(AG.cache || {}).forEach(function(w) {
+    var c = AG.cache[w]; if (!c) return;
+    ['tony', 'bruno', 'wesllene', 'sarah'].forEach(function(k) {
+      (c[k] || []).forEach(function(e) {
+        if (/cancel/i.test(String(e.status || '')) || (/remarcada/i.test(String(e.status || '')) && !_ildEvVivo(e, k))) return;
+        var bate = String(e.tel8 || '').slice(-8) === p.t8 || (nn.length > 3 && v2norm(String(e.title || '')).indexOf(nn) !== -1);
+        if (!bate) return;
+        if (!achou || (ds && e.date === ds && achou.date !== ds)) { achou = e; achou._cal = k; }
+      });
+    });
+  });
+  return achou;
+}
+function ildRemarcar(t8) {
+  var p = ildPessoas().filter(function(x) { return x.t8 === t8; })[0]; if (!p) return;
+  var r = _ildReuAtual(p);
+  if (!r) { try { avisoRapido('Essa pessoa não tem entrevista marcada para remarcar: use 📅 Marcar entrevista'); } catch (e) {} return; }
+  var ir = function() {
+    var ev = _ildEvDe(p, r), era = r.date ? r.date.toLocaleDateString('pt-BR').slice(0, 5) : '';
+    if (ev && ev.id) { window._agRemarcando = ev; }
+    else window._agRemarcando = { soPlanilha: true, r: r, title: (r.nome || p.nome || 'lead') + (era ? ' (era ' + era + ')' : '') };
+    ILDV.agRem = { t8: t8, nome: _ildNome(p), era: era + (ev && ev.startTime ? ' ' + ev.startTime : ''), closer: (r.closer || '').split(' ')[0] };
+    ILDV.agLead = '';
+    var dias = _ildAgDias(), hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    for (var i = 0; i < dias.length; i++) if (dias[i] >= hoje) { ILDV.agDia = i; break; }
+    ildFechar(); ildAba('agenda');
+    try { _faixaRemarcacao(_ildNome(p) + (era ? ' (era ' + era + ')' : '')); } catch (e2) {}
+  };
+  if (_ildEvDe(p, r)) { ir(); return; }
+  try { avisoRapido('🗓 Lendo a agenda…'); } catch (e3) {}
+  ILDV.agQuando = 0; _ildAgCarregar(true);
+  var n = 0, t = setInterval(function() { if (!ILDV.agLendo || ++n > 40) { clearInterval(t); ir(); } }, 250);
+}
+function ildSlot(ds, hora, ck) {
+  if (window._agRemarcando) { try { remarcarNoSlot(ds, hora, ck); } catch (e) { try { avisoRapido('Não consegui remarcar: ' + e.message); } catch (e2) {} } return; }
+  ildMarcarEm(ds, hora, ck);
+}
+(function() {
+  if (typeof cancelarRemarcacao !== 'function' || cancelarRemarcacao._ild) return;
+  var oc = cancelarRemarcacao;
+  cancelarRemarcacao = function() {
+    var r = oc.apply(this, arguments);
+    if (ILDV.agRem) { ILDV.agRem = null; try { if (ehIld()) setTimeout(function() { ILDV.agQuando = 0; _ildAgCarregar(true); renderIld(); }, 3000); renderIld(); } catch (e) {} }
+    return r;
+  };
+  cancelarRemarcacao._ild = true;
+})();
 function ildMarcar(t8) { ILDV.agLead = t8 || ''; ildFechar(); ildAba('agenda'); }
 function ildMarcarEm(dia, hora, ck) {
   var p = ILDV.agLead ? ildPessoas().filter(function(x) { return x.t8 === ILDV.agLead; })[0] : null;
@@ -40976,7 +41040,7 @@ function _ildAgSlots(key, d) {
 function _ildHm(m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); }
 function _ildAgDia(d, key) {
   var ds = agDataStr(d), cache = AG.cache[agDataStr(agSegunda(d))], agora = new Date();
-  var ev = ((cache && cache[key]) || []).filter(function(e) { return e.date === ds && !/no.?show|remarcada/i.test(String(e.status || '')); });
+  var ev = ((cache && cache[key]) || []).filter(function(e) { return e.date === ds && _ildEvVivo(e, key); });
   return _ildAgSlots(key, d).map(function(t) {
     var oc = ev.some(function(e) { var bi = agMin(e.startTime), bf = agMin(e.endTime); return t < bf && t + 50 > bi; });
     var passou = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(t / 60), t % 60) < agora;
@@ -40991,7 +41055,11 @@ function _ildAgenda(P) {
   if (ILDV.agDia == null || ILDV.agDia >= dias.length) ILDV.agDia = 0;
   var livres = function(d, k) { return _ildAgDia(d, k).filter(function(x) { return !x.oc && !x.passou; }).length; };
   var lead = ILDV.agLead ? P.filter(function(p) { return p.t8 === ILDV.agLead; })[0] : null;
-  var h = lead
+  var rm = window._agRemarcando && ILDV.agRem ? ILDV.agRem : null;
+  var h = rm
+    ? '<div class="novo-box" style="border-color:rgba(255,154,90,.6);background:rgba(255,154,90,.08);"><span class="nb-ico">🗓</span><div class="nb-txt"><b>Remarcando a entrevista de ' + dspEsc(rm.nome) + '</b><span>Era ' + dspEsc(rm.era || '—') + (rm.closer ? ' com ' + dspEsc(rm.closer) : '') + '. Toque no NOVO horário livre (verde) de qualquer closer; na confirmação dá para trocar o closer. Mesma pessoa, mesma linha na planilha.</span></div>'
+      + '<button class="close-x" title="Cancelar a remarcação" onclick="cancelarRemarcacao()">✕</button></div>'
+    : lead
     ? '<div class="novo-box"><span class="nb-ico">📅</span><div class="nb-txt"><b>Marcando a entrevista de ' + dspEsc(_ildNome(lead)) + '</b><span>Toque num horário livre (verde) de qualquer closer. Entrevista ILD · 50 min · origem ' + ILD_EVT.origem + ' · sem SDR.</span></div>'
       + '<button class="close-x" title="Cancelar" onclick="ILDV.agLead=\'\';renderIld()">✕</button></div>'
     : '<div class="ild-bloco ild-ag-cta"><div><b>Entrevista ILD · 50 minutos</b><p class="hint">Toque num horário livre (verde) para marcar. Abre o "Agendar reunião" do dash com o closer, o dia e a hora; origem <b>' + ILD_EVT.origem + '</b>, sem SDR — só o closer. Na ficha do lead, 📅 Marcar entrevista traz a pessoa para cá.</p></div></div>';
@@ -41013,7 +41081,7 @@ function _ildAgenda(P) {
     + '<span class="ild-ag-leg"><i class="l"></i>livre · <i class="e"></i>entrevista ILD · <i class="o"></i>outra reunião</span></div>';
   h += '<div class="ild-tl-wrap"><div class="ild-tl" style="--alt:' + alt + 'px"><div class="ild-tl-regua">' + regua + '</div>'
     + CL.map(function(c) {
-        var ev = ((cache && cache[c.key]) || []).filter(function(e) { return e.date === ds && !/no.?show|remarcada|cancel/i.test(String(e.status || '')); });
+        var ev = ((cache && cache[c.key]) || []).filter(function(e) { return e.date === ds && _ildEvVivo(e, c.key); });
         var L = _ildAgDia(d, c.key), nl = L.filter(function(x) { return !x.oc && !x.passou; }).length;
         var blocos = ev.map(function(e) {
           var a = agMin(e.startTime), b = agMin(e.endTime), ild = ehIldEv(e), p = porT8[String(e.tel8 || '').slice(-8)];
@@ -41022,7 +41090,7 @@ function _ildAgenda(P) {
           return '<div class="ild-tl-ev ' + (ild ? 'e' : 'o') + '" style="top:' + top(a) + 'px;height:' + Math.max(16, (b - a) * K - 2) + 'px"' + (ild && p ? ' onclick="ildFichaCompleta(\'' + p.t8 + '\')" title="abrir a ficha"' : ' title="' + dspEsc(e.startTime + '–' + e.endTime + ' · ' + (soEnt && !ild ? 'ocupado' : e.title || '')) + '"') + '><b>' + e.startTime + '</b> ' + dspEsc(rot) + '</div>';
         }).join('');
         var livres = L.filter(function(x) { return !x.oc && !x.passou; }).map(function(x) {
-          return '<button class="ild-tl-livre" style="top:' + top(x.t) + 'px;height:' + (50 * K - 2) + 'px" onclick="ildMarcarEm(\'' + ds + '\',\'' + _ildHm(x.t) + '\',\'' + c.key + '\')" title="marcar Entrevista ILD às ' + _ildHm(x.t) + '">＋ ' + _ildHm(x.t) + '</button>';
+          return '<button class="ild-tl-livre" style="top:' + top(x.t) + 'px;height:' + (50 * K - 2) + 'px" onclick="ildSlot(\'' + ds + '\',\'' + _ildHm(x.t) + '\',\'' + c.key + '\')" title="' + (rm ? 'remarcar para' : 'marcar Entrevista ILD às') + ' ' + _ildHm(x.t) + '">＋ ' + _ildHm(x.t) + '</button>';
         }).join('');
         return '<div class="ild-tl-col"><div class="ild-tl-cab"><b>' + dspEsc(c.nome.split(' ')[0]) + '</b><span>' + (carregou ? nl + ' livre' + (nl === 1 ? '' : 's') : 'lendo…') + '</span></div>'
           + '<div class="ild-tl-dia"><div class="ild-tl-linhas">' + linhas + '</div>' + livres + blocos + '</div></div>';
@@ -41034,7 +41102,7 @@ function _ildAgenda(P) {
   var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   var prox = R.filter(function(x) { return isFut(x.r.sn) || (x.r.date && x.r.date >= hoje && !isReal(x.r.sn)); }), feitas = R.filter(function(x) { return prox.indexOf(x) === -1; });
   var linha = function(x) { var r = x.r; return '<div class="ild-ag-l"><span class="d">' + (r.date ? r.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—') + '</span><b>' + dspEsc(_ildNome(x.p)) + '</b><span>' + dspEsc((r.closer || '').split(' ')[0]) + '</span><span class="st">' + dspEsc(r.status || '') + '</span></div>'; };
-  h += '<div class="ild-bloco"><div class="ild-bloco-t"><span>📅 Entrevistas ILD marcadas</span><b>' + prox.length + '</b></div>' + (prox.length ? prox.map(linha).join('') : '<div class="hint">Nenhuma marcada ainda.</div>') + '</div>'
+  h += '<div class="ild-bloco"><div class="ild-bloco-t"><span>📅 Entrevistas ILD marcadas</span><b>' + prox.length + '</b></div>' + (prox.length ? prox.map(function(x) { return linha(x).replace(/<\/div>$/, '<button class="btn" style="padding:4px 10px;font-size:.68rem;background:rgba(255,154,90,.14);border-color:rgba(255,154,90,.5);color:#ff9a5a;" onclick="ildRemarcar(\'' + x.p.t8 + '\')">🗓 Remarcar</button></div>'); }).join('') : '<div class="hint">Nenhuma marcada ainda.</div>') + '</div>'
     + '<div class="ild-bloco"><div class="ild-bloco-t"><span>🎙️ Já aconteceram</span><b>' + feitas.length + '</b></div>' + (feitas.length ? feitas.map(linha).join('') : '<div class="hint">—</div>') + '</div>';
   return h;
 }
