@@ -1444,7 +1444,7 @@ html.vtela-on, html.vtela-on body { overflow:hidden !important; }
 #vn-recado u { color:#3ddc97; text-decoration:none; font-weight:800; } #vn-recado.sai { opacity:0; transform:translateY(8px); }
 @media (max-width:900px) { #vn-recado { bottom:calc(var(--tb-h, 62px) + var(--safe-b, 0px) + 10px); } }
 </style>
-<style>.ild-ficha-pap{margin-top:8px}.ild-ficha-pap img{display:block;width:100%;max-width:520px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.12));background:#fff;cursor:zoom-in}.ild-ficha-pap img.grande{max-width:none;cursor:zoom-out}.ild-ficha-msg{display:block;padding:12px 14px;border-radius:10px;border:1px dashed var(--border,rgba(255,255,255,.2));color:var(--muted,#9aa3b2)}.ild-ficha-link{display:inline-block;margin-top:8px;font-size:.82rem;color:var(--muted,#9aa3b2)}</style>
+<style>.ild-ficha-pap{margin-top:8px}.ild-ficha-pap img{display:block;width:100%;max-width:520px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.12));background:#fff;cursor:zoom-in}.ild-ficha-pap img.grande{max-width:none;cursor:zoom-out}.ild-ficha-msg{display:block;padding:12px 14px;border-radius:10px;border:1px dashed var(--border,rgba(255,255,255,.2));color:var(--muted,#9aa3b2)}#fl-ficha-ild:not(:empty){margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(255,255,255,.12));display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.fl-ficha-t{font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted,#9aa3b2)}.fl-ficha-b{padding:8px 16px;font-size:.78rem;background:rgba(110,168,255,.14);border:1px solid rgba(110,168,255,.45);color:#6ea8ff}.fl-ficha-gr{overflow-x:auto}.fl-ficha-gr img{max-width:100%}.ild-ficha-link{display:inline-block;margin-top:8px;font-size:.82rem;color:var(--muted,#9aa3b2)}</style>
 </head>
 <body>
 <!-- Tela de espera: aparece na hora, enquanto o resto do dash ainda baixa.
@@ -2283,6 +2283,7 @@ Instagram: @pr.joaosilva</div>
       </div>
     </div>
     <div id="lead-info"></div>
+    <div id="fl-ficha-ild"></div>
   </div>
   <div id="fl-score"></div>
   <!-- o que a pessoa respondeu no formulário do diagnóstico (pedido do Bruno 19/08/2026) -->
@@ -2949,7 +2950,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-09-1745';
+var VERSAO_DASH = '2026-11-10-1404';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -15617,6 +15618,7 @@ function abrirLead(i) {
   _modoEdicao = false;
   desenharInfo();
   mostrarFormularioDoLead(r);
+  try { ildFichaNoLead(r); } catch (eFi) {}   // 10/11/2026: ficha de aplicação em papel (ILD)
   document.getElementById('modal-lead').classList.add('open');
   preencherGravacao(r);
   try { if (typeof scFichaReuniao === 'function') scFichaReuniao(r); } catch (eSc) {}
@@ -40657,6 +40659,42 @@ function _ildFichaVer(t8) {
     if (d && d.senha) { el.innerHTML = '<button class="btn primary" onclick="ildPedirSenha(function(){ ildFichaCompleta(\'' + t8 + '\'); })">🔑 Ver a ficha aqui (senha do evento)</button>'; return; }
     el.innerHTML = '<span class="ild-ficha-msg">Não consegui mostrar a imagem aqui: abra pelo link abaixo.</span>';
   });
+}
+// 10/11/2026 (Bruno: "tem que estar dentro das informações do lead"): a mesma ficha na janela do lead (quadro Informações)
+function _ildFichaPor(elId, id, denovo) {
+  var el = document.getElementById(elId); if (!id || !el) return;
+  ILDV._fichaImg = ILDV._fichaImg || {}; el.setAttribute('data-ficha', id);
+  var alvo = function() { var e = document.getElementById(elId); return e && e.getAttribute('data-ficha') === id ? e : null; };   // a janela pode já estar em outro lead
+  var poe = function(src) { var e = alvo(); if (!e) return; e.innerHTML = '<img alt="ficha de aplicação" title="toque para aumentar">'; var im = e.firstChild; im.src = src; im.onclick = function() { im.classList.toggle('grande'); }; };
+  if (ILDV._fichaImg[id]) { poe(ILDV._fichaImg[id]); return; }
+  el.innerHTML = '<span class="ild-ficha-msg">⏳ Carregando a ficha…</span>';
+  var cm = ''; try { cm = typeof _cmTok === 'function' ? _cmTok() : ''; } catch (e) {}
+  ctdPedir({ action: 'ildFichaImg', tok: _ildTok(), adm: cm, id: id }, function(d) {
+    var e = alvo(); if (!e) return;
+    if (d && d.success && d.img) { ILDV._fichaImg[id] = d.img; poe(d.img); return; }
+    if (d && d.senha) {
+      e.innerHTML = '<button class="btn primary">🔑 Ver a ficha aqui (senha do evento)</button>';
+      e.firstChild.onclick = function() { ildPedirSenha(denovo); var h = document.querySelector('#ild-modal .hint'); if (h) h.textContent = 'Para ver a ficha de aplicação aqui, digite a senha do acesso "Evento ILD" (uma vez; vale 4 dias).'; };
+      return;
+    }
+    e.innerHTML = '<span class="ild-ficha-msg">Não consegui mostrar a imagem aqui: abra pelo link abaixo.</span>';
+  });
+}
+// 10/11/2026 (Bruno: "coloca ver ficha, aí abre"): nas Informações fica só o botão; a ficha abre grande por cima
+function ildFichaNoLead(r) {
+  var cx = document.getElementById('fl-ficha-ild'); if (!cx) return;
+  var id = ''; try { id = _ildFichaId(ldTel8(r && r.telefone)); } catch (e) {}
+  if (!id) { cx.innerHTML = ''; return; }
+  cx.innerHTML = '<div class="fl-ficha-t">📄 Ficha de aplicação (papel) · ILD Goiânia</div><button type="button" class="btn fl-ficha-b">📄 Ver ficha</button>';
+  cx.querySelector('button').onclick = function() { ildFichaAbrir(id, (r && r.nome) || ''); };
+}
+function ildFichaAbrir(id, nome) {
+  var m = document.getElementById('ild-modal') || _ildModal();
+  m.querySelector('.ild-m-corpo').innerHTML = '<h3>📄 Ficha de aplicação · ILD Goiânia</h3>' + (nome ? '<p class="hint">' + dspEsc(nome) + '</p>' : '')
+    + '<div id="fl-ficha-img" class="ild-ficha-pap fl-ficha-gr"></div>'
+    + '<a class="ild-ficha-link" href="https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view" target="_blank" rel="noopener">abrir no Drive (com a conta equipe@)</a>';
+  m.classList.add('on');
+  _ildFichaPor('fl-ficha-img', id, function() { ildFichaAbrir(id, nome); });
 }
 function ildFichaCompleta(t8) {
   var p = ildPessoas().filter(function(x) { return x.t8 === t8; })[0]; if (!p) return;
