@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-11-1423';
+var VERSAO_DASH = '2026-11-11-1529';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41466,6 +41466,11 @@ button.trf-mf { background:none; border:0; padding:0; font:inherit; color:inheri
 button.trf-mf .trf-anel { transition:filter .15s; } button.trf-mf:hover .trf-anel { filter:brightness(1.18) drop-shadow(0 5px 5px rgba(0,0,0,.4)); } button.trf-mf:hover .trf-mf-rot { color:var(--accent); }
 button.trf-mf:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-radius:6px; }
 @media (max-width:720px) { .trf-canal button { font-size:.9rem; padding:8px 12px; } }
+/* atalhos para descer até o funil e os criativos */
+.trf-ir { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; } .trf-ir span { font-size:.62rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); }
+.trf-ir button { font:inherit; font-size:.74rem; font-weight:800; color:var(--accent); background:rgba(246,163,80,.1); border:1px solid rgba(246,163,80,.35); border-radius:999px; padding:5px 12px; cursor:pointer; }
+.trf-ir button:hover { background:rgba(246,163,80,.2); } .trf-ir button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.trf-bloco { scroll-margin-top:70px; }
 /* 🎓 workshop: as edições são as abas (11/11/2026) */
 .trf-canal button.on.ws { background:#b98aff; } .trf-canal button.on.mcp { background:#6ea8ff; } .trf-canal button.on.bio { background:#22d3ee; } .trf-topo h2.trf-canal { flex-wrap:wrap; }
 .trf-eds { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
@@ -41974,7 +41979,7 @@ function _trfFontes(D) {
 }
 // 🎬 os criativos do orgânico = os POSTS do período, no mesmo cartão dos criativos do tráfego (capa, toca ao passar o mouse, caixinhas),
 // e o clique abre a janela com o funil grande do post (11/11/2026 · Bruno: "cadê os criativos do orgânico?").
-function _trfPostCapa(o) { var f = ''; try { f = fotoDoPost(o.lk) || ''; } catch (e) {} return f; }
+function _trfPostCapa(o) { var f = ''; try { if (!POSTS_ORG.carregado) carregarPostsOrganicos(); f = fotoDoPost(o.lk) || ''; } catch (e) {} return f; }   // a lista das capas pode ainda não ter chegado: pede já (ao chegar, aplicarCapasIG preenche as imagens)
 function _trfPosts(D) {
   var L = (D.z.posts || []).slice().sort(function(a, b) { return b.vd - a.vd || b.marc - a.marc || b.com - a.com || b.vw - a.vw; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
   window._trfPostsOrd = L;
@@ -42148,8 +42153,13 @@ var TRF_WS_PASSOS = [['insc', 'Inscritos', 'têm ingresso pago'], ['part', 'Part
   ['marc', 'Marcada', 'tem reunião com origem do evento na planilha'], ['real', 'Realizada', 'o dia da reunião chegou e o resultado foi lançado'], ['apar', 'Compareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
 function _trfCanalHtml() {
   var b = function(v, r, cls) { var on = TRF.canal === v; return '<button type="button" class="' + (on ? 'on ' + cls : '') + '" onclick="trfFiltro(\'canal\',\'' + v + '\')" aria-pressed="' + on + '">' + r + '</button>'; };
-  return '<h2 class="trf-canal">' + b('pago', '📣 Tráfego pago', '') + b('org', '🌱 Orgânico', 'org') + b('bio', '🔗 Link na bio', 'bio') + b('ws', '🎓 Workshop', 'ws') + b('mcp', '🧩 MCP', 'mcp') + '</h2>';
+  // 11/11/2026 (Bruno, duas vezes: "cadê os criativos do orgânico?"): os criativos ficam depois do funil, longe do topo — atalhos para descer direto
+  var ir = { pago: [['trf-funil', '🔻 Funil'], ['trf-cri', '🎯 Criativos']], org: [['trf-funil', '🔻 Funil'], ['trf-posts', '🎬 Criativos (posts)'], ['trf-cri', '🌱 Caminhos lado a lado']], bio: [['trf-funil', '🔻 Funil'], ['trf-posts', '🎬 Criativos (posts)']],
+    ws: [['trf-funil', '🔻 Funil'], ['trf-cri', '🎓 Edição por edição'], ['trf-wscri', '🎯 Criativos']], mcp: [['trf-funil', '🔻 Funil'], ['trf-wscri', '🎯 Criativos']] }[TRF.canal] || [];
+  return '<h2 class="trf-canal">' + b('pago', '📣 Tráfego pago', '') + b('org', '🌱 Orgânico', 'org') + b('bio', '🔗 Link na bio', 'bio') + b('ws', '🎓 Workshop', 'ws') + b('mcp', '🧩 MCP', 'mcp') + '</h2>'
+    + '<div class="trf-ir"><span>ir para</span>' + ir.map(function(x) { return '<button type="button" onclick="trfIr(\'' + x[0] + '\')">' + x[1] + ' ↓</button>'; }).join('') + '</div>';
 }
+function trfIr(id) { var e = document.getElementById(id); if (!e) return; try { e.classList.remove('trf-esp'); e.scrollIntoView({ behavior: _trfSemMov() ? 'auto' : 'smooth', block: 'start' }); } catch (x) { e.scrollIntoView(); } }
 function _trfDadosWs() {
   var dia0 = function(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }, JAN = typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15;
   var ok = typeof WSL !== 'undefined' && WSL.carregado, E = {}, ehIld = function(x) { return /ild/i.test(x.prog || ''); }, fora = 0;
