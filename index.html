@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-11-1850';
+var VERSAO_DASH = '2026-11-12-0013';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41570,6 +41570,9 @@ button.trf-kpi:hover { transform:translateY(-2px); box-shadow:0 10px 26px -14px 
   .trf-pgs .trf-pg { animation:trfSobe .5s cubic-bezier(.2,.8,.2,1) backwards; } .trf-pgs .trf-pg:nth-child(2) { animation-delay:70ms; } .trf-pgs .trf-pg:nth-child(3) { animation-delay:140ms; } .trf-pgs .trf-pg:nth-child(4) { animation-delay:210ms; } .trf-pgs .trf-pg:nth-child(5) { animation-delay:280ms; } .trf-pgs .trf-pg:nth-child(n+6) { animation-delay:350ms; }
   .trf-pgs .trf-mf { animation:trfCai .4s cubic-bezier(.2,.8,.2,1) backwards; } .trf-pgs .trf-mf:nth-child(2) { animation-delay:.16s; } .trf-pgs .trf-mf:nth-child(3) { animation-delay:.22s; } .trf-pgs .trf-mf:nth-child(4) { animation-delay:.28s; } .trf-pgs .trf-mf:nth-child(5) { animation-delay:.34s; } .trf-pgs .trf-mf:nth-child(6) { animation-delay:.4s; } .trf-pgs .trf-mf:nth-child(7) { animation-delay:.46s; }
 }
+
+/* 12/11/2026: filtro por tipo de post nos criativos do orgânico e do link na bio */
+.trf-crif { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:2px 0 12px; }
 </style>
 <script>
 // =====================================================================================================
@@ -41643,7 +41646,7 @@ function trfFiltro(campo, valor) {
   if (campo === 'fam') TRF.cri = '';
   if (campo === 'wtipo') TRF.wed = '';
   if (campo === 'canal' || campo === 'per' || campo === 'modo' || campo === 'wtipo') setTimeout(_trfLembrar, 0);
-  if (campo === 'canal') { TRF.lst = null; TRF.cri = ''; TRF.pg = ''; TRF.todos = false; TRF.ord = 'vd'; try { trfCriFechar(); } catch (e) {} }
+  if (campo === 'canal') { TRF.lst = null; TRF.cri = ''; TRF.pg = ''; TRF.todos = false; TRF.ord = 'vd'; TRF.ordP = ''; TRF.ordB = ''; TRF.ordW = ''; TRF.tipoP = ''; try { trfCriFechar(); } catch (e) {} }
   renderTrafego();
 }
 function trfCriativo(k) { TRF.cri = TRF.cri === k ? '' : k; renderTrafego(); try { document.getElementById('trf-funil').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
@@ -41686,6 +41689,14 @@ function trfCriJanela(k) {
 }
 function trfPassoCri(k, passo) { if (!window._trfCtx) return; TRF.lst = { k: passo, f: '', cri: k }; _trfListaDesenhar(); }
 function trfPagina(pg) { TRF.pg = TRF.pg === pg ? '' : pg; try { vfFechar(); } catch (e) {} renderTrafego(); try { document.getElementById('trf-funil').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e2) {} }
+var TRF_ORD_P = [['vd', '💰 Vendas'], ['fat', 'Faturamento'], ['marc', '📅 Reuniões'], ['mql', '🔥 MQL'], ['ld', 'Leads'], ['com', 'Comentaram a palavra'], ['vw', 'Visualizações'], ['cur', 'Curtidas'], ['cm', 'Comentários'], ['t', 'Mais recentes']];
+var TRF_ORD_B = [['pf', 'Foram ao perfil'], ['taxa', '% de quem viu'], ['vw', 'Visualizações'], ['cur', 'Curtidas'], ['cm', 'Comentários'], ['t', 'Mais recentes']];
+var TRF_ORD_W = [['gasto', 'Gasto'], ['imp', 'Impressões'], ['cli', 'Cliques'], ['ctr', '% que clicam'], ['cpc', 'Menor custo por clique'], ['res', 'Resultados da Meta']];
+var TRF_TIPO_P = [['', 'Todos'], ['VIDEO', '🎬 Vídeos'], ['CAROUSEL_ALBUM', '🖼️ Carrosséis'], ['IMAGE', '📷 Fotos']];
+function trfOrdemDe(campo, v, id) { TRF[campo] = v; TRF.todos = false; renderTrafego(); try { document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+function _trfChipsDe(lista, campo, atual, id) { return lista.map(function(x) { return '<button type="button" class="pl-chip' + (atual === x[0] ? ' on' : '') + '" aria-pressed="' + (atual === x[0]) + '" onclick="trfOrdemDe(\'' + campo + '\',\'' + x[0] + '\',\'' + id + '\')">' + x[1] + '</button>'; }).join(''); }
+function _trfTiposDe(posts, id) { var tem = {}; posts.forEach(function(o) { tem[o.tipo || ''] = 1; }); var L = TRF_TIPO_P.filter(function(x) { return !x[0] || tem[x[0]]; }); if (L.length < 3) return '';
+  return '<div class="trf-filtros trf-crif"><span class="trf-sub">mostrar</span><div class="pl-chips">' + _trfChipsDe(L, 'tipoP', TRF.tipoP || '', id) + '</div></div>'; }
 function trfOrdem(o) { TRF.ord = o; renderTrafego(); try { document.getElementById('trf-cri').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
 // ---- site do diagnóstico: os leads (tabela diagnostico_v3) e as visitas (função trafego_visitas, só contagens) ----
 // A chave é a pública do próprio site (a mesma que o robô já usa em supabaseDados); o robô devolve no máximo 1.000 linhas, por isso
@@ -41761,8 +41772,24 @@ function _trfFam(camp) { return /(^|[^a-z])mcp([^a-z]|$)/i.test(String(camp || '
 // ---- a conta ----
 function _trfTem(p, k) { return k === 'ini' ? !!p.ini : (k === 'comp' || k === 'mql') ? !!(p.ini && p[k]) : !!p[k]; }   // formulário só conta para quem chegou no período
 function _trfPgNova(pag) { return { pag: pag, vis: 0, ini: 0, comp: 0, mql: 0, marc: 0, apar: 0, vd: 0, fat: 0 }; }
+function _trfJuntarLD(S) {
+  if (!S || !S.leads || S._ld) return;
+  try {
+    if (typeof LD === 'undefined') { S._ld = 1; return; }
+    if (!LD.carregado) { if (!TRF._ldPed && typeof carregarLeads === 'function') { TRF._ldPed = true; carregarLeads(); }
+      if ((TRF._ldEsp = (TRF._ldEsp || 0) + 1) < 30) setTimeout(function() { if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego(); }, 1500);
+      return; }
+    var t0 = S.leads.length ? S.leads[0].t : Date.now(), ant = [];
+    (LD.rows || []).forEach(function(l) { if (!(l.date instanceof Date)) return; var t = l.date.getTime(); if (t >= t0) return; var og = String(l.origem || ''); if (!/diag/i.test(og)) return;
+      ant.push({ t: t, t8: l.tel8 || ldTel8(l.tel || ''), tel: String(l.tel || ''), nome: String(l.nome || '').trim(), pag: 'formulário antigo', camp: l.campanha || '', cont: l.anuncio || '', src: /mchat|manychat/i.test(og) ? 'manychat' : /bio/i.test(og) ? 'bio' : _trfSrc(l.fonte),
+        comp: l.invest ? 1 : 0, inv: l.invest || '', fx: /^[ABCD]$/.test(l.faixaNova || '') ? l.faixaNova : '', sc: +l.score || 0, o: /ads/i.test(og) ? 't' : 'o', antigo: 1 }); });
+    ant.sort(function(a, b) { return a.t - b.t; });
+    S.t0site = t0; S.nAnt = ant.length; S.leads = ant.concat(S.leads); S._ld = 1;
+  } catch (e) { S._ld = 1; }
+}
 function _trfDados() {
   var P = _trfPer(), S = TRF.site, org = TRF.canal === 'org' || TRF.canal === 'bio';
+  _trfJuntarLD(S); var antigo = S && S.t0site && P.ini < S.t0site ? S.t0site : 0;
   var t0b = S && S.leads && S.leads.length ? new Date(new Date(S.leads[0].t).toDateString()).getTime() : 0, cortado = 0;
   if (t0b && P.ini < t0b) { cortado = t0b; P = { ini: t0b, fim: P.fim, rot: P.rot + ' (contado desde ' + new Date(t0b).toLocaleDateString('pt-BR') + ')' }; }   // não há leads do site antes disso
   var M = org ? { an: [] } : _trfMeta(P), ev = TRF.modo !== 'coorte';
@@ -41846,7 +41873,7 @@ function _trfDados() {
     z.posts = Object.keys(posts).map(function(k) { return posts[k]; });
   }
   var semOrg = org && !(S && S.visOrg);   // visitas por origem: só depois que a função da base do site passar a devolver esse recorte
-  return { P: P, cortado: cortado, ev: ev, org: org, topoOrg: topoOrg, semVw: !TRF.cont || (org && !z.nposts), semCom: !igOk, semVisCri: semOrg, z: z, soPg: soPg, todas: todas, lista: lista, dias: dias, pags: pags, cri: cri, temSite: !!S, semVis: !S || !!S.semVis || (semOrg && !!TRF.cri), temMeta: !!M, metaRuim: !!(M && M.erro) };
+  return { P: P, cortado: cortado, antigo: antigo, ev: ev, org: org, topoOrg: topoOrg, semVw: !TRF.cont || (org && !z.nposts), semCom: !igOk, semVisCri: semOrg, z: z, soPg: soPg, todas: todas, lista: lista, dias: dias, pags: pags, cri: cri, temSite: !!S, semVis: !S || !!S.semVis || (semOrg && !!TRF.cri), temMeta: !!M, metaRuim: !!(M && M.erro) };
 }
 // ---- desenho ----
 function _trfChips(semModo) {
@@ -41930,13 +41957,13 @@ function _trfFnBlocos(PS, val, gasto, D, clique) {
   var larg = function(i) { return 100 - i * (62 / n); };
   // a maior perda: a menor passagem entre os passos de baixo do funil (do formulário/ingresso em diante), com base de pelo menos 10 pessoas
   var PERDE = { comp: 1, mql: 1, part: 1, apl: 1, marc: 1, real: 1, apar: 1, pag: 1 }, pior = '', piorC = 101, a0 = null;
-  PS.forEach(function(p) { var k = p[0], v = val[k] || 0, sd = (k === 'imp' || k === 'cli') ? !D.temMeta : k === 'vis' ? D.semVis : k === 'ent' ? !!D.semEnt : (k === 'vw' || k === 'pf') ? D.semVw : k === 'com' ? D.semCom : false;
+  PS.forEach(function(p) { var k = p[0], v = val[k] || 0, sd = (k === 'imp' || k === 'cli') ? !D.temMeta : k === 'vis' ? D.semVis : k === 'ent' ? !!D.semEnt : k === 'mql' ? !!D.semMql : (k === 'vw' || k === 'pf') ? D.semVw : k === 'com' ? D.semCom : false;
     if (!sd) { if (PERDE[k] && a0 != null && a0 >= 10) { var cv = v / a0 * 100; if (cv < piorC) { piorC = cv; pior = k; } } a0 = v; } });
   pior = '';   // 11/11/2026 (Bruno: "não precisa evidenciar a maior perda"): o destaque saiu de todos os funis   // a boca de cada anel: de 100% até perto de 40%
   PS.forEach(function(p, i) {
     var k = p[0], v = val[k] || 0, a = larg(i), b = larg(i + 1), ck = clique(k);
     var conv = ant != null && ant > 0 ? (v / ant * 100) : null, cst = gasto && v ? gasto / v : null;
-    var semDado0 = 0, semDado = (k === 'imp' || k === 'cli') ? !D.temMeta : k === 'vis' ? D.semVis : k === 'ent' ? !!D.semEnt : (k === 'vw' || k === 'pf') ? D.semVw : k === 'com' ? D.semCom : false;
+    var semDado0 = 0, semDado = (k === 'imp' || k === 'cli') ? !D.temMeta : k === 'vis' ? D.semVis : k === 'ent' ? !!D.semEnt : k === 'mql' ? !!D.semMql : (k === 'vw' || k === 'pf') ? D.semVw : k === 'com' ? D.semCom : false;
     if (semDado) conv = null;
     var C = TRF_COR[TRF_COR_PASSO[k]] || TRF_COR.az, bb = b - 10, est = ' style="--i:' + i + ';--m:' + (Math.round((a * .42 + bb * .58) * 10) / 10) + ';--c:' + C[1] + '"';
     h += (ck ? '<button type="button" class="trf-fn' + (k === pior ? ' pior' : '') + '"' + est + ' onclick="' + ck + '" title="' + p[2] + ' · clique para ver">' : '<div class="trf-fn parado' + (k === pior ? ' pior' : '') + '"' + est + ' title="' + p[2] + '">')
@@ -42055,7 +42082,8 @@ function _trfFontes(D) {
 // e o clique abre a janela com o funil grande do post (11/11/2026 · Bruno: "cadê os criativos do orgânico?").
 function _trfPostCapa(o) { var f = ''; try { if (!POSTS_ORG.carregado) carregarPostsOrganicos(); f = fotoDoPost(o.lk) || ''; } catch (e) {} return f; }   // a lista das capas pode ainda não ter chegado: pede já (ao chegar, aplicarCapasIG preenche as imagens)
 function _trfPosts(D) {
-  var L = (D.z.posts || []).slice().sort(function(a, b) { return b.vd - a.vd || b.marc - a.marc || b.com - a.com || b.vw - a.vw; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
+  var oP = TRF.ordP || 'vd', tudo = D.z.posts || [], tP = TRF.tipoP || '';
+  var L = tudo.filter(function(o) { return !tP || o.tipo === tP; }).sort(function(a, b) { return (b[oP] || 0) - (a[oP] || 0) || b.vd - a.vd || b.marc - a.marc || b.com - a.com || b.vw - a.vw; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
   window._trfPostsOrd = L;
   var tp = { VIDEO: '🎬 vídeo', CAROUSEL_ALBUM: '🖼️ carrossel', IMAGE: '📷 foto' }, falta = 0;
   var caixa = function(v, r, cor, fundo) { return '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:' + fundo + ';"><b style="color:' + cor + ';font-size:.95rem;display:block;">' + v + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">' + r + '</span></div>'; };
@@ -42075,14 +42103,16 @@ function _trfPosts(D) {
       +   (o.fat ? '<div class="an-fat" style="margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);text-align:center;"><b style="color:#3ddc97;font-size:.92rem;">' + _trfRs(o.fat) + '</b><div style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">FATURAMENTO</div></div>' : '')
       +   '<div class="trf-anc-ver">🔎 ver por dentro · funil do post</div></div></div>'; }).join('');
   if (falta) { try { pedirCapasIG(); } catch (e) {} }
-  return '<div class="panel trf-bloco" id="trf-posts"><div class="trf-bt"><h3>🎬 Criativos do orgânico</h3><span class="trf-sub">os posts do período · em ordem de venda, reunião e comentários</span></div>'
-    + (h ? '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;">' + h + '</div>' : '<p class="trf-nota">' + (D.semCom ? 'Lendo os posts do Instagram…' : 'Nenhum post publicado neste período.') + '</p>')
+  return '<div class="panel trf-bloco" id="trf-posts"><div class="trf-bt"><h3>🎬 Criativos do orgânico</h3><span class="trf-sub">os posts do período · em ordem de</span><div class="pl-chips">' + _trfChipsDe(TRF_ORD_P, 'ordP', oP, 'trf-posts') + '</div></div>' + _trfTiposDe(tudo, 'trf-posts')
+    + ''
+    + (h ? '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;">' + h + '</div>' : '<p class="trf-nota">' + (D.semCom ? 'Lendo os posts do Instagram…' : tP ? 'Nenhum post deste tipo no período.' : 'Nenhum post publicado neste período.') + '</p>')
     + (tot > 12 ? '<button type="button" class="btn trf-mais" onclick="TRF.todos=!TRF.todos;renderTrafego()">' + (TRF.todos ? 'Mostrar só os 12 primeiros' : 'Ver os ' + tot + ' posts') + '</button>' : '')
     + '<p class="trf-nota">PALAVRA = pessoas que comentaram a palavra do diagnóstico no post. Lead = a pessoa foi achada na base pelo @ do Instagram; reunião e venda = as dela depois do comentário. Quem veio pela bio não entra em nenhum post. “…” nas visualizações = post com menos de 7 dias.</p></div>';
 }
 // 🔗 aba Link na bio: não dá para ligar a pessoa a um post (ela não comenta), mas o Instagram diz quantas idas ao perfil cada post gerou
 function _trfPostsBio(D) {
-  var L = (D.z.posts || []).filter(function(o) { return o.pf > 0; }).sort(function(a, b) { return b.pf - a.pf; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
+  var oB = TRF.ordB || 'pf', tudo = (D.z.posts || []).filter(function(o) { return o.pf > 0; }), tP = TRF.tipoP || '', vB = function(o) { return oB === 'taxa' ? (o.vw ? o.pf / o.vw : 0) : (o[oB] || 0); };
+  var L = tudo.filter(function(o) { return !tP || o.tipo === tP; }).sort(function(a, b) { return vB(b) - vB(a) || b.pf - a.pf; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
   var tp = { VIDEO: '🎬 vídeo', CAROUSEL_ALBUM: '🖼️ carrossel', IMAGE: '📷 foto' }, falta = 0; window._trfPostsOrd = L;
   var caixa = function(v, r, cor, fundo) { return '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:' + fundo + ';"><b style="color:' + cor + ';font-size:.95rem;display:block;">' + v + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">' + r + '</span></div>'; };
   var h = L.map(function(o, i) { var leg = o.leg.replace(/\s+/g, ' ').trim(), d = new Date(o.t), ft = _trfPostCapa(o); if (!ft) falta++;
@@ -42097,8 +42127,9 @@ function _trfPostsBio(D) {
       +   '<div class="an-nums" style="display:flex;gap:5px;margin-top:9px;">' + caixa(_trfK(o.vw), 'VISUALIZAÇÕES', '#6ea8ff', 'rgba(110,168,255,.1)') + caixa(_trfN(o.pf), 'FORAM AO PERFIL', '#22d3ee', 'rgba(34,211,238,.1)') + caixa(o.vw ? (o.pf / o.vw * 100).toFixed(2).replace('.', ',') + '%' : '—', 'DE QUEM VIU', '#ffd166', 'rgba(255,209,102,.1)') + '</div>'
       +   '<div class="trf-anc-ver">🔎 ver o post por dentro</div></div></div>'; }).join('');
   if (falta) { try { pedirCapasIG(); } catch (e) {} }
-  return '<div class="panel trf-bloco" id="trf-posts"><div class="trf-bt"><h3>🎬 Posts que mais levaram gente ao perfil</h3><span class="trf-sub">os criativos do link na bio · em ordem de idas ao perfil</span></div>'
-    + (h ? '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;">' + h + '</div>' : '<p class="trf-nota">' + (D.semVw ? 'Lendo os posts do Instagram…' : 'Nenhum post do período com idas ao perfil medidas.') + '</p>')
+  return '<div class="panel trf-bloco" id="trf-posts"><div class="trf-bt"><h3>🎬 Posts que mais levaram gente ao perfil</h3><span class="trf-sub">os criativos do link na bio · em ordem de</span><div class="pl-chips">' + _trfChipsDe(TRF_ORD_B, 'ordB', oB, 'trf-posts') + '</div></div>' + _trfTiposDe(tudo, 'trf-posts')
+    + ''
+    + (h ? '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;">' + h + '</div>' : '<p class="trf-nota">' + (D.semVw ? 'Lendo os posts do Instagram…' : tP ? 'Nenhum post deste tipo com idas ao perfil medidas.' : 'Nenhum post do período com idas ao perfil medidas.') + '</p>')
     + (tot > 12 ? '<button type="button" class="btn trf-mais" onclick="TRF.todos=!TRF.todos;renderTrafego()">' + (TRF.todos ? 'Mostrar só os 12 primeiros' : 'Ver os ' + tot + ' posts') + '</button>' : '')
     + '<p class="trf-nota">Quem vem pela bio não comenta, então não dá para dizer de qual post veio cada lead. O que o Instagram informa é quantas idas ao perfil cada post gerou (medido no 7º dia; nem todo post traz esse número). O clique no link da bio ainda não é medido.</p></div>';
 }
@@ -42178,7 +42209,8 @@ function _trfCriativosWsFunil(D) {
 // 🎯 os criativos dos eventos: os anúncios da Meta rodados na captação da edição (gasto, impressões, cliques)
 function _trfCriativosWs(D) {
   if (D.criC && !D.mcp) return _trfCriativosWsFunil(D);
-  var L = (D.ads || []).filter(function(c) { return c.gasto > 0.5; }).sort(function(a, b) { return b.gasto - a.gasto; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
+  var oW = TRF.ordW || 'gasto', vW = function(c) { return oW === 'ctr' ? (c.imp ? c.cli / c.imp : 0) : oW === 'cpc' ? (c.cli ? -c.gasto / c.cli : -1e12) : (c[oW] || 0); };
+  var L = (D.ads || []).filter(function(c) { return c.gasto > 0.5; }).sort(function(a, b) { return vW(b) - vW(a) || b.gasto - a.gasto; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
   try { _trfFotosPedir(L); } catch (e) {}
   window._trfWsCriOrd = L;
   var caixa = function(v, r, cor) { return '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:rgba(255,255,255,.05);"><b style="color:' + cor + ';font-size:.9rem;display:block;">' + v + '</b><span style="font-size:.55rem;color:var(--text-secondary);font-weight:700;">' + r + '</span></div>'; };
@@ -42191,7 +42223,7 @@ function _trfCriativosWs(D) {
       + '<div class="an-cc" style="padding:11px 12px;flex:1;display:flex;flex-direction:column;"><b style="font-size:.74rem;line-height:1.3;">' + _trfE(c.nome) + '</b><div class="hint" style="margin-top:3px;">' + _trfRs(c.gasto) + ' investidos</div>'
       + '<div style="display:flex;gap:5px;margin-top:9px;">' + caixa(_trfK(c.imp), 'IMPRESSÕES', '#6ea8ff') + caixa(_trfK(c.cli), 'CLIQUES', '#b98aff') + caixa(c.imp ? (c.cli / c.imp * 100).toFixed(1).replace('.', ',') + '%' : '—', 'CLICAM', '#ffd166') + caixa(c.cli ? 'R$ ' + (c.gasto / c.cli).toFixed(2).replace('.', ',') : '—', 'POR CLIQUE', '#f6a350') + '</div>'
       + (c.res ? '<div class="hint" style="margin-top:7px;">' + _trfN(c.res) + ' resultados contados pela Meta · ' + _trfRs(c.gasto / c.res) + ' cada</div>' : '') + '</div></div>'; }).join('');
-  return '<div class="panel trf-bloco" id="trf-wscri"><div class="trf-bt"><h3>🎯 Criativos do ' + (D.mcp ? 'MCP' : 'evento') + '</h3><span class="trf-sub">anúncios rodados na captação · em ordem de investimento</span></div>'
+  return '<div class="panel trf-bloco" id="trf-wscri"><div class="trf-bt"><h3>🎯 Criativos do ' + (D.mcp ? 'MCP' : 'evento') + '</h3><span class="trf-sub">anúncios rodados na captação · em ordem de</span><div class="pl-chips">' + _trfChipsDe(TRF_ORD_W, 'ordW', oW, 'trf-wscri') + '</div></div>'
     + (h ? '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;">' + h + '</div>' : '<p class="trf-nota">' + (D.temMeta ? 'Nenhum anúncio com gasto na captação desta edição.' : 'Buscando os anúncios na Meta…') + '</p>')
     + (tot > 12 ? '<button type="button" class="btn trf-mais" onclick="TRF.todos=!TRF.todos;renderTrafego()">' + (TRF.todos ? 'Mostrar só os 12 primeiros' : 'Ver os ' + tot + ' criativos') + '</button>' : '')
     + '<p class="trf-nota">Aqui ainda não dá para dizer quantas ' + (D.mcp ? 'compras' : 'ingressos e vendas') + ' cada criativo trouxe: essa ligação (o anúncio de quem comprou) está ' + (D.mcp ? 'no app do MCP' : 'na Central do workshop') + ', e o dash ainda não lê de lá.</p></div>';
@@ -42226,7 +42258,7 @@ function _trfAnimar(el, D) {
     var sig = [TRF.canal, TRF.tprod, TRF.wed, TRF.wtipo, TRF.per, TRF.de, TRF.ate, TRF.modo, TRF.fam, TRF.cri, TRF.pg].join('|');
     if (!TRF._rev || TRF._rev.sig !== sig) TRF._rev = { sig: sig, ok: {} };
     var rev = TRF._rev, pend = [];
-    [['.trf-kpis', 'kpis'], ['.trf-leads', 'leads'], ['#trf-graf', 'graf'], ['#trf-funil', 'funil'], ['#trf-cri', 'cri:' + TRF.ord + (TRF.todos ? 't' : '')], ['#trf-posts', 'posts' + (TRF.todos ? 't' : '')], ['#trf-wscri', 'wscri' + (TRF.todos ? 't' : '')]].forEach(function(u) {
+    [['.trf-kpis', 'kpis'], ['.trf-leads', 'leads'], ['#trf-graf', 'graf'], ['#trf-funil', 'funil'], ['#trf-cri', 'cri:' + TRF.ord + (TRF.todos ? 't' : '')], ['#trf-posts', 'posts' + (TRF.ordP || '') + (TRF.ordB || '') + (TRF.tipoP || '') + (TRF.todos ? 't' : '')], ['#trf-wscri', 'wscri' + (TRF.ordW || '') + (TRF.todos ? 't' : '')]].forEach(function(u) {
       var x = el.querySelector(u[0]); if (!x || rev.ok[u[1]]) return; if (u[1] === 'graf') x = x.closest('.trf-bloco') || x;
       x.classList.add('trf-esp'); x._trfK = u[1]; pend.push(x);
     });
@@ -42253,6 +42285,7 @@ function renderTrafego() {
   var ret = z.gasto ? z.valor / z.gasto : 0, pend = z.ini - z.comp;
   var avisos = '';
   if (!D.temSite) avisos += '<div class="trf-aviso">' + (TRF.siteErro ? '⚠️ Não consegui ler os dados do site do diagnóstico (' + _trfE(TRF.siteErro) + '). <button type="button" class="pl-chip" onclick="trfSiteCarregar(true);renderTrafego()">Tentar de novo</button>' : '<span class="mv-brilho-txt">Lendo os leads e as visitas do site do diagnóstico…</span>') + '</div>';
+  if (D.antigo && !D.cortado) avisos += '<div class="trf-aviso">ℹ️ Antes de ' + new Date(D.antigo).toLocaleDateString('pt-BR') + ' os leads vêm da planilha de leads (formulário antigo), com origem, anúncio e investimento. Nesse trecho não existem as visitas à página, o “iniciou × completou” nem a página de cada lead; as visitas só existem a partir de setembro de 2026.</div>';
   if (D.cortado) avisos += '<div class="trf-aviso">ℹ️ A base de leads do site começa em ' + new Date(D.cortado).toLocaleDateString('pt-BR') + '. Este período está sendo contado a partir dessa data (investido, leads, reuniões e vendas), para os números conversarem entre si. As visitas à página só existem a partir de setembro.</div>';
   if (D.org) {} else if (!D.temMeta) avisos += '<div class="trf-aviso"><span class="mv-brilho-txt">Buscando os anúncios na Meta…</span></div>';
   else if (D.metaRuim) avisos += '<div class="trf-aviso">⚠️ A Meta não respondeu agora: investido, impressões e cliques ficam zerados até a próxima tentativa.</div>';
@@ -42553,6 +42586,7 @@ function _trfOrigemLinha(o) {
 }
 function _trfRenderTodos(el) {
   trfSiteCarregar(false); try { if (!WSL.carregado && !WSL.buscando) carregarWS(); } catch (e) {}
+  _trfJuntarLD(TRF.site);
   var okWs = typeof WSL !== 'undefined' && WSL.carregado, okV = V2.carregado || (V2.rows || []).length;
   if ((!okWs || !okV) && (TRF._tdEsp = (TRF._tdEsp || 0) + 1) < 40) setTimeout(function() { if (TRF.canal === 'todos' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1000);
   var P = _trfPer(), M = _trfMeta(P), S = TRF.site;
@@ -42560,7 +42594,7 @@ function _trfRenderTodos(el) {
   var L = { pago: novo('📣 Tráfego pago', 'pago', 'leads'), org: novo('🌱 Orgânico · comentário (ManyChat)', 'org', 'leads'), bio: novo('🔗 Link na bio e orgânico direto', 'bio', 'leads'), ws: novo('🎓 Workshop on-line', 'ws', 'ingressos'),
     pres: novo('📍 Presencial (ILD)', 'ws', 'ingressos'), mcp: novo('🧩 MCP', 'mcp', 'compras'), ss: novo('💬 Social Selling', '', ''), ind: novo('🤝 Indicação', '', ''), out: novo('Outras origens', '', ''), dist: novo('📢 Anúncios de distribuição de conteúdo', '', '') };
   var G = TRF.tprod === 'diag' ? { pago: 1, org: 1, bio: 1 } : TRF.tprod === 'ws' ? { ws: 1, pres: 1 } : null, gRot = TRF.tprod === 'diag' ? 'Diagnóstico' : TRF.tprod === 'ws' ? 'Workshop' : '';
-  var linhasF = [], zf = { marc: 0, real: 0, apar: 0, pag: 0 };
+  var linhasF = [], zf = { marc: 0, real: 0, apar: 0, pag: 0 }, mqlDiag = null, mqlEv = null;
   (V2.rows || []).forEach(function(r, i) { if (!r.date) return; var d = r.date.getTime(); if (d < P.ini || d >= P.fim) return; var kL = _trfOrigemLinha(r.origem), x = L[kL];
     x.reun++; if (isReal(r.sn)) x.real++; if (isComp(r.sn)) x.apar++; if (r.sn === 'vendido') { x.vend++; x.valor += r.valor || 0; }
     if (G && !G[kL]) return;
@@ -42570,12 +42604,17 @@ function _trfRenderTodos(el) {
   ((M && M.an) || []).forEach(function(a) { var g = +a.gasto || 0, tp = metaTipoCampanha(a.campanha), od = tp === 'workshop' || tp === 'imersao' ? '' : metaOrigemDiag(a.campanha), x = tp === 'workshop' ? L.ws : tp === 'imersao' ? L.pres : od === 'mcp' ? L.mcp : od === 'quente' ? L.pago : L.dist;
     x.gasto += g; x.imp += +a.impressoes || 0; x.cli += +a.cliques || 0; });   // o tráfego pago aqui é o mesmo da chave dele (campanhas de diagnóstico); o resto do gasto aparece à parte
   if (S) { var v = { pago: {}, org: {}, bio: {} }; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim) return; v[l.o !== 'o' ? 'pago' : l.src === 'manychat' ? 'org' : 'bio'][l.t8 || ('n:' + l.nome)] = 1; });
-    L.pago.entr = Object.keys(v.pago).length; L.org.entr = Object.keys(v.org).length; L.bio.entr = Object.keys(v.bio).length; }
+    L.pago.entr = Object.keys(v.pago).length; L.org.entr = Object.keys(v.org).length; L.bio.entr = Object.keys(v.bio).length;
+    var q = {}; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim || !_vfMql(l.inv)) return; q[l.t8 || ('n:' + l.nome)] = 1; }); mqlDiag = Object.keys(q).length; }
+  if (okWs) { mqlEv = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (/mcp/i.test(x.prog || '') || !(x.apl instanceof Date)) return; var t = x.apl.getTime(); if (t < P.ini || t >= P.fim) return; if (/ild/i.test(x.prog || '') || /^comprou/i.test(x.compra || '')) mqlEv++; }); }
   if (okWs) { L.ws.entr = 0; L.pres.entr = 0; L.mcp.entr = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (!(x.ing instanceof Date)) return; var t = x.ing.getTime(); if (t < P.ini || t >= P.fim) return;
     if (/mcp/i.test(x.prog || '')) L.mcp.entr++; else if (/ild/i.test(x.prog || '')) L.pres.entr++; else L.ws.entr++; }); }
   var ks = ['pago', 'org', 'bio', 'ws', 'pres', 'mcp', 'ss', 'ind', 'out', 'dist'].filter(function(k) { return !G || G[k]; }), T = { gasto: 0, reun: 0, real: 0, apar: 0, vend: 0, valor: 0 };
   ks.forEach(function(k) { ['gasto', 'reun', 'real', 'apar', 'vend', 'valor'].forEach(function(c) { T[c] += L[k][c]; }); });
+  trfContCarregar(); var impAds = 0, vwOrg = 0, nPosts = 0; if (TRF.tprod !== 'ws') (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { vwOrg += x.v; nPosts++; } });
   var semEnt = true; zf.imp = 0; zf.cli = 0; zf.ent = 0; ks.forEach(function(k) { zf.imp += L[k].imp; zf.cli += L[k].cli; if (L[k].entr != null) { zf.ent += L[k].entr; semEnt = false; } });
+  impAds = zf.imp; zf.imp += vwOrg;
+  var semMql = TRF.tprod === 'diag' ? mqlDiag == null : TRF.tprod === 'ws' ? mqlEv == null : (mqlDiag == null && mqlEv == null); zf.mql = (TRF.tprod === 'ws' ? 0 : (mqlDiag || 0)) + (TRF.tprod === 'diag' ? 0 : (mqlEv || 0));
   var ret = T.gasto ? T.valor / T.gasto : 0, maxV = Math.max.apply(null, ks.map(function(k) { return L[k].valor; })) || 1;
   var cel = function(r, v, cls) { return '<span class="' + (cls || '') + '" data-r="' + r + '">' + v + '</span>'; };
   var pos = 0, pc = function(a, b) { return b ? ' <small>' + Math.round(a / b * 100) + '%</small>' : ''; };
@@ -42603,9 +42642,9 @@ function _trfRenderTodos(el) {
     + cel('Vendas', _trfN(T.vend) + pc(T.vend, T.apar)) + cel('Vendido', '<b>' + _trfRs(T.valor) + '</b>', 'vd') + '</div></div>'
     + '<p class="trf-nota"><b>Como esta tela conta:</b> cada reunião e cada venda entra uma vez só, pela origem escrita na planilha de vendas e na data da planilha. Por isso o total ' + (gRot ? 'é o das origens de ' + gRot + ' na planilha.' : 'é igual ao da planilha.') + ' Dentro de cada funil a conta é feita pela pessoa (o lead, o inscrito), então o número pode ser um pouco diferente do daqui — por exemplo, quando alguém preencheu dois formulários. O Workshop aqui é pelo mês da venda; dentro do funil dele é por edição.</p></div>'
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>🔻 Funil final · ' + (gRot ? gRot : 'todos os canais juntos') + '</h3><span class="trf-sub">' + _trfE(P.rot) + ' · do anúncio até a venda</span></div><div class="trf-fns">'
-    + _trfFnBlocos([['imp', 'Impressões', 'vezes que os anúncios apareceram'], ['cli', 'Cliques', 'todos os cliques nos anúncios'], ['ent', 'Entraram nos funis', TRF.tprod === 'diag' ? 'leads do diagnóstico (pago, orgânico e bio)' : TRF.tprod === 'ws' ? 'ingressos comprados (on-line e presencial)' : 'leads do diagnóstico + ingressos de evento + compras do MCP'], ['marc', 'Reuniões marcadas', 'todas as reuniões da planilha de vendas no período'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']],
-        zf, 0, { temMeta: !!M, semVis: false, semEnt: semEnt }, function(k) { return 'trfPasso(\'' + k + '\')'; })
-    + '</div><p class="trf-nota">É o mesmo funil dos outros, adaptado para todos os canais juntos. “Entraram nos funis” soma as pessoas que chegaram em cada canal (lead, ingresso, compra). Impressões e cliques são só dos anúncios (o orgânico não tem); Social Selling e indicação não têm entrada, começam na reunião. Clique nos passos de reunião para ver as pessoas.</p></div>'
+    + _trfFnBlocos([['imp', TRF.tprod === 'ws' ? 'Impressões' : 'Vezes que fomos vistos', TRF.tprod === 'ws' ? 'vezes que os anúncios apareceram' : 'anúncios ' + (M ? _trfN(impAds) : '…') + ' + posts do orgânico ' + (TRF.cont ? _trfN(vwOrg) : '…')], ['cli', 'Cliques nos anúncios', 'todos os cliques nos anúncios (o orgânico não tem clique medido)'], ['ent', 'Entraram nos funis', TRF.tprod === 'diag' ? 'leads do diagnóstico (pago, orgânico e bio)' : TRF.tprod === 'ws' ? 'ingressos comprados (on-line e presencial)' : 'leads do diagnóstico + ingressos de evento + compras do MCP'], ['mql', 'Qualificados (MQL)', TRF.tprod === 'diag' ? 'marcaram algum investimento no formulário' : TRF.tprod === 'ws' ? 'aplicação paga (no presencial, aplicação feita)' : 'diagnóstico: marcou investimento (' + _trfN(mqlDiag || 0) + ') + evento: aplicação paga (' + _trfN(mqlEv || 0) + ')'], ['marc', 'Reuniões marcadas', 'todas as reuniões da planilha de vendas no período'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']],
+        zf, 0, { temMeta: !!M, semVis: false, semEnt: semEnt, semMql: semMql }, function(k) { return 'trfPasso(\'' + k + '\')'; })
+    + '</div><p class="trf-nota">É o mesmo funil dos outros, adaptado para todos os canais juntos. “Entraram nos funis” soma as pessoas que chegaram em cada canal (lead, ingresso, compra). ' + (TRF.tprod === 'ws' ? 'Impressões e cliques são dos anúncios do evento.' : 'O topo soma as vezes que os anúncios apareceram com as visualizações dos ' + _trfN(nPosts) + ' posts publicados no período (medidas no 7º dia de cada post; os dos últimos 7 dias ainda não entraram). É o número de vezes, não de pessoas: a mesma pessoa conta cada vez que vê. Os cliques são só dos anúncios.') + ' Qualificados (MQL): no diagnóstico, quem marcou algum investimento no formulário; nos eventos, quem pagou a aplicação (o MCP não tem esse passo). Social Selling e indicação não têm entrada, começam na reunião. Clique nos passos de reunião para ver as pessoas.</p></div>'
     + '<p class="trf-nota">O ranking é pelo valor vendido no período. O valor investido não aparece aqui porque boa parte das vendas de um mês vem de anúncio pago em meses anteriores (principalmente nos eventos); o investido e o retorno de cada funil ficam dentro da chave dele. Os % pequenos são sempre sobre o passo anterior: em Realizadas, quantas das marcadas; em Compareceram, quantas das realizadas; em Vendas, quantos dos que compareceram. Entradas não se somam (lead, ingresso e compra são coisas diferentes). “Link na bio e orgânico direto” = origem [Org][Diag] da planilha.</p>';
   window._trfCtx = { todosC: true, ev: true, P: P, z: zf, lista: linhasF, todas: linhasF, cri: {}, soPg: '', temSite: true, temMeta: !!M };
   _trfAnimar(el, { temSite: true, temMeta: !!M });
@@ -42614,7 +42653,7 @@ function trfWsEd(k) { TRF.wed = TRF.wed === k ? '*' : k; renderTrafego(); try { 
 // ---- o clique em cada passo ----
 function trfPasso(k, filtro) {
   var D = window._trfCtx; if (!D) return;
-  if (D.todosC && (k === 'imp' || k === 'cli' || k === 'ent')) { trfIr('trf-funil'); return; }
+  if (D.todosC && (k === 'imp' || k === 'cli' || k === 'ent' || k === 'mql')) { trfIr('trf-funil'); return; }
   if (k === 'imp' || k === 'cli') { if (!D.ws) trfOrdem(k); else trfIr('trf-wscri'); return; }
   if (k === 'vis') { if (D.org) { try { document.getElementById('trf-cri').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} } else trfPaginas(); return; }
   TRF.lst = { k: k, f: filtro || '' }; _trfListaDesenhar();
