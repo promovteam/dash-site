@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-0855';
+var VERSAO_DASH = '2026-11-12-0941';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41605,6 +41605,18 @@ button.trf-kpi:hover { transform:translateY(-2px); box-shadow:0 10px 26px -14px 
 .trf-igp-m { flex:1; min-width:160px; } .trf-igp-m > b { font-size:.8rem; font-weight:900; } .trf-igp-m > b small { font-weight:700; color:var(--text2); font-size:.68rem; }
 .trf-igp-i { font-size:.68rem; color:#ffd166; margin-top:2px; line-height:1.45; } .trf-igp-s { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .trf-igp-v { color:#6ea8ff; font-weight:800; font-size:.66rem; }
+
+/* 12/11/2026: botão Chamar na Clint nos cartões de quem só tem o Instagram + envio da lista */
+.trf-clint-b { font:inherit; cursor:pointer; white-space:nowrap; } .trf-clint-b:disabled { opacity:.6; cursor:wait; }
+.trf-lote { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:2px 0 12px; }
+
+/* 12/11/2026: chave Todos — três funis finais (Diagnóstico, Workshop, tudo junto) */
+.trf-f3 { margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,.08); } .trf-f3:first-of-type { border-top:0; padding-top:4px; margin-top:6px; }
+.trf-f3-t { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:6px; } .trf-f3-t > b { font-size:.98rem; font-weight:900; }
+.trf-f3-v { margin-left:auto; font-size:.8rem; font-weight:900; color:#3ddc97; font-variant-numeric:tabular-nums; }
+.trf-f3-tudo { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:14px 14px 10px; }
+
+.trf-prod-f { margin:4px 0 2px; }
 </style>
 <script>
 // =====================================================================================================
@@ -41640,6 +41652,17 @@ var TRF_ORG = { manychat: ['🤖', 'ManyChat', 'recebeu o link pela automação 
 var TRF_ORG_VW = ['vw', 'Visualizações', 'dos posts publicados no período · no 7º dia de cada post (ou até hoje, se tem menos de 7 dias)'];
 var TRF_ORG_TOPO = { '': [TRF_ORG_VW], manychat: [TRF_ORG_VW, ['com', 'Comentaram a palavra', 'pessoas que comentaram a palavra do diagnóstico nos posts']],
   bio: [['pf', 'Visitas ao perfil', 'idas ao perfil a partir dos posts do período · medidas no 7º dia de cada post']], sem: [] };   // a bio começa no perfil: visualização é número de conteúdo e fica na chave Orgânico
+function trfCmtCarregar() {
+  if (TRF.cmt || TRF.cmtPed) return; TRF.cmtPed = true;
+  var fim = function(L) { TRF.cmtPed = false; TRF.cmt = L; if (L.length && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); };
+  try { _ildGv('sheet=' + encodeURIComponent('IG Comentaram'), '', function(r) {
+    var T = null; try { T = _ildTab(r); } catch (e) {} if (!T) { fim([]); return; }
+    var ix = function(re) { for (var i = 0; i < T.cols.length; i++) if (re.test(T.cols[i].l)) return i; return -1; }, cp = ix(/^perfil$/), cl = ix(/^post$/), cq = ix(/^quando$/);
+    if (cp < 0 || cl < 0 || cq < 0) { fim([]); return; }   // a aba ainda não existe (o Google devolve outra aba): fica sem o passo
+    fim(T.rows.map(function(x) { var u = String(x[cp] || '').replace(/^@+/, '').trim().toLowerCase(), d = x[cq], t = d instanceof Date ? d.getTime() : new Date(String(d || '')).getTime();
+      return u && t ? { u: u, lk: String(x[cl] || '').trim(), t: t } : null; }).filter(Boolean));
+  }); } catch (e) { fim([]); }
+}
 function trfContCarregar() {
   if (TRF.cont || TRF.contPed) return; TRF.contPed = true;
   var fim = function(L) { TRF.contPed = false; TRF.cont = L; if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego(); };
@@ -41685,6 +41708,7 @@ function trfFiltro(campo, valor) {
   if (campo === 'fam') TRF.cri = '';
   if (campo === 'wtipo') TRF.wed = '';
   if (campo === 'canal' || campo === 'per' || campo === 'modo' || campo === 'wtipo') setTimeout(_trfLembrar, 0);
+  if (campo === 'tprod') TRF.tfun = '';
   if (campo === 'canal') { TRF.lst = null; TRF.cri = ''; TRF.pg = ''; TRF.todos = false; TRF.ord = 'vd'; TRF.ordP = ''; TRF.ordB = ''; TRF.ordW = ''; TRF.tipoP = ''; try { trfCriFechar(); } catch (e) {} }
   renderTrafego();
 }
@@ -41702,7 +41726,7 @@ function trfCriJanela(k) {
   // 11/11/2026 (Bruno: "quero que possa dar para ver como na aba de criativos"): a janela mostra o criativo tocando (o mesmo player da aba Criativos)
   var temPlayer = !!post && String(post).split('_').length === 2;
   var val = { imp: c.imp, cli: c.cli, vis: c.vis, ini: c.ini, comp: c.comp, mql: c.mql, marc: c.marc, real: c.real, apar: c.apar, sim: c.sim, pag: c.vd };
-  var blocos = _trfFnBlocos(TRF_PASSOS, val, c.gasto, D, function(p) { return p === 'imp' || p === 'cli' || p === 'vis' ? '' : 'trfPassoCri(\'' + k + '\',\'' + p + '\')'; });
+  var blocos = _trfFnBlocos(TRF_PASSOS, val, c.gasto, D, function(p) { return p === 'imp' || p === 'cli' ? 'trfSoTotal(\'meta\')' : p === 'vis' ? 'trfSoTotal(\'vis\')' : 'trfPassoCri(\'' + k + '\',\'' + p + '\')'; });
   var num = function(rot, v, cor) { return '<div class="trf-jan-n"><span>' + rot + '</span><b' + (cor ? ' style="color:' + cor + '"' : '') + '>' + v + '</b></div>'; };
   var L = window._trfCriOrd || [], i = L.indexOf(k), ant = i > 0 ? L[i - 1] : '', prox = i >= 0 && i < L.length - 1 ? L[i + 1] : '';
   var h = '<div class="trf-jan-box" role="dialog" aria-modal="true" aria-label="Funil do criativo"><button type="button" class="vf-modal-x" onclick="trfCriFechar()" aria-label="Fechar">✕</button>'
@@ -41915,7 +41939,7 @@ function _trfDados() {
   }
   var topoOrg = org && TRF.cri !== 'sem', igOk = false;
   if (org) {
-    trfContCarregar(); try { igOk = !!IGO.carregado; if (!igOk && !IGO.buscando) carregarIGOrganico(); } catch (eI) {}
+    trfContCarregar(); trfCmtCarregar(); try { igOk = !!IGO.carregado; if (!igOk && !IGO.buscando) carregarIGOrganico(); } catch (eI) {}
     if (!igOk && (TRF._igEsp = (TRF._igEsp || 0) + 1) < 25) setTimeout(function() { if ((TRF.canal === 'org' || TRF.canal === 'bio') && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1500);
     z.vw = 0; z.pf = 0; z.nposts = 0; z.nHoje = 0; (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { z.vw += x.v; z.pf += x.pf || 0; z.nposts++; if (x.hoje) z.nHoje++; } });
     var quem = {}, comPs = [], _formT = {}; ((S && S.leads) || []).forEach(function(x) { if (!x.t8) return; var f = _formT[x.t8] || (_formT[x.t8] = { c: false }); if (x.comp) f.c = true; });
@@ -41932,6 +41956,16 @@ function _trfDados() {
       pe.marc = rs.length > 0; pe.real = rs.some(function(r) { return isReal(r.sn); }); pe.apar = rs.some(function(r) { return isComp(r.sn); });
       var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); } });
     z.com = comPs.length; z.comPs = comPs;
+    // quem comentou no post SEM a palavra (uma pessoa conta uma vez, mesmo comentando em vários posts)
+    if (TRF.cmt && TRF.cmt.length) { var semPal = {}, cmtPs = [], cmtDesde = Infinity;
+      TRF.cmt.forEach(function(q) { if (q.t < cmtDesde) cmtDesde = q.t; if (q.t < P.ini || q.t >= P.fim || quem[q.u]) return;
+        var pe = semPal[q.u]; if (pe) { pe.nCom++; if (q.t > pe.t) { pe.t = q.t; pe.lkPost = q.lk; } return; }
+        var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = igLeadPorInsta(q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
+        var rf = l && l.tel8 ? (_formT[l.tel8] || null) : null;
+        pe = semPal[q.u] = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, cmt: true, semPalavra: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _vfMql(l.invest)),
+          fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 };
+        cmtPs.push(pe); });
+      z.cmtPs = cmtPs; z.cmt = cmtPs.length + comPs.length; z.cmtDesde = cmtDesde; }
     // 11/11/2026 (Bruno: "no orgânico e no evento coloque os criativos como no tráfego"): no orgânico o criativo é o POST — cada post publicado
     // no período com quem comentou a palavra nele, quem virou lead (pelo @), e as reuniões e vendas dessas pessoas depois do comentário.
     var formDe = {}; ((S && S.leads) || []).forEach(function(x) { if (!x.t8) return; var f = formDe[x.t8] || (formDe[x.t8] = { c: false }); if (x.comp) f.c = true; });
@@ -41951,11 +41985,10 @@ function _trfDados() {
   }
   var semOrg = org && !(S && S.visOrg);   // visitas por origem: só depois que a função da base do site passar a devolver esse recorte
   var aparte = {}, naoBase = {}, visDesde = ''; ((S && S.visPag) || []).forEach(function(v) { if (!visDesde || v[0] < visDesde) visDesde = v[0]; });
-  if (org && TRF.canal === 'org' && TRF.cri === 'manychat' && topoOrg) aparte.vis = 'a visita não diz quem é a pessoa';
-  if (org && TRF.cont && TRF.cont.length) { var vwDesde = Math.min.apply(null, TRF.cont.map(function(x) { return x.t; })); if (P.ini < vwDesde - 864e5) { var txV = 'medido só desde ' + new Date(vwDesde).toLocaleDateString('pt-BR') + ' · o período começa antes'; aparte.vw = txV; naoBase.vw = 1; if (TRF.canal === 'bio') { aparte.pf = txV; naoBase.pf = 1; } } }
-  if (org && TRF.canal === 'bio') aparte.vis = 'o Instagram não liga a ida ao perfil à visita na página';
+  if (org && TRF.canal === 'org' && z.cmt != null && z.cmtDesde && P.ini < z.cmtDesde - 864e5) { aparte.cmt = '~guardado só desde ' + new Date(z.cmtDesde).toLocaleDateString('pt-BR') + ' · o período começa antes'; naoBase.cmt = 1; }
+  if (org && TRF.cont && TRF.cont.length) { var vwDesde = Math.min.apply(null, TRF.cont.map(function(x) { return x.t; })); if (P.ini < vwDesde - 864e5) { var txV = '~medido só desde ' + new Date(vwDesde).toLocaleDateString('pt-BR') + ' · o período começa antes'; aparte.vw = txV; naoBase.vw = 1; if (TRF.canal === 'bio') { aparte.pf = txV; naoBase.pf = 1; } } }
   if (visDesde && P.ini < new Date(visDesde + 'T00:00:00').getTime() - 864e5) {   // o período começa antes de existirem visitas: o número é parcial
-    aparte.vis = 'as visitas só existem desde ' + visDesde.slice(8, 10) + '/' + visDesde.slice(5, 7) + '/' + visDesde.slice(0, 4) + ' · o período começa antes'; naoBase.vis = 1;
+    aparte.vis = '~as visitas só existem desde ' + visDesde.slice(8, 10) + '/' + visDesde.slice(5, 7) + '/' + visDesde.slice(0, 4) + ' · o período começa antes'; naoBase.vis = 1;
     if (org) aparte.ini = TRF.canal === 'bio' ? 'todos que chegaram pelo link da bio' : 'todos que chegaram pelo link do ManyChat'; }
   return { P: P, cortado: cortado, antigo: antigo, aparte: aparte, naoBase: naoBase, rowsEv: rowsEv, ev: ev, org: org, topoOrg: topoOrg, semVw: !TRF.cont || (org && !z.nposts), semCom: !igOk, semVisCri: semOrg, z: z, soPg: soPg, todas: todas, lista: lista, dias: dias, pags: pags, cri: cri, temSite: !!S, semVis: !S || !!S.semVis || (semOrg && !!TRF.cri), temMeta: !!M, metaRuim: !!(M && M.erro) };
 }
@@ -42007,7 +42040,7 @@ var _trfUid = 0;
 var TRF_COR = {   // [escuro, base, claro, borda, fundo do buraco]
   az: ['#2759bb', '#4f8dff', '#93bbff', '#b4d0ff', '#17346f'], rx: ['#6337c9', '#9a6bff', '#c6a8ff', '#d9c5ff', '#3b2180'],
   lj: ['#bd5f14', '#f08a2c', '#ffb86e', '#ffd0a0', '#74390a'], am: ['#bd8c18', '#e9b93f', '#ffe28f', '#ffeeb8', '#73560e'], vd: ['#0f8250', '#22c481', '#70ecb4', '#a3f5cf', '#0a5234'] };
-var TRF_COR_PASSO = { d1: 'az', d2: 'az', vw: 'az', com: 'az', pf: 'az', insc: 'az', part: 'az', apl: 'rx', aplT: 'rx', imp: 'az', cli: 'az', vis: 'az', ent: 'rx', ini: 'rx', comp: 'rx', mql: 'lj', marc: 'am', real: 'am', apar: 'am', sim: 'vd', pag: 'vd' };
+var TRF_COR_PASSO = { d1: 'az', d2: 'az', vw: 'az', com: 'az', cmt: 'az', pf: 'az', insc: 'az', part: 'az', apl: 'rx', aplT: 'rx', imp: 'az', cli: 'az', vis: 'az', ent: 'rx', ini: 'rx', comp: 'rx', mql: 'lj', marc: 'am', real: 'am', apar: 'am', sim: 'vd', pag: 'vd' };
 function _trfAnel(a, b, C, H, ry) {
   // corpo com sombra dos lados e escurecendo para baixo, dois brilhos, luz que desce; em cima a boca: borda clara com um fio de luz e o buraco escuro
   var id = 'trfg' + (++_trfUid), ryb = ry * .78, yt = ry + 1, yb = H - ryb - 1, f = function(v) { return Math.round(v * 100) / 100; };
@@ -42054,7 +42087,7 @@ function _trfFnBlocos(PS, val, gasto, D, clique) {
     h += (ck ? '<button type="button" class="trf-fn' + (k === pior ? ' pior' : '') + '"' + est + ' onclick="' + ck + '" title="' + p[2] + ' · clique para ver">' : '<div class="trf-fn parado' + (k === pior ? ' pior' : '') + '"' + est + ' title="' + p[2] + '">')
       + '<span class="trf-fn-rot"><b>' + p[1] + '</b><small>' + p[2] + '</small></span>'
       + '<span class="trf-fn-meio">' + _trfAnel(a, bb, C, 66, 10) + '<b>' + (semDado ? '…' : _trfN(v)) + '</b></span>'
-      + '<span class="trf-fn-lado"><span class="trf-fn-conv"' + (conv != null && conv > 100 ? ' title="' + _trfE(MAIOR[k] || 'Este passo conta gente que não passou pelo passo de cima.') + '"' : '') + '>' + (semLig ? '<em class="trf-maior" style="color:var(--text2);">contagem à parte</em><small>' + _trfE(apTxt) + '</small>' : conv == null ? '&nbsp;' : conv > 100 ? '<em class="trf-maior">↑ maior que o de cima</em><small>não é parte dele · veja a nota</small>' : '↓ ' + (conv >= 10 ? Math.round(conv) : conv.toFixed(conv < 1 ? 2 : 1).replace('.', ',')) + '%<small>do passo anterior</small>' + (k === pior ? '<em class="trf-pior">⚠ maior perda</em>' : '')) + '</span>'
+      + '<span class="trf-fn-lado"><span class="trf-fn-conv"' + (conv != null && conv > 100 ? ' title="' + _trfE(MAIOR[k] || 'Este passo conta gente que não passou pelo passo de cima.') + '"' : '') + '>' + (semLig ? '<em class="trf-maior" style="color:var(--text2);">' + (apTxt.charAt(0) === '~' ? 'número parcial' : 'contagem à parte') + '</em><small>' + _trfE(apTxt.replace(/^~/, '')) + '</small>' : conv == null ? '&nbsp;' : conv > 100 ? '<em class="trf-maior">↑ maior que o de cima</em><small>não é parte dele · veja a nota</small>' : '↓ ' + (conv >= 10 ? Math.round(conv) : conv.toFixed(conv < 1 ? 2 : 1).replace('.', ',')) + '%<small>do passo anterior</small>' + (k === pior ? '<em class="trf-pior">⚠ maior perda</em>' : '')) + '</span>'
       + '<span class="trf-fn-custo">' + (cst == null ? '&nbsp;' : (cst >= 10 ? _trfRs(cst) : 'R$ ' + cst.toFixed(2).replace('.', ',')) + '<small>cada</small>') + '</span></span>' + (ck ? '</button>' : '</div>');
     if (!semDado && !(D.naoBase && D.naoBase[k])) ant = v;
   });
@@ -42071,9 +42104,11 @@ function _trfComIniHtml(D) {
 function _trfFunil(D) {
   // 11/11/2026 (Bruno: "coloca em formato de funil"): funil de verdade — blocos centralizados que vão afinando, um por passo.
   // A largura só desenha o funil (afina por igual); o que vale são os números, a % do passo anterior e o custo de cada um.
-  var z = D.z, PS = D.org ? (TRF_ORG_TOPO[TRF.cri] || []).concat(TRF_PASSOS.slice(2)) : D.soPg ? TRF_PASSOS.slice(2) : TRF_PASSOS;
-  var val = { vw: z.vw, com: z.com, pf: z.pf, imp: z.imp, cli: z.cli, vis: z.vis, ini: z.ini, comp: z.comp, mql: z.mql, marc: z.marc, real: z.real, apar: z.apar, sim: z.sim, pag: z.pag };
-  var h = _trfFnBlocos(PS, val, z.gasto, D, function(k) { return k === 'vw' || k === 'pf' || (k === 'com' && !(z.comPs && z.comPs.length)) ? '' : 'trfPasso(\'' + k + '\')'; });
+  var semVisOrg = TRF.canal === 'org' && TRF.cri === 'manychat', z = D.z, topoO = (TRF_ORG_TOPO[TRF.cri] || []).slice();
+  if (semVisOrg && z.cmt != null) topoO.splice(1, 0, ['cmt', 'Comentaram no post', 'pessoas que comentaram qualquer coisa nos posts']);
+  var PS = D.org ? topoO.concat(TRF_PASSOS.slice(semVisOrg ? 3 : 2)) : D.soPg ? TRF_PASSOS.slice(2) : TRF_PASSOS;
+  var val = { vw: z.vw, cmt: z.cmt, com: z.com, pf: z.pf, imp: z.imp, cli: z.cli, vis: z.vis, ini: z.ini, comp: z.comp, mql: z.mql, marc: z.marc, real: z.real, apar: z.apar, sim: z.sim, pag: z.pag };
+  var h = _trfFnBlocos(PS, val, z.gasto, D, function(k) { return k === 'vw' || k === 'pf' || (k === 'com' && !(z.comPs && z.comPs.length)) ? 'trfIr(\'trf-posts\')' : 'trfPasso(\'' + k + '\')'; });
   var c = TRF.cri ? D.cri[TRF.cri] : null;
   return '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🔻 Funil do ' + (D.org ? (TRF.canal === 'bio' ? 'link na bio' : TRF.cri === 'sem' ? 'link sem marcação' : 'orgânico · comentário') : 'tráfego') + (D.soPg ? ' · página ' + _trfE(D.soPg) : '') + (c && !D.org ? ' · ' + _trfE(c.nome) : '') + '</h3>'
     + (D.soPg ? '<button type="button" class="pl-chip on" onclick="trfPagina(\'' + _trfE(D.soPg) + '\')">✕ ver todas as páginas</button>' : '')
@@ -42082,11 +42117,11 @@ function _trfFunil(D) {
     + (!D.soPg && !TRF.cri && !D.org ? '<span class="trf-sub">' + (D.ev ? 'o que aconteceu em ' + _trfE(D.P.rot) : 'quem chegou em ' + _trfE(D.P.rot) + ', seguido até hoje') + ' · clique num passo</span>' : '')
     + (D.soPg ? '<button type="button" class="pl-chip" onclick="trfPaginas()">🌐 comparar as páginas</button>' : '') + '</div>'
     + '<div class="trf-fns">' + h + '</div>' + _trfComIniHtml(D)
-    + (D.org && D.topoOrg ? '<p class="trf-nota">' + (TRF.cri === 'manychat' ? 'Caminho do comentário: a pessoa vê o post, comenta a palavra e o ManyChat manda o link. De “Visitas na página” para baixo conta todo mundo que chegou pelo link do ManyChat (inclusive por story e direct); a visita é anônima, então não dá para dizer qual comentário virou visita — por isso o quadro abaixo do funil mostra, dos que comentaram, quantos iniciaram o formulário.'
+    + (D.org && D.topoOrg ? '<p class="trf-nota">' + (TRF.cri === 'manychat' ? 'Caminho do comentário: a pessoa vê o post, comenta, escreve a palavra e o ManyChat manda o link. “Comentaram no post” = todo mundo que comentou (com ou sem a palavra), guardado pelo robô desde 12/11. De “Iniciou o formulário” para baixo conta todo mundo que chegou pelo link do ManyChat (inclusive por story e direct). O quadro abaixo do funil mostra, dos que comentaram, quantos iniciaram o formulário.'
         : TRF.cri === 'bio' ? 'Caminho da bio: a pessoa vai ao perfil e clica no link da bio. Daqui para baixo, só quem chegou com a etiqueta da bio. O clique no link da bio ainda não é medido (o robô do Instagram não lê esse número).'
         : 'Tudo junto: os dois caminhos somados. Entre a visualização e a visita, cada caminho tem o seu passo (comentar a palavra ou ir ao perfil e clicar na bio): escolha um deles acima para ver.')
       + (TRF.cri === 'bio' ? ' Visitas ao perfil: o que o Instagram atribui a cada um dos ' + _trfN(z.nposts || 0) + ' posts publicados no período (medido no 7º dia; nem todo post traz esse número). Quem chega ao perfil por story, busca ou indicação ainda não entra aqui.' : ' Visualizações: soma dos ' + _trfN(z.nposts || 0) + ' posts publicados no período no perfil @joaostecca, medidas no 7º dia de cada post' + (z.nHoje ? '; os ' + _trfN(z.nHoje) + ' posts com menos de 7 dias entram com o número de hoje (atualizado uma vez por dia).' : ' (os posts dos últimos 7 dias ainda não entraram).')) + '</p>' : '')
-    + (D.org && TRF.canal !== 'bio' ? '<p class="trf-nota"><b>Por que um passo pode ser maior que o de cima:</b> cada passo vem de um lugar diferente e nem todos são “parte” do anterior. Comentaram a palavra = comentários nos 12 posts mais recentes, lidos uma vez por dia. Visitas = todo mundo que abriu a página com o link do ManyChat, inclusive quem recebeu o link por story ou conversa. MQL = marcou algum investimento, mesmo sem terminar o formulário. Em períodos curtos (7 dias) isso aparece mais.</p>' : '')
+    + (D.org && TRF.canal !== 'bio' ? '<p class="trf-nota"><b>Por que um passo pode ser maior que o de cima:</b> “Iniciou o formulário” conta todo mundo que chegou pelo link do ManyChat no período — inclusive quem recebeu o link por story ou direct e quem comentou antes do período e só preencheu agora. Por isso, em períodos curtos (7 dias), pode passar de “Comentaram a palavra”. MQL = marcou algum investimento, mesmo sem terminar o formulário. O quadro acima (“Dos que comentaram…”) mostra a conta fechada: só quem comentou a palavra no período.</p>' : '')
     + (D.soPg ? '<p class="trf-nota">Só quem entrou pela página ' + _trfE(D.soPg) + '. O funil começa nas visitas: o gasto, as impressões e os cliques não se separam por página, porque o mesmo anúncio manda gente para várias.</p>' : '') + '</div>';
 }
 function _trfFoto(c) { if (c.foto) return c.foto; try { var cc = criativoDe(c.nome, c.adId); return (cc && cc.foto) || ''; } catch (e) { return ''; } }
@@ -42163,8 +42198,8 @@ function _trfFontes(D) {
     var o = TRF_ORG[c.k], on = TRF.cri === c.k;
     return '<div class="trf-pg trf-org' + (on ? ' on' : '') + '" role="button" tabindex="0" style="--i:' + i + '" onclick="' + (c.k === 'bio' ? 'trfFiltro(\'canal\',\'bio\')' : c.k === 'manychat' ? 'trfFiltro(\'cri\',\'\')' : 'trfCriativo(\'sem\')') + '" title="' + (c.k === 'bio' ? 'Abrir a aba Link na bio' : 'Ver o funil desta origem') + '">'
       + '<div class="trf-pg-t"><b>' + o[0] + ' ' + o[1] + '</b><span>' + (tot ? '<b>' + Math.round(c.ini / tot * 100) + '%</b> dos leads' : '') + '</span></div><p class="trf-org-d">' + o[2] + '</p>'
-      + _trfMiniFunil((c.k === 'manychat' ? [['Comentaram', D.z.com, 'az', D.semCom]] : c.k === 'bio' ? [['Foram ao perfil', D.z.pf, 'az', D.semVw]] : []).concat([['Visitas', c.vis, 'az', sv], ['Iniciaram', c.ini, 'rx', 0, 'ini'], ['Completos', c.comp, 'rx', 0, 'comp'], ['MQL', c.mql, 'lj', 0, 'mql'], ['Marcada', c.marc, 'am', 0, 'marc'], ['Compareceu', c.apar, 'am', 0, 'apar'], ['Entrou', c.vd, 'vd', 0, 'pag']]), c.k)
-      + '<div class="trf-pg-r">' + (c.vd ? '💰 ' + _trfRs(c.fat) + ' vendidos' : 'sem venda no período') + (!sv && c.vis ? ' · ' + pc(c.ini, c.vis) + ' das visitas viram lead' : '') + '</div>'
+      + _trfMiniFunil((c.k === 'manychat' ? [['Comentaram', D.z.com, 'az', D.semCom]] : c.k === 'bio' ? [['Foram ao perfil', D.z.pf, 'az', D.semVw]] : []).concat(c.k === 'manychat' ? [] : [['Visitas', c.vis, 'az', sv]]).concat([['Iniciaram', c.ini, 'rx', 0, 'ini'], ['Completos', c.comp, 'rx', 0, 'comp'], ['MQL', c.mql, 'lj', 0, 'mql'], ['Marcada', c.marc, 'am', 0, 'marc'], ['Compareceu', c.apar, 'am', 0, 'apar'], ['Entrou', c.vd, 'vd', 0, 'pag']]), c.k)
+      + '<div class="trf-pg-r">' + (c.vd ? '💰 ' + _trfRs(c.fat) + ' vendidos' : 'sem venda no período') + (!sv && c.vis && c.k !== 'manychat' ? ' · ' + pc(c.ini, c.vis) + ' das visitas viram lead' : '') + '</div>'
       + '<div class="trf-anc-ver">' + (c.k === 'bio' ? '🔗 tem aba própria · abrir Link na bio' : on ? 'é o funil que está acima' : '🔎 ver o funil desta origem') + '</div></div>';
   }).join('');
   return '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>🌱 Os caminhos do orgânico, lado a lado</h3><span class="trf-sub">clique num passo para ver as pessoas</span></div><div class="trf-pgs trf-orgs">' + h + '</div>'
@@ -42233,7 +42268,7 @@ function trfWsCriJanela(i) {
   var ft = c.foto || (cc && cc.foto) || '', link = (cc && cc.link) || '', post = (cc && cc.post) || '', temPlayer = !!post && String(post).split('_').length === 2, temFunil = c.ing != null;
   var PS = (c.org ? [] : TRF_PASSOS.slice(0, 2)).concat(temFunil ? [['insc', 'Ingressos', 'ingressos comprados com este anúncio marcado'], ['apl', 'Aplicaram', 'preencheram a aplicação'], ['marc', 'Marcada', 'têm reunião marcada'], ['apar', 'Compareceu', 'compareceram à reunião'], ['pag', 'Entrou', 'pagou tudo · status Vendido']] : []);
   var val = { imp: c.imp, cli: c.cli, insc: c.ing, apl: c.apl, marc: c.marc, apar: c.apar, pag: c.vd };
-  var blocos = _trfFnBlocos(PS, val, c.gasto, { temMeta: D.temMeta, semVis: false }, function() { return ''; });
+  var blocos = _trfFnBlocos(PS, val, c.gasto, { temMeta: D.temMeta, semVis: false }, function() { return 'trfSoTotal(\'meta\')'; });
   var num = function(rot, v, cor) { return '<div class="trf-jan-n"><span>' + rot + '</span><b' + (cor ? ' style="color:' + cor + '"' : '') + '>' + v + '</b></div>'; };
   var h = '<div class="trf-jan-box" role="dialog" aria-modal="true" aria-label="Criativo"><button type="button" class="vf-modal-x" onclick="trfCriFechar()" aria-label="Fechar">✕</button>'
     + '<div class="trf-jan-t"><h3>🔻 ' + _trfE(c.nome) + '</h3><span class="trf-sub">' + _trfE(D.P.rot) + ' · #' + (i + 1) + ' de ' + L.length + '</span>'
@@ -42251,6 +42286,38 @@ function trfWsCriJanela(i) {
   try { var jd = el.querySelector('.trf-jan-g'); jd.classList.add('trf-vai'); _trfContar(jd); } catch (e3) {}
   try { if (temPlayer) criMontarPlayer(el); } catch (e4) {}
 }
+var TRF_CLINT_SS = { funil: 'Sarah', grupo: 'Programas Promov', etapa: 'Base', etiqueta: 'comentou sem formulário' };
+function trfClintUm(u, btn) {
+  try { if (typeof soOlhar === 'function' && soOlhar()) return; } catch (e) {}
+  var dono = typeof DONO_COMENTARIOS !== 'undefined' ? DONO_COMENTARIOS : 'Sarah Promov', pf = (typeof IGO !== 'undefined' && IGO.perfil && IGO.perfil[u]) || {};
+  if (!confirm('Criar @' + u + ' na Clint?\n\nEntra no funil ' + TRF_CLINT_SS.funil + ', etapa ' + TRF_CLINT_SS.etapa + ', com a ' + dono + ' de dona.')) return;
+  var txt = btn ? btn.textContent : ''; if (btn) { btn.textContent = '⏳ criando…'; btn.disabled = true; }
+  var nome = 'trfUm' + Math.random().toString(36).slice(2, 8), sc = document.createElement('script'), fez = false;
+  var fim = function(d) { if (fez) return; fez = true; try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
+    if (d && d.success) { if (btn) { btn.textContent = d.jaExistia ? '✓ já está na Clint' : '✓ na Clint'; btn.disabled = true; } try { avisoRapido(d.jaExistia ? '@' + u + ' já estava na Clint — nada duplicado.' : '✅ @' + u + ' criado na Clint' + (d.etapa ? ' (' + d.etapa + ')' : '') + '.'); } catch (e) {} }
+    else { if (btn) { btn.textContent = txt; btn.disabled = false; } alert('Não consegui criar (' + ((d && d.error) || 'sem resposta') + ').'); } };
+  window[nome] = fim; sc.onerror = function() { fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintCriarContato', nome: pf.nome || '', insta: u, donoNome: dono, origem: 'comentou a palavra e não preencheu', origemNome: TRF_CLINT_SS.funil, etapaNome: TRF_CLINT_SS.etapa, grupoNome: TRF_CLINT_SS.grupo, etiqueta: TRF_CLINT_SS.etiqueta }));
+  document.body.appendChild(sc); setTimeout(function() { fim(null); }, 60000);
+}
+function trfClintLote(btn) {
+  try { if (typeof soOlhar === 'function' && soOlhar()) return; } catch (e) {}
+  var L = (window._trfListaAtual || []).filter(function(p) { return p.ig && !p.t8; }).map(function(p) { var u = String(p.ig).toLowerCase().replace(/^@+/, ''), pf = (typeof IGO !== 'undefined' && IGO.perfil && IGO.perfil[u]) || {}; return { nome: pf.nome || '', insta: u }; });
+  if (!L.length) { alert('Ninguém nesta lista para mandar.'); return; }
+  var dono = typeof DONO_COMENTARIOS !== 'undefined' ? DONO_COMENTARIOS : 'Sarah Promov';
+  if (!confirm('Criar na Clint ' + (L.length > 60 ? 'os primeiros 60 dos ' + L.length : 'os ' + L.length) + ' desta lista?\n\nCada um entra no funil ' + TRF_CLINT_SS.funil + ', etapa ' + TRF_CLINT_SS.etapa + ', com a ' + dono + ' de dona (até 40 por clique).\nQuem já existir lá não é duplicado.')) return;
+  var txt = btn ? btn.textContent : ''; if (btn) { btn.textContent = '⏳ criando… (até 2 min)'; btn.disabled = true; }
+  var nome = 'trfLt' + Math.random().toString(36).slice(2, 8), sc = document.createElement('script'), fez = false;
+  var fim = function(d) { if (fez) return; fez = true; try { sc.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {} if (btn) { btn.textContent = txt; btn.disabled = false; }
+    if (d && d.success) alert('✅ Pronto!\n\n· Criados: ' + d.criados + '\n· Já existiam (pulados): ' + d.pulados + (d.falhas ? '\n· Falharam: ' + d.falhas : '') + (d.faltam ? '\n· Faltam para o próximo clique: ' + d.faltam : ''));
+    else alert('Não consegui criar (' + ((d && d.error) || 'sem resposta') + '). Tente de novo.'); };
+  window[nome] = fim; sc.onerror = function() { fim(null); };
+  sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'clintCriarComentaristas', lista: L.slice(0, 60), donoNome: dono, origemNome: TRF_CLINT_SS.funil, etapaNome: TRF_CLINT_SS.etapa, grupoNome: TRF_CLINT_SS.grupo, etiqueta: TRF_CLINT_SS.etiqueta }));
+  document.body.appendChild(sc); setTimeout(function() { fim(null); }, 300000);
+}
+function trfFunilVer(v) { TRF.tfun = v; renderTrafego(); try { document.getElementById('trf-cri').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
+function trfPassoT(esc, k) { if (!window._trfCtx) return; TRF.lst = { k: k, f: '', esc: esc }; _trfListaDesenhar(); }
+function trfSoTotal(q) { try { avisoRapido(q === 'meta' ? 'Este número é um total dos anúncios na Meta: não existe lista de pessoas.' : q === 'vis' ? 'Visita é anônima: a página só sabe quantas foram, não quem foi.' : 'Este número é um total que vem do Instagram: não existe lista de quem viu ou de quem foi ao perfil.'); } catch (e) {} }
 function trfPostPasso(i, k) { if (!window._trfCtx) return; TRF.lst = { k: k, f: '', post: i }; _trfListaDesenhar(); }
 function trfPostJanela(i) {
   var L = window._trfPostsOrd || [], o = L[i]; if (!o) return; var jaAberta = !!document.getElementById('trf-jan'); trfCriFechar();
@@ -42258,7 +42325,7 @@ function trfPostJanela(i) {
     ['marc', 'Marcada', 'têm reunião depois do comentário'], ['real', 'Realizada', 'o dia da reunião chegou e o resultado foi lançado'], ['apar', 'Compareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
   var val = { vw: o.vw, com: o.com, pf: o.pf, ini: o.ld, comp: o.comp, mql: o.mql, marc: o.marc, real: o.real, apar: o.apar, pag: o.vd }, naBio = TRF.canal === 'bio';
   if (naBio) PS = [TRF_ORG_VW, ['pf', 'Foram ao perfil', 'idas ao perfil a partir deste post']];
-  var blocos = _trfFnBlocos(PS, val, 0, { semVw: !o.temVw, semCom: false, temMeta: true, semVis: false }, function(k) { return naBio || k === 'vw' ? '' : 'trfPostPasso(' + i + ',\'' + k + '\')'; });
+  var blocos = _trfFnBlocos(PS, val, 0, { semVw: !o.temVw, semCom: false, temMeta: true, semVis: false }, function(k) { return naBio || k === 'vw' ? 'trfSoTotal()' : 'trfPostPasso(' + i + ',\'' + k + '\')'; });
   var num = function(rot, v, cor) { return '<div class="trf-jan-n"><span>' + rot + '</span><b' + (cor ? ' style="color:' + cor + '"' : '') + '>' + v + '</b></div>'; };
   var leg = o.leg.replace(/\s+/g, ' ').trim(), d = new Date(o.t), ft = _trfPostCapa(o);
   var mi = String(o.lk).match(/instagram\.com\/(?:[^\/?#]+\/)?(reels?|p|tv)\/([A-Za-z0-9_-]+)/i);   // o post inteiro, como na aba Criativos
@@ -42465,7 +42532,7 @@ function _trfDadosWs() {
   var pessoa = function(e, k, x, r) {
     return e.pes[k] || (e.pes[k] = { k: k, t8: x ? x.t8 : (r ? ldTel8(r.telefone || '') : ''), tel: x ? x.tel : String((r && r.telefone) || ''), nome: String((x ? x.nome : r && r.nome) || '').trim(), ini: true, semCad: !x, ck: e.k,
       t: x ? ((x.ing instanceof Date ? x.ing : x.apl instanceof Date ? x.apl : new Date()).getTime()) : (r && r.date ? r.date.getTime() : 0),
-      insc: !!(x && x.ing instanceof Date), part: !!(x && (x.p1 || x.p2 || x.p3)), aplT: !!(x && x.apl instanceof Date), apl: !!(x && x.apl instanceof Date && /^comprou/i.test(x.compra || '')), mql: !!(x && x.apl instanceof Date && _vfMql(x.inv)), comp: false, fx: '', cont: '', pg: '', rs: [] });
+      insc: !!(x && x.ing instanceof Date), p1: !!(x && x.p1), p2: !!(x && x.p2), part: !!(x && (x.p1 || x.p2 || x.p3)), aplT: !!(x && x.apl instanceof Date), apl: !!(x && x.apl instanceof Date && /^comprou/i.test(x.compra || '')), mql: !!(x && x.apl instanceof Date && _vfMql(x.inv)), comp: false, fx: '', cont: '', pg: '', rs: [] });
   };
   if (ok) Object.keys(WSL.porTel).forEach(function(t8) {
     var x = WSL.porTel[t8]; if (/mcp/i.test(x.prog || '') || !(x.ing instanceof Date || x.apl instanceof Date)) return;
@@ -42600,7 +42667,7 @@ function _trfRenderWs(el) {
     + '<div class="trf-leads trf-mom">' + '<div class="trf-kpi l"><span>' + (D.soPres ? 'Participantes' : 'Inscritos') + '</span><b>' + _trfN(z.insc) + '</b><small>' + (D.soPres ? 'na lista do evento · ' + _trfN(z.part) + ' compareceram' : 'com ingresso pago') + (z.gasto && z.insc ? '<br>' + _trfRs(z.gasto / z.insc) + ' investidos por ' + (D.soPres ? 'participante' : 'ingresso') : '') + '</small></div>'
     + '<div class="trf-kpi l"><span>' + (D.soPres ? 'Do participante à venda' : 'Do ingresso à venda') + '</span><b>' + (z.insc ? (z.pag / z.insc * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</b><small>' + (D.soPres ? 'vendas ÷ participantes' + (z.part ? ' · ' + (z.pag / z.part * 100).toFixed(1).replace('.', ',') + '% de quem compareceu' : '') : 'vendas ÷ inscritos') + '</small></div>' + m3('Antes do evento', 'reunião antes do dia do pitch', D.mom.pre) + m3('No workshop', 'do pitch até 15 dias depois', D.mom.ws) + m3('Pós-workshop', 'mais de 15 dias depois', D.mom.pos) + '</div>'
     + '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🔻 Funil do workshop · ' + _trfE(D.um ? D.um.nome : 'todas as edições') + '</h3><span class="trf-sub">clique num passo para ver as pessoas</span></div>'
-    +   '<div class="trf-fns">' + _trfFnBlocos(D.PS, val, z.gasto, D, function(k) { return k === 'd1' || k === 'd2' ? '' : 'trfPasso(\'' + k + '\')'; }) + '</div>'
+    +   '<div class="trf-fns">' + _trfFnBlocos(D.PS, val, z.gasto, D, function(k) { return k === 'd1' ? 'trfPasso(\'insc\',\'p1\')' : k === 'd2' ? 'trfPasso(\'insc\',\'p2\')' : 'trfPasso(\'' + k + '\')'; }) + '</div>'
     +   _trfPagouHtml(D)
     +   (D.temPres ? '<p class="trf-nota">Presentes: inscritos que clicaram para entrar na sala em cada dia (registro da Central do workshop). O pitch é no 2º dia.</p>' : '')
     +   (D.some.length ? '<p class="trf-nota">Ficou de fora do desenho: ' + D.some.map(function(k) { return nomeSome[k]; }).join(', ') + ' — nesta seleção a planilha não tem esse dado completo (a presença só veio em algumas edições; no presencial a entrevista é marcada sem a aplicação do app).</p>' : '')
@@ -42689,7 +42756,7 @@ function _trfRenderMcp(el) {
 function _trfOrigemLinha(o) {
   var n = v2norm(o || '');
   if (/(^|[^a-z])ads([^a-z]|$)/.test(n)) return 'pago'; if (/mchat|manychat/.test(n)) return 'org'; if (/(^|[^a-z])org([^a-z]|$)/.test(n)) return 'bio';
-  if (/(^|[^a-z])ild([^a-z]|$)|imers/.test(n)) return 'pres'; if (/workshop/.test(n)) return 'ws'; if (/social/.test(n)) return 'ss'; if (/indica/.test(n)) return 'ind'; return 'out';
+  if (/(^|[^a-z])ild([^a-z]|$)|imers/.test(n)) return 'pres'; if (/workshop/.test(n) && /(^|[^a-z])(pre|pos)([^a-z]|$)/.test(n)) return 'pp'; if (/workshop/.test(n)) return 'ws'; if (/social/.test(n)) return 'ss'; if (/indica/.test(n)) return 'ind'; return 'out';
 }
 function _trfRenderTodos(el) {
   trfSiteCarregar(false); try { if (!WSL.carregado && !WSL.buscando) carregarWS(); } catch (e) {}
@@ -42698,22 +42765,27 @@ function _trfRenderTodos(el) {
   if ((!okWs || !okV) && (TRF._tdEsp = (TRF._tdEsp || 0) + 1) < 40) setTimeout(function() { if (TRF.canal === 'todos' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1000);
   var P = _trfPer(), M = _trfMeta(P), S = TRF.site;
   var novo = function(rot, abre, ent) { return { rot: rot, abre: abre, ent: ent, gasto: 0, imp: 0, cli: 0, entr: null, reun: 0, real: 0, apar: 0, vend: 0, valor: 0 }; };
-  var L = { pago: novo('📣 Tráfego pago', 'pago', 'leads'), org: novo('🌱 Orgânico · comentário (ManyChat)', 'org', 'leads'), bio: novo('🔗 Link na bio e orgânico direto', 'bio', 'leads'), ws: novo('🎓 Workshop on-line', 'ws', 'ingressos'),
+  var L = { pago: novo('📣 Tráfego pago', 'pago', 'leads'), org: novo('🌱 Orgânico · comentário (ManyChat)', 'org', 'leads'), bio: novo('🔗 Link na bio e orgânico direto', 'bio', 'leads'), pp: novo('🔁 Pré e pós workshop (pelo diagnóstico)', '', ''), ws: novo('🎓 Workshop on-line', 'ws', 'ingressos'),
     pres: novo('📍 Presencial (ILD)', 'ws', 'ingressos'), mcp: novo('🧩 MCP', 'mcp', 'compras'), ss: novo('💬 Social Selling', '', ''), ind: novo('🤝 Indicação', '', ''), out: novo('Outras origens', '', ''), dist: novo('📢 Anúncios de distribuição de conteúdo', '', '') };
-  var G = TRF.tprod === 'diag' ? { pago: 1, org: 1, bio: 1 } : TRF.tprod === 'ws' ? { ws: 1, pres: 1 } : null, gRot = TRF.tprod === 'diag' ? 'Diagnóstico' : TRF.tprod === 'ws' ? 'Workshop' : '';
-  var linhasF = [], zf = { marc: 0, real: 0, apar: 0, pag: 0 }, mqlDiag = null, mqlEv = null, mqlEvPg = 0;
+  var G = TRF.tprod === 'diag' ? { pago: 1, org: 1, bio: 1, pp: 1 } : TRF.tprod === 'ws' ? { ws: 1, pres: 1 } : null, gRot = TRF.tprod === 'diag' ? 'Diagnóstico' : TRF.tprod === 'ws' ? 'Workshop' : '';
+  var linhasF = [], zf = { marc: 0, real: 0, apar: 0, pag: 0 }, mqlDiag = null, mqlEv = null, mqlEvPg = 0, GD = { pago: 1, org: 1, bio: 1, pp: 1 }, GW = { ws: 1, pres: 1 }, linDe = { diag: [], ws: [], tudo: [] };
   (V2.rows || []).forEach(function(r, i) { if (!r.date) return; var d = r.date.getTime(); if (d < P.ini || d >= P.fim) return; var kL = _trfOrigemLinha(r.origem), x = L[kL];
     x.reun++; if (isReal(r.sn)) x.real++; if (isComp(r.sn)) x.apar++; if (r.sn === 'vendido') { x.vend++; x.valor += r.valor || 0; }
-    if (G && !G[kL]) return;
     var o = { k: 'r' + i, t8: ldTel8(r.telefone || ''), tel: String(r.telefone || ''), nome: String(r.nome || '').trim(), t: d, ini: true, comp: false, mql: false, fx: '', cont: '', pg: '', ck: '', marc: true, real: isReal(r.sn), apar: isComp(r.sn), pag: r.sn === 'vendido',
       valor: r.sn === 'vendido' ? (r.valor || 0) : 0, dv: d, deOnde: x.rot, closer: r.closer || '', res: r.status || r.sn || '' };
+    linDe.tudo.push(o); if (GD[kL]) linDe.diag.push(o); if (GW[kL]) linDe.ws.push(o);
+    if (G && !G[kL]) return;
     linhasF.push(o); zf.marc++; if (o.real) zf.real++; if (o.apar) zf.apar++; if (o.pag) zf.pag++; });
   ((M && M.an) || []).forEach(function(a) { var g = +a.gasto || 0, tp = metaTipoCampanha(a.campanha), od = tp === 'workshop' || tp === 'imersao' ? '' : metaOrigemDiag(a.campanha), x = tp === 'workshop' ? L.ws : tp === 'imersao' ? L.pres : od === 'mcp' ? L.mcp : od === 'quente' ? L.pago : L.dist;
     x.gasto += g; x.imp += +a.impressoes || 0; x.cli += +a.cliques || 0; });   // o tráfego pago aqui é o mesmo da chave dele (campanhas de diagnóstico); o resto do gasto aparece à parte
+  var compD = {}, visDiag = null, visDesdeT = '';
   if (S) { var donoT = _trfDonoLeads(S, P.fim), v = { pago: {}, org: {}, bio: {} }, inv = {}, nSem = 0, vSem = {};
     S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim) return; var kL = l.t8 || ('n:' + l.nome), dk = donoT[kL] || _trfDonoDe(l), c = dk === 'pago' ? 'pago' : dk === 'manychat' ? 'org' : 'bio';
-      v[c][kL] = 1; if (dk === 'sem') vSem[kL] = 1; if (l.inv) inv[kL] = l.inv; });   // os leads vêm em ordem de data: fica a resposta mais recente
+      v[c][kL] = 1; if (dk === 'sem') vSem[kL] = 1; if (l.inv) inv[kL] = l.inv; if (l.comp) compD[kL] = 1; });   // os leads vêm em ordem de data: fica a resposta mais recente
     nSem = Object.keys(vSem).length; L.bio.nSem = nSem;
+    if (S.visPag && !S.semVis) { visDiag = 0; var noPerV = function(d) { var tV = new Date(d + 'T12:00:00').getTime(); return tV >= P.ini && tV < P.fim; };
+      S.visPag.forEach(function(x) { if (!visDesdeT || x[0] < visDesdeT) visDesdeT = x[0]; if (noPerV(x[0]) && (x[2] !== 'o' || !S.visOrg)) visDiag += x[3]; });
+      (S.visOrg || []).forEach(function(x) { if (noPerV(x[0])) visDiag += x[2]; }); }
     var q = 0; ['pago', 'org', 'bio'].forEach(function(c) { var ks2 = Object.keys(v[c]), nq = ks2.filter(function(kk) { return _vfMql(inv[kk]); }).length; L[c].entr = ks2.length; L[c].qual = nq; L[c].qualRot = 'MQL'; q += nq; }); mqlDiag = q; }
   if (okWs) { mqlEv = 0; mqlEvPg = 0; L.ws.qual = 0; L.ws.qualPg = 0; L.pres.qual = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (/mcp/i.test(x.prog || '') || !(x.apl instanceof Date)) return; var t = x.apl.getTime(); if (t < P.ini || t >= P.fim) return;
       var ild = /ild/i.test(x.prog || ''), pg = ild || /^comprou/i.test(x.compra || ''); mqlEv++; if (pg) mqlEvPg++; if (ild) L.pres.qual++; else { L.ws.qual++; if (pg) L.ws.qualPg++; } });
@@ -42728,18 +42800,44 @@ function _trfRenderTodos(el) {
     if (/mcp/i.test(x.prog || '')) { if (!(WSL.mcpEm && WSL.mcpEm[t8] instanceof Date)) L.mcp.entr++; } else if (/ild/i.test(x.prog || '')) L.pres.entr++; else L.ws.entr++; });
     Object.keys(WSL.mcpEm || {}).forEach(function(t8) { var dM = WSL.mcpEm[t8]; if (dM instanceof Date && dM.getTime() >= P.ini && dM.getTime() < P.fim) L.mcp.entr++; });
     if (L.pres.listaN != null) { L.pres.entr = L.pres.listaN; L.pres.ent = 'na lista do evento'; } }
-  var ks = ['pago', 'org', 'bio', 'ws', 'pres', 'mcp', 'ss', 'ind', 'out', 'dist'].filter(function(k) { return !G || G[k]; }), T = { gasto: 0, reun: 0, real: 0, apar: 0, vend: 0, valor: 0 };
+  var ks = ['pago', 'org', 'bio', 'pp', 'ws', 'pres', 'mcp', 'ss', 'ind', 'out', 'dist'].filter(function(k) { return !G || G[k]; }), T = { gasto: 0, reun: 0, real: 0, apar: 0, vend: 0, valor: 0 };
   ks.forEach(function(k) { ['gasto', 'reun', 'real', 'apar', 'vend', 'valor'].forEach(function(c) { T[c] += L[k][c]; }); });
-  trfContCarregar(); var impAds = 0, vwOrg = 0, nPosts = 0; if (TRF.tprod !== 'ws') (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { vwOrg += x.v; nPosts++; } });
+  trfContCarregar(); var impAds = 0, vwOrg = 0, nPosts = 0, vwTodos = 0; (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { vwTodos += x.v; nPosts++; } }); if (TRF.tprod !== 'ws') vwOrg = vwTodos;
   var semEnt = true; zf.imp = 0; zf.cli = 0; zf.ent = 0; ks.forEach(function(k) { zf.imp += L[k].imp; zf.cli += L[k].cli; if (L[k].entr != null) { zf.ent += L[k].entr; semEnt = false; } });
   impAds = zf.imp; zf.imp += vwOrg;
   var semMql = TRF.tprod === 'diag' ? mqlDiag == null : TRF.tprod === 'ws' ? mqlEv == null : (mqlDiag == null && mqlEv == null); zf.mql = (TRF.tprod === 'ws' ? 0 : (mqlDiag || 0)) + (TRF.tprod === 'diag' ? 0 : (mqlEv || 0));
+  var funilDe = function(esc) {
+    var Gx = esc === 'diag' ? GD : esc === 'ws' ? GW : null, kz = ['pago', 'org', 'bio', 'pp', 'ws', 'pres', 'mcp', 'ss', 'ind', 'out', 'dist'].filter(function(k) { return !Gx || Gx[k]; });
+    var z = { imp: 0, cli: 0, ent: 0, marc: 0, real: 0, apar: 0, pag: 0 }, semE = true; kz.forEach(function(k) { z.imp += L[k].imp; z.cli += L[k].cli; if (L[k].entr != null) { z.ent += L[k].entr; semE = false; } });
+    var iA = z.imp, vw = esc === 'ws' ? 0 : vwTodos; z.imp += vw; z.mql = (esc === 'ws' ? 0 : (mqlDiag || 0)) + (esc === 'diag' ? 0 : (mqlEv || 0));
+    linDe[esc].forEach(function(o) { z.marc++; if (o.real) z.real++; if (o.apar) z.apar++; if (o.pag) z.pag++; });
+    var vend = linDe[esc].reduce(function(a, o) { return a + (o.pag ? o.valor : 0); }, 0);
+    var semM = esc === 'diag' ? mqlDiag == null : esc === 'ws' ? mqlEv == null : (mqlDiag == null && mqlEv == null);
+    if (esc === 'diag') {   // as mesmas etapas dos funis de tráfego, orgânico e bio
+      var nComp = Object.keys(compD).length, visParcial = visDesdeT && P.ini < new Date(visDesdeT + 'T00:00:00').getTime() - 864e5;
+      var zD = { imp: z.imp, vis: visDiag || 0, ini: z.ent, comp: nComp, mql: mqlDiag || 0, marc: z.marc, real: z.real, apar: z.apar, pag: z.pag };
+      var pD = [['imp', 'Vezes que fomos vistos', 'anúncios ' + (M ? _trfN(iA) : '…') + ' + posts do orgânico ' + (TRF.cont ? _trfN(vw) : '…')], ['vis', 'Visitas na página', 'abriram a página do diagnóstico (anúncio, comentário e bio)'], ['ini', 'Iniciaram o formulário', 'deixaram nome e WhatsApp'], ['comp', 'Formulário completo', 'responderam a pesquisa até o fim'], ['mql', 'MQL', 'marcaram algum investimento'],
+        ['marc', 'Reuniões marcadas', 'reuniões da planilha com origem de diagnóstico'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
+      return '<div class="trf-f3 trf-f3-diag"><div class="trf-f3-t"><b>🩺 Funil do Diagnóstico</b><span class="trf-sub">tráfego pago + orgânico + link na bio + pré e pós workshop</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div><div class="trf-fns">'
+        + _trfFnBlocos(pD, zD, 0, { temMeta: !!M, semVis: visDiag == null, semEnt: semE, semMql: semM, aparte: visParcial ? { vis: '~as visitas só existem desde ' + visDesdeT.slice(8, 10) + '/' + visDesdeT.slice(5, 7) + '/' + visDesdeT.slice(0, 4) + ' · o período começa antes' } : {}, naoBase: visParcial ? { vis: 1 } : {} },
+            function(k) { return /^(marc|real|apar|pag)$/.test(k) ? 'trfPassoT(\'diag\',\'' + k + '\')' : 'trfIr(\'trf-funil\')'; }) + '</div></div>';
+    }
+    var passos = [['imp', esc === 'ws' ? 'Impressões' : 'Vezes que fomos vistos', esc === 'ws' ? 'vezes que os anúncios apareceram' : 'anúncios ' + (M ? _trfN(iA) : '…') + ' + posts do orgânico ' + (TRF.cont ? _trfN(vw) : '…')], ['cli', 'Cliques nos anúncios', esc === 'ws' ? 'todos os cliques nos anúncios do evento' : 'todos os cliques nos anúncios (o orgânico não tem clique medido)'],
+      ['ent', esc === 'diag' ? 'Leads' : esc === 'ws' ? 'Ingressos' : 'Entraram nos funis', esc === 'diag' ? 'iniciaram o formulário (pago, orgânico e bio)' : esc === 'ws' ? 'ingressos comprados (on-line e presencial)' : 'leads do diagnóstico + ingressos de evento + compras do MCP'],
+      ['mql', esc === 'ws' ? 'Aplicaram' : 'Qualificados (MQL)', esc === 'diag' ? 'marcaram algum investimento no formulário' : esc === 'ws' ? _trfN(mqlEvPg) + ' com a aplicação paga' : 'diagnóstico: marcou investimento (' + _trfN(mqlDiag || 0) + ') + eventos: aplicaram (' + _trfN(mqlEv || 0) + ')'],
+      ['marc', 'Reuniões marcadas', 'reuniões da planilha de vendas no período'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
+    var tit = esc === 'diag' ? '🩺 Funil do Diagnóstico' : esc === 'ws' ? '🎓 Funil do Workshop' : '🔻 Tudo junto', sub = esc === 'diag' ? 'tráfego pago + orgânico + link na bio + pré e pós workshop' : esc === 'ws' ? 'workshop on-line (origem Workshop) + presencial' : 'Diagnóstico + Workshop + os outros canais';
+    return '<div class="trf-f3 trf-f3-' + esc + '"><div class="trf-f3-t"><b>' + tit + '</b><span class="trf-sub">' + sub + '</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div><div class="trf-fns">'
+      + _trfFnBlocos(passos, z, 0, { temMeta: !!M, semVis: false, semEnt: semE, semMql: semM, aparte: (esc === 'ws' ? {} : { cli: vw > 0 ? 'só dos anúncios' + (iA ? ' · ' + (z.cli / iA * 100).toFixed(1).replace('.', ',') + '% das impressões deles' : '') : '', ent: 'inclui o orgânico, que não vem de clique em anúncio' }) },
+          function(k) { return /^(marc|real|apar|pag)$/.test(k) ? 'trfPassoT(\'' + esc + '\',\'' + k + '\')' : 'trfIr(\'trf-funil\')'; }) + '</div></div>';
+  };
+  var fEsc = TRF.tfun || TRF.tprod || 'tudo';
   var ret = T.gasto ? T.valor / T.gasto : 0, maxV = Math.max.apply(null, ks.map(function(k) { return L[k].valor; })) || 1;
   var cel = function(r, v, cls) { return '<span class="' + (cls || '') + '" data-r="' + r + '">' + v + '</span>'; };
   var pos = 0, pc = function(a, b) { return b && a <= b ? ' <small>' + Math.round(a / b * 100) + '%</small>' : ''; };
   var linha = function(k) { var x = L[k]; if (k === 'dist' || (k !== 'mcp' && !x.reun && !x.entr)) return '';
     var lugar = x.reun || x.valor ? ++pos : 0;
-    var dentro = cel('Funil', (lugar ? '<i class="trf-td-pos p' + Math.min(lugar, 4) + '">' + lugar + 'º</i>' : '<i class="trf-td-pos p0">–</i>') + '<span><b>' + x.rot + '</b>' + (k === 'mcp' && x.entr ? '<small>receita do MCP: ' + _trfRs(x.entr * TRF_MCP_PRECO) + ' (fora do total · a mentoria de quem comprou entra na origem da venda)</small>' : '') + (k === 'bio' && x.nSem ? '<small>inclui ' + _trfN(x.nSem) + ' leads de link sem marcação (ficam num funil à parte dentro do Orgânico)</small>' : '') + '</span>', 'trf-td-n')
+    var dentro = cel('Funil', (lugar ? '<i class="trf-td-pos p' + Math.min(lugar, 4) + '">' + lugar + 'º</i>' : '<i class="trf-td-pos p0">–</i>') + '<span><b>' + x.rot + '</b>' + (k === 'mcp' && x.entr ? '<small>receita do MCP: ' + _trfRs(x.entr * TRF_MCP_PRECO) + ' (fora do total · a mentoria de quem comprou entra na origem da venda)</small>' : '') + (k === 'pp' ? '<small>origem Pré workshop ou Pós workshop na planilha: quem veio pelo diagnóstico, fora da janela do evento</small>' : '') + (k === 'bio' && x.nSem ? '<small>inclui ' + _trfN(x.nSem) + ' leads de link sem marcação (ficam num funil à parte dentro do Orgânico)</small>' : '') + '</span>', 'trf-td-n')
       + cel('Entradas', x.entr == null ? '—' : _trfN(x.entr) + (x.ent ? ' <small>' + x.ent + '</small>' : ''))
       + cel('Qualificados', x.qual == null ? '—' : _trfN(x.qual) + pc(x.qual, x.entr) + (x.qualRot ? '<small class="trf-td-q">' + x.qualRot + '</small>' : ''))
       + cel('Marcadas', _trfN(x.reun) + (x.qual && x.reun <= x.qual ? pc(x.reun, x.qual) : '')) + cel('Realizadas', _trfN(x.real) + pc(x.real, x.reun)) + cel('Compareceram', _trfN(x.apar) + pc(x.apar, x.real)) + cel('Vendas', _trfN(x.vend) + pc(x.vend, x.apar))
@@ -42751,7 +42849,7 @@ function _trfRenderTodos(el) {
   if (!M) avisos += '<div class="trf-aviso"><span class="mv-brilho-txt">Buscando os anúncios na Meta…</span></div>'; else if (M.erro) avisos += '<div class="trf-aviso">⚠️ A Meta não respondeu agora: as impressões e os cliques do funil final ficam zerados até a próxima tentativa.</div>';
   var bp = function(v, r) { return '<button type="button" class="' + (TRF.tprod === v ? 'on' : '') + '" onclick="trfFiltro(\'tprod\',\'' + v + '\')" aria-pressed="' + (TRF.tprod === v) + '">' + r + '</button>'; };
   el.innerHTML = _trfCanalHtml() + '<div class="trf-topo"><div><p>' + (gRot ? 'Só os funis do ' + gRot : 'Todos os funis lado a lado') + ' · reuniões e vendas pela origem escrita na planilha de vendas · ' + _trfE(P.rot) + '</p></div>' + _trfChips(true) + '</div>'
-    + '<div class="trf-prod" role="group" aria-label="Diagnóstico ou Workshop">' + bp('', 'Tudo') + bp('diag', '🩺 Diagnóstico') + bp('ws', '🎓 Workshop') + '<span class="trf-sub">' + (TRF.tprod === 'diag' ? 'tráfego pago, orgânico e link na bio' : TRF.tprod === 'ws' ? 'workshop on-line e presencial' : 'todos os canais, inclusive MCP, Social Selling e indicação') + '</span></div>' + avisos
+    + '<div class="trf-prod" role="group" aria-label="Diagnóstico ou Workshop">' + bp('', 'Tudo') + bp('diag', '🩺 Diagnóstico') + bp('ws', '🎓 Workshop') + '<span class="trf-sub">' + (TRF.tprod === 'diag' ? 'tráfego pago, orgânico, link na bio e pré/pós workshop' : TRF.tprod === 'ws' ? 'workshop on-line e presencial' : 'todos os canais, inclusive MCP, Social Selling e indicação') + '</span></div>' + avisos
     + '<div class="trf-kpis">' + _trfKpi('Vendido', _trfRs(T.valor), gRot ? 'vendas com origem de ' + gRot : 'todas as vendas da planilha no período', 'vd')
     + _trfKpi('Vendas', _trfN(T.vend), T.apar ? Math.round(T.vend / T.apar * 100) + '% dos que compareceram' : 'status Vendido', '') + _trfKpi('Reuniões marcadas', _trfN(T.reun), 'todas as reuniões da planilha no período', '')
     + _trfKpi('Compareceram', _trfN(T.apar), T.reun ? Math.round(T.apar / T.reun * 100) + '% das marcadas' : '', '') + '</div>'
@@ -42761,12 +42859,13 @@ function _trfRenderTodos(el) {
     + '<div class="trf-td-l tot">' + cel('Funil', '<i class="trf-td-pos p0">Σ</i><span><b>Total</b></span>', 'trf-td-n') + cel('Entradas', '—') + cel('Qualificados', '—') + cel('Marcadas', _trfN(T.reun)) + cel('Realizadas', _trfN(T.real) + pc(T.real, T.reun)) + cel('Compareceram', _trfN(T.apar) + pc(T.apar, T.real))
     + cel('Vendas', _trfN(T.vend) + pc(T.vend, T.apar)) + cel('Vendido', '<b>' + _trfRs(T.valor) + '</b>', 'vd') + '</div></div>'
     + '<p class="trf-nota"><b>Como esta tela conta:</b> cada reunião e cada venda entra uma vez só, pela origem escrita na planilha de vendas e na data da planilha. Por isso o total ' + (gRot ? 'é o das origens de ' + gRot + ' na planilha.' : 'é igual ao da planilha.') + ' Dentro de cada funil a conta é feita pela pessoa (o lead, o inscrito), então o número pode ser um pouco diferente do daqui — por exemplo, quando alguém preencheu dois formulários. O Workshop aqui é pelo mês da venda; dentro do funil dele é por edição.</p></div>'
-    + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>🔻 Funil final · ' + (gRot ? gRot : 'todos os canais juntos') + '</h3><span class="trf-sub">' + _trfE(P.rot) + ' · do anúncio até a venda</span></div><div class="trf-fns">'
-    + _trfFnBlocos([['imp', TRF.tprod === 'ws' ? 'Impressões' : 'Vezes que fomos vistos', TRF.tprod === 'ws' ? 'vezes que os anúncios apareceram' : 'anúncios ' + (M ? _trfN(impAds) : '…') + ' + posts do orgânico ' + (TRF.cont ? _trfN(vwOrg) : '…')], ['cli', 'Cliques nos anúncios', 'todos os cliques nos anúncios (o orgânico não tem clique medido)'], ['ent', 'Entraram nos funis', TRF.tprod === 'diag' ? 'leads do diagnóstico (pago, orgânico e bio)' : TRF.tprod === 'ws' ? 'ingressos comprados (on-line e presencial)' : 'leads do diagnóstico + ingressos de evento + compras do MCP'], ['mql', 'Qualificados (MQL)', TRF.tprod === 'diag' ? 'marcaram algum investimento no formulário' : TRF.tprod === 'ws' ? 'aplicaram nos eventos (' + _trfN(mqlEvPg) + ' com a aplicação paga)' : 'diagnóstico: marcou investimento (' + _trfN(mqlDiag || 0) + ') + eventos: aplicaram (' + _trfN(mqlEv || 0) + ')'], ['marc', 'Reuniões marcadas', 'todas as reuniões da planilha de vendas no período'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']],
-        zf, 0, { temMeta: !!M, semVis: false, semEnt: semEnt, semMql: semMql, aparte: (TRF.tprod === 'ws' ? {} : { cli: vwOrg > 0 ? 'só dos anúncios' + (impAds ? ' · ' + (zf.cli / impAds * 100).toFixed(1).replace('.', ',') + '% das impressões deles' : '') : '', ent: 'inclui o orgânico, que não vem de clique em anúncio' }) }, function(k) { return 'trfPasso(\'' + k + '\')'; })
-    + '</div><p class="trf-nota">É o mesmo funil dos outros, adaptado para todos os canais juntos. “Entraram nos funis” soma as pessoas que chegaram em cada canal (lead, ingresso, compra). ' + (TRF.tprod === 'ws' ? 'Impressões e cliques são dos anúncios do evento.' : 'O topo soma as vezes que os anúncios apareceram com as visualizações dos ' + _trfN(nPosts) + ' posts publicados no período (medidas no 7º dia de cada post; os que têm menos de 7 dias entram com o número de hoje). É o número de vezes, não de pessoas: a mesma pessoa conta cada vez que vê. Os cliques são só dos anúncios.') + ' Qualificados (MQL): no diagnóstico, quem marcou algum investimento no formulário; nos eventos, quem aplicou (o MCP não tem esse passo). Social Selling e indicação não têm entrada, começam na reunião.' + (!G && (L.ss.reun + L.ind.reun + L.out.reun) ? ' Das ' + _trfN(zf.marc) + ' reuniões marcadas, ' + _trfN(L.ss.reun + L.ind.reun + L.out.reun) + ' são de Social Selling, indicação e outras origens, que não passam pelos passos de cima.' : '') + ' Clique nos passos de reunião para ver as pessoas.</p></div>'
+    + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>🔻 Funis finais</h3><span class="trf-sub">' + _trfE(P.rot) + ' · do anúncio até a venda · clique nos passos de reunião para ver as pessoas</span></div>'
+    + '<div class="trf-prod trf-prod-f" role="group" aria-label="Qual funil ver">' + [['tudo', '🔻 Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎓 Workshop']].map(function(b) { return '<button type="button" class="' + (fEsc === b[0] ? 'on' : '') + '" aria-pressed="' + (fEsc === b[0]) + '" onclick="trfFunilVer(\'' + b[0] + '\')">' + b[1] + '</button>'; }).join('') + '</div>'
+    + funilDe(fEsc)
+    + '<p class="trf-nota">“Entraram” soma as pessoas que chegaram em cada canal (lead, ingresso, compra). No Diagnóstico e no “tudo junto”, o topo soma as vezes que os anúncios apareceram com as visualizações dos ' + _trfN(nPosts) + ' posts publicados no período (no 7º dia de cada post; os que têm menos de 7 dias entram com o número de hoje) — é número de vezes, não de pessoas. Qualificados: no diagnóstico, quem marcou algum investimento no formulário; nos eventos, quem aplicou. Reuniões, comparecimento e vendas vêm da planilha de vendas, pela origem escrita: “Pré workshop” e “Pós workshop” contam no Diagnóstico; o Workshop fica com a origem “Workshop”.'
+    + ((L.ss.reun + L.ind.reun + L.out.reun) ? ' No “tudo junto” entram também ' + _trfN(L.ss.reun + L.ind.reun + L.out.reun) + ' reuniões de Social Selling, indicação e outras origens, que não passam pelos passos de cima.' : '') + '</p></div>'
     + '<p class="trf-nota">O ranking é pelo valor vendido no período. Qualificados: no diagnóstico é o MQL (marcou algum investimento no formulário); nos eventos é quem aplicou (ao lado, quantas aplicações foram pagas). O % pequeno em Marcadas é sobre os qualificados. O valor investido não aparece aqui porque boa parte das vendas de um mês vem de anúncio pago em meses anteriores (principalmente nos eventos); o investido e o retorno de cada funil ficam dentro da chave dele. Os % pequenos são sempre sobre o passo anterior: em Realizadas, quantas das marcadas; em Compareceram, quantas das realizadas; em Vendas, quantos dos que compareceram. Entradas não se somam (lead, ingresso e compra são coisas diferentes). “Link na bio e orgânico direto” = origem [Org][Diag] da planilha.</p>';
-  window._trfCtx = { todosC: true, ev: true, P: P, z: zf, lista: linhasF, todas: linhasF, cri: {}, soPg: '', temSite: true, temMeta: !!M };
+  window._trfCtx = { todosC: true, ev: true, P: P, z: zf, lista: linhasF, todas: linhasF, listas: linDe, cri: {}, soPg: '', temSite: true, temMeta: !!M };
   _trfAnimar(el, { temSite: true, temMeta: !!M });
 }
 function trfWsEd(k) { TRF.wed = TRF.wed === k ? '*' : k; renderTrafego(); try { document.getElementById('trf-funil').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
@@ -42810,20 +42909,23 @@ function doPostNome(S) { return S && S.post != null ? { com: 'Comentaram a palav
 function trfListaFiltro(f) { if (!TRF.lst) return; TRF.lst.f = TRF.lst.f === f ? '' : f; _trfListaDesenhar(); }
 function _trfListaDesenhar() {
   var D = window._trfCtx, S = TRF.lst; if (!D || !S) return;
-  var nome = (doPostNome(S) || (D.mcp ? { insc: 'Compraram o MCP', diag: 'Pediram diagnóstico', evento: 'Compraram ingresso de evento', marc: 'Tiveram reunião', real: 'Realizada', apar: 'Compareceu', pag: 'Viraram cliente' } : null) || { com: 'Comentaram a palavra', insc: 'Inscritos', part: 'Participaram', apl: (D.ws && !D.soPres ? 'Aplicações pagas' : 'Aplicaram'), aplT: 'Aplicaram', ini: 'Iniciou o formulário', comp: 'Formulário completo', mql: 'MQL', marc: 'Marcada', real: 'Realizada', apar: 'Compareceu', sim: 'Disse sim', pag: 'Entrou' })[S.k] || S.k;
-  var doPost = S.post != null ? (window._trfPostsOrd || [])[S.post] : null, doCom = !doPost && S.k === 'com' && D.z && D.z.comPs, deCom = !!doCom || (!!doPost && S.k === 'com');
+  var nome = (doPostNome(S) || (D.mcp ? { insc: 'Compraram o MCP', diag: 'Pediram diagnóstico', evento: 'Compraram ingresso de evento', marc: 'Tiveram reunião', real: 'Realizada', apar: 'Compareceu', pag: 'Viraram cliente' } : null) || { cmt: 'Comentaram sem a palavra', com: 'Comentaram a palavra', insc: 'Inscritos', part: 'Participaram', apl: (D.ws && !D.soPres ? 'Aplicações pagas' : 'Aplicaram'), aplT: 'Aplicaram', ini: 'Iniciou o formulário', comp: 'Formulário completo', mql: 'MQL', marc: 'Marcada', real: 'Realizada', apar: 'Compareceu', sim: 'Disse sim', pag: 'Entrou' })[S.k] || S.k;
+  var doPost = S.post != null ? (window._trfPostsOrd || [])[S.post] : null, doCmt = !doPost && S.k === 'cmt' && D.z && D.z.cmtPs, doCom = (!doPost && S.k === 'com' && D.z && D.z.comPs) || doCmt, deCom = !!doCom || (!!doPost && S.k === 'com');
   var porLinha = !!D.todosC || (!!D.rowsEv && !doPost && !S.cri && /^(marc|real|apar|sim|pag)$/.test(S.k));
-  var base = (doPost ? (doPost.ps || []) : doCom ? D.z.comPs : porLinha && !D.todosC ? D.rowsEv : S.cri ? D.todas.filter(function(p) { return p.ck === S.cri; }) : D.lista).filter(function(p) { return _trfTem(p, S.k); });
-  var F = { iniF: function(p) { return !!p.ini; }, nini: function(p) { return !p.ini; }, marcF: function(p) { return !!p.marc; }, pagF: function(p) { return !!p.pag; }, apl: function(p) { return p.apl; }, napl: function(p) { return !(p.aplT || p.apl); }, aplsp: function(p) { return !!p.aplT && !p.apl; }, comp: function(p) { return p.comp; }, inc: function(p) { return !p.comp; }, mql: function(p) { return p.mql; }, nmql: function(p) { return !p.mql; }, A: function(p) { return p.fx === 'A'; }, B: function(p) { return p.fx === 'B'; }, C: function(p) { return p.fx === 'C'; }, D: function(p) { return p.fx === 'D'; } };
-  var lista = S.f && F[S.f] ? base.filter(F[S.f]) : base.slice();
+  var base = (D.todosC && S.esc && D.listas && D.listas[S.esc] ? D.listas[S.esc] : doPost ? (doPost.ps || []) : doCmt ? D.z.cmtPs : doCom ? D.z.comPs : porLinha && !D.todosC ? D.rowsEv : S.cri ? D.todas.filter(function(p) { return p.ck === S.cri; }) : D.lista).filter(function(p) { return _trfTem(p, S.k); });
+  var F = { p1: function(p) { return !!p.p1; }, p2: function(p) { return !!p.p2; }, iniF: function(p) { return !!p.ini; }, nini: function(p) { return !p.ini; }, marcF: function(p) { return !!p.marc; }, pagF: function(p) { return !!p.pag; }, apl: function(p) { return p.apl; }, napl: function(p) { return !(p.aplT || p.apl); }, aplsp: function(p) { return !!p.aplT && !p.apl; }, comp: function(p) { return p.comp; }, inc: function(p) { return !p.comp; }, mql: function(p) { return p.mql; }, nmql: function(p) { return !p.mql; }, A: function(p) { return p.fx === 'A'; }, B: function(p) { return p.fx === 'B'; }, C: function(p) { return p.fx === 'C'; }, D: function(p) { return p.fx === 'D'; } };
+  var lista = S.f && F[S.f] ? base.filter(F[S.f]) : base.slice(), notaPres = '';
+  if (D.ws && (S.f === 'p1' || S.f === 'p2')) { var totP = (D.z && D.z[S.f === 'p1' ? 'd1' : 'd2']) || 0, nP = lista.length;   // presença por pessoa só existe em algumas edições
+    if (nP < totP * 0.5) { lista = base.slice(); notaPres = 'Desta seleção o dash recebe só o TOTAL de presentes ' + (S.f === 'p1' ? 'no 1º dia' : 'no dia do pitch') + ' (' + _trfN(totP) + ', da Central do workshop), não a lista com os nomes. Abaixo estão todos os inscritos.'; }
+    else if (totP && nP !== totP) notaPres = 'O app do workshop tem ' + _trfN(nP) + ' presenças marcadas por pessoa neste dia; o total da Central é ' + _trfN(totP) + '.'; }
   lista.sort(function(a, b) { return (S.k === 'pag' ? b.valor - a.valor : 0) || b.t - a.t; });
   var tc = {}; try { ((TC.dados && TC.dados.leads) || []).forEach(function(x) { tc[x.t8] = x; }); } catch (e) {}
   var chip = function(f, r) { var n = base.filter(F[f]).length; return '<button type="button" class="pl-chip' + (S.f === f ? ' on' : '') + '" onclick="trfListaFiltro(\'' + f + '\')">' + r + ' <small>' + n + '</small></button>'; };
-  var chips = '<div class="pl-chips trf-lchips">' + (deCom ? chip('iniF', '✅ Iniciou o formulário') + chip('nini', '⏳ Não iniciou') + chip('marcF', '📅 Com reunião') + chip('pagF', '💰 Compraram') : '') + (S.k === 'ini' && !doPost ? chip('comp', 'Completos') + chip('inc', 'Incompletos') : '') + (D.ws && !D.mcp ? chip('apl', '📝 Aplicação paga') + chip('aplsp', '⏳ Aplicou e não pagou') + chip('napl', '🎟️ Só inscritos') : '') + (porLinha ? '' : chip('mql', '🔥 MQL') + chip('nmql', 'Não MQL')) + (D.ws || doPost || doCom || porLinha ? '' : chip('A', 'A') + chip('B', 'B') + chip('C', 'C') + chip('D', 'D')) + '</div>';
+  var chips = '<div class="pl-chips trf-lchips">' + (deCom ? chip('iniF', '✅ Iniciou o formulário') + chip('nini', '⏳ Não iniciou') + chip('marcF', '📅 Com reunião') + chip('pagF', '💰 Compraram') : '') + (S.k === 'ini' && !doPost ? chip('comp', 'Completos') + chip('inc', 'Incompletos') : '') + (D.ws && !D.mcp && S.k === 'insc' && base.some(function(p) { return p.p1 || p.p2; }) ? chip('p1', '✅ Presente no 1º dia') + chip('p2', '✅ Presente no dia do pitch') : '') + (D.ws && !D.mcp ? chip('apl', '📝 Aplicação paga') + chip('aplsp', '⏳ Aplicou e não pagou') + chip('napl', '🎟️ Só inscritos') : '') + (porLinha ? '' : chip('mql', '🔥 MQL') + chip('nmql', 'Não MQL')) + (D.ws || doPost || doCom || porLinha ? '' : chip('A', 'A') + chip('B', 'B') + chip('C', 'C') + chip('D', 'D')) + '</div>';
   var linha = function(p) {
     var x = tc[p.t8], dc = x ? (x.humano && x.humano >= x.chegou ? '⏱ 1º contato em ' + tcTempoTxt(x.humano - x.chegou) : '⏱ ainda sem contato humano') : '';
     var info = porLinha ? ['📅 reunião em ' + new Date(p.t).toLocaleDateString('pt-BR'), _trfE(p.res), p.closer ? 'closer ' + _trfE(p.closer) : '', p.pag ? '💰 ' + _trfRs(p.valor) : '', _trfE(p.deOnde)].filter(Boolean).join(' · ')
-      : (doPost || doCom) ? [p.ini ? '<b style="color:#3ddc97">✅ iniciou o formulário</b>' + (p.comp ? ' · completo' : ' · não terminou') : '<b style="color:#ffd166">⏳ não iniciou o formulário</b>', p.mql ? '🔥 MQL' : '', '💬 comentou em ' + new Date(p.t).toLocaleDateString('pt-BR') + (p.nCom > 1 ? ' (' + p.nCom + ' comentários)' : ''), p.lkPost ? '<a href="#" onclick="event.stopPropagation();return abrirPostCriativo(' + JSON.stringify(p.lkPost).replace(/"/g, '&quot;') + ');" style="color:#6ea8ff;font-weight:800;text-decoration:none;">🎬 ver o post</a>' : '', p.marc ? '📅 tem reunião' : '', p.apar ? 'compareceu' : '', p.pag ? '💰 ' + _trfRs(p.valor) : '', p.ig && p.t8 ? '@' + _trfE(p.ig) : ''].filter(Boolean).join(' · ')
+      : (doPost || doCom) ? [p.ini ? '<b style="color:#3ddc97">✅ iniciou o formulário</b>' + (p.comp ? ' · completo' : ' · não terminou') : '<b style="color:#ffd166">⏳ não iniciou o formulário</b>', p.mql ? '🔥 MQL' : '', (p.semPalavra ? '💬 comentou sem a palavra em ' : '💬 comentou em ') + new Date(p.t).toLocaleDateString('pt-BR') + (p.nCom > 1 ? ' (' + p.nCom + ' comentários)' : ''), p.lkPost ? '<a href="#" onclick="event.stopPropagation();return abrirPostCriativo(' + JSON.stringify(p.lkPost).replace(/"/g, '&quot;') + ');" style="color:#6ea8ff;font-weight:800;text-decoration:none;">🎬 ver o post</a>' : '', p.marc ? '📅 tem reunião' : '', p.apar ? 'compareceu' : '', p.pag ? '💰 ' + _trfRs(p.valor) : '', p.ig && p.t8 ? '@' + _trfE(p.ig) : ''].filter(Boolean).join(' · ')
       : D.ws ? [p.mql ? '🔥 MQL' : '', p.semCad ? 'sem cadastro no app' : (D.mcp ? '🛒 comprou o MCP em ' + new Date(p.t).toLocaleDateString('pt-BR') : p.insc ? '🎟️ ingresso em ' + new Date(p.t).toLocaleDateString('pt-BR') : 'sem ingresso'), p.part ? '✅ participou' : '', p.semCad || D.mcp ? '' : (p.apl ? '<b style="color:#3ddc97">📝 ' + (p.tipoTxt != null ? 'APLICOU' : 'APLICAÇÃO PAGA') + '</b>' : p.aplT ? '<span style="color:#ffd166">⏳ aplicou e não pagou</span>' : '<span style="color:var(--text2)">só inscrito · não aplicou</span>'),
       p.marc ? '📅 reunião' + (p.mom ? ' ' + ({ pre: 'antes do evento', ws: 'no workshop', pos: 'no pós' }[p.mom] || '') : '') : '', p.pag ? '💰 ' + _trfRs(p.valor) + (D.mcp && p.caminho ? ' pela origem ' + _trfE(p.caminho) : '') : '', D.mcp && p.diag ? '📝 pediu diagnóstico' : '', D.mcp && p.evento ? '🎟️ ' + _trfE(p.eventoQual) : '', p.movida ? '↪ hoje tem ingresso da edição ' + _trfE(p.movida) : '', p.tipoTxt ? '🏷️ ' + _trfE(p.tipoTxt) : '', D.mcp ? '' : '🎓 ' + _trfE((D.cri[p.ck] || {}).nome || '')].filter(Boolean).join(' · ')
       : [p.mql ? '🔥 MQL' : '', p.fx ? '<b style="color:' + TRF_FX[p.fx] + '">nota ' + p.fx + '</b>' : '', 'chegou ' + new Date(p.t).toLocaleDateString('pt-BR'), p.comp ? 'formulário completo' : 'formulário incompleto', dc,
@@ -42839,7 +42941,8 @@ function _trfListaDesenhar() {
       var segI = pf.seg != null ? '<span class="ld-tag" style="background:rgba(255,209,102,.16);color:#ffd166;font-weight:800;">👥 ' + (pf.seg >= 1000 ? (pf.seg / 1000).toFixed(pf.seg >= 10000 ? 0 : 1).replace('.', ',') + ' mil' : pf.seg) + '</span>' : '';
       return '<div class="click trf-igp" role="button" tabindex="0" onclick="crmVerPerfil(\'' + u + '\')" onkeydown="if(event.key===\'Enter\'&&event.target===this)crmVerPerfil(\'' + u + '\')" title="Abrir a ficha desta pessoa (Social Selling)">'
         + '<div class="avatar trf-igp-a" style="background:linear-gradient(135deg,' + v2grad(u) + ');">' + _trfE(u.slice(0, 2).toUpperCase()) + (ftI ? '<img loading="lazy" decoding="async" src="' + _trfE(ftI) + '" onerror="this.remove()">' : '') + '</div>'
-        + '<div class="trf-igp-m"><b>' + (pf.nome ? _trfE(pf.nome) + ' <small>@' + u + '</small>' : '@' + u) + '</b> ' + segI + '<div class="trf-igp-i">' + info + '</div><div class="trf-igp-s">' + selos + '</div></div>'
+        + '<div class="trf-igp-m"><b>' + (pf.nome ? _trfE(pf.nome) + ' <small>@' + u + '</small>' : '@' + u) + '</b> ' + segI + '<div class="trf-igp-i">' + info + '</div></div>'
+        + '<button type="button" class="trf-clint trf-clint-b" onclick="event.stopPropagation();trfClintUm(\'' + u + '\', this)" title="Criar esta pessoa na Clint (nome e @), com a Sarah de dona">🟣 Chamar na Clint</button>'
         + '<a class="ld-wa" onclick="event.stopPropagation();" title="abrir o perfil @' + u + ' no Instagram" href="https://instagram.com/' + encodeURIComponent(u) + '" target="_blank" rel="noopener" style="background:rgba(225,48,108,.14);border-color:rgba(225,48,108,.45);color:#e1306c;">@</a>'
         + '<span class="trf-igp-v">ver →</span></div>';
     } catch (eIg) {} }
@@ -42849,9 +42952,11 @@ function _trfListaDesenhar() {
   var corte = 150, h = lista.slice(0, corte).map(linha).join('') + (lista.length > corte ? '<div class="trf-nota" style="padding:10px 2px;">Mostrando os ' + corte + ' mais recentes de ' + lista.length + '. Use os filtros acima para afinar.</div>' : '');
   var g = function(id) { return document.getElementById(id); }; if (!g('modal-b')) return;
   var c = S.cri ? D.cri[S.cri] : (TRF.cri ? D.cri[TRF.cri] : null);
-  g('mb-titulo').textContent = (D.todosC ? (TRF.tprod === 'diag' ? 'Diagnóstico' : TRF.tprod === 'ws' ? 'Workshop' : 'Todos os canais') : doPost ? 'Post de ' + new Date(doPost.t).toLocaleDateString('pt-BR') : D.mcp ? 'MCP' : D.ws ? 'Workshop' : D.org ? (TRF.canal === 'bio' ? 'Link na bio' : 'Orgânico') : 'Tráfego') + (D.soPg && !S.cri ? ' · página ' + D.soPg : '') + (c ? ' · ' + c.nome : '') + ' — ' + (D.todosC && S.k === 'marc' ? 'Reuniões marcadas' : nome) + ' — ' + lista.length + (porLinha ? (lista.length === 1 ? ' reunião' : ' reuniões') : (lista.length === 1 ? ' pessoa' : ' pessoas'));
-  g('mb-ico').textContent = D.ws ? '🎓' : D.org ? '🌱' : '📣'; g('mb-sub').textContent = porLinha ? 'Linhas da planilha de vendas em ' + D.P.rot + (D.todosC ? '' : ' com esta origem') + ' · clique no nome para abrir a ficha' : doPost ? 'Quem comentou a palavra neste post · clique no nome para abrir a ficha' : doCom ? 'Quem comentou a palavra em ' + D.P.rot + ' · use os botões para separar quem iniciou o formulário de quem não iniciou' : D.ws ? D.P.rot + ' · clique no nome para abrir a ficha' : (D.ev ? (S.k === 'ini' || S.k === 'comp' || S.k === 'mql' ? 'Chegaram em ' : 'Aconteceu em ') : 'Chegaram em ') + D.P.rot + ' · clique no nome para abrir a ficha';
-  g('mb-lista').innerHTML = chips + (h || '<div style="color:var(--muted);font-size:.8rem;">Ninguém neste passo.</div>');
+  g('mb-titulo').textContent = (D.todosC ? ((S.esc || TRF.tprod) === 'diag' ? 'Diagnóstico' : (S.esc || TRF.tprod) === 'ws' ? 'Workshop' : 'Todos os canais') : doPost ? 'Post de ' + new Date(doPost.t).toLocaleDateString('pt-BR') : D.mcp ? 'MCP' : D.ws ? 'Workshop' : D.org ? (TRF.canal === 'bio' ? 'Link na bio' : 'Orgânico') : 'Tráfego') + (D.soPg && !S.cri ? ' · página ' + D.soPg : '') + (c ? ' · ' + c.nome : '') + ' — ' + (D.todosC && S.k === 'marc' ? 'Reuniões marcadas' : nome) + ' — ' + lista.length + (porLinha ? (lista.length === 1 ? ' reunião' : ' reuniões') : (lista.length === 1 ? ' pessoa' : ' pessoas'));
+  g('mb-ico').textContent = D.ws ? '🎓' : D.org ? '🌱' : '📣'; g('mb-sub').textContent = porLinha ? 'Linhas da planilha de vendas em ' + D.P.rot + (D.todosC ? '' : ' com esta origem') + ' · clique no nome para abrir a ficha' : doPost ? 'Quem comentou a palavra neste post · clique no nome para abrir a ficha' : doCmt ? 'Quem comentou nos posts em ' + D.P.rot + ' e NÃO escreveu a palavra · gente interessada que ainda não foi chamada' : doCom ? 'Quem comentou a palavra em ' + D.P.rot + ' · use os botões para separar quem iniciou o formulário de quem não iniciou' : D.ws ? D.P.rot + ' · clique no nome para abrir a ficha' : (D.ev ? (S.k === 'ini' || S.k === 'comp' || S.k === 'mql' ? 'Chegaram em ' : 'Aconteceu em ') : 'Chegaram em ') + D.P.rot + ' · clique no nome para abrir a ficha';
+  window._trfListaAtual = lista;
+  var loteClint = deCom && lista.some(function(p) { return p.ig && !p.t8; }) ? '<div class="trf-lote"><button type="button" class="btn" onclick="trfClintLote(this)">🟣 Mandar para a Clint os ' + _trfN(lista.filter(function(p) { return p.ig && !p.t8; }).length) + ' desta lista que só têm o Instagram</button><span class="trf-sub">entram com a Sarah de dona · quem já está lá não duplica · até 40 por clique</span></div>' : '';
+  g('mb-lista').innerHTML = chips + loteClint + (notaPres ? '<div class="trf-nota" style="padding:4px 2px 10px;">ℹ️ ' + notaPres + '</div>' : '') + (h || '<div style="color:var(--muted);font-size:.8rem;">Ninguém neste passo.</div>');
   var bq = g('mb-busca'); if (bq) { bq.value = ''; bq.style.display = ''; }
   g('modal-b').classList.add('open');
 }
