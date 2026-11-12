@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-0814';
+var VERSAO_DASH = '2026-11-12-0855';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41677,7 +41677,7 @@ function _trfPer() {
   if (TRF.per === 'mesant') return { ini: new Date(h.getFullYear(), h.getMonth() - 1, 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), rot: 'o mês passado' };
   if (TRF.per === 'pers' && TRF.de && TRF.ate) { var a = TRF.de <= TRF.ate ? TRF.de : TRF.ate, b = TRF.de <= TRF.ate ? TRF.ate : TRF.de, pa = a.split('-'), pb = b.split('-');
     return { ini: new Date(+pa[0], +pa[1] - 1, +pa[2]).getTime(), fim: new Date(+pb[0], +pb[1] - 1, +pb[2] + 1).getTime(), rot: a.split('-').reverse().join('/') + ' a ' + b.split('-').reverse().join('/') }; }
-  return { ini: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth() + 1, 1).getTime(), rot: 'o mês atual' };
+  return { ini: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth() + 1, 1).getTime(), rot: TRF.per === 'pers' ? 'o mês atual (escolha as duas datas do período)' : 'o mês atual' };
 }
 function trfFiltro(campo, valor) {
   TRF[campo] = valor;
@@ -41769,9 +41769,9 @@ function trfSiteCarregar(forcar) {
       d.forEach(function(r) {
         var tel = String(r.whatsapp || '').replace(/\D/g, ''), og = String(r.origem || '');
         leads.push({ t: new Date(r.created_at).getTime(), t8: ldTel8(tel), tel: tel, nome: String(r.nome || '').trim(), pag: String(r.origem_form || '').replace('diagnostico-', ''), camp: r.utm_campaign || '', cont: r.utm_content || '', src: _trfSrc(r.utm_source),
-          comp: r.pesquisa_completa === true ? 1 : 0, inv: r.investimento || '', fx: /^[ABCD]$/.test(r.lead_faixa || '') ? r.lead_faixa : '', sc: +r.lead_score || 0, o: /org/i.test(og) ? 'o' : /^vsl/i.test(og) ? 'v' : 't' });
+          comp: r.pesquisa_completa === true ? 1 : 0, inv: r.investimento || '', fx: /^[ABCD]$/.test(r.lead_faixa || '') ? r.lead_faixa : '', sc: +r.lead_score || 0, o: /^\s*https?:/i.test(og) ? 't' : /org/i.test(og) ? 'o' : /^vsl/i.test(og) ? 'v' : 't' });
       });
-      if (d.length === 1000 && i < 14) pagina(i + 1); else fim();
+      if (d.length === 1000 && i < 59) pagina(i + 1); else fim();
     });
   };
   pagina(0);
@@ -41780,7 +41780,7 @@ function trfSiteCarregar(forcar) {
       if (!d || !d.length) { fim(); return; }
       d.forEach(function(r) { var tel = String(r.whatsapp || '').replace(/\D/g, ''), og = String(r.origem || '');
         leads.push({ t: new Date(r.created_at).getTime(), t8: ldTel8(tel), tel: tel, nome: String(r.nome || '').trim(), pag: String(r.origem_form || '').replace('diagnostico-', ''), camp: r.utm_campaign || '', cont: r.utm_content || '', src: _trfSrc(r.utm_source),
-          comp: r.pesquisa_completa === true ? 1 : 0, inv: r.investimento || '', fx: '', sc: 0, o: /org/i.test(og) ? 'o' : /^vsl/i.test(og) ? 'v' : 't' }); });
+          comp: r.pesquisa_completa === true ? 1 : 0, inv: r.investimento || '', fx: '', sc: 0, o: /^\s*https?:/i.test(og) ? 't' : /org/i.test(og) ? 'o' : /^vsl/i.test(og) ? 'v' : 't' }); });
       if (d.length === 1000 && i < 9) antiga(i + 1); else fim();
     });
   };
@@ -41822,15 +41822,22 @@ function _trfJuntarLD(S) {
     (LD.rows || []).forEach(function(l) { if (!(l.date instanceof Date)) return; var t = l.date.getTime(); if (t >= t0) return; var og = String(l.origem || ''); if (!/diag/i.test(og)) return;
       ant.push({ t: t, t8: l.tel8 || ldTel8(l.tel || ''), tel: String(l.tel || ''), nome: String(l.nome || '').trim(), pag: 'formulário antigo', camp: l.campanha || '', cont: l.anuncio || '', src: /mchat|manychat/i.test(og) ? 'manychat' : /bio/i.test(og) ? 'bio' : _trfSrc(l.fonte),
         comp: l.invest ? 1 : 0, inv: l.invest || '', fx: /^[ABCD]$/.test(l.faixaNova || '') ? l.faixaNova : '', sc: +l.score || 0, o: /ads/i.test(og) ? 't' : 'o', antigo: 1 }); });
-    ant.sort(function(a, b) { return a.t - b.t; });
-    S.t0site = t0; S.nAnt = ant.length; S.leads = ant.concat(S.leads); S._ld = 1;
+    var noSite = {}; S.leads.forEach(function(x) { if (x.t8) noSite[x.t8] = 1; });
+    (LD.rows || []).forEach(function(l) { if (!(l.date instanceof Date)) return; var t = l.date.getTime(); if (t < t0) return; var og = String(l.origem || ''); if (!/diag/i.test(og)) return; var t8 = l.tel8 || ldTel8(l.tel || ''); if (!t8 || noSite[t8]) return;
+      ant.push({ t: t, t8: t8, tel: String(l.tel || ''), nome: String(l.nome || '').trim(), pag: 'formulário antigo', camp: l.campanha || '', cont: l.anuncio || '', src: /mchat|manychat/i.test(og) ? 'manychat' : /bio/i.test(og) ? 'bio' : _trfSrc(l.fonte),
+        comp: l.invest ? 1 : 0, inv: l.invest || '', fx: /^[ABCD]$/.test(l.faixaNova || '') ? l.faixaNova : '', sc: +l.score || 0, o: /ads/i.test(og) ? 't' : 'o', antigo: 1 }); });
+    S.t0site = t0; S.nAnt = ant.length; S.leads = ant.concat(S.leads); S.leads.sort(function(a, b) { return a.t - b.t; }); S._ld = 1;
   } catch (e) { S._ld = 1; }
 }
 function _trfDonoDe(x) { return x.o !== 'o' ? 'pago' : (x.src || 'sem'); }   // pago | manychat | bio | sem
 function _trfDonoLeads(S, fim) {   // de qual funil é cada pessoa: o do formulário mais recente até o fim do período (S.leads já vem em ordem de data)
-  if (!S || !S.leads) return {}; if (S._dono && S._donoFim === fim && S._donoN === S.leads.length) return S._dono;
+  var nV = (typeof V2 !== 'undefined' && V2.rows) ? V2.rows.length : 0;
+  if (!S || !S.leads) return {}; if (S._dono && S._donoFim === fim && S._donoN === S.leads.length && S._donoV === nV) return S._dono;
   var d = {}; S.leads.forEach(function(x) { if (x.t >= fim) return; d[x.t8 || ('n:' + x.nome)] = _trfDonoDe(x); });
-  S._dono = d; S._donoFim = fim; S._donoN = S.leads.length; return d;
+  var ult = {}; ((typeof V2 !== 'undefined' && V2.rows) || []).forEach(function(r) { if (!r.date) return; var kO = _trfOrigemLinha(r.origem); if (kO !== 'pago' && kO !== 'org' && kO !== 'bio') return; var t8 = ldTel8(r.telefone || ''); if (!t8 || !d[t8]) return;
+    var t = r.date.getTime(); if (!ult[t8] || t >= ult[t8].t) ult[t8] = { t: t, k: kO }; });
+  Object.keys(ult).forEach(function(t8) { var kO = ult[t8].k; d[t8] = kO === 'pago' ? 'pago' : kO === 'org' ? 'manychat' : (d[t8] === 'sem' ? 'sem' : 'bio'); });
+  S._dono = d; S._donoFim = fim; S._donoN = S.leads.length; S._donoV = nV; return d;
 }
 function _trfDados() {
   var P = _trfPer(), S = TRF.site, org = TRF.canal === 'org' || TRF.canal === 'bio';
@@ -41840,22 +41847,21 @@ function _trfDados() {
   var M = org ? { an: [] } : _trfMeta(P), ev = TRF.modo !== 'coorte';
   var porTel = {}; (V2.rows || []).forEach(function(r) { var t = ldTel8(r.telefone); if (t) (porTel[t] = porTel[t] || []).push(r); });
   var pes = {}, dias = {};
-  var dono = _trfDonoLeads(S, P.fim);
+  var dono = _trfDonoLeads(S, P.fim), jaNoGraf = {};
   ((S && S.leads) || []).forEach(function(x) {
     var noP = x.t >= P.ini && x.t < P.fim; if (!noP && !ev) return;   // no modo "aconteceu", quem chegou antes entra para achar a reunião e a venda do período
     var k = x.t8 || ('n:' + x.nome);
-    if (org ? x.o !== 'o' : x.o === 'o') return;
-    if (dono[k] && dono[k] !== _trfDonoDe(x)) return;   // a pessoa é de um funil só: o do formulário mais recente dela
+    var dk = dono[k] || _trfDonoDe(x); if (org ? dk === 'pago' : dk !== 'pago') return;   // a pessoa é de um funil só (veja _trfDonoLeads)
     if (!org && TRF.fam !== 'todos' && _trfFam(x.camp) !== TRF.fam) return;
     // 11/11/2026 (Bruno, no gráfico por dia: "mostre só tráfego"): o gráfico conta só os leads da tela (tráfego pago OU orgânico), sem misturar
-    if (noP && !(org && TRF.cri && x.src !== TRF.cri)) { var dk = _trfDia(x.t), dd = dias[dk] || (dias[dk] = { n: 0, A: 0, B: 0, C: 0, D: 0, _v: {} });
-      if (!dd._v[k]) { dd._v[k] = 1; dd.n++; if (dd[x.fx] != null) dd[x.fx]++; } }
+    if (noP && !(org && TRF.cri && dk !== TRF.cri) && !jaNoGraf[k]) { jaNoGraf[k] = 1; var dkd = _trfDia(x.t), dd = dias[dkd] || (dias[dkd] = { n: 0, A: 0, B: 0, C: 0, D: 0, _v: {} });
+      dd._v[k] = 1; dd.n++; if (dd[x.fx] != null) dd[x.fx]++; }
     var p = pes[k]; if (!p) p = pes[k] = { k: k, t8: x.t8, tel: x.tel || '', nome: x.nome || '', t: x.t, pg: x.pag || '', cont: '', src: '', comp: false, inv: '', fx: '', sc: 0, ini: false };
     if (x.t < p.t) p.t = x.t;
     if (noP && !p.ini) { p.ini = true; p.pg = x.pag || ''; p.cont = ''; p.src = ''; p.comp = false; p.inv = ''; p.fx = ''; p.sc = 0; }   // chegou no período: as respostas que valem são as do período (igual nas duas formas de contar)
     else if (p.ini && !noP) return;
     if (x.comp) p.comp = true; if (x.inv) p.inv = x.inv; if (x.fx) { p.fx = x.fx; p.sc = x.sc || 0; }
-    if (x.src && (!p.src || p.src === 'sem')) p.src = x.src;
+    if (org) p.src = dk;
     var c = _trfCont(x.cont); if (c && !p.cont) p.cont = c; if (x.nome && x.nome.length > p.nome.length) p.nome = x.nome;
   });
   var todas = Object.keys(pes).map(function(k) {
@@ -41913,10 +41919,10 @@ function _trfDados() {
     if (!igOk && (TRF._igEsp = (TRF._igEsp || 0) + 1) < 25) setTimeout(function() { if ((TRF.canal === 'org' || TRF.canal === 'bio') && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1500);
     z.vw = 0; z.pf = 0; z.nposts = 0; z.nHoje = 0; (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { z.vw += x.v; z.pf += x.pf || 0; z.nposts++; if (x.hoje) z.nHoje++; } });
     var quem = {}, comPs = [], _formT = {}; ((S && S.leads) || []).forEach(function(x) { if (!x.t8) return; var f = _formT[x.t8] || (_formT[x.t8] = { c: false }); if (x.comp) f.c = true; });
-    TRF._igL = TRF._igL || {};
+    var _nLd = (typeof LD !== 'undefined' && LD.rows) ? LD.rows.length : 0; if (!TRF._igL || TRF._igLn !== _nLd) { TRF._igL = {}; TRF._igLn = _nLd; }
     try { (IGO.ped || []).forEach(function(q) { if (q.t == null || q.t < P.ini || q.t >= P.fim) return; var d = rkoDono(q.x, q.i); if (!d || d.f !== 'diag') return;
       var pe = quem[q.u]; if (pe) { pe.nCom++; if (q.t < pe.t) pe.t = q.t; return; }
-      var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = igLeadPorInsta(q.u) || null; } catch (e) {} TRF._igL[q.u] = l; }
+      var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = igLeadPorInsta(q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
       var rf = l && l.tel8 ? (_formT[l.tel8] || null) : null;
       pe = quem[q.u] = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, com: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _vfMql(l.invest)),
         fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 };
@@ -41946,6 +41952,7 @@ function _trfDados() {
   var semOrg = org && !(S && S.visOrg);   // visitas por origem: só depois que a função da base do site passar a devolver esse recorte
   var aparte = {}, naoBase = {}, visDesde = ''; ((S && S.visPag) || []).forEach(function(v) { if (!visDesde || v[0] < visDesde) visDesde = v[0]; });
   if (org && TRF.canal === 'org' && TRF.cri === 'manychat' && topoOrg) aparte.vis = 'a visita não diz quem é a pessoa';
+  if (org && TRF.cont && TRF.cont.length) { var vwDesde = Math.min.apply(null, TRF.cont.map(function(x) { return x.t; })); if (P.ini < vwDesde - 864e5) { var txV = 'medido só desde ' + new Date(vwDesde).toLocaleDateString('pt-BR') + ' · o período começa antes'; aparte.vw = txV; naoBase.vw = 1; if (TRF.canal === 'bio') { aparte.pf = txV; naoBase.pf = 1; } } }
   if (org && TRF.canal === 'bio') aparte.vis = 'o Instagram não liga a ida ao perfil à visita na página';
   if (visDesde && P.ini < new Date(visDesde + 'T00:00:00').getTime() - 864e5) {   // o período começa antes de existirem visitas: o número é parcial
     aparte.vis = 'as visitas só existem desde ' + visDesde.slice(8, 10) + '/' + visDesde.slice(5, 7) + '/' + visDesde.slice(0, 4) + ' · o período começa antes'; naoBase.vis = 1;
@@ -42449,7 +42456,7 @@ function _trfCentralEd(slug) { var m = String(slug || '').match(/(janeiro|fevere
 function _trfCriNome(c) { c = String(c || ''); return c === '(sem anúncio)' ? '🌱 Sem anúncio (orgânico ou link direto)' : /^organic_bio$/i.test(c) || /^\{/.test(c) ? '🔗 Link da bio' : /recuperacao/i.test(c) ? '🛒 Recuperação de carrinho' : /\{\{/.test(c) ? 'Anúncio sem nome (etiqueta quebrada)' : c === '(outros criativos)' ? 'Outros criativos (somados)' : c; }
 function _trfDadosWs() {
   var dia0 = function(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }, JAN = typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15;
-  var ok = typeof WSL !== 'undefined' && WSL.carregado, E = {}, ehIld = function(x) { return /ild/i.test(x.prog || ''); }, fora = 0;
+  var ok = typeof WSL !== 'undefined' && WSL.carregado, E = {}, ehIld = function(x) { return /ild/i.test(x.prog || ''); }, fora = 0, foraV = 0, foraR = 0;
   var nova = function(pres, m, x) {
     var k = (pres ? 'p:' : 'o:') + m, e = E[k]; if (e) return e;
     var cid = ''; if (pres && x) { var mm = String(x.ws || '').match(/digital\s+(.+?)\s+(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i); if (mm) cid = mm[1]; }
@@ -42488,7 +42495,7 @@ function _trfDadosWs() {
     var t8 = ldTel8(r.telefone || ''), x = t8 ? WSL.porTel[t8] : null, e = null, dt = dia0(r.date);
     if (x && !/mcp/i.test(x.prog || '') && ehIld(x) === ild && _wsMes(x)) e = E[(ild ? 'p:' : 'o:') + _wsMes(x)] || null; else x = null;
     if (!e) for (var i = todasEd.length - 1; i >= 0; i--) if (todasEd[i].pres === ild && todasEd[i].d1 && todasEd[i].d1 <= dt) { e = todasEd[i]; break; }
-    if (!e) { fora++; return; }
+    if (!e) { fora++; if (r.sn === 'vendido') { foraV++; foraR += r.valor || 0; } return; }
     if (x && dt < e.d1 && !/pre/.test(o)) { var eA = edNaData(ild, dt); if (eA && eA !== e) { fantasma(eA, t8, x, e).rs.push(r); return; } }   // reunião anterior à edição atual da pessoa (e que não é "pré"): é da edição daquela data
     pessoa(e, t8 || ('n:' + v2norm(r.nome || '')), x, r).rs.push(r);
   });
@@ -42540,12 +42547,13 @@ function _trfDadosWs() {
     z.gasto += g; if (cri[e.k]) cri[e.k].gasto = g;
   });
   var some = []; if (z.part < Math.max(z.aplT, z.marc) || z.part < z.insc * .15) some.push('part'); if (z.aplT < z.marc * .5) { some.push('aplT'); some.push('mql'); }
-  var temPres = z.d1 > 0 && z.d2 > 0 && comPres === L.length;   // só quando TODAS as edições escolhidas têm a presença (senão a soma engana) if (temPres) { some = some.filter(function(k) { return k !== 'part'; }); }
+  var temPres = z.d1 > 0 && z.d2 > 0 && comPres === L.length;   // só quando TODAS as edições escolhidas têm a presença (senão a soma engana)
+  if (temPres) { some = some.filter(function(k) { return k !== 'part'; }); }
   var soPres = L.length === 1 && L[0].pres && L[0].lista;
   var PS = TRF_PASSOS.slice(0, 2); TRF_WS_PASSOS.forEach(function(p) { if (soPres && p[0] === 'insc') p = ['insc', 'Participantes', 'todos na lista do evento' + (TRF.wpub ? ' deste tipo' : ': compradores, acompanhantes, mentorados e cortesias')]; if (soPres && p[0] === 'aplT') p = ['aplT', 'Aplicaram', 'preencheram a ficha de aplicação no evento']; else if (p[0] === 'aplT' && z.aplT > z.apl) p = ['aplT', 'Aplicaram', _trfN(z.apl) + ' pagaram a aplicação · ' + _trfN(z.aplT - z.apl) + ' não pagaram']; if (soPres && p[0] === 'part') p = ['part', 'Compareceram ao evento', 'check-in, presença confirmada pelo time ou aplicação feita no evento']; if (p[0] === 'part') { if (temPres) { PS.push(['d1', 'Presentes no 1º dia', 'inscritos que entraram na sala no dia 1']); PS.push(['d2', 'Presentes no dia do pitch', 'inscritos que entraram na sala no dia 2 (o do pitch)']); } else if (some.indexOf('part') < 0) PS.push(p); } else if (some.indexOf(p[0]) < 0) PS.push(p); });
   var um = L.length === 1 ? L[0] : null;
   return { ws: true, ev: true, P: { rot: um ? 'edição ' + um.nome.replace(/^\S+\s/, '') + (um.pres ? ' (presencial)' : ' (on-line)') : 'todas as edições' + (TRF.wtipo ? (TRF.wtipo === 'pres' ? ' presenciais' : ' on-line') : '') },
-    z: z, mom: mom, lista: lista, todas: todas, cri: cri, eds: eds, sel: sel, um: um, PS: PS, some: some, fora: fora, ads: Object.keys(adsWs).map(function(k) { return adsWs[k]; }), criC: CT ? criC : null, temPres: temPres, ildTipos: ildTipos, soPres: soPres, temSite: ok, temMeta: temMeta, metaRuim: metaRuim, semVis: false, soPg: '', dias: {} };
+    z: z, mom: mom, lista: lista, todas: todas, cri: cri, eds: eds, sel: sel, um: um, PS: PS, some: some, fora: fora, foraV: foraV, foraR: foraR, ads: Object.keys(adsWs).map(function(k) { return adsWs[k]; }), criC: CT ? criC : null, temPres: temPres, ildTipos: ildTipos, soPres: soPres, temSite: ok, temMeta: temMeta, metaRuim: metaRuim, semVis: false, soPg: '', dias: {} };
 }
 // 12/11/2026: quem pagou a aplicação × quem aplicou e não pagou, até a venda (só edições on-line; no presencial a aplicação é a ficha)
 function _trfPagouHtml(D) {
@@ -42597,7 +42605,7 @@ function _trfRenderWs(el) {
     +   (D.temPres ? '<p class="trf-nota">Presentes: inscritos que clicaram para entrar na sala em cada dia (registro da Central do workshop). O pitch é no 2º dia.</p>' : '')
     +   (D.some.length ? '<p class="trf-nota">Ficou de fora do desenho: ' + D.some.map(function(k) { return nomeSome[k]; }).join(', ') + ' — nesta seleção a planilha não tem esse dado completo (a presença só veio em algumas edições; no presencial a entrevista é marcada sem a aplicação do app).</p>' : '')
     +   '<p class="trf-nota">Investido, impressões e cliques são dos anúncios do evento na Meta durante a captação de cada edição (do dia seguinte ao início da edição anterior até o dia em que ela começa). O retorno conta só as mentorias vendidas, sem a receita dos ingressos. Visitas à página do evento ainda não são registradas em nenhuma base.</p>'
-    +   (D.fora ? '<p class="trf-nota">' + _trfN(D.fora) + ' reuniões com origem de workshop são de antes da primeira edição que está no app (julho) e não entram aqui.</p>' : '') + '</div>'
+    +   (D.fora ? '<p class="trf-nota">' + _trfN(D.fora) + ' reuniões com origem de workshop são de antes da primeira edição que está no app (julho) e não entram aqui' + (D.foraV ? ': nelas há ' + _trfN(D.foraV) + ' vendas, ' + _trfRs(D.foraR) + '. No ranking da chave Todos elas contam, pelo mês da venda' : '') + '.</p>' : '') + '</div>'
     + _trfCriativosWs(D)
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>🎓 Edição por edição</h3><span class="trf-sub">clique num passo para ver as pessoas, ou no cartão para ver só aquela edição</span></div><div class="trf-pgs trf-orgs">' + cards + '</div></div>';
   _trfAnimar(el, D);
@@ -42702,21 +42710,24 @@ function _trfRenderTodos(el) {
     linhasF.push(o); zf.marc++; if (o.real) zf.real++; if (o.apar) zf.apar++; if (o.pag) zf.pag++; });
   ((M && M.an) || []).forEach(function(a) { var g = +a.gasto || 0, tp = metaTipoCampanha(a.campanha), od = tp === 'workshop' || tp === 'imersao' ? '' : metaOrigemDiag(a.campanha), x = tp === 'workshop' ? L.ws : tp === 'imersao' ? L.pres : od === 'mcp' ? L.mcp : od === 'quente' ? L.pago : L.dist;
     x.gasto += g; x.imp += +a.impressoes || 0; x.cli += +a.cliques || 0; });   // o tráfego pago aqui é o mesmo da chave dele (campanhas de diagnóstico); o resto do gasto aparece à parte
-  if (S) { var donoT = _trfDonoLeads(S, P.fim), v = { pago: {}, org: {}, bio: {} }; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim) return; var kL = l.t8 || ('n:' + l.nome); if (donoT[kL] && donoT[kL] !== _trfDonoDe(l)) return; v[l.o !== 'o' ? 'pago' : l.src === 'manychat' ? 'org' : 'bio'][kL] = 1; });
-    L.pago.entr = Object.keys(v.pago).length; L.org.entr = Object.keys(v.org).length; L.bio.entr = Object.keys(v.bio).length;
-    var q = {}, qc = { pago: {}, org: {}, bio: {} }; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim || !_vfMql(l.inv)) return; var kk = l.t8 || ('n:' + l.nome); if (donoT[kk] && donoT[kk] !== _trfDonoDe(l)) return; q[kk] = 1; qc[l.o !== 'o' ? 'pago' : l.src === 'manychat' ? 'org' : 'bio'][kk] = 1; }); mqlDiag = Object.keys(q).length;
-    ['pago', 'org', 'bio'].forEach(function(c) { L[c].qual = Object.keys(qc[c]).length; L[c].qualRot = 'MQL'; }); }
+  if (S) { var donoT = _trfDonoLeads(S, P.fim), v = { pago: {}, org: {}, bio: {} }, inv = {}, nSem = 0, vSem = {};
+    S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim) return; var kL = l.t8 || ('n:' + l.nome), dk = donoT[kL] || _trfDonoDe(l), c = dk === 'pago' ? 'pago' : dk === 'manychat' ? 'org' : 'bio';
+      v[c][kL] = 1; if (dk === 'sem') vSem[kL] = 1; if (l.inv) inv[kL] = l.inv; });   // os leads vêm em ordem de data: fica a resposta mais recente
+    nSem = Object.keys(vSem).length; L.bio.nSem = nSem;
+    var q = 0; ['pago', 'org', 'bio'].forEach(function(c) { var ks2 = Object.keys(v[c]), nq = ks2.filter(function(kk) { return _vfMql(inv[kk]); }).length; L[c].entr = ks2.length; L[c].qual = nq; L[c].qualRot = 'MQL'; q += nq; }); mqlDiag = q; }
   if (okWs) { mqlEv = 0; mqlEvPg = 0; L.ws.qual = 0; L.ws.qualPg = 0; L.pres.qual = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (/mcp/i.test(x.prog || '') || !(x.apl instanceof Date)) return; var t = x.apl.getTime(); if (t < P.ini || t >= P.fim) return;
       var ild = /ild/i.test(x.prog || ''), pg = ild || /^comprou/i.test(x.compra || ''); mqlEv++; if (pg) mqlEvPg++; if (ild) L.pres.qual++; else { L.ws.qual++; if (pg) L.ws.qualPg++; } });
     // presencial: a aplicação é a ficha em papel (lista do Evento ILD), não a do app
     try { var dI = 0; Object.keys(WSL.porTel).some(function(t) { var x = WSL.porTel[t]; if (/ild/i.test(x.prog || '') && x.d1 instanceof Date) { dI = x.d1.getTime(); return true; } return false; });
       if (dI >= P.ini && dI < P.fim) {
-        if (typeof ildPessoas === 'function' && typeof ILDV !== 'undefined' && ILDV.base && ILDV.app) { var nf = ildPessoas().filter(function(q) { return q.tipo !== 'staff' && q.apl; }).length;
+        if (typeof ildPessoas === 'function' && typeof ILDV !== 'undefined' && ILDV.base && ILDV.app) { var ipL = ildPessoas().filter(function(q) { return q.tipo !== 'staff'; }), nf = ipL.filter(function(q) { return q.apl; }).length; L.pres.listaN = ipL.length;
           if (nf > L.pres.qual) { mqlEv += nf - L.pres.qual; mqlEvPg += nf - L.pres.qual; L.pres.qual = nf; } }
         else { L.pres.qual = null; if (!TRF._ildT && typeof ildCarregar === 'function') { TRF._ildT = 1; try { ildCarregar(false); } catch (eC) {} setTimeout(function() { TRF._ildT = 0; if (TRF.canal === 'todos' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 5000); } } } } catch (eI) {}
     L.ws.qualRot = 'aplicaram' + (L.ws.qual ? ' · ' + _trfN(L.ws.qualPg) + ' pagas' : ''); L.pres.qualRot = 'aplicaram (ficha)'; }
   if (okWs) { L.ws.entr = 0; L.pres.entr = 0; L.mcp.entr = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (!(x.ing instanceof Date)) return; var t = x.ing.getTime(); if (t < P.ini || t >= P.fim) return;
-    if (/mcp/i.test(x.prog || '')) L.mcp.entr++; else if (/ild/i.test(x.prog || '')) L.pres.entr++; else L.ws.entr++; }); }
+    if (/mcp/i.test(x.prog || '')) { if (!(WSL.mcpEm && WSL.mcpEm[t8] instanceof Date)) L.mcp.entr++; } else if (/ild/i.test(x.prog || '')) L.pres.entr++; else L.ws.entr++; });
+    Object.keys(WSL.mcpEm || {}).forEach(function(t8) { var dM = WSL.mcpEm[t8]; if (dM instanceof Date && dM.getTime() >= P.ini && dM.getTime() < P.fim) L.mcp.entr++; });
+    if (L.pres.listaN != null) { L.pres.entr = L.pres.listaN; L.pres.ent = 'na lista do evento'; } }
   var ks = ['pago', 'org', 'bio', 'ws', 'pres', 'mcp', 'ss', 'ind', 'out', 'dist'].filter(function(k) { return !G || G[k]; }), T = { gasto: 0, reun: 0, real: 0, apar: 0, vend: 0, valor: 0 };
   ks.forEach(function(k) { ['gasto', 'reun', 'real', 'apar', 'vend', 'valor'].forEach(function(c) { T[c] += L[k][c]; }); });
   trfContCarregar(); var impAds = 0, vwOrg = 0, nPosts = 0; if (TRF.tprod !== 'ws') (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { vwOrg += x.v; nPosts++; } });
@@ -42725,10 +42736,10 @@ function _trfRenderTodos(el) {
   var semMql = TRF.tprod === 'diag' ? mqlDiag == null : TRF.tprod === 'ws' ? mqlEv == null : (mqlDiag == null && mqlEv == null); zf.mql = (TRF.tprod === 'ws' ? 0 : (mqlDiag || 0)) + (TRF.tprod === 'diag' ? 0 : (mqlEv || 0));
   var ret = T.gasto ? T.valor / T.gasto : 0, maxV = Math.max.apply(null, ks.map(function(k) { return L[k].valor; })) || 1;
   var cel = function(r, v, cls) { return '<span class="' + (cls || '') + '" data-r="' + r + '">' + v + '</span>'; };
-  var pos = 0, pc = function(a, b) { return b ? ' <small>' + Math.round(a / b * 100) + '%</small>' : ''; };
+  var pos = 0, pc = function(a, b) { return b && a <= b ? ' <small>' + Math.round(a / b * 100) + '%</small>' : ''; };
   var linha = function(k) { var x = L[k]; if (k === 'dist' || (k !== 'mcp' && !x.reun && !x.entr)) return '';
     var lugar = x.reun || x.valor ? ++pos : 0;
-    var dentro = cel('Funil', (lugar ? '<i class="trf-td-pos p' + Math.min(lugar, 4) + '">' + lugar + 'º</i>' : '<i class="trf-td-pos p0">–</i>') + '<span><b>' + x.rot + '</b>' + (k === 'mcp' && x.entr ? '<small>receita do MCP: ' + _trfRs(x.entr * TRF_MCP_PRECO) + ' (fora do total · a mentoria de quem comprou entra na origem da venda)</small>' : '') + '</span>', 'trf-td-n')
+    var dentro = cel('Funil', (lugar ? '<i class="trf-td-pos p' + Math.min(lugar, 4) + '">' + lugar + 'º</i>' : '<i class="trf-td-pos p0">–</i>') + '<span><b>' + x.rot + '</b>' + (k === 'mcp' && x.entr ? '<small>receita do MCP: ' + _trfRs(x.entr * TRF_MCP_PRECO) + ' (fora do total · a mentoria de quem comprou entra na origem da venda)</small>' : '') + (k === 'bio' && x.nSem ? '<small>inclui ' + _trfN(x.nSem) + ' leads de link sem marcação (ficam num funil à parte dentro do Orgânico)</small>' : '') + '</span>', 'trf-td-n')
       + cel('Entradas', x.entr == null ? '—' : _trfN(x.entr) + (x.ent ? ' <small>' + x.ent + '</small>' : ''))
       + cel('Qualificados', x.qual == null ? '—' : _trfN(x.qual) + pc(x.qual, x.entr) + (x.qualRot ? '<small class="trf-td-q">' + x.qualRot + '</small>' : ''))
       + cel('Marcadas', _trfN(x.reun) + (x.qual && x.reun <= x.qual ? pc(x.reun, x.qual) : '')) + cel('Realizadas', _trfN(x.real) + pc(x.real, x.reun)) + cel('Compareceram', _trfN(x.apar) + pc(x.apar, x.real)) + cel('Vendas', _trfN(x.vend) + pc(x.vend, x.apar))
