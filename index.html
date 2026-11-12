@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-0802';
+var VERSAO_DASH = '2026-11-12-0814';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41826,6 +41826,12 @@ function _trfJuntarLD(S) {
     S.t0site = t0; S.nAnt = ant.length; S.leads = ant.concat(S.leads); S._ld = 1;
   } catch (e) { S._ld = 1; }
 }
+function _trfDonoDe(x) { return x.o !== 'o' ? 'pago' : (x.src || 'sem'); }   // pago | manychat | bio | sem
+function _trfDonoLeads(S, fim) {   // de qual funil é cada pessoa: o do formulário mais recente até o fim do período (S.leads já vem em ordem de data)
+  if (!S || !S.leads) return {}; if (S._dono && S._donoFim === fim && S._donoN === S.leads.length) return S._dono;
+  var d = {}; S.leads.forEach(function(x) { if (x.t >= fim) return; d[x.t8 || ('n:' + x.nome)] = _trfDonoDe(x); });
+  S._dono = d; S._donoFim = fim; S._donoN = S.leads.length; return d;
+}
 function _trfDados() {
   var P = _trfPer(), S = TRF.site, org = TRF.canal === 'org' || TRF.canal === 'bio';
   _trfJuntarLD(S); var antigo = S && S.t0site && P.ini < S.t0site ? S.t0site : 0;
@@ -41834,10 +41840,12 @@ function _trfDados() {
   var M = org ? { an: [] } : _trfMeta(P), ev = TRF.modo !== 'coorte';
   var porTel = {}; (V2.rows || []).forEach(function(r) { var t = ldTel8(r.telefone); if (t) (porTel[t] = porTel[t] || []).push(r); });
   var pes = {}, dias = {};
+  var dono = _trfDonoLeads(S, P.fim);
   ((S && S.leads) || []).forEach(function(x) {
     var noP = x.t >= P.ini && x.t < P.fim; if (!noP && !ev) return;   // no modo "aconteceu", quem chegou antes entra para achar a reunião e a venda do período
     var k = x.t8 || ('n:' + x.nome);
     if (org ? x.o !== 'o' : x.o === 'o') return;
+    if (dono[k] && dono[k] !== _trfDonoDe(x)) return;   // a pessoa é de um funil só: o do formulário mais recente dela
     if (!org && TRF.fam !== 'todos' && _trfFam(x.camp) !== TRF.fam) return;
     // 11/11/2026 (Bruno, no gráfico por dia: "mostre só tráfego"): o gráfico conta só os leads da tela (tráfego pago OU orgânico), sem misturar
     if (noP && !(org && TRF.cri && x.src !== TRF.cri)) { var dk = _trfDia(x.t), dd = dias[dk] || (dias[dk] = { n: 0, A: 0, B: 0, C: 0, D: 0, _v: {} });
@@ -41852,8 +41860,8 @@ function _trfDados() {
   });
   var todas = Object.keys(pes).map(function(k) {
     var p = pes[k]; p.mql = _vfMql(p.inv); p.ck = org ? (p.src || 'sem') : (p.cont ? _chaveAnuncio(p.cont) : '');
-    var rs = ((p.t8 && porTel[p.t8]) || []).filter(function(r) { return r.date && r.date.getTime() >= p.t - 2 * 864e5 && !/workshop|(^|[^a-z])ild([^a-z]|$)|imers/.test(v2norm(r.origem || ''))
-        && !(org && /(^|[^a-z])ads([^a-z]|$)/.test(v2norm(r.origem || ''))); });   // no orgânico, reunião que a planilha marca como [Ads] fica com o tráfego pago   // venda de evento (workshop, ILD) segue a origem da planilha: não é venda do tráfego
+    var kv = org ? (p.src === 'manychat' ? 'org' : 'bio') : 'pago';   // a reunião e a venda são do funil da ORIGEM escrita na planilha de vendas
+    var rs = ((p.t8 && porTel[p.t8]) || []).filter(function(r) { return r.date && r.date.getTime() >= p.t - 2 * 864e5 && _trfOrigemLinha(r.origem) === kv; });   // no orgânico, reunião que a planilha marca como [Ads] fica com o tráfego pago   // venda de evento (workshop, ILD) segue a origem da planilha: não é venda do tráfego
     if (ev) rs = rs.filter(function(r) { var t = r.date.getTime(); return t >= P.ini && t < P.fim; });   // só o que tem data dentro do período
     var vd = rs.filter(function(r) { return r.sn === 'vendido'; });
     p.marc = rs.length > 0; p.real = rs.some(function(r) { return isReal(r.sn); }); p.apar = rs.some(function(r) { return isComp(r.sn); }); p.sim = rs.some(function(r) { return isFechouReuniao(r.sn); });
@@ -41889,6 +41897,16 @@ function _trfDados() {
   var z = { gasto: 0, imp: 0, cli: 0, vis: visTot, ini: 0, comp: 0, mql: 0, marc: 0, real: 0, apar: 0, sim: 0, pag: 0, valor: 0, fx: { A: 0, B: 0, C: 0, D: 0 } };
   if (!soPg) Object.keys(ads).forEach(function(k) { if (TRF.cri && k !== TRF.cri) return; z.gasto += ads[k].gasto; z.imp += ads[k].imp; z.cli += ads[k].cli; });
   lista.forEach(function(p) { ['ini', 'comp', 'mql', 'marc', 'real', 'apar', 'sim', 'pag'].forEach(function(c) { if (_trfTem(p, c)) z[c]++; }); z.valor += p.valor; if (p.ini && z.fx[p.fx] != null) z.fx[p.fx]++; });
+  var rowsEv = null;
+  if (ev && !soPg && (org || !TRF.cri) && (V2.carregado || (V2.rows || []).length)) {
+    var KV = !org ? 'pago' : TRF.cri === 'manychat' ? 'org' : 'bio'; rowsEv = [];
+    (V2.rows || []).forEach(function(r, i) { if (!r.date) return; var d = r.date.getTime(); if (d < P.ini || d >= P.fim || _trfOrigemLinha(r.origem) !== KV) return; var t8 = ldTel8(r.telefone || '');
+      if (KV === 'bio' && ((dono[t8] === 'sem') !== (TRF.cri === 'sem'))) return;   // [Org][Diag] de quem veio por link sem marcação fica no funil "sem marcação"; o resto, na bio
+      rowsEv.push({ k: 'r' + i, t8: t8, tel: String(r.telefone || ''), nome: String(r.nome || '').trim(), t: d, ini: true, comp: false, mql: false, fx: '', cont: '', pg: '', ck: '', marc: true, real: isReal(r.sn), apar: isComp(r.sn), sim: isFechouReuniao(r.sn), pag: r.sn === 'vendido',
+        valor: r.sn === 'vendido' ? (r.valor || 0) : 0, dv: d, deOnde: String(r.origem || ''), closer: r.closer || '', res: r.status || r.sn || '' }); });
+    z.marc = rowsEv.length; z.real = 0; z.apar = 0; z.sim = 0; z.pag = 0; z.valor = 0;
+    rowsEv.forEach(function(o) { if (o.real) z.real++; if (o.apar) z.apar++; if (o.sim) z.sim++; if (o.pag) { z.pag++; z.valor += o.valor; } });
+  }
   var topoOrg = org && TRF.cri !== 'sem', igOk = false;
   if (org) {
     trfContCarregar(); try { igOk = !!IGO.carregado; if (!igOk && !IGO.buscando) carregarIGOrganico(); } catch (eI) {}
@@ -41904,7 +41922,7 @@ function _trfDados() {
         fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 };
       comPs.push(pe); }); } catch (eR) {}
     comPs.forEach(function(pe) { if (!pe.t8) return;
-      var rs = (porTel[pe.t8] || []).filter(function(r) { var n = v2norm(r.origem || ''); return r.date && r.date.getTime() >= pe.t - 2 * 864e5 && !/workshop|(^|[^a-z])ild([^a-z]|$)|imers|(^|[^a-z])ads([^a-z]|$)/.test(n); });
+      var rs = (porTel[pe.t8] || []).filter(function(r) { var n = v2norm(r.origem || ''); var kO = _trfOrigemLinha(r.origem); return r.date && r.date.getTime() >= pe.t - 2 * 864e5 && (kO === 'org' || kO === 'bio'); });
       pe.marc = rs.length > 0; pe.real = rs.some(function(r) { return isReal(r.sn); }); pe.apar = rs.some(function(r) { return isComp(r.sn); });
       var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); } });
     z.com = comPs.length; z.comPs = comPs;
@@ -41919,7 +41937,7 @@ function _trfDados() {
         var _rf = l && l.tel8 ? (formDe[l.tel8] || null) : null, _cp = !!l && (_rf ? _rf.c : !!l.invest);   // formulário completo: pela base do site (ou, no formulário antigo, se respondeu o investimento)
         var pe = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t || o.t, com: true, ini: !!l, comp: _cp, mql: !!(l && _vfMql(l.invest)), fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 }; o.ps.push(pe);
         if (!l) return; o.ld++; if (pe.comp) o.comp++; if (pe.mql) o.mql++;
-        var rs = ((l.tel8 && porTel[l.tel8]) || []).filter(function(r) { var n = v2norm(r.origem || ''); return r.date && r.date.getTime() >= (q.t || o.t) - 2 * 864e5 && !/workshop|(^|[^a-z])ild([^a-z]|$)|imers|(^|[^a-z])ads([^a-z]|$)/.test(n); });
+        var rs = ((l.tel8 && porTel[l.tel8]) || []).filter(function(r) { var n = v2norm(r.origem || ''); var kO = _trfOrigemLinha(r.origem); return r.date && r.date.getTime() >= (q.t || o.t) - 2 * 864e5 && (kO === 'org' || kO === 'bio'); });
         if (rs.length) { o.marc++; pe.marc = true; } pe.real = rs.some(function(r) { return isReal(r.sn); }); if (pe.real) o.real++; if (rs.some(function(r) { return isComp(r.sn); })) { o.apar++; pe.apar = true; }
         var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { o.vd++; pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); o.fat += pe.valor; } });
     } catch (eP) {}
@@ -41932,7 +41950,7 @@ function _trfDados() {
   if (visDesde && P.ini < new Date(visDesde + 'T00:00:00').getTime() - 864e5) {   // o período começa antes de existirem visitas: o número é parcial
     aparte.vis = 'as visitas só existem desde ' + visDesde.slice(8, 10) + '/' + visDesde.slice(5, 7) + '/' + visDesde.slice(0, 4) + ' · o período começa antes'; naoBase.vis = 1;
     if (org) aparte.ini = TRF.canal === 'bio' ? 'todos que chegaram pelo link da bio' : 'todos que chegaram pelo link do ManyChat'; }
-  return { P: P, cortado: cortado, antigo: antigo, aparte: aparte, naoBase: naoBase, ev: ev, org: org, topoOrg: topoOrg, semVw: !TRF.cont || (org && !z.nposts), semCom: !igOk, semVisCri: semOrg, z: z, soPg: soPg, todas: todas, lista: lista, dias: dias, pags: pags, cri: cri, temSite: !!S, semVis: !S || !!S.semVis || (semOrg && !!TRF.cri), temMeta: !!M, metaRuim: !!(M && M.erro) };
+  return { P: P, cortado: cortado, antigo: antigo, aparte: aparte, naoBase: naoBase, rowsEv: rowsEv, ev: ev, org: org, topoOrg: topoOrg, semVw: !TRF.cont || (org && !z.nposts), semCom: !igOk, semVisCri: semOrg, z: z, soPg: soPg, todas: todas, lista: lista, dias: dias, pags: pags, cri: cri, temSite: !!S, semVis: !S || !!S.semVis || (semOrg && !!TRF.cri), temMeta: !!M, metaRuim: !!(M && M.erro) };
 }
 // ---- desenho ----
 function _trfChips(semModo) {
@@ -42684,9 +42702,9 @@ function _trfRenderTodos(el) {
     linhasF.push(o); zf.marc++; if (o.real) zf.real++; if (o.apar) zf.apar++; if (o.pag) zf.pag++; });
   ((M && M.an) || []).forEach(function(a) { var g = +a.gasto || 0, tp = metaTipoCampanha(a.campanha), od = tp === 'workshop' || tp === 'imersao' ? '' : metaOrigemDiag(a.campanha), x = tp === 'workshop' ? L.ws : tp === 'imersao' ? L.pres : od === 'mcp' ? L.mcp : od === 'quente' ? L.pago : L.dist;
     x.gasto += g; x.imp += +a.impressoes || 0; x.cli += +a.cliques || 0; });   // o tráfego pago aqui é o mesmo da chave dele (campanhas de diagnóstico); o resto do gasto aparece à parte
-  if (S) { var v = { pago: {}, org: {}, bio: {} }; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim) return; v[l.o !== 'o' ? 'pago' : l.src === 'manychat' ? 'org' : 'bio'][l.t8 || ('n:' + l.nome)] = 1; });
+  if (S) { var donoT = _trfDonoLeads(S, P.fim), v = { pago: {}, org: {}, bio: {} }; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim) return; var kL = l.t8 || ('n:' + l.nome); if (donoT[kL] && donoT[kL] !== _trfDonoDe(l)) return; v[l.o !== 'o' ? 'pago' : l.src === 'manychat' ? 'org' : 'bio'][kL] = 1; });
     L.pago.entr = Object.keys(v.pago).length; L.org.entr = Object.keys(v.org).length; L.bio.entr = Object.keys(v.bio).length;
-    var q = {}, qc = { pago: {}, org: {}, bio: {} }; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim || !_vfMql(l.inv)) return; var kk = l.t8 || ('n:' + l.nome); q[kk] = 1; qc[l.o !== 'o' ? 'pago' : l.src === 'manychat' ? 'org' : 'bio'][kk] = 1; }); mqlDiag = Object.keys(q).length;
+    var q = {}, qc = { pago: {}, org: {}, bio: {} }; S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim || !_vfMql(l.inv)) return; var kk = l.t8 || ('n:' + l.nome); if (donoT[kk] && donoT[kk] !== _trfDonoDe(l)) return; q[kk] = 1; qc[l.o !== 'o' ? 'pago' : l.src === 'manychat' ? 'org' : 'bio'][kk] = 1; }); mqlDiag = Object.keys(q).length;
     ['pago', 'org', 'bio'].forEach(function(c) { L[c].qual = Object.keys(qc[c]).length; L[c].qualRot = 'MQL'; }); }
   if (okWs) { mqlEv = 0; mqlEvPg = 0; L.ws.qual = 0; L.ws.qualPg = 0; L.pres.qual = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (/mcp/i.test(x.prog || '') || !(x.apl instanceof Date)) return; var t = x.apl.getTime(); if (t < P.ini || t >= P.fim) return;
       var ild = /ild/i.test(x.prog || ''), pg = ild || /^comprou/i.test(x.compra || ''); mqlEv++; if (pg) mqlEvPg++; if (ild) L.pres.qual++; else { L.ws.qual++; if (pg) L.ws.qualPg++; } });
@@ -42783,16 +42801,17 @@ function _trfListaDesenhar() {
   var D = window._trfCtx, S = TRF.lst; if (!D || !S) return;
   var nome = (doPostNome(S) || (D.mcp ? { insc: 'Compraram o MCP', diag: 'Pediram diagnóstico', evento: 'Compraram ingresso de evento', marc: 'Tiveram reunião', real: 'Realizada', apar: 'Compareceu', pag: 'Viraram cliente' } : null) || { com: 'Comentaram a palavra', insc: 'Inscritos', part: 'Participaram', apl: (D.ws && !D.soPres ? 'Aplicações pagas' : 'Aplicaram'), aplT: 'Aplicaram', ini: 'Iniciou o formulário', comp: 'Formulário completo', mql: 'MQL', marc: 'Marcada', real: 'Realizada', apar: 'Compareceu', sim: 'Disse sim', pag: 'Entrou' })[S.k] || S.k;
   var doPost = S.post != null ? (window._trfPostsOrd || [])[S.post] : null, doCom = !doPost && S.k === 'com' && D.z && D.z.comPs, deCom = !!doCom || (!!doPost && S.k === 'com');
-  var base = (doPost ? (doPost.ps || []) : doCom ? D.z.comPs : S.cri ? D.todas.filter(function(p) { return p.ck === S.cri; }) : D.lista).filter(function(p) { return _trfTem(p, S.k); });
+  var porLinha = !!D.todosC || (!!D.rowsEv && !doPost && !S.cri && /^(marc|real|apar|sim|pag)$/.test(S.k));
+  var base = (doPost ? (doPost.ps || []) : doCom ? D.z.comPs : porLinha && !D.todosC ? D.rowsEv : S.cri ? D.todas.filter(function(p) { return p.ck === S.cri; }) : D.lista).filter(function(p) { return _trfTem(p, S.k); });
   var F = { iniF: function(p) { return !!p.ini; }, nini: function(p) { return !p.ini; }, marcF: function(p) { return !!p.marc; }, pagF: function(p) { return !!p.pag; }, apl: function(p) { return p.apl; }, napl: function(p) { return !(p.aplT || p.apl); }, aplsp: function(p) { return !!p.aplT && !p.apl; }, comp: function(p) { return p.comp; }, inc: function(p) { return !p.comp; }, mql: function(p) { return p.mql; }, nmql: function(p) { return !p.mql; }, A: function(p) { return p.fx === 'A'; }, B: function(p) { return p.fx === 'B'; }, C: function(p) { return p.fx === 'C'; }, D: function(p) { return p.fx === 'D'; } };
   var lista = S.f && F[S.f] ? base.filter(F[S.f]) : base.slice();
   lista.sort(function(a, b) { return (S.k === 'pag' ? b.valor - a.valor : 0) || b.t - a.t; });
   var tc = {}; try { ((TC.dados && TC.dados.leads) || []).forEach(function(x) { tc[x.t8] = x; }); } catch (e) {}
   var chip = function(f, r) { var n = base.filter(F[f]).length; return '<button type="button" class="pl-chip' + (S.f === f ? ' on' : '') + '" onclick="trfListaFiltro(\'' + f + '\')">' + r + ' <small>' + n + '</small></button>'; };
-  var chips = '<div class="pl-chips trf-lchips">' + (deCom ? chip('iniF', '✅ Iniciou o formulário') + chip('nini', '⏳ Não iniciou') + chip('marcF', '📅 Com reunião') + chip('pagF', '💰 Compraram') : '') + (S.k === 'ini' && !doPost ? chip('comp', 'Completos') + chip('inc', 'Incompletos') : '') + (D.ws && !D.mcp ? chip('apl', '📝 Aplicação paga') + chip('aplsp', '⏳ Aplicou e não pagou') + chip('napl', '🎟️ Só inscritos') : '') + (D.todosC ? '' : chip('mql', '🔥 MQL') + chip('nmql', 'Não MQL')) + (D.ws || doPost || doCom ? '' : chip('A', 'A') + chip('B', 'B') + chip('C', 'C') + chip('D', 'D')) + '</div>';
+  var chips = '<div class="pl-chips trf-lchips">' + (deCom ? chip('iniF', '✅ Iniciou o formulário') + chip('nini', '⏳ Não iniciou') + chip('marcF', '📅 Com reunião') + chip('pagF', '💰 Compraram') : '') + (S.k === 'ini' && !doPost ? chip('comp', 'Completos') + chip('inc', 'Incompletos') : '') + (D.ws && !D.mcp ? chip('apl', '📝 Aplicação paga') + chip('aplsp', '⏳ Aplicou e não pagou') + chip('napl', '🎟️ Só inscritos') : '') + (porLinha ? '' : chip('mql', '🔥 MQL') + chip('nmql', 'Não MQL')) + (D.ws || doPost || doCom || porLinha ? '' : chip('A', 'A') + chip('B', 'B') + chip('C', 'C') + chip('D', 'D')) + '</div>';
   var linha = function(p) {
     var x = tc[p.t8], dc = x ? (x.humano && x.humano >= x.chegou ? '⏱ 1º contato em ' + tcTempoTxt(x.humano - x.chegou) : '⏱ ainda sem contato humano') : '';
-    var info = D.todosC ? ['📅 reunião em ' + new Date(p.t).toLocaleDateString('pt-BR'), _trfE(p.res), p.closer ? 'closer ' + _trfE(p.closer) : '', p.pag ? '💰 ' + _trfRs(p.valor) : '', _trfE(p.deOnde)].filter(Boolean).join(' · ')
+    var info = porLinha ? ['📅 reunião em ' + new Date(p.t).toLocaleDateString('pt-BR'), _trfE(p.res), p.closer ? 'closer ' + _trfE(p.closer) : '', p.pag ? '💰 ' + _trfRs(p.valor) : '', _trfE(p.deOnde)].filter(Boolean).join(' · ')
       : (doPost || doCom) ? [p.ini ? '<b style="color:#3ddc97">✅ iniciou o formulário</b>' + (p.comp ? ' · completo' : ' · não terminou') : '<b style="color:#ffd166">⏳ não iniciou o formulário</b>', p.mql ? '🔥 MQL' : '', '💬 comentou em ' + new Date(p.t).toLocaleDateString('pt-BR') + (p.nCom > 1 ? ' (' + p.nCom + ' comentários)' : ''), p.lkPost ? '<a href="#" onclick="event.stopPropagation();return abrirPostCriativo(' + JSON.stringify(p.lkPost).replace(/"/g, '&quot;') + ');" style="color:#6ea8ff;font-weight:800;text-decoration:none;">🎬 ver o post</a>' : '', p.marc ? '📅 tem reunião' : '', p.apar ? 'compareceu' : '', p.pag ? '💰 ' + _trfRs(p.valor) : '', p.ig && p.t8 ? '@' + _trfE(p.ig) : ''].filter(Boolean).join(' · ')
       : D.ws ? [p.mql ? '🔥 MQL' : '', p.semCad ? 'sem cadastro no app' : (D.mcp ? '🛒 comprou o MCP em ' + new Date(p.t).toLocaleDateString('pt-BR') : p.insc ? '🎟️ ingresso em ' + new Date(p.t).toLocaleDateString('pt-BR') : 'sem ingresso'), p.part ? '✅ participou' : '', p.semCad || D.mcp ? '' : (p.apl ? '<b style="color:#3ddc97">📝 ' + (p.tipoTxt != null ? 'APLICOU' : 'APLICAÇÃO PAGA') + '</b>' : p.aplT ? '<span style="color:#ffd166">⏳ aplicou e não pagou</span>' : '<span style="color:var(--text2)">só inscrito · não aplicou</span>'),
       p.marc ? '📅 reunião' + (p.mom ? ' ' + ({ pre: 'antes do evento', ws: 'no workshop', pos: 'no pós' }[p.mom] || '') : '') : '', p.pag ? '💰 ' + _trfRs(p.valor) + (D.mcp && p.caminho ? ' pela origem ' + _trfE(p.caminho) : '') : '', D.mcp && p.diag ? '📝 pediu diagnóstico' : '', D.mcp && p.evento ? '🎟️ ' + _trfE(p.eventoQual) : '', p.movida ? '↪ hoje tem ingresso da edição ' + _trfE(p.movida) : '', p.tipoTxt ? '🏷️ ' + _trfE(p.tipoTxt) : '', D.mcp ? '' : '🎓 ' + _trfE((D.cri[p.ck] || {}).nome || '')].filter(Boolean).join(' · ')
@@ -42819,8 +42838,8 @@ function _trfListaDesenhar() {
   var corte = 150, h = lista.slice(0, corte).map(linha).join('') + (lista.length > corte ? '<div class="trf-nota" style="padding:10px 2px;">Mostrando os ' + corte + ' mais recentes de ' + lista.length + '. Use os filtros acima para afinar.</div>' : '');
   var g = function(id) { return document.getElementById(id); }; if (!g('modal-b')) return;
   var c = S.cri ? D.cri[S.cri] : (TRF.cri ? D.cri[TRF.cri] : null);
-  g('mb-titulo').textContent = (D.todosC ? (TRF.tprod === 'diag' ? 'Diagnóstico' : TRF.tprod === 'ws' ? 'Workshop' : 'Todos os canais') : doPost ? 'Post de ' + new Date(doPost.t).toLocaleDateString('pt-BR') : D.mcp ? 'MCP' : D.ws ? 'Workshop' : D.org ? (TRF.canal === 'bio' ? 'Link na bio' : 'Orgânico') : 'Tráfego') + (D.soPg && !S.cri ? ' · página ' + D.soPg : '') + (c ? ' · ' + c.nome : '') + ' — ' + (D.todosC && S.k === 'marc' ? 'Reuniões marcadas' : nome) + ' — ' + lista.length + (D.todosC ? (lista.length === 1 ? ' reunião' : ' reuniões') : (lista.length === 1 ? ' pessoa' : ' pessoas'));
-  g('mb-ico').textContent = D.ws ? '🎓' : D.org ? '🌱' : '📣'; g('mb-sub').textContent = D.todosC ? 'Linhas da planilha de vendas em ' + D.P.rot + ' · clique no nome para abrir a ficha' : doPost ? 'Quem comentou a palavra neste post · clique no nome para abrir a ficha' : doCom ? 'Quem comentou a palavra em ' + D.P.rot + ' · use os botões para separar quem iniciou o formulário de quem não iniciou' : D.ws ? D.P.rot + ' · clique no nome para abrir a ficha' : (D.ev ? (S.k === 'ini' || S.k === 'comp' || S.k === 'mql' ? 'Chegaram em ' : 'Aconteceu em ') : 'Chegaram em ') + D.P.rot + ' · clique no nome para abrir a ficha';
+  g('mb-titulo').textContent = (D.todosC ? (TRF.tprod === 'diag' ? 'Diagnóstico' : TRF.tprod === 'ws' ? 'Workshop' : 'Todos os canais') : doPost ? 'Post de ' + new Date(doPost.t).toLocaleDateString('pt-BR') : D.mcp ? 'MCP' : D.ws ? 'Workshop' : D.org ? (TRF.canal === 'bio' ? 'Link na bio' : 'Orgânico') : 'Tráfego') + (D.soPg && !S.cri ? ' · página ' + D.soPg : '') + (c ? ' · ' + c.nome : '') + ' — ' + (D.todosC && S.k === 'marc' ? 'Reuniões marcadas' : nome) + ' — ' + lista.length + (porLinha ? (lista.length === 1 ? ' reunião' : ' reuniões') : (lista.length === 1 ? ' pessoa' : ' pessoas'));
+  g('mb-ico').textContent = D.ws ? '🎓' : D.org ? '🌱' : '📣'; g('mb-sub').textContent = porLinha ? 'Linhas da planilha de vendas em ' + D.P.rot + (D.todosC ? '' : ' com esta origem') + ' · clique no nome para abrir a ficha' : doPost ? 'Quem comentou a palavra neste post · clique no nome para abrir a ficha' : doCom ? 'Quem comentou a palavra em ' + D.P.rot + ' · use os botões para separar quem iniciou o formulário de quem não iniciou' : D.ws ? D.P.rot + ' · clique no nome para abrir a ficha' : (D.ev ? (S.k === 'ini' || S.k === 'comp' || S.k === 'mql' ? 'Chegaram em ' : 'Aconteceu em ') : 'Chegaram em ') + D.P.rot + ' · clique no nome para abrir a ficha';
   g('mb-lista').innerHTML = chips + (h || '<div style="color:var(--muted);font-size:.8rem;">Ninguém neste passo.</div>');
   var bq = g('mb-busca'); if (bq) { bq.value = ''; bq.style.display = ''; }
   g('modal-b').classList.add('open');
