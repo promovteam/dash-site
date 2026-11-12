@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-1227';
+var VERSAO_DASH = '2026-11-12-1232';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41625,6 +41625,9 @@ button.trf-kpi:hover { transform:translateY(-2px); box-shadow:0 10px 26px -14px 
 /* 12/11/2026: período dentro da janela do criativo */
 .trf-jan-per { display:flex; gap:6px; flex-wrap:wrap; }
 
+/* 12/11/2026 — ticket médio em todas as chaves: quando são seis números no topo, seis colunas em tela larga */
+@media (min-width:1101px) { .trf-kpis.k6 { grid-template-columns:repeat(6, minmax(0,1fr)); } .trf-kpis.k6 .trf-kpi > b { font-size:1.32rem; } }
+
 /* =====================================================================================================
    ✨ Gestão de funis — folha de acabamento (12/11/2026)
    Bruno: "bem fluido, bem bonito, bem claro… que quem entrar veja que foi feito por um cara hiper, mega profissional…
@@ -41740,7 +41743,7 @@ button.trf-kpi:hover::after, button.trf-td-l:hover::after { color:var(--accent);
 button.trf-td-l::after { right:8px; top:calc(50% - 5px); }
 .trf-td-pos { font-variant-numeric:tabular-nums; }
 /* Funis finais: investido · vendido · retorno · custo por venda viram quatro mini-números (rótulo em cima, valor embaixo) */
-.trf-f3-k { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; max-width:880px; margin:4px 0 18px; }
+.trf-f3-k { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; max-width:1040px; margin:4px 0 18px; }
 .trf-f3-k > span { display:flex; flex-direction:column; gap:3px; min-width:0; padding:9px 12px 10px; border-radius:12px; background:var(--panel2, rgba(255,255,255,.04)); border:1px solid var(--trf-fio, rgba(255,255,255,.08)); font-size:.62rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; line-height:1.3; }
 .trf-f3-k b { margin-left:0; font-size:1.08rem; letter-spacing:-.01em; text-transform:none; line-height:1.15; white-space:nowrap; }
 .trf-tab { font-size:.86rem; } .trf-tab th { font-size:.64rem; }
@@ -42363,7 +42366,7 @@ function trfCriJanela(k) {
     +     (link ? '<a href="' + _trfE(link) + '" target="_blank" rel="noopener" class="trf-jan-link">ver anúncio ↗</a>' : '')
     +   '</div>')
     +   '<div class="trf-jan-ns">' + num('Investido', c.gasto ? _trfRs(c.gasto) : '—', '#f6a350') + num('Vendido', _trfRs(c.fat), '#3ddc97') + num('Retorno', c.gasto && c.fat ? (c.fat / c.gasto).toFixed(1).replace('.', ',') + 'x' : '—')
-    +     num('Vendas', _trfN(c.vd)) + num('Custo por lead', c.gasto && c.ini ? _trfRs(c.gasto / c.ini) : '—') + num('Custo por venda', c.gasto && c.vd ? _trfRs(c.gasto / c.vd) : '—') + '</div>'
+    +     num('Vendas', _trfN(c.vd)) + num('Ticket médio', _trfTicket(c.fat, c.vd)) + num('Custo por lead', c.gasto && c.ini ? _trfRs(c.gasto / c.ini) : '—') + num('Custo por venda', c.gasto && c.vd ? _trfRs(c.gasto / c.vd) : '—') + '</div>'
     +   '<button type="button" class="trf-anc-toda" onclick="trfCriFechar();trfCriativo(\'' + k + '\')">abrir a aba toda só com este criativo</button>'
     + '</div><div class="trf-jan-d"><div class="trf-fns">' + blocos + '</div><p class="trf-nota">Clique num passo, do formulário para baixo, para ver as pessoas.</p></div></div></div>';
   var d = document.createElement('div'); d.id = 'trf-jan'; d.className = 'trf-jan' + (jaAberta ? ' troca' : ''); d.innerHTML = h;
@@ -42700,6 +42703,8 @@ function _trfChips(semModo) {
     + '<button type="button" class="pl-chip' + (TRF.modo === 'coorte' ? ' on' : '') + '" onclick="trfFiltro(\'modo\',\'coorte\')" title="Só quem chegou no período, seguido até hoje (mesmo que a venda saia depois).">👥 Quem chegou no período</button></div>')
     + '</div>';
 }
+// 12/11/2026 (Bruno: "em todos coloque o ticket médio"): vendido ÷ vendas, em toda chave, no ranking, nos funis finais e nas janelas
+function _trfTicket(valor, n) { return n ? _trfRs(valor / n) : '—'; }
 function _trfKpi(rot, val, sub, cls) { return '<div class="trf-kpi ' + (cls || '') + '"><span>' + rot + '</span><b>' + val + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>'; }
 function _trfGrafico(D) {
   var P = D.P, fim = Math.min(P.fim, new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime() + 864e5), ds = [];
@@ -43040,7 +43045,7 @@ function trfPostJanela(i) {
     + '<div class="trf-jan-g' + (mi ? ' vid' : '') + '"><div class="trf-jan-e">'
     +   (mi ? '<div class="trf-jan-igw"' + (ft ? ' style="background-image:url(\'' + _trfE(ft).replace(/'/g, '%27') + '\')"' : '') + '><iframe class="trf-jan-ig" src="https://www.instagram.com/' + (mi[1].toLowerCase() === 'reels' ? 'reel' : mi[1].toLowerCase()) + '/' + mi[2] + '/embed/captioned/" height="560" scrolling="no" frameborder="0" allowtransparency="true" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Post do Instagram"></iframe></div><a href="' + _trfE(o.lk) + '" target="_blank" rel="noopener" class="trf-jan-fora">abrir no Instagram ↗</a>'
         : '<div class="an-capa trf-jan-capa">' + (ft ? '<img decoding="async" src="' + _trfE(ft) + '" onerror="this.style.display=\'none\'">' : '<span class="trf-jan-sem">🎬<small>post do Instagram</small></span>') + '<a href="' + _trfE(o.lk) + '" target="_blank" rel="noopener" class="trf-jan-link">ver post ↗</a></div>')
-    +   '<div class="trf-jan-ns">' + num('Visualizações', o.temVw ? _trfK(o.vw) : '…') + num('Vendido', _trfRs(o.fat), '#3ddc97') + num('Curtidas', _trfK(o.cur)) + num('Comentários', _trfK(o.cm)) + (naBio ? num('Foram ao perfil', _trfN(o.pf), '#22d3ee') + num('De quem viu', o.vw ? (o.pf / o.vw * 100).toFixed(2).replace('.', ',') + '%' : '—') : num('Viram lead', o.com ? Math.round(o.ld / o.com * 100) + '%' : '—') + num('Vendas', _trfN(o.vd))) + '</div></div>'
+    +   '<div class="trf-jan-ns">' + num('Visualizações', o.temVw ? _trfK(o.vw) : '…') + num('Vendido', _trfRs(o.fat), '#3ddc97') + num('Curtidas', _trfK(o.cur)) + num('Comentários', _trfK(o.cm)) + (naBio ? num('Foram ao perfil', _trfN(o.pf), '#22d3ee') + num('De quem viu', o.vw ? (o.pf / o.vw * 100).toFixed(2).replace('.', ',') + '%' : '—') : num('Viram lead', o.com ? Math.round(o.ld / o.com * 100) + '%' : '—') + num('Vendas', _trfN(o.vd))) + num('Ticket médio', _trfTicket(o.fat, o.vd)) + '</div></div>'
     + '<div class="trf-jan-d"><div class="trf-fns">' + blocos + '</div><p class="trf-nota">' + (naBio ? '' : 'Clique num passo para ver as pessoas. ') + (naBio ? 'Quem vem pela bio não comenta, então não dá para seguir este post até a venda. Pelo comentário, este mesmo post trouxe ' + _trfN(o.ld) + (o.ld === 1 ? ' lead' : ' leads') + ' e ' + _trfN(o.vd) + (o.vd === 1 ? ' venda' : ' vendas') + ' (veja na chave Orgânico).' : 'É o funil completo só deste post, da publicação até hoje (não só do período escolhido na tela): quem comentou nele e o que aconteceu com cada pessoa. A ligação é pelo @ do Instagram escrito no formulário (quem escreveu diferente não é achado, então os números são um piso). “Visitas na página” ainda não existe por post: o link do ManyChat é o mesmo em todos.') + '</p></div></div></div>';
   var el = document.createElement('div'); el.id = 'trf-jan'; el.className = 'trf-jan' + (jaAberta ? ' troca' : ''); el.innerHTML = h;
   el.addEventListener('click', function(e) { if (e.target === el) trfCriFechar(); });
@@ -43177,8 +43182,8 @@ function _trfRender0() {
       + _trfKpi('Reuniões marcadas', _trfN(z.marc), D.ev ? 'com data no período' : 'de quem chegou no período', '') + _trfKpi('Compareceram', _trfN(z.apar), z.marc ? Math.round(z.apar / z.marc * 100) + '% das marcadas' : 'das reuniões marcadas', '')
     : '';
   el.innerHTML = canal + '<div class="trf-topo"><div><p>' + (D.org ? (TRF.canal === 'bio' ? 'Link na bio: viu o post, foi ao perfil e clicou no link da bio · sem gasto de anúncio · ' : TRF.cri === 'sem' ? 'Link do orgânico sem etiqueta (não dá para saber de onde veio) · ' : 'Orgânico pelo comentário: comentou a palavra e o ManyChat mandou o link · sem gasto de anúncio · ') : 'Tráfego do Diagnóstico (sem MCP), do anúncio até o pagamento · ') + _trfPerHtml(D.P) + (oc ? ' · <b style="color:var(--accent)">só ' + _trfE(oc) + '</b>' : '') + (D.ev ? '' : ' · só quem chegou no período') + (D.soPg ? ' · <b style="color:var(--accent)">só a página ' + _trfE(D.soPg) + '</b>' : '') + '</p></div>' + _trfChips() + '</div>' + avisos
-    + '<div class="trf-kpis">' + (kpis || _trfKpi('Investido', D.soPg ? '—' : D.temMeta ? _trfRs(z.gasto) : '…', D.soPg ? 'não se separa por página' : 'gasto na Meta', 'inv') + _trfKpi('Vendido', _trfRs(z.valor), D.ev ? 'vendas fechadas no período' : 'de quem chegou no período', 'vd')
-    + _trfKpi('Retorno', z.gasto ? ret.toFixed(1).replace('.', ',') + 'x' : '—', 'vendido ÷ investido', ret >= 1 ? 'bom' : '') + _trfKpi('Vendas', _trfN(z.pag), 'pagaram tudo', '') + _trfKpi('Custo por venda', z.pag && z.gasto ? _trfRs(z.gasto / z.pag) : '—', 'investido ÷ vendas', '')) + '</div>'
+    + '<div class="trf-kpis' + (kpis ? '' : ' k6') + '">' + (kpis || _trfKpi('Investido', D.soPg ? '—' : D.temMeta ? _trfRs(z.gasto) : '…', D.soPg ? 'não se separa por página' : 'gasto na Meta', 'inv') + _trfKpi('Vendido', _trfRs(z.valor), D.ev ? 'vendas fechadas no período' : 'de quem chegou no período', 'vd')
+    + _trfKpi('Retorno', z.gasto ? ret.toFixed(1).replace('.', ',') + 'x' : '—', 'vendido ÷ investido', ret >= 1 ? 'bom' : '') + _trfKpi('Vendas', _trfN(z.pag), 'pagaram tudo', '') + _trfKpi('Ticket médio', _trfTicket(z.valor, z.pag), 'vendido ÷ vendas', '') + _trfKpi('Custo por venda', z.pag && z.gasto ? _trfRs(z.gasto / z.pag) : '—', 'investido ÷ vendas', '')) + '</div>'
     + '<div class="trf-leads"><button type="button" class="trf-kpi l" onclick="trfPasso(\'ini\')"><span>Total de leads</span><b>' + _trfN(z.ini) + '</b><small>iniciaram o formulário</small></button>'
     + '<button type="button" class="trf-kpi l" onclick="trfPasso(\'ini\',\'comp\')"><span>Leads completos</span><b>' + _trfN(z.comp) + '</b><small>responderam tudo</small></button>'
     + '<button type="button" class="trf-kpi l" onclick="trfPasso(\'ini\',\'inc\')"><span>Leads pendentes</span><b>' + _trfN(pend) + '</b><small>pararam no meio</small></button>'
@@ -43406,8 +43411,8 @@ function _trfRenderWs(el) {
       + '<div class="trf-pg-r">' + (c.vd ? '💰 ' + _trfRs(c.fat) + ' vendidos' : 'sem venda ainda') + '</div></div>'; }).join('');
   el.innerHTML = _trfCanalHtml() + '<div class="trf-topo"><div><p>Workshop on-line e presencial, do ingresso até o pagamento · cada edição é o seu período · ' + _trfPerHtml(D.P) + '</p></div>'
     + '<div class="trf-filtros"><div class="pl-chips">' + tp('', 'Todos') + tp('on', '💻 On-line') + tp('pres', '📍 Presencial') + '</div></div></div>' + avisos + abas + pub
-    + '<div class="trf-kpis">' + _trfKpi('Investido', D.temMeta ? _trfRs(z.gasto) : '…', 'anúncios do evento na Meta' + (jan ? ' · ' + jan : ''), 'inv') + _trfKpi('Vendido', _trfRs(z.valor), 'mentorias vendidas a quem é da edição', 'vd')
-    + _trfKpi('Retorno', z.gasto ? ret.toFixed(1).replace('.', ',') + 'x' : '—', z.gasto ? 'vendido ÷ investido · ROI ' + Math.round((ret - 1) * 100) + '%' : 'vendido ÷ investido', ret >= 1 ? 'bom' : '') + _trfKpi('Vendas', _trfN(z.pag), 'pagaram tudo · ticket médio ' + (z.pag ? _trfRs(z.valor / z.pag) : '—'), '')
+    + '<div class="trf-kpis k6">' + _trfKpi('Investido', D.temMeta ? _trfRs(z.gasto) : '…', 'anúncios do evento na Meta' + (jan ? ' · ' + jan : ''), 'inv') + _trfKpi('Vendido', _trfRs(z.valor), 'mentorias vendidas a quem é da edição', 'vd')
+    + _trfKpi('Retorno', z.gasto ? ret.toFixed(1).replace('.', ',') + 'x' : '—', z.gasto ? 'vendido ÷ investido · ROI ' + Math.round((ret - 1) * 100) + '%' : 'vendido ÷ investido', ret >= 1 ? 'bom' : '') + _trfKpi('Vendas', _trfN(z.pag), 'pagaram tudo', '') + _trfKpi('Ticket médio', _trfTicket(z.valor, z.pag), 'vendido ÷ vendas', '')
     + _trfKpi('Custo por venda', z.pag && z.gasto ? _trfRs(z.gasto / z.pag) : '—', 'investido ÷ vendas', '') + '</div>'
     + '<div class="trf-leads trf-mom">' + '<div class="trf-kpi l"><span>' + (D.soPres ? 'Participantes' : 'Inscritos') + '</span><b>' + _trfN(z.insc) + '</b><small>' + (D.soPres ? 'na lista do evento · ' + _trfN(z.part) + ' compareceram' : 'com ingresso pago') + (z.gasto && z.insc ? '<br>' + _trfRs(z.gasto / z.insc) + ' investidos por ' + (D.soPres ? 'participante' : 'ingresso') : '') + '</small></div>'
     + '<div class="trf-kpi l"><span>' + (D.soPres ? 'Do participante à venda' : 'Do ingresso à venda') + '</span><b>' + (z.insc ? (z.pag / z.insc * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</b><small>' + (D.soPres ? 'vendas ÷ participantes' + (z.part ? ' · ' + (z.pag / z.part * 100).toFixed(1).replace('.', ',') + '% de quem compareceu' : '') : 'vendas ÷ inscritos') + '</small></div>' + m3('Antes do evento', 'reunião antes do dia do pitch', D.mom.pre) + m3('No workshop', 'do pitch até 15 dias depois', D.mom.ws) + m3('Pós-workshop', 'mais de 15 dias depois', D.mom.pos) + '</div>'
@@ -43487,8 +43492,8 @@ function _trfRenderMcp(el) {
   else if (D.metaRuim) avisos += '<div class="trf-aviso">⚠️ A Meta não respondeu agora: investido, impressões e cliques ficam zerados até a próxima tentativa.</div>';
   if (okWs && D.ultima && Date.now() - D.ultima > 6 * 864e5 && z.gasto > 0) avisos += '<div class="trf-aviso">⚠️ A última compra do MCP que chegou à planilha é de ' + new Date(D.ultima).toLocaleDateString('pt-BR') + ', mas os anúncios continuam rodando. As compras mais novas não estão chegando: enquanto isso, os números daqui para baixo ficam incompletos.</div>';
   el.innerHTML = _trfCanalHtml() + '<div class="trf-topo"><div><p>MCP (Método Conteúdo Pedagógico): do anúncio à compra e da compra à mentoria · ' + _trfPerHtml(D.P) + (D.ev ? '' : ' · só quem comprou no período') + '</p></div>' + _trfChips() + '</div>' + avisos
-    + '<div class="trf-kpis">' + _trfKpi('Investido', D.temMeta ? _trfRs(z.gasto) : '…', 'anúncios do MCP na Meta', 'inv') + _trfKpi('Compras do MCP', _trfN(z.insc), z.gasto && z.insc ? _trfRs(z.gasto / z.insc) + ' investidos por compra' : 'compras pagas no período', '')
-    + _trfKpi('Receita do MCP', _trfRs(recMcp), _trfN(z.insc) + ' compras × ' + _trfRs(TRF_MCP_PRECO), '') + _trfKpi('Viraram clientes', _trfN(z.pag) + (z.valor ? ' · ' + _trfRs(z.valor) : ''), 'mentoria vendida a quem comprou o MCP, por qualquer origem', 'vd')
+    + '<div class="trf-kpis k6">' + _trfKpi('Investido', D.temMeta ? _trfRs(z.gasto) : '…', 'anúncios do MCP na Meta', 'inv') + _trfKpi('Compras do MCP', _trfN(z.insc), z.gasto && z.insc ? _trfRs(z.gasto / z.insc) + ' investidos por compra' : 'compras pagas no período', '')
+    + _trfKpi('Receita do MCP', _trfRs(recMcp), _trfN(z.insc) + ' compras × ' + _trfRs(TRF_MCP_PRECO), '') + _trfKpi('Viraram clientes', _trfN(z.pag) + (z.valor ? ' · ' + _trfRs(z.valor) : ''), 'mentoria vendida a quem comprou o MCP, por qualquer origem', 'vd') + _trfKpi('Ticket médio', _trfTicket(z.valor, z.pag), 'das mentorias vendidas a quem comprou o MCP', '')
     + _trfKpi('Retorno', z.gasto ? ret.toFixed(1).replace('.', ',') + 'x' : '—', '(MCP + mentoria) ÷ investido', ret >= 1 ? 'bom' : '') + '</div>'
     + '<div class="trf-leads trf-mom">'
     +   '<button type="button" class="trf-kpi l" onclick="trfPasso(\'insc\')"><span>Compraram o MCP</span><b>' + _trfN(z.insc) + '</b><small>no período</small></button>'
@@ -43591,7 +43596,7 @@ function _trfRenderTodos(el) {
     if (esc === 'diag') {   // as mesmas etapas dos funis de tráfego, orgânico e bio
       var gD = 0; kz.forEach(function(k) { gD += L[k].gasto || 0; });
       var cabD = function(tit, sub) { return '<div class="trf-f3-t"><b>' + tit + '</b><span class="trf-sub">' + sub + '</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div>'
-        + '<div class="trf-f3-k"><span>Investido em anúncios <b>' + (M ? _trfRs(gD) : '…') + '</b></span><span>Vendido <b class="vd">' + _trfRs(vend) + '</b></span><span>Retorno <b>' + (gD && vend ? (vend / gD).toFixed(1).replace('.', ',') + 'x' : '—') + '</b></span><span>Custo por venda <b>' + (gD && z.pag ? _trfRs(gD / z.pag) : '—') + '</b></span></div>'; };
+        + '<div class="trf-f3-k"><span>Investido em anúncios <b>' + (M ? _trfRs(gD) : '…') + '</b></span><span>Vendido <b class="vd">' + _trfRs(vend) + '</b></span><span>Retorno <b>' + (gD && vend ? (vend / gD).toFixed(1).replace('.', ',') + 'x' : '—') + '</b></span><span>Custo por venda <b>' + (gD && z.pag ? _trfRs(gD / z.pag) : '—') + '</b></span><span>Ticket médio <b>' + _trfTicket(vend, z.pag) + '</b></span></div>'; };
       var nComp = Object.keys(compD).length, visParcial = visDesdeT && P.ini < new Date(visDesdeT + 'T00:00:00').getTime() - 864e5;
       var zD = { imp: z.imp, vis: visDiag || 0, ini: z.ent, comp: nComp, mql: mqlDiag || 0, marc: z.marc, real: z.real, apar: z.apar, pag: z.pag };
       var pD = [['imp', 'Vezes que fomos vistos', 'anúncios ' + (M ? _trfN(iA) : '…') + ' + posts do orgânico ' + (TRF.cont ? _trfN(vw) : '…')], ['vis', 'Visitas na página', 'abriram a página do diagnóstico (anúncio, comentário e bio)'], ['ini', 'Iniciaram o formulário', 'deixaram nome e WhatsApp'], ['comp', 'Formulário completo', 'responderam a pesquisa até o fim'], ['mql', 'MQL', 'marcaram algum investimento'],
@@ -43602,7 +43607,7 @@ function _trfRenderTodos(el) {
     }
     var gDe = 0; kz.forEach(function(k) { gDe += L[k].gasto || 0; });
     var cab = function(tit, sub) { return '<div class="trf-f3-t"><b>' + tit + '</b><span class="trf-sub">' + sub + '</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div>'
-      + '<div class="trf-f3-k"><span>Investido em anúncios <b>' + (M ? _trfRs(gDe) : '…') + '</b></span><span>Vendido <b class="vd">' + _trfRs(vend) + '</b></span><span>Retorno <b>' + (gDe && vend ? (vend / gDe).toFixed(1).replace('.', ',') + 'x' : '—') + '</b></span><span>Custo por venda <b>' + (gDe && z.pag ? _trfRs(gDe / z.pag) : '—') + '</b></span></div>'; };
+      + '<div class="trf-f3-k"><span>Investido em anúncios <b>' + (M ? _trfRs(gDe) : '…') + '</b></span><span>Vendido <b class="vd">' + _trfRs(vend) + '</b></span><span>Retorno <b>' + (gDe && vend ? (vend / gDe).toFixed(1).replace('.', ',') + 'x' : '—') + '</b></span><span>Custo por venda <b>' + (gDe && z.pag ? _trfRs(gDe / z.pag) : '—') + '</b></span><span>Ticket médio <b>' + _trfTicket(vend, z.pag) + '</b></span></div>'; };
     if (esc === 'ws' && wsEd) {   // igual ao funil da chave Workshop: inscritos › presentes › aplicaram › reuniões…
       var zW = { imp: z.imp, cli: z.cli, insc: wsEd.insc, d1: wsEd.d1, d2: wsEd.d2, aplT: wsEd.apl, marc: z.marc, real: z.real, apar: z.apar, pag: z.pag }, eds = wsEd.nomes.join(', ');
       var pW = [['imp', 'Impressões', 'vezes que os anúncios apareceram'], ['cli', 'Cliques nos anúncios', 'todos os cliques nos anúncios do evento'], ['insc', 'Inscritos', 'têm ingresso · edições do período: ' + eds]]
@@ -43630,7 +43635,7 @@ function _trfRenderTodos(el) {
       + cel('Entradas', x.entr == null ? '—' : _trfN(x.entr) + (x.ent ? ' <small>' + x.ent + '</small>' : ''))
       + cel('Qualificados', x.qual == null ? '—' : _trfN(x.qual) + pc(x.qual, x.entr) + (x.qualRot ? '<small class="trf-td-q">' + x.qualRot + '</small>' : ''))
       + cel('Marcadas', _trfN(x.reun) + (x.qual && x.reun <= x.qual ? pc(x.reun, x.qual) : '')) + cel('Realizadas', _trfN(x.real) + pc(x.real, x.reun)) + cel('Compareceram', _trfN(x.apar) + pc(x.apar, x.real)) + cel('Vendas', _trfN(x.vend) + pc(x.vend, x.apar))
-      + cel('Vendido', '<b>' + _trfRs(x.valor) + '</b>', 'vd')
+      + cel('Vendido', '<b>' + _trfRs(x.valor) + '</b>' + (x.vend ? '<small class="trf-td-q">ticket ' + _trfTicket(x.valor, x.vend) + '</small>' : ''), 'vd')
       + '<i class="trf-td-bar"><u style="width:' + Math.round(x.valor / maxV * 100) + '%"></u></i>';
     return x.abre ? '<button type="button" class="trf-td-l' + (lugar === 1 ? ' lider' : '') + '" onclick="trfFiltro(\'canal\',\'' + x.abre + '\')" title="Abrir este funil">' + dentro + '</button>' : '<div class="trf-td-l parado' + (lugar === 1 ? ' lider' : '') + '">' + dentro + '</div>'; };
   var avisos = '';
@@ -43642,13 +43647,13 @@ function _trfRenderTodos(el) {
   el.innerHTML = _trfCanalHtml() + '<div class="trf-topo"><div><p>' + (gRot ? 'Só os funis do ' + gRot : 'Todos os funis lado a lado') + ' · reuniões e vendas pela origem escrita na planilha de vendas · ' + _trfPerHtml(P) + '</p></div>' + _trfChips(true) + '</div>'
     + '<div class="trf-prod" role="group" aria-label="Diagnóstico ou Workshop">' + bp('', 'Tudo') + bp('diag', '🩺 Diagnóstico') + bp('ws', '🎓 Workshop') + '<span class="trf-sub">' + (TRF.tprod === 'diag' ? 'tráfego pago, orgânico, link na bio e pré/pós workshop' : TRF.tprod === 'ws' ? 'workshop on-line e presencial' : 'todos os canais, inclusive MCP, Social Selling e indicação') + '</span></div>' + avisos
     + '<div class="trf-kpis">' + _trfKpi('Vendido', _trfRs(T.valor), gRot ? 'vendas com origem de ' + gRot : 'todas as vendas da planilha no período', 'vd')
-    + _trfKpi('Vendas', _trfN(T.vend), T.apar ? Math.round(T.vend / T.apar * 100) + '% dos que compareceram' : 'status Vendido', '') + _trfKpi('Reuniões marcadas', _trfN(T.reun), 'todas as reuniões da planilha no período', '')
+    + _trfKpi('Vendas', _trfN(T.vend), T.apar ? Math.round(T.vend / T.apar * 100) + '% dos que compareceram' : 'status Vendido', '') + _trfKpi('Ticket médio', _trfTicket(T.valor, T.vend), 'vendido ÷ vendas', '') + _trfKpi('Reuniões marcadas', _trfN(T.reun), 'todas as reuniões da planilha no período', '')
     + _trfKpi('Compareceram', _trfN(T.apar), T.reun ? Math.round(T.apar / T.reun * 100) + '% das marcadas' : '', '') + '</div>'
     + '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🏆 Ranking dos funis' + (gRot ? ' · ' + gRot : '') + '</h3><span class="trf-sub">do que mais vendeu para o que menos vendeu · clique numa linha para abrir o funil</span></div>'
     + '<div class="trf-td"><div class="trf-td-l cab">' + cel('', '<i class="trf-td-pos p0">#</i><span>Funil</span>', 'trf-td-n') + cel('', 'Entradas') + cel('', 'Qualificados') + cel('', 'Marcadas') + cel('', 'Realizadas') + cel('', 'Compareceram') + cel('', 'Vendas') + cel('', 'Vendido') + '</div>'
     + ks.slice().sort(function(a, b) { var A = L[a], B = L[b]; return (a === 'dist') - (b === 'dist') || B.valor - A.valor || B.vend - A.vend || B.apar - A.apar || B.reun - A.reun; }).map(linha).join('')
     + '<div class="trf-td-l tot">' + cel('Funil', '<i class="trf-td-pos p0">Σ</i><span><b>Total</b></span>', 'trf-td-n') + cel('Entradas', '—') + cel('Qualificados', '—') + cel('Marcadas', _trfN(T.reun)) + cel('Realizadas', _trfN(T.real) + pc(T.real, T.reun)) + cel('Compareceram', _trfN(T.apar) + pc(T.apar, T.real))
-    + cel('Vendas', _trfN(T.vend) + pc(T.vend, T.apar)) + cel('Vendido', '<b>' + _trfRs(T.valor) + '</b>', 'vd') + '</div></div>'
+    + cel('Vendas', _trfN(T.vend) + pc(T.vend, T.apar)) + cel('Vendido', '<b>' + _trfRs(T.valor) + '</b>' + (T.vend ? '<small class="trf-td-q">ticket ' + _trfTicket(T.valor, T.vend) + '</small>' : ''), 'vd') + '</div></div>'
     + '<p class="trf-nota"><b>Como esta tela conta:</b> cada reunião e cada venda entra uma vez só, pela origem escrita na planilha de vendas e na data da planilha. Por isso o total ' + (gRot ? 'é o das origens de ' + gRot + ' na planilha.' : 'é igual ao da planilha.') + ' Dentro de cada funil a conta é feita pela pessoa (o lead, o inscrito), então o número pode ser um pouco diferente do daqui — por exemplo, quando alguém preencheu dois formulários. O Workshop aqui é pelo mês da venda; dentro do funil dele é por edição.</p></div>'
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>🔻 Funis finais</h3><span class="trf-sub">' + _trfE(P.rot) + ' · do anúncio até a venda · clique nos passos de reunião para ver as pessoas</span></div>'
     + '<div class="trf-prod trf-prod-f" role="group" aria-label="Qual funil ver">' + [['tudo', '🔻 Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎓 Workshop']].map(function(b) { return '<button type="button" class="' + (fEsc === b[0] ? 'on' : '') + '" aria-pressed="' + (fEsc === b[0]) + '" onclick="trfFunilVer(\'' + b[0] + '\')">' + b[1] + '</button>'; }).join('') + '</div>'
