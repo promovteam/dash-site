@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-1023';
+var VERSAO_DASH = '2026-11-12-1028';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41621,6 +41621,9 @@ button.trf-kpi:hover { transform:translateY(-2px); box-shadow:0 10px 26px -14px 
 /* 12/11/2026: investido, vendido, retorno e custo por venda em cada funil final */
 .trf-f3-k { display:flex; flex-wrap:wrap; gap:8px 18px; margin:2px 0 10px; font-size:.72rem; font-weight:700; color:var(--text2); }
 .trf-f3-k b { color:var(--text); font-weight:900; font-variant-numeric:tabular-nums; margin-left:4px; } .trf-f3-k b.vd { color:#3ddc97; }
+
+/* 12/11/2026: período dentro da janela do criativo */
+.trf-jan-per { display:flex; gap:6px; flex-wrap:wrap; }
 </style>
 <script>
 // =====================================================================================================
@@ -41721,10 +41724,17 @@ function trfCriativo(k) { TRF.cri = TRF.cri === k ? '' : k; renderTrafego(); try
 // 11/11/2026 (Bruno, vendo o funil espremido dentro do cartão: "não seria melhor ver por dentro?"): o clique no cartão abre uma JANELA do
 // criativo — o anúncio de um lado, o funil grande do outro (com a % e o custo de cada passo). Os passos abrem a lista das pessoas por
 // cima, e ao fechar a lista a janela continua lá (por isso ela fica abaixo das outras janelas do dash, e não usa a vf-modal).
-function trfCriFechar() { var m = document.getElementById('trf-jan'); if (m) m.remove(); document.removeEventListener('keydown', _trfJanTecla); }
+function trfCriFechar(manter) { var m = document.getElementById('trf-jan'); if (m) m.remove(); document.removeEventListener('keydown', _trfJanTecla);
+  if (!manter && TRF._perVolta) { var v = TRF._perVolta; TRF._perVolta = null; TRF.per = v.per; TRF.de = v.de; TRF.ate = v.ate; try { renderTrafego(); } catch (e) {} } }
+function trfCriPeriodo(k, todo) {   // todo = true: o ano inteiro, só enquanto a janela estiver aberta
+  if (todo) { if (!TRF._perVolta) TRF._perVolta = { per: TRF.per, de: TRF.de, ate: TRF.ate }; TRF.per = 'ano'; }
+  else if (TRF._perVolta) { var v = TRF._perVolta; TRF._perVolta = null; TRF.per = v.per; TRF.de = v.de; TRF.ate = v.ate; }
+  trfCriFechar(true); renderTrafego(); var n = 0;
+  (function abrir() { var D = window._trfCtx; if (D && D.cri && D.cri[k]) { trfCriJanela(k); if (!D.temMeta && n++ < 12) setTimeout(function() { if (document.getElementById('trf-jan')) abrir(); }, 1500); } else if (n++ < 12) setTimeout(abrir, 800); })();
+}
 function _trfJanTecla(e) { if (e.key !== 'Escape') return; if (document.querySelector('.modal-overlay.open, #vf-modal')) return; trfCriFechar(); }
 function trfCriJanela(k) {
-  var D = window._trfCtx, c = D && D.cri[k]; if (!c) return; var jaAberta = !!document.getElementById('trf-jan'); trfCriFechar();
+  var D = window._trfCtx, c = D && D.cri[k]; if (!c) return; var jaAberta = !!document.getElementById('trf-jan'); trfCriFechar(true);
   var cc = null; try { cc = criativoDe(c.nome, c.adId); } catch (e) {}
   var ft = c.foto || (cc && cc.foto) || '', link = (cc && cc.link) || '', post = (cc && cc.post) || '';
   // 11/11/2026 (Bruno: "quero que possa dar para ver como na aba de criativos"): a janela mostra o criativo tocando (o mesmo player da aba Criativos)
@@ -41735,6 +41745,7 @@ function trfCriJanela(k) {
   var L = window._trfCriOrd || [], i = L.indexOf(k), ant = i > 0 ? L[i - 1] : '', prox = i >= 0 && i < L.length - 1 ? L[i + 1] : '';
   var h = '<div class="trf-jan-box" role="dialog" aria-modal="true" aria-label="Funil do criativo"><button type="button" class="vf-modal-x" onclick="trfCriFechar()" aria-label="Fechar">✕</button>'
     + '<div class="trf-jan-t"><h3>🔻 ' + _trfE(c.nome) + '</h3><span class="trf-sub">' + (D.ev ? 'o que aconteceu em ' : 'quem chegou em ') + _trfE(D.P.rot) + (i >= 0 ? ' · #' + (i + 1) + ' de ' + L.length : '') + '</span>'
+    + '<span class="trf-jan-per" role="group" aria-label="Período do criativo"><button type="button" class="pl-chip' + (TRF._perVolta ? '' : ' on') + '" onclick="trfCriPeriodo(\'' + k + '\',false)">No período da tela</button><button type="button" class="pl-chip' + (TRF._perVolta ? ' on' : '') + '" onclick="trfCriPeriodo(\'' + k + '\',true)" title="Tudo o que este criativo fez no ano">Todo o período do criativo</button></span>'
     + '<span class="trf-jan-nav">' + (ant ? '<button type="button" class="pl-chip" onclick="trfCriJanela(\'' + ant + '\')">‹ anterior</button>' : '') + (prox ? '<button type="button" class="pl-chip" onclick="trfCriJanela(\'' + prox + '\')">próximo ›</button>' : '') + '</span></div>'
     + '<div class="trf-jan-g' + (temPlayer ? ' vid' : '') + '"><div class="trf-jan-e">'
     +   (temPlayer ? '<div class="cri-fb trf-jan-play" data-post="' + _trfE(post) + '" data-video="' + _trfE((cc && cc.video) || '') + '" data-link="' + _trfE(link) + '" data-titulo="' + _trfE(c.nome) + '" data-foto="' + _trfE(ft) + '"' + (ft ? ' style="background-image:url(&quot;' + _trfE(ft) + '&quot;)"' : '') + '></div>'
@@ -42330,7 +42341,7 @@ function trfPassoT(esc, k, f) { if (!window._trfCtx) return; TRF.lst = { k: k, f
 function trfSoTotal(q) { try { avisoRapido(q === 'meta' ? 'Este número é um total dos anúncios na Meta: não existe lista de pessoas.' : q === 'vis' ? 'Visita é anônima: a página só sabe quantas foram, não quem foi.' : 'Este número é um total que vem do Instagram: não existe lista de quem viu ou de quem foi ao perfil.'); } catch (e) {} }
 function trfPostPasso(i, k) { if (!window._trfCtx) return; TRF.lst = { k: k, f: '', post: i }; _trfListaDesenhar(); }
 function trfPostJanela(i) {
-  var L = window._trfPostsOrd || [], o = L[i]; if (!o) return; var jaAberta = !!document.getElementById('trf-jan'); trfCriFechar();
+  var L = window._trfPostsOrd || [], o = L[i]; if (!o) return; var jaAberta = !!document.getElementById('trf-jan'); trfCriFechar(true);
   var naBio0 = TRF.canal === 'bio';
   var PS = [TRF_ORG_VW, ['com', 'Comentaram a palavra', 'comentaram a palavra do diagnóstico neste post'], ['ini', 'Iniciou o formulário', 'dos que comentaram, os achados na base pelo @ do Instagram'], ['comp', 'Formulário completo', 'responderam a pesquisa até o fim'], ['mql', 'MQL', 'marcaram algum investimento'],
     ['marc', 'Marcada', 'têm reunião depois do comentário'], ['real', 'Realizada', 'o dia da reunião chegou e o resultado foi lançado'], ['apar', 'Compareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
@@ -42342,13 +42353,13 @@ function trfPostJanela(i) {
   var leg = o.leg.replace(/\s+/g, ' ').trim(), d = new Date(o.t), ft = _trfPostCapa(o);
   var mi = String(o.lk).match(/instagram\.com\/(?:[^\/?#]+\/)?(reels?|p|tv)\/([A-Za-z0-9_-]+)/i);   // o post inteiro, como na aba Criativos
   var h = '<div class="trf-jan-box" role="dialog" aria-modal="true" aria-label="Funil do post"><button type="button" class="vf-modal-x" onclick="trfCriFechar()" aria-label="Fechar">✕</button>'
-    + '<div class="trf-jan-t"><h3>🔻 ' + _trfE(leg ? leg.slice(0, 70) + (leg.length > 70 ? '…' : '') : 'Post sem legenda') + '</h3><span class="trf-sub">post de ' + d.toLocaleDateString('pt-BR') + ' · #' + (i + 1) + ' de ' + L.length + '</span>'
+    + '<div class="trf-jan-t"><h3>🔻 ' + _trfE(leg ? leg.slice(0, 70) + (leg.length > 70 ? '…' : '') : 'Post sem legenda') + '</h3><span class="trf-sub">post de ' + d.toLocaleDateString('pt-BR') + ' · #' + (i + 1) + ' de ' + L.length + '</span><span class="trf-jan-per"><span class="pl-chip on" style="cursor:default;" title="Comentários, formulários, reuniões e vendas deste post, da publicação até hoje">📅 Todo o período do post: de ' + d.toLocaleDateString('pt-BR').slice(0, 5) + ' até hoje</span></span>'
     + '<span class="trf-jan-nav">' + (i > 0 ? '<button type="button" class="pl-chip" onclick="trfPostJanela(' + (i - 1) + ')">‹ anterior</button>' : '') + (i < L.length - 1 ? '<button type="button" class="pl-chip" onclick="trfPostJanela(' + (i + 1) + ')">próximo ›</button>' : '') + '</span></div>'
     + '<div class="trf-jan-g' + (mi ? ' vid' : '') + '"><div class="trf-jan-e">'
     +   (mi ? '<div class="trf-jan-igw"' + (ft ? ' style="background-image:url(\'' + _trfE(ft).replace(/'/g, '%27') + '\')"' : '') + '><iframe class="trf-jan-ig" src="https://www.instagram.com/' + (mi[1].toLowerCase() === 'reels' ? 'reel' : mi[1].toLowerCase()) + '/' + mi[2] + '/embed/captioned/" height="560" scrolling="no" frameborder="0" allowtransparency="true" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Post do Instagram"></iframe></div><a href="' + _trfE(o.lk) + '" target="_blank" rel="noopener" class="trf-jan-fora">abrir no Instagram ↗</a>'
         : '<div class="an-capa trf-jan-capa">' + (ft ? '<img decoding="async" src="' + _trfE(ft) + '" onerror="this.style.display=\'none\'">' : '<span class="trf-jan-sem">🎬<small>post do Instagram</small></span>') + '<a href="' + _trfE(o.lk) + '" target="_blank" rel="noopener" class="trf-jan-link">ver post ↗</a></div>')
     +   '<div class="trf-jan-ns">' + num('Visualizações', o.temVw ? _trfK(o.vw) : '…') + num('Vendido', _trfRs(o.fat), '#3ddc97') + num('Curtidas', _trfK(o.cur)) + num('Comentários', _trfK(o.cm)) + (naBio ? num('Foram ao perfil', _trfN(o.pf), '#22d3ee') + num('De quem viu', o.vw ? (o.pf / o.vw * 100).toFixed(2).replace('.', ',') + '%' : '—') : num('Viram lead', o.com ? Math.round(o.ld / o.com * 100) + '%' : '—') + num('Vendas', _trfN(o.vd))) + '</div></div>'
-    + '<div class="trf-jan-d"><div class="trf-fns">' + blocos + '</div><p class="trf-nota">' + (naBio ? '' : 'Clique num passo para ver as pessoas. ') + (naBio ? 'Quem vem pela bio não comenta, então não dá para seguir este post até a venda. Pelo comentário, este mesmo post trouxe ' + _trfN(o.ld) + (o.ld === 1 ? ' lead' : ' leads') + ' e ' + _trfN(o.vd) + (o.vd === 1 ? ' venda' : ' vendas') + ' (veja na chave Orgânico).' : 'É o funil completo só deste post: quem comentou a palavra nele e o que aconteceu com cada pessoa. A ligação é pelo @ do Instagram escrito no formulário (quem escreveu diferente não é achado, então os números são um piso). “Visitas na página” ainda não existe por post: o link do ManyChat é o mesmo em todos.') + '</p></div></div></div>';
+    + '<div class="trf-jan-d"><div class="trf-fns">' + blocos + '</div><p class="trf-nota">' + (naBio ? '' : 'Clique num passo para ver as pessoas. ') + (naBio ? 'Quem vem pela bio não comenta, então não dá para seguir este post até a venda. Pelo comentário, este mesmo post trouxe ' + _trfN(o.ld) + (o.ld === 1 ? ' lead' : ' leads') + ' e ' + _trfN(o.vd) + (o.vd === 1 ? ' venda' : ' vendas') + ' (veja na chave Orgânico).' : 'É o funil completo só deste post, da publicação até hoje (não só do período escolhido na tela): quem comentou nele e o que aconteceu com cada pessoa. A ligação é pelo @ do Instagram escrito no formulário (quem escreveu diferente não é achado, então os números são um piso). “Visitas na página” ainda não existe por post: o link do ManyChat é o mesmo em todos.') + '</p></div></div></div>';
   var el = document.createElement('div'); el.id = 'trf-jan'; el.className = 'trf-jan' + (jaAberta ? ' troca' : ''); el.innerHTML = h;
   el.addEventListener('click', function(e) { if (e.target === el) trfCriFechar(); });
   document.body.appendChild(el); document.addEventListener('keydown', _trfJanTecla); try { el.querySelector('.vf-modal-x').focus(); } catch (e2) {}
