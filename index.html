@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-0941';
+var VERSAO_DASH = '2026-11-12-1015';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41617,6 +41617,10 @@ button.trf-kpi:hover { transform:translateY(-2px); box-shadow:0 10px 26px -14px 
 .trf-f3-tudo { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:14px 14px 10px; }
 
 .trf-prod-f { margin:4px 0 2px; }
+
+/* 12/11/2026: investido, vendido, retorno e custo por venda em cada funil final */
+.trf-f3-k { display:flex; flex-wrap:wrap; gap:8px 18px; margin:2px 0 10px; font-size:.72rem; font-weight:700; color:var(--text2); }
+.trf-f3-k b { color:var(--text); font-weight:900; font-variant-numeric:tabular-nums; margin-left:4px; } .trf-f3-k b.vd { color:#3ddc97; }
 </style>
 <script>
 // =====================================================================================================
@@ -41957,15 +41961,15 @@ function _trfDados() {
       var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); } });
     z.com = comPs.length; z.comPs = comPs;
     // quem comentou no post SEM a palavra (uma pessoa conta uma vez, mesmo comentando em vários posts)
+    var novaSem = function(q) { var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = igLeadPorInsta(q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
+      var rf = l && l.tel8 ? (_formT[l.tel8] || null) : null;
+      return { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, cmt: true, semPalavra: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _vfMql(l.invest)),
+        fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 }; };
     if (TRF.cmt && TRF.cmt.length) { var semPal = {}, cmtPs = [], cmtDesde = Infinity;
       TRF.cmt.forEach(function(q) { if (q.t < cmtDesde) cmtDesde = q.t; if (q.t < P.ini || q.t >= P.fim || quem[q.u]) return;
         var pe = semPal[q.u]; if (pe) { pe.nCom++; if (q.t > pe.t) { pe.t = q.t; pe.lkPost = q.lk; } return; }
-        var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = igLeadPorInsta(q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
-        var rf = l && l.tel8 ? (_formT[l.tel8] || null) : null;
-        pe = semPal[q.u] = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, cmt: true, semPalavra: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _vfMql(l.invest)),
-          fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 };
-        cmtPs.push(pe); });
-      z.cmtPs = cmtPs; z.cmt = cmtPs.length + comPs.length; z.cmtDesde = cmtDesde; }
+        pe = semPal[q.u] = novaSem(q); cmtPs.push(pe); });
+      z.cmtPs = cmtPs; z.cmt = cmtPs.length + comPs.length; z.cmtDesde = cmtDesde; z._semPal = semPal; }
     // 11/11/2026 (Bruno: "no orgânico e no evento coloque os criativos como no tráfego"): no orgânico o criativo é o POST — cada post publicado
     // no período com quem comentou a palavra nele, quem virou lead (pelo @), e as reuniões e vendas dessas pessoas depois do comentário.
     var formDe = {}; ((S && S.leads) || []).forEach(function(x) { if (!x.t8) return; var f = formDe[x.t8] || (formDe[x.t8] = { c: false }); if (x.comp) f.c = true; });
@@ -41981,6 +41985,8 @@ function _trfDados() {
         if (rs.length) { o.marc++; pe.marc = true; } pe.real = rs.some(function(r) { return isReal(r.sn); }); if (pe.real) o.real++; if (rs.some(function(r) { return isComp(r.sn); })) { o.apar++; pe.apar = true; }
         var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { o.vd++; pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); o.fat += pe.valor; } });
     } catch (eP) {}
+    if (TRF.cmt && TRF.cmt.length) TRF.cmt.forEach(function(q) { var o = posts[q.lk]; if (!o || o._u[q.u]) return; o._c = o._c || {}; if (o._c[q.u]) return;   // quem comentou neste post SEM a palavra
+      var pe = (z._semPal && z._semPal[q.u]) || novaSem(q); o._c[q.u] = pe; (o.cs = o.cs || []).push(pe); });
     z.posts = Object.keys(posts).map(function(k) { return posts[k]; });
   }
   var semOrg = org && !(S && S.visOrg);   // visitas por origem: só depois que a função da base do site passar a devolver esse recorte
@@ -42316,14 +42322,16 @@ function trfClintLote(btn) {
   document.body.appendChild(sc); setTimeout(function() { fim(null); }, 300000);
 }
 function trfFunilVer(v) { TRF.tfun = v; renderTrafego(); try { document.getElementById('trf-cri').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
-function trfPassoT(esc, k) { if (!window._trfCtx) return; TRF.lst = { k: k, f: '', esc: esc }; _trfListaDesenhar(); }
+function trfPassoT(esc, k, f) { if (!window._trfCtx) return; TRF.lst = { k: k, f: f || '', esc: esc }; _trfListaDesenhar(); }
 function trfSoTotal(q) { try { avisoRapido(q === 'meta' ? 'Este número é um total dos anúncios na Meta: não existe lista de pessoas.' : q === 'vis' ? 'Visita é anônima: a página só sabe quantas foram, não quem foi.' : 'Este número é um total que vem do Instagram: não existe lista de quem viu ou de quem foi ao perfil.'); } catch (e) {} }
 function trfPostPasso(i, k) { if (!window._trfCtx) return; TRF.lst = { k: k, f: '', post: i }; _trfListaDesenhar(); }
 function trfPostJanela(i) {
   var L = window._trfPostsOrd || [], o = L[i]; if (!o) return; var jaAberta = !!document.getElementById('trf-jan'); trfCriFechar();
+  var naBio0 = TRF.canal === 'bio';
   var PS = [TRF_ORG_VW, ['com', 'Comentaram a palavra', 'comentaram a palavra do diagnóstico neste post'], ['ini', 'Iniciou o formulário', 'dos que comentaram, os achados na base pelo @ do Instagram'], ['comp', 'Formulário completo', 'responderam a pesquisa até o fim'], ['mql', 'MQL', 'marcaram algum investimento'],
     ['marc', 'Marcada', 'têm reunião depois do comentário'], ['real', 'Realizada', 'o dia da reunião chegou e o resultado foi lançado'], ['apar', 'Compareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
-  var val = { vw: o.vw, com: o.com, pf: o.pf, ini: o.ld, comp: o.comp, mql: o.mql, marc: o.marc, real: o.real, apar: o.apar, pag: o.vd }, naBio = TRF.canal === 'bio';
+  if (!naBio0 && o.cs) PS.splice(1, 0, ['cmt', 'Comentaram no post', 'pessoas que comentaram qualquer coisa neste post']);
+  var val = { vw: o.vw, cmt: o.com + ((o.cs || []).length), com: o.com, pf: o.pf, ini: o.ld, comp: o.comp, mql: o.mql, marc: o.marc, real: o.real, apar: o.apar, pag: o.vd }, naBio = TRF.canal === 'bio';
   if (naBio) PS = [TRF_ORG_VW, ['pf', 'Foram ao perfil', 'idas ao perfil a partir deste post']];
   var blocos = _trfFnBlocos(PS, val, 0, { semVw: !o.temVw, semCom: false, temMeta: true, semVis: false }, function(k) { return naBio || k === 'vw' ? 'trfSoTotal()' : 'trfPostPasso(' + i + ',\'' + k + '\')'; });
   var num = function(rot, v, cor) { return '<div class="trf-jan-n"><span>' + rot + '</span><b' + (cor ? ' style="color:' + cor + '"' : '') + '>' + v + '</b></div>'; };
@@ -42806,6 +42814,12 @@ function _trfRenderTodos(el) {
   var semEnt = true; zf.imp = 0; zf.cli = 0; zf.ent = 0; ks.forEach(function(k) { zf.imp += L[k].imp; zf.cli += L[k].cli; if (L[k].entr != null) { zf.ent += L[k].entr; semEnt = false; } });
   impAds = zf.imp; zf.imp += vwOrg;
   var semMql = TRF.tprod === 'diag' ? mqlDiag == null : TRF.tprod === 'ws' ? mqlEv == null : (mqlDiag == null && mqlEv == null); zf.mql = (TRF.tprod === 'ws' ? 0 : (mqlDiag || 0)) + (TRF.tprod === 'diag' ? 0 : (mqlEv || 0));
+  var wsEd = null;
+  try { var _sv = [TRF.wed, TRF.wtipo, TRF.wpub]; TRF.wed = '*'; TRF.wtipo = ''; TRF.wpub = ''; var DW = null; try { DW = _trfDadosWs(); } catch (eW) {} TRF.wed = _sv[0]; TRF.wtipo = _sv[1]; TRF.wpub = _sv[2];
+    if (DW && DW.cri) { var we = { insc: 0, d1: 0, d2: 0, apl: 0, aplPg: 0, nomes: [], semPres: false };
+      Object.keys(DW.cri).forEach(function(k) { var c = DW.cri[k]; if (c.fut || !(c.d1 >= P.ini && c.d1 < P.fim)) return; we.insc += c.insc || 0; we.apl += c.aplT || 0; we.aplPg += c.apl || 0; we.nomes.push(String(c.nome || '').replace(/^\S+\s/, ''));
+        if (c.pres) { we.d1 += c.part || 0; we.d2 += c.part || 0; } else { var f = TRF_WS_PRES_FIXA[k]; if (f) { we.d1 += f[0]; we.d2 += f[1]; } else we.semPres = true; } });
+      if (we.nomes.length) wsEd = we; } } catch (eWs) {}
   var funilDe = function(esc) {
     var Gx = esc === 'diag' ? GD : esc === 'ws' ? GW : null, kz = ['pago', 'org', 'bio', 'pp', 'ws', 'pres', 'mcp', 'ss', 'ind', 'out', 'dist'].filter(function(k) { return !Gx || Gx[k]; });
     var z = { imp: 0, cli: 0, ent: 0, marc: 0, real: 0, apar: 0, pag: 0 }, semE = true; kz.forEach(function(k) { z.imp += L[k].imp; z.cli += L[k].cli; if (L[k].entr != null) { z.ent += L[k].entr; semE = false; } });
@@ -42814,21 +42828,35 @@ function _trfRenderTodos(el) {
     var vend = linDe[esc].reduce(function(a, o) { return a + (o.pag ? o.valor : 0); }, 0);
     var semM = esc === 'diag' ? mqlDiag == null : esc === 'ws' ? mqlEv == null : (mqlDiag == null && mqlEv == null);
     if (esc === 'diag') {   // as mesmas etapas dos funis de tráfego, orgânico e bio
+      var gD = 0; kz.forEach(function(k) { gD += L[k].gasto || 0; });
+      var cabD = function(tit, sub) { return '<div class="trf-f3-t"><b>' + tit + '</b><span class="trf-sub">' + sub + '</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div>'
+        + '<div class="trf-f3-k"><span>Investido em anúncios <b>' + (M ? _trfRs(gD) : '…') + '</b></span><span>Vendido <b class="vd">' + _trfRs(vend) + '</b></span><span>Retorno <b>' + (gD && vend ? (vend / gD).toFixed(1).replace('.', ',') + 'x' : '—') + '</b></span><span>Custo por venda <b>' + (gD && z.pag ? _trfRs(gD / z.pag) : '—') + '</b></span></div>'; };
       var nComp = Object.keys(compD).length, visParcial = visDesdeT && P.ini < new Date(visDesdeT + 'T00:00:00').getTime() - 864e5;
       var zD = { imp: z.imp, vis: visDiag || 0, ini: z.ent, comp: nComp, mql: mqlDiag || 0, marc: z.marc, real: z.real, apar: z.apar, pag: z.pag };
       var pD = [['imp', 'Vezes que fomos vistos', 'anúncios ' + (M ? _trfN(iA) : '…') + ' + posts do orgânico ' + (TRF.cont ? _trfN(vw) : '…')], ['vis', 'Visitas na página', 'abriram a página do diagnóstico (anúncio, comentário e bio)'], ['ini', 'Iniciaram o formulário', 'deixaram nome e WhatsApp'], ['comp', 'Formulário completo', 'responderam a pesquisa até o fim'], ['mql', 'MQL', 'marcaram algum investimento'],
         ['marc', 'Reuniões marcadas', 'reuniões da planilha com origem de diagnóstico'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
-      return '<div class="trf-f3 trf-f3-diag"><div class="trf-f3-t"><b>🩺 Funil do Diagnóstico</b><span class="trf-sub">tráfego pago + orgânico + link na bio + pré e pós workshop</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div><div class="trf-fns">'
-        + _trfFnBlocos(pD, zD, 0, { temMeta: !!M, semVis: visDiag == null, semEnt: semE, semMql: semM, aparte: visParcial ? { vis: '~as visitas só existem desde ' + visDesdeT.slice(8, 10) + '/' + visDesdeT.slice(5, 7) + '/' + visDesdeT.slice(0, 4) + ' · o período começa antes' } : {}, naoBase: visParcial ? { vis: 1 } : {} },
+      return '<div class="trf-f3 trf-f3-diag">' + cabD('🩺 Funil do Diagnóstico', 'tráfego pago + orgânico + link na bio + pré e pós workshop') + '<div class="trf-fns">'
+        + _trfFnBlocos(pD, zD, gD, { temMeta: !!M, semVis: visDiag == null, semEnt: semE, semMql: semM, aparte: visParcial ? { vis: '~as visitas só existem desde ' + visDesdeT.slice(8, 10) + '/' + visDesdeT.slice(5, 7) + '/' + visDesdeT.slice(0, 4) + ' · o período começa antes' } : {}, naoBase: visParcial ? { vis: 1 } : {} },
             function(k) { return /^(marc|real|apar|pag)$/.test(k) ? 'trfPassoT(\'diag\',\'' + k + '\')' : 'trfIr(\'trf-funil\')'; }) + '</div></div>';
+    }
+    var gDe = 0; kz.forEach(function(k) { gDe += L[k].gasto || 0; });
+    var cab = function(tit, sub) { return '<div class="trf-f3-t"><b>' + tit + '</b><span class="trf-sub">' + sub + '</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div>'
+      + '<div class="trf-f3-k"><span>Investido em anúncios <b>' + (M ? _trfRs(gDe) : '…') + '</b></span><span>Vendido <b class="vd">' + _trfRs(vend) + '</b></span><span>Retorno <b>' + (gDe && vend ? (vend / gDe).toFixed(1).replace('.', ',') + 'x' : '—') + '</b></span><span>Custo por venda <b>' + (gDe && z.pag ? _trfRs(gDe / z.pag) : '—') + '</b></span></div>'; };
+    if (esc === 'ws' && wsEd) {   // igual ao funil da chave Workshop: inscritos › presentes › aplicaram › reuniões…
+      var zW = { imp: z.imp, cli: z.cli, insc: wsEd.insc, d1: wsEd.d1, d2: wsEd.d2, aplT: wsEd.apl, marc: z.marc, real: z.real, apar: z.apar, pag: z.pag }, eds = wsEd.nomes.join(', ');
+      var pW = [['imp', 'Impressões', 'vezes que os anúncios apareceram'], ['cli', 'Cliques nos anúncios', 'todos os cliques nos anúncios do evento'], ['insc', 'Inscritos', 'têm ingresso · edições do período: ' + eds]]
+        .concat(wsEd.semPres ? [] : [['d1', 'Presentes no 1º dia', 'entraram na sala no dia 1'], ['d2', 'Presentes no dia do pitch', 'entraram na sala no dia do pitch']])
+        .concat([['aplT', 'Aplicaram', _trfN(wsEd.aplPg) + ' com a aplicação paga'], ['marc', 'Reuniões marcadas', 'reuniões da planilha com origem Workshop no período'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'à reunião: vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']]);
+      return '<div class="trf-f3 trf-f3-ws">' + cab('🎓 Funil do Workshop', 'edições que aconteceram no período: ' + eds) + '<div class="trf-fns">'
+        + _trfFnBlocos(pW, zW, gDe, { temMeta: !!M, semVis: false }, function(k) { return /^(marc|real|apar|pag)$/.test(k) ? 'trfPassoT(\'ws\',\'' + k + '\')' : 'trfFiltro(\'canal\',\'ws\')'; }) + '</div></div>';
     }
     var passos = [['imp', esc === 'ws' ? 'Impressões' : 'Vezes que fomos vistos', esc === 'ws' ? 'vezes que os anúncios apareceram' : 'anúncios ' + (M ? _trfN(iA) : '…') + ' + posts do orgânico ' + (TRF.cont ? _trfN(vw) : '…')], ['cli', 'Cliques nos anúncios', esc === 'ws' ? 'todos os cliques nos anúncios do evento' : 'todos os cliques nos anúncios (o orgânico não tem clique medido)'],
       ['ent', esc === 'diag' ? 'Leads' : esc === 'ws' ? 'Ingressos' : 'Entraram nos funis', esc === 'diag' ? 'iniciaram o formulário (pago, orgânico e bio)' : esc === 'ws' ? 'ingressos comprados (on-line e presencial)' : 'leads do diagnóstico + ingressos de evento + compras do MCP'],
       ['mql', esc === 'ws' ? 'Aplicaram' : 'Qualificados (MQL)', esc === 'diag' ? 'marcaram algum investimento no formulário' : esc === 'ws' ? _trfN(mqlEvPg) + ' com a aplicação paga' : 'diagnóstico: marcou investimento (' + _trfN(mqlDiag || 0) + ') + eventos: aplicaram (' + _trfN(mqlEv || 0) + ')'],
       ['marc', 'Reuniões marcadas', 'reuniões da planilha de vendas no período'], ['real', 'Realizadas', 'o dia chegou e o resultado foi lançado'], ['apar', 'Compareceram', 'vendido, não vendido, entrada, bloqueio ou estorno'], ['pag', 'Entrou', 'pagou tudo · status Vendido']];
     var tit = esc === 'diag' ? '🩺 Funil do Diagnóstico' : esc === 'ws' ? '🎓 Funil do Workshop' : '🔻 Tudo junto', sub = esc === 'diag' ? 'tráfego pago + orgânico + link na bio + pré e pós workshop' : esc === 'ws' ? 'workshop on-line (origem Workshop) + presencial' : 'Diagnóstico + Workshop + os outros canais';
-    return '<div class="trf-f3 trf-f3-' + esc + '"><div class="trf-f3-t"><b>' + tit + '</b><span class="trf-sub">' + sub + '</span><span class="trf-f3-v">' + _trfN(z.pag) + (z.pag === 1 ? ' venda' : ' vendas') + ' · ' + _trfRs(vend) + '</span></div><div class="trf-fns">'
-      + _trfFnBlocos(passos, z, 0, { temMeta: !!M, semVis: false, semEnt: semE, semMql: semM, aparte: (esc === 'ws' ? {} : { cli: vw > 0 ? 'só dos anúncios' + (iA ? ' · ' + (z.cli / iA * 100).toFixed(1).replace('.', ',') + '% das impressões deles' : '') : '', ent: 'inclui o orgânico, que não vem de clique em anúncio' }) },
+    return '<div class="trf-f3 trf-f3-' + esc + '">' + cab(tit, sub) + '<div class="trf-fns">'
+      + _trfFnBlocos(passos, z, gDe, { temMeta: !!M, semVis: false, semEnt: semE, semMql: semM, aparte: (esc === 'ws' ? {} : { cli: vw > 0 ? 'só dos anúncios' + (iA ? ' · ' + (z.cli / iA * 100).toFixed(1).replace('.', ',') + '% das impressões deles' : '') : '', ent: 'inclui o orgânico, que não vem de clique em anúncio' }) },
           function(k) { return /^(marc|real|apar|pag)$/.test(k) ? 'trfPassoT(\'' + esc + '\',\'' + k + '\')' : 'trfIr(\'trf-funil\')'; }) + '</div></div>';
   };
   var fEsc = TRF.tfun || TRF.tprod || 'tudo';
@@ -42847,6 +42875,8 @@ function _trfRenderTodos(el) {
   var avisos = '';
   if (!okV) avisos += '<div class="trf-aviso"><span class="mv-brilho-txt">Lendo a planilha de vendas…</span></div>';
   if (!M) avisos += '<div class="trf-aviso"><span class="mv-brilho-txt">Buscando os anúncios na Meta…</span></div>'; else if (M.erro) avisos += '<div class="trf-aviso">⚠️ A Meta não respondeu agora: as impressões e os cliques do funil final ficam zerados até a próxima tentativa.</div>';
+  var semValorN = linDe.tudo.filter(function(o) { return o.pag && !(o.valor > 0); }).length;
+  if (semValorN) avisos += '<div class="trf-aviso">⚠️ ' + _trfN(semValorN) + (semValorN === 1 ? ' venda deste período está' : ' vendas deste período estão') + ' com o valor ZERADO para o dash — quase sempre é valor digitado como texto na planilha de vendas (por exemplo “R$ 5000,00” sem o ponto). O total vendido está menor do que o real até a planilha ser corrigida. <button type="button" class="pl-chip" onclick="trfPassoT(\'tudo\',\'pag\',\'semValor\')">ver quais são</button></div>';
   var bp = function(v, r) { return '<button type="button" class="' + (TRF.tprod === v ? 'on' : '') + '" onclick="trfFiltro(\'tprod\',\'' + v + '\')" aria-pressed="' + (TRF.tprod === v) + '">' + r + '</button>'; };
   el.innerHTML = _trfCanalHtml() + '<div class="trf-topo"><div><p>' + (gRot ? 'Só os funis do ' + gRot : 'Todos os funis lado a lado') + ' · reuniões e vendas pela origem escrita na planilha de vendas · ' + _trfE(P.rot) + '</p></div>' + _trfChips(true) + '</div>'
     + '<div class="trf-prod" role="group" aria-label="Diagnóstico ou Workshop">' + bp('', 'Tudo') + bp('diag', '🩺 Diagnóstico') + bp('ws', '🎓 Workshop') + '<span class="trf-sub">' + (TRF.tprod === 'diag' ? 'tráfego pago, orgânico, link na bio e pré/pós workshop' : TRF.tprod === 'ws' ? 'workshop on-line e presencial' : 'todos os canais, inclusive MCP, Social Selling e indicação') + '</span></div>' + avisos
@@ -42862,7 +42892,7 @@ function _trfRenderTodos(el) {
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>🔻 Funis finais</h3><span class="trf-sub">' + _trfE(P.rot) + ' · do anúncio até a venda · clique nos passos de reunião para ver as pessoas</span></div>'
     + '<div class="trf-prod trf-prod-f" role="group" aria-label="Qual funil ver">' + [['tudo', '🔻 Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎓 Workshop']].map(function(b) { return '<button type="button" class="' + (fEsc === b[0] ? 'on' : '') + '" aria-pressed="' + (fEsc === b[0]) + '" onclick="trfFunilVer(\'' + b[0] + '\')">' + b[1] + '</button>'; }).join('') + '</div>'
     + funilDe(fEsc)
-    + '<p class="trf-nota">“Entraram” soma as pessoas que chegaram em cada canal (lead, ingresso, compra). No Diagnóstico e no “tudo junto”, o topo soma as vezes que os anúncios apareceram com as visualizações dos ' + _trfN(nPosts) + ' posts publicados no período (no 7º dia de cada post; os que têm menos de 7 dias entram com o número de hoje) — é número de vezes, não de pessoas. Qualificados: no diagnóstico, quem marcou algum investimento no formulário; nos eventos, quem aplicou. Reuniões, comparecimento e vendas vêm da planilha de vendas, pela origem escrita: “Pré workshop” e “Pós workshop” contam no Diagnóstico; o Workshop fica com a origem “Workshop”.'
+    + '<p class="trf-nota">“Entraram” soma as pessoas que chegaram em cada canal (lead, ingresso, compra). No Diagnóstico e no “tudo junto”, o topo soma as vezes que os anúncios apareceram com as visualizações dos ' + _trfN(nPosts) + ' posts publicados no período (no 7º dia de cada post; os que têm menos de 7 dias entram com o número de hoje) — é número de vezes, não de pessoas. Qualificados: no diagnóstico, quem marcou algum investimento no formulário; nos eventos, quem aplicou. O investido é o gasto em anúncios na Meta dentro do período; como venda de um mês pode vir de anúncio pago no mês anterior (principalmente nos eventos), o retorno de períodos curtos é só uma referência. No Workshop, inscritos, presença e aplicações são das edições que aconteceram no período. Reuniões, comparecimento e vendas vêm da planilha de vendas, pela origem escrita: “Pré workshop” e “Pós workshop” contam no Diagnóstico; o Workshop fica com a origem “Workshop”.'
     + ((L.ss.reun + L.ind.reun + L.out.reun) ? ' No “tudo junto” entram também ' + _trfN(L.ss.reun + L.ind.reun + L.out.reun) + ' reuniões de Social Selling, indicação e outras origens, que não passam pelos passos de cima.' : '') + '</p></div>'
     + '<p class="trf-nota">O ranking é pelo valor vendido no período. Qualificados: no diagnóstico é o MQL (marcou algum investimento no formulário); nos eventos é quem aplicou (ao lado, quantas aplicações foram pagas). O % pequeno em Marcadas é sobre os qualificados. O valor investido não aparece aqui porque boa parte das vendas de um mês vem de anúncio pago em meses anteriores (principalmente nos eventos); o investido e o retorno de cada funil ficam dentro da chave dele. Os % pequenos são sempre sobre o passo anterior: em Realizadas, quantas das marcadas; em Compareceram, quantas das realizadas; em Vendas, quantos dos que compareceram. Entradas não se somam (lead, ingresso e compra são coisas diferentes). “Link na bio e orgânico direto” = origem [Org][Diag] da planilha.</p>';
   window._trfCtx = { todosC: true, ev: true, P: P, z: zf, lista: linhasF, todas: linhasF, listas: linDe, cri: {}, soPg: '', temSite: true, temMeta: !!M };
@@ -42905,15 +42935,15 @@ function trfPaginas() {
       }).join('') + '</div>';
   window._vfModal = window._vfModal || {}; window._vfModal.trfpag = h; vfAbrir('trfpag');
 }
-function doPostNome(S) { return S && S.post != null ? { com: 'Comentaram a palavra', ini: 'Iniciou o formulário', comp: 'Formulário completo', mql: 'MQL', marc: 'Marcada', real: 'Realizada', apar: 'Compareceu', pag: 'Entrou' } : null; }
+function doPostNome(S) { return S && S.post != null ? { cmt: 'Comentaram sem a palavra', com: 'Comentaram a palavra', ini: 'Iniciou o formulário', comp: 'Formulário completo', mql: 'MQL', marc: 'Marcada', real: 'Realizada', apar: 'Compareceu', pag: 'Entrou' } : null; }
 function trfListaFiltro(f) { if (!TRF.lst) return; TRF.lst.f = TRF.lst.f === f ? '' : f; _trfListaDesenhar(); }
 function _trfListaDesenhar() {
   var D = window._trfCtx, S = TRF.lst; if (!D || !S) return;
   var nome = (doPostNome(S) || (D.mcp ? { insc: 'Compraram o MCP', diag: 'Pediram diagnóstico', evento: 'Compraram ingresso de evento', marc: 'Tiveram reunião', real: 'Realizada', apar: 'Compareceu', pag: 'Viraram cliente' } : null) || { cmt: 'Comentaram sem a palavra', com: 'Comentaram a palavra', insc: 'Inscritos', part: 'Participaram', apl: (D.ws && !D.soPres ? 'Aplicações pagas' : 'Aplicaram'), aplT: 'Aplicaram', ini: 'Iniciou o formulário', comp: 'Formulário completo', mql: 'MQL', marc: 'Marcada', real: 'Realizada', apar: 'Compareceu', sim: 'Disse sim', pag: 'Entrou' })[S.k] || S.k;
-  var doPost = S.post != null ? (window._trfPostsOrd || [])[S.post] : null, doCmt = !doPost && S.k === 'cmt' && D.z && D.z.cmtPs, doCom = (!doPost && S.k === 'com' && D.z && D.z.comPs) || doCmt, deCom = !!doCom || (!!doPost && S.k === 'com');
+  var doPost = S.post != null ? (window._trfPostsOrd || [])[S.post] : null, doCmt = !doPost && S.k === 'cmt' && D.z && D.z.cmtPs, doCom = (!doPost && S.k === 'com' && D.z && D.z.comPs) || doCmt, deCom = !!doCom || (!!doPost && (S.k === 'com' || S.k === 'cmt'));
   var porLinha = !!D.todosC || (!!D.rowsEv && !doPost && !S.cri && /^(marc|real|apar|sim|pag)$/.test(S.k));
-  var base = (D.todosC && S.esc && D.listas && D.listas[S.esc] ? D.listas[S.esc] : doPost ? (doPost.ps || []) : doCmt ? D.z.cmtPs : doCom ? D.z.comPs : porLinha && !D.todosC ? D.rowsEv : S.cri ? D.todas.filter(function(p) { return p.ck === S.cri; }) : D.lista).filter(function(p) { return _trfTem(p, S.k); });
-  var F = { p1: function(p) { return !!p.p1; }, p2: function(p) { return !!p.p2; }, iniF: function(p) { return !!p.ini; }, nini: function(p) { return !p.ini; }, marcF: function(p) { return !!p.marc; }, pagF: function(p) { return !!p.pag; }, apl: function(p) { return p.apl; }, napl: function(p) { return !(p.aplT || p.apl); }, aplsp: function(p) { return !!p.aplT && !p.apl; }, comp: function(p) { return p.comp; }, inc: function(p) { return !p.comp; }, mql: function(p) { return p.mql; }, nmql: function(p) { return !p.mql; }, A: function(p) { return p.fx === 'A'; }, B: function(p) { return p.fx === 'B'; }, C: function(p) { return p.fx === 'C'; }, D: function(p) { return p.fx === 'D'; } };
+  var base = (D.todosC && S.esc && D.listas && D.listas[S.esc] ? D.listas[S.esc] : doPost ? (S.k === 'cmt' ? (doPost.cs || []) : (doPost.ps || [])) : doCmt ? D.z.cmtPs : doCom ? D.z.comPs : porLinha && !D.todosC ? D.rowsEv : S.cri ? D.todas.filter(function(p) { return p.ck === S.cri; }) : D.lista).filter(function(p) { return _trfTem(p, S.k); });
+  var F = { semValor: function(p) { return !!p.pag && !(p.valor > 0); }, p1: function(p) { return !!p.p1; }, p2: function(p) { return !!p.p2; }, iniF: function(p) { return !!p.ini; }, nini: function(p) { return !p.ini; }, marcF: function(p) { return !!p.marc; }, pagF: function(p) { return !!p.pag; }, apl: function(p) { return p.apl; }, napl: function(p) { return !(p.aplT || p.apl); }, aplsp: function(p) { return !!p.aplT && !p.apl; }, comp: function(p) { return p.comp; }, inc: function(p) { return !p.comp; }, mql: function(p) { return p.mql; }, nmql: function(p) { return !p.mql; }, A: function(p) { return p.fx === 'A'; }, B: function(p) { return p.fx === 'B'; }, C: function(p) { return p.fx === 'C'; }, D: function(p) { return p.fx === 'D'; } };
   var lista = S.f && F[S.f] ? base.filter(F[S.f]) : base.slice(), notaPres = '';
   if (D.ws && (S.f === 'p1' || S.f === 'p2')) { var totP = (D.z && D.z[S.f === 'p1' ? 'd1' : 'd2']) || 0, nP = lista.length;   // presença por pessoa só existe em algumas edições
     if (nP < totP * 0.5) { lista = base.slice(); notaPres = 'Desta seleção o dash recebe só o TOTAL de presentes ' + (S.f === 'p1' ? 'no 1º dia' : 'no dia do pitch') + ' (' + _trfN(totP) + ', da Central do workshop), não a lista com os nomes. Abaixo estão todos os inscritos.'; }
