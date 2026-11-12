@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-1015';
+var VERSAO_DASH = '2026-11-12-1023';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -41590,7 +41590,7 @@ button.trf-kpi:hover { transform:translateY(-2px); box-shadow:0 10px 26px -14px 
 
 /* 12/11/2026: orgânico — dos que comentaram, quantos iniciaram o formulário */
 .trf-comini { margin:16px auto 6px; max-width:900px; } .trf-comini-t { font-size:.82rem; font-weight:900; margin-bottom:8px; } .trf-comini-t small { font-weight:700; color:var(--text2); margin-left:6px; font-size:.68rem; }
-.trf-comini-g { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; }
+.trf-comini-g { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:8px; }
 .trf-comini-c { text-align:left; font:inherit; font-size:.64rem; font-weight:700; color:var(--text2); cursor:pointer; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.1); background:var(--panel2, rgba(255,255,255,.03)); transition:border-color .15s, transform .15s; }
 .trf-comini-c:hover { transform:translateY(-1px); border-color:var(--accent); } .trf-comini-c:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .trf-comini-c u { display:block; text-decoration:none; font-size:1.15rem; font-weight:900; color:var(--text); font-variant-numeric:tabular-nums; }
@@ -42100,12 +42100,16 @@ function _trfFnBlocos(PS, val, gasto, D, clique) {
   return h;
 }
 function _trfComIniHtml(D) {
+  // 12/11/2026 (Bruno: "143 comentaram a palavra, 84 não iniciaram, 59 iniciaram o formulário, 40 completaram, 6 reuniões, X vendas"): a ordem que ele pediu
   var c = D.org && TRF.canal === 'org' && TRF.cri === 'manychat' ? (D.z.comPs || []) : []; if (!c.length) return '';
-  var n = function(f) { return c.filter(f).length; }, ini = n(function(p) { return p.ini; }), comp = n(function(p) { return p.comp; }), marc = n(function(p) { return p.marc; }), pag = n(function(p) { return p.pag; });
+  var n = function(f) { return c.filter(f).length; }, ini = n(function(p) { return p.ini; }), comp = n(function(p) { return p.comp; }), marc = n(function(p) { return p.marc; }), pag = n(function(p) { return p.pag; }), val = c.reduce(function(a, p) { return a + (p.pag ? p.valor : 0); }, 0);
   var cx = function(v, r, f, cor) { return '<button type="button" class="trf-comini-c" onclick="trfPasso(\'com\',\'' + f + '\')" title="Ver as pessoas"><u' + (cor ? ' style="color:' + cor + '"' : '') + '>' + _trfN(v) + '</u>' + r + '</button>'; };
-  return '<div class="trf-comini"><div class="trf-comini-t">💬 Dos ' + _trfN(c.length) + ' que comentaram a palavra <small>ligados ao formulário pelo @ do Instagram · clique para ver as pessoas</small></div><div class="trf-comini-g">'
-    + cx(ini, 'iniciaram o formulário · ' + Math.round(ini / c.length * 100) + '%', 'iniF', '#3ddc97') + cx(c.length - ini, 'não iniciaram · ' + Math.round((c.length - ini) / c.length * 100) + '%', 'nini', '#ffd166')
-    + cx(comp, 'completaram o formulário', 'comp') + cx(marc, 'tiveram reunião', 'marcF') + cx(pag, 'compraram', 'pagF', '#3ddc97') + '</div></div>';
+  var pc = function(v) { return Math.round(v / c.length * 100) + '%'; };
+  return '<div class="trf-comini"><div class="trf-comini-t">💬 Quem comentou a palavra neste período <small>ligados ao formulário pelo @ do Instagram · clique para ver as pessoas</small></div><div class="trf-comini-g">'
+    + cx(c.length, 'comentaram a palavra', '') + cx(c.length - ini, 'não iniciaram o formulário · ' + pc(c.length - ini), 'nini', '#ffd166') + cx(ini, 'iniciaram o formulário · ' + pc(ini), 'iniF', '#3ddc97')
+    + cx(comp, 'completaram o formulário', 'comp') + cx(marc, marc === 1 ? 'reunião' : 'reuniões', 'marcF') + cx(pag, (pag === 1 ? 'venda' : 'vendas') + (val ? ' · ' + _trfRs(val) : ''), 'pagF', '#3ddc97') + '</div>'
+    + (D.z.pag > pag ? '<p class="trf-nota" style="margin-top:8px;">O funil acima mostra ' + _trfN(D.z.pag) + (D.z.pag === 1 ? ' venda' : ' vendas') + ' porque conta toda venda com origem do orgânico na planilha dentro do período. Este quadro segue só quem comentou a palavra NESTE período: venda de quem comentou antes não aparece aqui.</p>' : '')
+    + '</div>';
 }
 function _trfFunil(D) {
   // 11/11/2026 (Bruno: "coloca em formato de funil"): funil de verdade — blocos centralizados que vão afinando, um por passo.
