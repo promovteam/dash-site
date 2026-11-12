@@ -2953,7 +2953,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-1100';
+var VERSAO_DASH = '2026-11-12-1217';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -42010,6 +42010,148 @@ button.trf-kpi:focus-visible, .trf-fx:focus-visible, .trf-pg:focus-visible, .trf
 //  'coorte' — quem CHEGOU no período, seguido até hoje (igual à imagem "Funil do tráfego · Diagnóstico" de 09/11).
 // =====================================================================================================
 var TRF = { tprod: '', wpub: '', wed: '', wtipo: '', canal: 'pago', modo: 'ev', per: 'mes', de: '', ate: '', fam: 'quente', cri: '', pg: '', ord: 'vd', todos: false, site: null, siteEm: 0, sitePed: false, siteErro: '', meta: {}, metaPed: {}, metaErro: '', lst: null };
+// =====================================================================================================
+// ⚡ RÁPIDO (12/11/2026 · Bruno: "quero que os dados abram cada vez mais rápido"). Nada aqui muda regra nem número: é só para a conta
+// não ser refeita à toa. Conferido na bancada contra o trafego.js original (objetos de saída comparados campo a campo).
+//  1) cada fonte ganha um ÍNDICE montado uma vez (planilha de vendas por telefone, leads por pessoa, comentários por post);
+//  2) o resultado de cada tela fica GUARDADO pela "assinatura" (período + chave + filtros + versão de cada fonte): clicar em ordem,
+//     "ver todos", abrir e fechar janela ou a chegada de uma foto não refaz a conta;
+//  3) no modo "aconteceu no período" só entram na conta as pessoas que podem aparecer (chegaram no período ou têm reunião nele);
+//  4) as redesenhadas de bastidor (uma fonte que chega) são juntadas numa só, e a espera por uma fonte é UM relógio que só redesenha
+//     quando ela chega (antes cada desenho armava novos relógios e a aba se redesenhava dezenas de vezes sozinha);
+//  5) as páginas da base do site são pedidas em paralelo, e as duas abas do conteúdo também.
+// =====================================================================================================
+var TRF_R = { v2: null, site: null, ped: null, cmt: null, igP: null, memo: {}, ordem: [], MAX: 8, IDADE: 120000, n: { render: 0, conta: 0, guardado: 0 }, vigQ: {}, vigT: 0, vigEst: '', rT: 0, acao: 0, semAn: { an: [] },
+  mCont: new Map(), mChave: new Map(), mMql: new Map(), mOrig: new Map(), mT12: new Map(), mTipo: new Map(), mOd: new Map(), dc: null };
+function _trfDif(a, b) { return a !== b && (a === a || b === b); }
+// versão da planilha de vendas: muda quando o dash relê (lista nova) e também quando uma linha é mexida no lugar (status, valor, origem…)
+function _trfV2() {
+  var R = TRF_R.v2 || (TRF_R.v2 = { rows: null, n: -1, snap: [], ver: 0, idx: null }), rows = (typeof V2 !== 'undefined' && V2.rows) || null, n = rows ? rows.length : 0, igual = R.rows === rows && R.n === n, s = R.snap, i, j, r;
+  if (igual) for (i = 0, j = 0; i < n; i++, j += 10) { r = rows[i];
+    if (s[j] !== r || s[j + 1] !== r.telefone || s[j + 2] !== r.date || _trfDif(s[j + 3], r.date ? r.date.getTime() : 0) || s[j + 4] !== r.origem || s[j + 5] !== r.sn || _trfDif(s[j + 6], r.valor) || s[j + 7] !== r.nome || s[j + 8] !== r.closer || s[j + 9] !== r.status) { igual = false; break; } }
+  if (!igual) { s = R.snap = new Array(n * 10);
+    for (i = 0, j = 0; i < n; i++, j += 10) { r = rows[i]; s[j] = r; s[j + 1] = r.telefone; s[j + 2] = r.date; s[j + 3] = r.date ? r.date.getTime() : 0; s[j + 4] = r.origem; s[j + 5] = r.sn; s[j + 6] = r.valor; s[j + 7] = r.nome; s[j + 8] = r.closer; s[j + 9] = r.status; }
+    R.rows = rows; R.n = n; R.ver++; R.idx = null; }
+  return R.ver;
+}
+// índice da planilha de vendas (uma vez por versão): linhas por telefone, o telefone e a data de cada linha
+function _trfIdxV2() {
+  var ver = _trfV2(), R = TRF_R.v2; if (R.idx && R.idx.ver === ver) return R.idx;
+  var rows = R.rows || [], n = rows.length, porTel = {}, t8 = new Array(n), t = new Float64Array(n);
+  for (var i = 0; i < n; i++) { var r = rows[i], k = ldTel8(r.telefone); t8[i] = k; t[i] = r.date ? r.date.getTime() : NaN; if (k) (porTel[k] = porTel[k] || []).push(r); }
+  return R.idx = { ver: ver, rows: rows, porTel: porTel, t8: t8, t: t };
+}
+// índice dos leads (uma vez por leitura da base do site + junção com a planilha): a pessoa de cada lead e os leads de cada pessoa
+function _trfIdxSite(S) {
+  var L = (S && S.leads) || [], X = TRF_R.site; if (X && X.S === S && X.L === L && X.n === L.length) return X;
+  var n = L.length, k = new Array(n), pid = new Int32Array(n), mcp = new Uint8Array(n), pidDe = new Map(), ord = true, ant = -Infinity, np = 0;
+  for (var i = 0; i < n; i++) { var x = L[i], kk = x.t8 || ('n:' + x.nome), p = pidDe.get(kk); if (p === undefined) { p = np++; pidDe.set(kk, p); }
+    k[i] = kk; pid[i] = p; mcp[i] = _trfFam(x.camp) === 'mcp' ? 1 : 0; if (!(x.t >= ant)) ord = false; ant = x.t; }
+  return TRF_R.site = { S: S, L: L, n: n, k: k, pid: pid, mcp: mcp, pidDe: pidDe, np: np, ord: ord, formC: null, dia: new Array(n) };
+}
+function _trfFormC(XS) {   // por telefone: a pessoa completou o formulário alguma vez? (era montado duas vezes a cada desenho)
+  if (XS.formC) return XS.formC; var f = {}, L = XS.L;
+  for (var i = 0; i < L.length; i++) { var x = L[i]; if (!x.t8) continue; var o = f[x.t8] || (f[x.t8] = { c: false }); if (x.comp) o.c = true; }
+  return XS.formC = f;
+}
+function _trfLB(L, v) { var a = 0, b = L.length; while (a < b) { var m = (a + b) >> 1; if (L[m].t < v) a = m + 1; else b = m; } return a; }   // 1º lead com data >= v (leads em ordem de data)
+// índice dos comentários com a palavra (aba IG Pedidos): por post, e de qual funil é cada um (a palavra é conferida uma vez só)
+function _trfIdxPed() {
+  var ped = null; try { ped = IGO.ped || null; } catch (e) {}
+  var X = TRF_R.ped; if (X && X.src === ped && X.n === (ped ? ped.length : 0)) return X;
+  var n = ped ? ped.length : 0, porLk = new Map();
+  for (var i = 0; i < n; i++) { var a = porLk.get(ped[i].lk); if (a) a.push(i); else porLk.set(ped[i].lk, [i]); }
+  return TRF_R.ped = { src: ped, ped: ped || [], n: n, diag: new Uint8Array(n), porLk: porLk };
+}
+function _trfPedDiag(X, i) { var v = X.diag[i]; if (!v) { var q = X.ped[i], d = rkoDono(q.x, q.i); v = X.diag[i] = (d && d.f === 'diag') ? 1 : 2; } return v === 1; }
+// índice dos comentários sem a palavra (aba IG Comentaram): por post e a data do mais antigo
+function _trfIdxCmt() {
+  var c = TRF.cmt || null, X = TRF_R.cmt; if (X && X.src === c && X.n === (c ? c.length : 0)) return X;
+  var n = c ? c.length : 0, porLk = new Map(), desde = Infinity;
+  for (var i = 0; i < n; i++) { var q = c[i]; if (q.t < desde) desde = q.t; var a = porLk.get(q.lk); if (a) a.push(i); else porLk.set(q.lk, [i]); }
+  return TRF_R.cmt = { src: c, cmt: c || [], n: n, porLk: porLk, desde: desde };
+}
+// o @ → a pessoa na base (igLeadPorInsta), guardado enquanto a planilha de leads e os perfis do Instagram forem os mesmos
+function _trfIgPMapa() {
+  var rows = (typeof LD !== 'undefined' && LD.rows) || null, pf = null; try { pf = IGO.perfil; } catch (e) {}
+  var C = TRF_R.igP; if (!C || C.rows !== rows || C.n !== (rows ? rows.length : 0) || C.pf !== pf) C = TRF_R.igP = { rows: rows, n: rows ? rows.length : 0, pf: pf, m: new Map() };
+  return C.m;
+}
+function _trfIgLer(m, u) { var l = m.get(u); if (l === undefined) { l = igLeadPorInsta(u); m.set(u, l === undefined ? null : l); } return l; }
+// ⚡ aquecimento nas horas vagas: achar a pessoa de cada @ que comentou (e de qual funil é cada comentário) é a parte mais cara do 1º desenho
+// do Orgânico. Depois de cada desenho, com o Instagram e a planilha de leads já lidos, isso vai sendo adiantado em fatias curtas (até ~8 ms),
+// sem travar a tela. É a mesma pergunta, feita antes; a resposta fica no mesmo mapa que a conta consulta.
+function _trfAquecerIg() {
+  if (TRF_R.aqT) return;
+  var ok = false; try { ok = !!IGO.carregado && typeof LD !== 'undefined' && !!LD.carregado && (LD.rows || []).length > 0; } catch (e) {} if (!ok) return;
+  var XP = _trfIdxPed(), XC = _trfIdxCmt(), m = _trfIgPMapa(), st = TRF_R.aq;
+  if (!st || st.sP !== XP.src || st.nP !== XP.n || st.sC !== XC.src || st.nC !== XC.n || st.m !== m) st = TRF_R.aq = { sP: XP.src, ped: XP.ped, nP: XP.n, sC: XC.src, cmt: XC.cmt, nC: XC.n, m: m, i: 0, j: 0, fim: false };
+  if (st.fim) return;
+  var passo = function() {
+    TRF_R.aqT = 0;
+    try {
+      if (typeof telaVisivel === 'function' && !telaVisivel('s-trafego')) return;   // saiu da aba: para (recomeça de onde parou no próximo desenho)
+      var XP2 = _trfIdxPed(), XC2 = _trfIdxCmt(), m2 = _trfIgPMapa();
+      if (st !== TRF_R.aq || XP2.src !== st.sP || XP2.n !== st.nP || XC2.src !== st.sC || XC2.n !== st.nC || m2 !== st.m) { _trfAquecerIg(); return; }   // alguma fonte mudou: recomeça com a nova
+      var t0 = Date.now(), n = 0, u;
+      while (n < 300 && st.i < st.nP) { u = st.ped[st.i].u; _trfPedDiag(XP2, st.i); if (m2.get(u) === undefined) { _trfIgLer(m2, u); n++; } st.i++; if ((st.i & 31) === 0 && Date.now() - t0 > 8) break; }
+      while (n < 300 && st.i >= st.nP && st.j < st.nC) { u = st.cmt[st.j].u; if (m2.get(u) === undefined) { _trfIgLer(m2, u); n++; } st.j++; if ((st.j & 31) === 0 && Date.now() - t0 > 8) break; }
+      if (st.i >= st.nP && st.j >= st.nC) { st.fim = true; return; }
+    } catch (e) { return; }
+    TRF_R.aqT = setTimeout(vago, 30);
+  };
+  var vago = function() { if (typeof requestIdleCallback === 'function') requestIdleCallback(passo, { timeout: 2000 }); else passo(); };   // no navegador, só quando ele estiver à toa
+  TRF_R.aqT = setTimeout(vago, 400);
+}
+// no workshop, quem está no app sem data de ingresso nem de aplicação entra com a hora da conta ("agora"): anota, para o guardado devolver a hora certa
+function _trfAgoraWs() { var d = new Date(); if (TRF_R.wsAg) TRF_R.wsAg.add(d.getTime()); return d; }
+// funções puras (o mesmo texto dá sempre a mesma resposta): a resposta fica guardada
+function _trfMql(inv) { var m = TRF_R.mMql, r = m.get(inv); if (r === undefined) { r = _vfMql(inv); if (m.size > 20000) m.clear(); m.set(inv, r); } return r; }
+function _trfChave(n) { var m = TRF_R.mChave, r = m.get(n); if (r === undefined) { r = _chaveAnuncio(n); if (m.size > 50000) m.clear(); m.set(n, r); } return r; }
+function _trfTipoC(c) { var m = TRF_R.mTipo, r = m.get(c); if (r === undefined) { r = metaTipoCampanha(c); if (m.size > 20000) m.clear(); m.set(c, r); } return r; }
+function _trfOrigC(c) { var m = TRF_R.mOd, r = m.get(c); if (r === undefined) { r = metaOrigemDiag(c); if (m.size > 20000) m.clear(); m.set(c, r); } return r; }
+function _trfT12(d) { var m = TRF_R.mT12, r = m.get(d); if (r === undefined) { r = new Date(d + 'T12:00:00').getTime(); if (m.size > 5000) m.clear(); m.set(d, r); } return r; }   // o meio-dia de um dia 'aaaa-mm-dd'
+// resultado guardado de uma tela: vale enquanto a assinatura (lista de valores comparados um a um) for a mesma
+function _trfMemoVer(chave, sig) {
+  var e = TRF_R.memo[chave]; if (!e || e.sig.length !== sig.length || Date.now() - e.em > TRF_R.IDADE) return null;
+  for (var i = 0; i < sig.length; i++) if (_trfDif(e.sig[i], sig[i])) return null;
+  return e;
+}
+function _trfMemoPor(chave, sig, D, extra) {
+  var o = TRF_R.ordem, i = o.indexOf(chave); if (i >= 0) o.splice(i, 1); o.push(chave);
+  while (o.length > TRF_R.MAX) delete TRF_R.memo[o.shift()];
+  return TRF_R.memo[chave] = { sig: sig, D: D, em: Date.now(), x: extra || null };
+}
+// ---- redesenho de bastidor: várias fontes chegando quase juntas viram UM desenho ----
+function _trfPedirRender() {
+  if (TRF_R.rT) return;
+  TRF_R.rT = setTimeout(function() { TRF_R.rT = 0; if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego(); }, 60);
+}
+// ---- espera por uma fonte que ainda não chegou: um relógio só, que olha se ela chegou e só então redesenha ----
+function _trfFonteOk(q) {
+  try {
+    if (q === 'v2') return !!(V2.carregado || (V2.rows || []).length);
+    if (q === 'ld') return typeof LD === 'undefined' || !!LD.carregado;
+    if (q === 'ig') return !!IGO.carregado;
+    if (q === 'ws') return typeof WSL !== 'undefined' && !!WSL.carregado;
+    if (q === 'ild') return !!(ILDV.base && ILDV.app);
+  } catch (e) {}
+  return false;
+}
+function _trfVigiar(q) { TRF_R.vigQ[q] = 1; }
+function _trfVigEstado() { var s = ''; for (var q in TRF_R.vigQ) s += q + (_trfFonteOk(q) ? '1' : '0'); return s; }
+function _trfVigArmar() {
+  if (TRF_R.vigT) { clearTimeout(TRF_R.vigT); TRF_R.vigT = 0; }
+  var est = _trfVigEstado(); if (!est) return;
+  if (!TRF_R.acao) TRF_R.acao = Date.now();
+  var olhar = function() {
+    TRF_R.vigT = 0;
+    if (typeof telaVisivel === 'function' && !telaVisivel('s-trafego')) return;   // saiu da aba: para de olhar (ao voltar, trfAbrir desenha e arma de novo)
+    if (_trfVigEstado() !== est) { renderTrafego(); return; }                      // chegou: desenha (e, se ainda faltar outra, o desenho arma de novo)
+    if (Date.now() - TRF_R.acao < 300000) TRF_R.vigT = setTimeout(olhar, 250);     // até 5 minutos depois do último clique
+  };
+  TRF_R.vigT = setTimeout(olhar, 250);
+}
 var TRF_PASSOS = [['imp', 'Impressões', 'vezes que os anúncios apareceram'], ['cli', 'Cliques', 'todos os cliques nos anúncios'], ['vis', 'Visitas na página', 'pessoas que abriram a página do diagnóstico'],
   ['ini', 'Iniciou o formulário', 'deixou nome e WhatsApp'], ['comp', 'Formulário completo', 'respondeu a pesquisa até o fim'], ['mql', 'MQL', 'marcou algum investimento'],
   ['marc', 'Marcada', 'tem reunião na planilha depois de chegar'], ['real', 'Realizada', 'o dia da reunião chegou e o resultado foi lançado'], ['apar', 'Compareceu', 'vendido, não vendido, entrada, bloqueio ou estorno'],
@@ -42030,7 +42172,7 @@ var TRF_ORG_TOPO = { '': [TRF_ORG_VW], manychat: [TRF_ORG_VW, ['com', 'Comentara
   bio: [['pf', 'Visitas ao perfil', 'idas ao perfil a partir dos posts do período · medidas no 7º dia de cada post']], sem: [] };   // a bio começa no perfil: visualização é número de conteúdo e fica na chave Orgânico
 function trfCmtCarregar() {
   if (TRF.cmt || TRF.cmtPed) return; TRF.cmtPed = true;
-  var fim = function(L) { TRF.cmtPed = false; TRF.cmt = L; if (L.length && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); };
+  var fim = function(L) { TRF.cmtPed = false; TRF.cmt = L; if (L.length) _trfPedirRender(); };
   try { _ildGv('sheet=' + encodeURIComponent('IG Comentaram'), '', function(r) {
     var T = null; try { T = _ildTab(r); } catch (e) {} if (!T) { fim([]); return; }
     var ix = function(re) { for (var i = 0; i < T.cols.length; i++) if (re.test(T.cols[i].l)) return i; return -1; }, cp = ix(/^perfil$/), cl = ix(/^post$/), cq = ix(/^quando$/);
@@ -42039,22 +42181,27 @@ function trfCmtCarregar() {
       return u && t ? { u: u, lk: String(x[cl] || '').trim(), t: t } : null; }).filter(Boolean));
   }); } catch (e) { fim([]); }
 }
+// ⚡ as duas abas do conteúdo ("Conteudo D7" e "Conteudo hoje") são pedidas JUNTAS (antes a 2ª só saía depois de a 1ª chegar);
+// a junção é a mesma de antes: primeiro o 7º dia, depois o número de hoje para os posts que ainda não têm 7 dias.
 function trfContCarregar() {
   if (TRF.cont || TRF.contPed) return; TRF.contPed = true;
-  var fim = function(L) { TRF.contPed = false; TRF.cont = L; if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego(); };
-  try { _ildGv('sheet=' + encodeURIComponent('Conteudo D7'), '', function(r) {
-    var T = null; try { T = _ildTab(r); } catch (e) {} if (!T) { fim([]); return; }
+  var fim = function(L) { TRF.contPed = false; TRF.cont = L; _trfPedirRender(); };
+  var r7, r2, tem7 = false, tem2 = false, feito = false;
+  var juntar = function() {
+    if (feito || !tem7 || !tem2) return; feito = true;
+    var T = null; try { T = _ildTab(r7); } catch (e) {} if (!T) { fim([]); return; }
     var ix = function(re) { for (var i = 0; i < T.cols.length; i++) if (re.test(T.cols[i].l)) return i; return -1; }, cd = ix(/^publicado/), cv = ix(/^visualiza/), cc = ix(/^comentarios/), cl = ix(/^link$/), cp = ix(/^visitas ao perfil/);
     var le = function(T2, i) { return T2.rows.map(function(x) { var d = x[i.cd]; if (!(d instanceof Date)) { var m = String(d || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); d = m ? new Date(+m[3], +m[2] - 1, +m[1]) : null; }
       return d ? { t: d.getTime(), v: +x[i.cv] || 0, c: +x[i.cc] || 0, pf: i.cp >= 0 ? (+x[i.cp] || 0) : 0, lk: i.cl >= 0 ? String(x[i.cl] || '').trim() : '' } : null; }).filter(Boolean); };
     var L7 = le(T, { cd: cd, cv: cv, cc: cc, cl: cl, cp: cp });
-    try { _ildGv('sheet=' + encodeURIComponent('Conteudo hoje'), '', function(r2) {   // número acumulado de hoje (robô 386); se a aba ainda não existir, segue só com o 7º dia
-      try { var T2 = _ildTab(r2); if (T2) { var ix2 = function(re) { for (var i = 0; i < T2.cols.length; i++) if (re.test(T2.cols[i].l)) return i; return -1; };
-        var H = {}, tem7 = {}; L7.forEach(function(x) { if (x.lk) tem7[x.lk] = 1; });
-        le(T2, { cd: ix2(/^publicado/), cv: ix2(/^visualiza/), cc: ix2(/^comentarios/), cl: ix2(/^link$/), cp: ix2(/^visitas ao perfil/) }).forEach(function(x) { if (!x.lk) return; H[x.lk] = x; if (!tem7[x.lk]) { x.hoje = 1; L7.push(x); } });
-        TRF.contHoje = H; } } catch (e2) {}
-      fim(L7); }); } catch (e3) { fim(L7); }
-  }); } catch (e) { fim([]); }
+    try { var T2 = _ildTab(r2); if (T2) { var ix2 = function(re) { for (var i = 0; i < T2.cols.length; i++) if (re.test(T2.cols[i].l)) return i; return -1; };   // número acumulado de hoje (robô 386); se a aba ainda não existir, segue só com o 7º dia
+      var H = {}, tem = {}; L7.forEach(function(x) { if (x.lk) tem[x.lk] = 1; });
+      le(T2, { cd: ix2(/^publicado/), cv: ix2(/^visualiza/), cc: ix2(/^comentarios/), cl: ix2(/^link$/), cp: ix2(/^visitas ao perfil/) }).forEach(function(x) { if (!x.lk) return; H[x.lk] = x; if (!tem[x.lk]) { x.hoje = 1; L7.push(x); } });
+      TRF.contHoje = H; } } catch (e2) {}
+    fim(L7);
+  };
+  try { _ildGv('sheet=' + encodeURIComponent('Conteudo D7'), '', function(r) { r7 = r; tem7 = true; juntar(); }); } catch (e) { feito = true; fim([]); return; }
+  try { _ildGv('sheet=' + encodeURIComponent('Conteudo hoje'), '', function(r) { r2 = r; tem2 = true; juntar(); }); } catch (e3) { r2 = null; tem2 = true; juntar(); }
 }
 function _trfSrc(f) { f = String(f || '').toLowerCase(); return /manychat|mchat/.test(f) ? 'manychat' : /bio/.test(f) ? 'bio' : 'sem'; }
 var TRF_ORD = [['vd', '💰 Vendas'], ['fat', 'Faturamento'], ['marc', '📅 Reuniões'], ['mql', '🔥 MQL'], ['ini', 'Leads'], ['cli', 'Cliques'], ['imp', 'Impressões'], ['gasto', 'Gasto']];
@@ -42079,7 +42226,7 @@ function _trfPer() {
   return { ini: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth() + 1, 1).getTime(), rot: TRF.per === 'pers' ? 'o mês atual (escolha as duas datas do período)' : 'o mês atual' };
 }
 function trfFiltro(campo, valor) {
-  TRF[campo] = valor;
+  TRF[campo] = valor; TRF_R.acao = Date.now();
   if (campo === 'per' && valor === 'pers' && !TRF.de) { var h = new Date(); TRF.de = _trfDia(new Date(h.getFullYear(), h.getMonth(), 1).getTime()); TRF.ate = _trfDia(h.getTime()); }
   if (campo === 'fam') TRF.cri = '';
   if (campo === 'wtipo') TRF.wed = '';
@@ -42162,39 +42309,44 @@ function _trfSb(caminho, faixa, corpo, cb) {
     h.send(corpo || null);
   } catch (e) { fim(null); }
 }
+// ⚡ páginas em paralelo: a base devolve 1.000 linhas por pedido e antes cada página só saía depois de a anterior chegar (6 pedidos em
+// fila). Agora a aba lembra quantas páginas vieram da última vez e pede todas juntas; se a base cresceu, segue pedindo uma a uma como
+// antes. As páginas entram na lista na ordem certa (0, 1, 2…) e a leitura para na primeira página incompleta: o resultado é o mesmo.
 function trfSiteCarregar(forcar) {
   if (TRF.sitePed) return; if (!forcar && TRF.site && Date.now() - TRF.siteEm < 10 * 60000) return;
   TRF.sitePed = true;
-  var dTxt = _trfDia(Date.now() - 370 * 864e5), leads = [], vis = null, falta = 3, erro = '';
+  var dTxt = _trfDia(Date.now() - 370 * 864e5), vis = null, falta = 3, erro = '', usadas = { v3: 0, ant: 0 }, parte = { v3: [], ant: [] };
+  var palpite = {}; try { palpite = JSON.parse(localStorage.getItem('trfSitePg') || '{}') || {}; } catch (e) {}
   var fim = function() {
     if (--falta > 0) return;
     TRF.sitePed = false;
+    var leads = parte.v3.concat(parte.ant);
     leads.sort(function(a, b) { return a.t - b.t; });
-    if (erro) TRF.siteErro = erro; else { TRF.site = { leads: leads, visPag: vis.pag, visCri: vis.cri, visOrg: vis.org, semVis: !vis.ok }; TRF.siteEm = Date.now(); TRF.siteErro = ''; }
-    if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego();
+    if (erro) TRF.siteErro = erro; else { TRF.site = { leads: leads, visPag: vis.pag, visCri: vis.cri, visOrg: vis.org, semVis: !vis.ok }; TRF.siteEm = Date.now(); TRF.siteErro = '';
+      try { localStorage.setItem('trfSitePg', JSON.stringify(usadas)); } catch (e2) {} }
+    _trfPedirRender();
   };
-  var pagina = function(i) {
-    _trfSb('/diagnostico_v3?select=created_at,nome,whatsapp,origem,origem_form,utm_source,utm_campaign,utm_content,pesquisa_completa,investimento,lead_faixa,lead_score&created_at=gte.' + dTxt + 'T03:00:00Z&order=created_at.asc', (i * 1000) + '-' + (i * 1000 + 999), null, function(d) {
-      if (!d || !d.length && i === 0) { if (!d) erro = 'a base do site não respondeu'; fim(); return; }
-      d.forEach(function(r) {
-        var tel = String(r.whatsapp || '').replace(/\D/g, ''), og = String(r.origem || '');
-        leads.push({ t: new Date(r.created_at).getTime(), t8: ldTel8(tel), tel: tel, nome: String(r.nome || '').trim(), pag: String(r.origem_form || '').replace('diagnostico-', ''), camp: r.utm_campaign || '', cont: r.utm_content || '', src: _trfSrc(r.utm_source),
-          comp: r.pesquisa_completa === true ? 1 : 0, inv: r.investimento || '', fx: /^[ABCD]$/.test(r.lead_faixa || '') ? r.lead_faixa : '', sc: +r.lead_score || 0, o: /^\s*https?:/i.test(og) ? 't' : /org/i.test(og) ? 'o' : /^vsl/i.test(og) ? 'v' : 't' });
-      });
-      if (d.length === 1000 && i < 59) pagina(i + 1); else fim();
-    });
+  var linha = function(r, v3) { var tel = String(r.whatsapp || '').replace(/\D/g, ''), og = String(r.origem || '');
+    return { t: new Date(r.created_at).getTime(), t8: ldTel8(tel), tel: tel, nome: String(r.nome || '').trim(), pag: String(r.origem_form || '').replace('diagnostico-', ''), camp: r.utm_campaign || '', cont: r.utm_content || '', src: _trfSrc(r.utm_source),
+      comp: r.pesquisa_completa === true ? 1 : 0, inv: r.investimento || '', fx: v3 && /^[ABCD]$/.test(r.lead_faixa || '') ? r.lead_faixa : '', sc: v3 ? (+r.lead_score || 0) : 0, o: /^\s*https?:/i.test(og) ? 't' : /org/i.test(og) ? 'o' : /^vsl/i.test(og) ? 'v' : 't' }; };
+  // qual = 'v3' (tabela nova, até 60 páginas) ou 'ant' (tabela antiga, até 10 páginas)
+  var tabela = function(qual, caminho, ultima) {
+    var res = {}, pedidas = 0, prox = 0, acabou = false, avisou = false, v3 = qual === 'v3';
+    var pedir = function(i) { pedidas = Math.max(pedidas, i + 1); _trfSb(caminho, (i * 1000) + '-' + (i * 1000 + 999), null, function(d) { res[i] = d === undefined ? null : d; andar(); }); };
+    var andar = function() {
+      while (!acabou && res[prox] !== undefined) {
+        var i = prox, d = res[i]; prox++;
+        if (v3 ? (!d || !d.length && i === 0) : (!d || !d.length)) { if (v3 && !d) erro = 'a base do site não respondeu'; acabou = true; break; }
+        for (var k = 0; k < d.length; k++) parte[qual].push(linha(d[k], v3));
+        usadas[qual] = i + 1;
+        if (d.length === 1000 && i < ultima) { if (prox >= pedidas) pedir(prox); } else { acabou = true; break; }
+      }
+      if (acabou && !avisou) { avisou = true; fim(); }
+    };
+    var n = Math.max(1, Math.min(ultima + 1, +palpite[qual] || 1)); for (var p = 0; p < n; p++) pedir(p);
   };
-  pagina(0);
-  var antiga = function(i) {   // tabela antiga (sem nota do lead): mesmos campos de origem e de formulário
-    _trfSb('/diagnostico?select=created_at,nome,whatsapp,origem,origem_form,utm_source,utm_campaign,utm_content,pesquisa_completa,investimento&created_at=gte.' + dTxt + 'T03:00:00Z&order=created_at.asc', (i * 1000) + '-' + (i * 1000 + 999), null, function(d) {
-      if (!d || !d.length) { fim(); return; }
-      d.forEach(function(r) { var tel = String(r.whatsapp || '').replace(/\D/g, ''), og = String(r.origem || '');
-        leads.push({ t: new Date(r.created_at).getTime(), t8: ldTel8(tel), tel: tel, nome: String(r.nome || '').trim(), pag: String(r.origem_form || '').replace('diagnostico-', ''), camp: r.utm_campaign || '', cont: r.utm_content || '', src: _trfSrc(r.utm_source),
-          comp: r.pesquisa_completa === true ? 1 : 0, inv: r.investimento || '', fx: '', sc: 0, o: /^\s*https?:/i.test(og) ? 't' : /org/i.test(og) ? 'o' : /^vsl/i.test(og) ? 'v' : 't' }); });
-      if (d.length === 1000 && i < 9) antiga(i + 1); else fim();
-    });
-  };
-  antiga(0);
+  tabela('v3', '/diagnostico_v3?select=created_at,nome,whatsapp,origem,origem_form,utm_source,utm_campaign,utm_content,pesquisa_completa,investimento,lead_faixa,lead_score&created_at=gte.' + dTxt + 'T03:00:00Z&order=created_at.asc', 59);
+  tabela('ant', '/diagnostico?select=created_at,nome,whatsapp,origem,origem_form,utm_source,utm_campaign,utm_content,pesquisa_completa,investimento&created_at=gte.' + dTxt + 'T03:00:00Z&order=created_at.asc', 9);   // tabela antiga (sem nota do lead): mesmos campos de origem e de formulário
   _trfSb('/rpc/trafego_visitas', '', JSON.stringify({ desde: dTxt }), function(d) { vis = d && d.pag ? { ok: true, pag: d.pag, cri: d.cri || [], org: d.org || null } : { ok: false, pag: [], cri: [], org: null }; fim(); });
 }
 // ---- Meta: os anúncios do período (os meses ficam guardados pelo dash) ----
@@ -42211,12 +42363,20 @@ function _trfMeta(P) {
       delete TRF.metaPed[k];
       if (ruim) { TRF.metaErro = 'a Meta não respondeu'; TRF.meta[k] = { an: [], erro: true }; setTimeout(function() { delete TRF.meta[k]; }, 120000); }
       else { var an = []; partes.forEach(function(x) { an = an.concat(x.anuncios || []); }); TRF.meta[k] = { an: an }; TRF.metaErro = ''; }
-      if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego();
+      _trfPedirRender();
     }, 0);
   }); });
   return null;
 }
-function _trfCont(c) { c = String(c || '').replace(/\+/g, ' ').trim(); if (!c || /\{\{/.test(c)) return ''; var n = ''; try { n = ldAnuncioLimpo(c); } catch (e) { n = c; } return n && n.charAt(0) !== '(' ? n : ''; }
+// ⚡ o mesmo texto de anúncio era limpo de novo a cada lead e a cada desenho: agora a resposta fica guardada. Só o caso em que o texto é o
+// NÚMERO do anúncio continua sendo feito na hora (o nome vem da lista de criativos, que pode chegar depois) e fica anotado para a conferência.
+function _trfCont0(c) { c = String(c || '').replace(/\+/g, ' ').trim(); if (!c || /\{\{/.test(c)) return ''; var n = ''; try { n = ldAnuncioLimpo(c); } catch (e) { n = c; } return n && n.charAt(0) !== '(' ? n : ''; }
+function _trfCont(c) {
+  var m = TRF_R.mCont, r = m.get(c); if (r !== undefined) return r;
+  r = _trfCont0(c);
+  if (/^\d{15,20}$/.test(String(c || '').replace(/\+/g, ' ').trim())) { if (TRF_R.dc) TRF_R.dc.push(c, r); return r; }
+  if (m.size > 50000) m.clear(); m.set(c, r); return r;
+}
 function _trfFam(camp) { return /(^|[^a-z])mcp([^a-z]|$)/i.test(String(camp || '')) ? 'mcp' : 'quente'; }
 // ---- a conta ----
 function _trfTem(p, k) { return k === 'ini' ? !!p.ini : (k === 'comp' || k === 'mql') ? !!(p.ini && p[k]) : !!p[k]; }   // formulário só conta para quem chegou no período
@@ -42226,7 +42386,7 @@ function _trfJuntarLD(S) {
   try {
     if (typeof LD === 'undefined') { S._ld = 1; return; }
     if (!LD.carregado) { if (!TRF._ldPed && typeof carregarLeads === 'function') { TRF._ldPed = true; carregarLeads(); }
-      if ((TRF._ldEsp = (TRF._ldEsp || 0) + 1) < 30) setTimeout(function() { if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego(); }, 1500);
+      _trfVigiar('ld');
       return; }
     var t0 = S.leads.length ? S.leads[0].t : Date.now(), ant = [];
     (LD.rows || []).forEach(function(l) { if (!(l.date instanceof Date)) return; var t = l.date.getTime(); if (t >= t0) return; var og = String(l.origem || ''); if (!/diag/i.test(og)) return;
@@ -42243,28 +42403,62 @@ function _trfDonoDe(x) { return x.o !== 'o' ? 'pago' : (x.src || 'sem'); }   // 
 function _trfDonoLeads(S, fim) {   // de qual funil é cada pessoa: o do formulário mais recente até o fim do período (S.leads já vem em ordem de data)
   var nV = (typeof V2 !== 'undefined' && V2.rows) ? V2.rows.length : 0;
   if (!S || !S.leads) return {}; if (S._dono && S._donoFim === fim && S._donoN === S.leads.length && S._donoV === nV) return S._dono;
-  var d = {}; S.leads.forEach(function(x) { if (x.t >= fim) return; d[x.t8 || ('n:' + x.nome)] = _trfDonoDe(x); });
-  var ult = {}; ((typeof V2 !== 'undefined' && V2.rows) || []).forEach(function(r) { if (!r.date) return; var kO = _trfOrigemLinha(r.origem); if (kO !== 'pago' && kO !== 'org' && kO !== 'bio') return; var t8 = ldTel8(r.telefone || ''); if (!t8 || !d[t8]) return;
-    var t = r.date.getTime(); if (!ult[t8] || t >= ult[t8].t) ult[t8] = { t: t, k: kO }; });
-  Object.keys(ult).forEach(function(t8) { var kO = ult[t8].k; d[t8] = kO === 'pago' ? 'pago' : kO === 'org' ? 'manychat' : (d[t8] === 'sem' ? 'sem' : 'bio'); });
+  // ⚡ trocar de período e voltar não refaz a conta: fica guardada por fim de período, enquanto os leads e a planilha de vendas forem os mesmos
+  var X2 = _trfIdxV2(), C = S._donoC; if (!C || C.ver !== X2.ver || C.L !== S.leads || C.n !== S.leads.length) C = S._donoC = { ver: X2.ver, L: S.leads, n: S.leads.length, m: {}, q: [] };
+  var d = C.m[fim];
+  if (!d) {
+    d = {}; var L = S.leads, XS = _trfIdxSite(S), i;
+    for (i = 0; i < L.length; i++) { var x = L[i]; if (x.t >= fim) continue; d[XS.k[i]] = _trfDonoDe(x); }
+    var ult = {}, rows = X2.rows;
+    for (i = 0; i < rows.length; i++) { var r = rows[i]; if (!r.date) continue; var kO = _trfOrigemLinha(r.origem); if (kO !== 'pago' && kO !== 'org' && kO !== 'bio') continue; var t8 = X2.t8[i]; if (!t8 || !d[t8]) continue;
+      var t = r.date.getTime(); if (!ult[t8] || t >= ult[t8].t) ult[t8] = { t: t, k: kO }; }
+    Object.keys(ult).forEach(function(t8) { var kO = ult[t8].k; d[t8] = kO === 'pago' ? 'pago' : kO === 'org' ? 'manychat' : (d[t8] === 'sem' ? 'sem' : 'bio'); });
+    C.m[fim] = d; C.q.push(fim); if (C.q.length > 8) delete C.m[C.q.shift()];
+  }
   S._dono = d; S._donoFim = fim; S._donoN = S.leads.length; S._donoV = nV; return d;
 }
+// ⚡ _trfDados em duas partes: (1) o que SEMPRE roda — período, pedidos às fontes, de quem é cada lead; (2) a conta, que só é refeita
+// quando a assinatura muda (período, chave, filtros ou alguma fonte). A conta é a mesma de antes, linha por linha; o que mudou foi
+// só o caminho: índices por fonte e, no modo "aconteceu", a volta passa só pelas pessoas que podem aparecer na tela.
 function _trfDados() {
   var P = _trfPer(), S = TRF.site, org = TRF.canal === 'org' || TRF.canal === 'bio';
   _trfJuntarLD(S); var antigo = S && S.t0site && P.ini < S.t0site ? S.t0site : 0;
   var t0b = S && S.leads && S.leads.length ? new Date(new Date(S.leads[0].t).toDateString()).getTime() : 0, cortado = 0;
   if (t0b && P.ini < t0b) { cortado = t0b; P = { ini: t0b, fim: P.fim, rot: P.rot + ' (contado desde ' + new Date(t0b).toLocaleDateString('pt-BR') + ')' }; }   // não há leads do site antes disso
-  var M = org ? { an: [] } : _trfMeta(P), ev = TRF.modo !== 'coorte';
-  var porTel = {}; (V2.rows || []).forEach(function(r) { var t = ldTel8(r.telefone); if (t) (porTel[t] = porTel[t] || []).push(r); });
-  var pes = {}, dias = {};
-  var dono = _trfDonoLeads(S, P.fim), jaNoGraf = {};
-  ((S && S.leads) || []).forEach(function(x) {
+  var M = org ? TRF_R.semAn : _trfMeta(P), ev = TRF.modo !== 'coorte';
+  var dono = _trfDonoLeads(S, P.fim), igOk = false;
+  var v2c = false; try { v2c = !!V2.carregado; } catch (e0) {}
+  var sig = [P.ini, P.fim, P.rot, cortado, antigo, TRF.canal, ev, TRF.fam, TRF.cri, TRF.pg, S, S ? S.leads : null, S && S.leads ? S.leads.length : 0, S ? S.visPag : null, S ? S.visCri : null, S ? S.visOrg : null, S ? S.semVis : null, M, dono, _trfV2(), v2c, !TRF.cont];
+  if (org) {
+    trfContCarregar(); trfCmtCarregar(); try { igOk = !!IGO.carregado; if (!igOk && !IGO.buscando) carregarIGOrganico(); } catch (eI) {}
+    if (!igOk) _trfVigiar('ig');
+    var ldR = (typeof LD !== 'undefined' && LD.rows) || null, igo = null; try { igo = IGO; } catch (eG) {}
+    sig.push(igOk, TRF.cont, TRF.cont ? TRF.cont.length : 0, TRF.contHoje, TRF.cmt, TRF.cmt ? TRF.cmt.length : 0, igo ? igo.ped : null, igo && igo.ped ? igo.ped.length : 0, igo ? igo.posts : null, igo && igo.posts ? igo.posts.length : 0, igo ? igo.perfil : null,
+      ldR, ldR ? ldR.length : 0, typeof LD !== 'undefined' && !!LD.carregado);
+  }
+  var chave = 'd|' + TRF.canal + '|' + P.ini + '|' + P.fim + '|' + (ev ? 'e' : 'c') + '|' + TRF.fam + '|' + TRF.cri + '|' + TRF.pg, e = _trfMemoVer(chave, sig);
+  if (e) {   // confere também o que foi lido "ao vivo" na conta: nome de criativo vindo da lista da Meta e os dados da pessoa achada pelo @
+    var ok = true, dc = e.x.dc, dl = e.x.dl, i;
+    for (i = 0; ok && i < dc.length; i += 2) if (_trfCont0(dc[i]) !== dc[i + 1]) ok = false;
+    for (i = 0; ok && i < dl.length; i += 5) { var l = dl[i]; if (l.tel8 !== dl[i + 1] || l.tel !== dl[i + 2] || l.nome !== dl[i + 3] || l.invest !== dl[i + 4]) ok = false; }
+    if (ok) { TRF_R.n.guardado++; return e.D; }
+  }
+  TRF_R.n.conta++; TRF_R.dc = []; var dlS = new Set(), D;
+  try { D = _trfDadosConta(P, S, org, M, ev, dono, cortado, antigo, igOk, dlS); } finally { var dcF = TRF_R.dc; TRF_R.dc = null; }
+  var dlF = []; dlS.forEach(function(l) { dlF.push(l, l.tel8, l.tel, l.nome, l.invest); });
+  _trfMemoPor(chave, sig, D, { dc: dcF, dl: dlF });
+  return D;
+}
+function _trfDadosConta(P, S, org, M, ev, dono, cortado, antigo, igOk, dlS) {
+  var X2 = _trfIdxV2(), porTel = X2.porTel, rowsV = X2.rows, XS = _trfIdxSite(S), LS = XS.L, nL = LS.length;
+  var pes = {}, dias = {}, jaNoGraf = {}, fam = TRF.fam, criSel = TRF.cri, soFam = !org && fam !== 'todos', i;
+  var umLead = function(x, i) {
     var noP = x.t >= P.ini && x.t < P.fim; if (!noP && !ev) return;   // no modo "aconteceu", quem chegou antes entra para achar a reunião e a venda do período
-    var k = x.t8 || ('n:' + x.nome);
+    var k = XS.k[i];
     var dk = dono[k] || _trfDonoDe(x); if (org ? dk === 'pago' : dk !== 'pago') return;   // a pessoa é de um funil só (veja _trfDonoLeads)
-    if (!org && TRF.fam !== 'todos' && _trfFam(x.camp) !== TRF.fam) return;
+    if (soFam && (XS.mcp[i] ? 'mcp' : 'quente') !== fam) return;
     // 11/11/2026 (Bruno, no gráfico por dia: "mostre só tráfego"): o gráfico conta só os leads da tela (tráfego pago OU orgânico), sem misturar
-    if (noP && !(org && TRF.cri && dk !== TRF.cri) && !jaNoGraf[k]) { jaNoGraf[k] = 1; var dkd = _trfDia(x.t), dd = dias[dkd] || (dias[dkd] = { n: 0, A: 0, B: 0, C: 0, D: 0, _v: {} });
+    if (noP && !(org && criSel && dk !== criSel) && !jaNoGraf[k]) { jaNoGraf[k] = 1; var dkd = XS.dia[i] || (XS.dia[i] = _trfDia(x.t)), dd = dias[dkd] || (dias[dkd] = { n: 0, A: 0, B: 0, C: 0, D: 0, _v: {} });
       dd._v[k] = 1; dd.n++; if (dd[x.fx] != null) dd[x.fx]++; }
     var p = pes[k]; if (!p) p = pes[k] = { k: k, t8: x.t8, tel: x.tel || '', nome: x.nome || '', t: x.t, pg: x.pag || '', cont: '', src: '', comp: false, inv: '', fx: '', sc: 0, ini: false };
     if (x.t < p.t) p.t = x.t;
@@ -42273,12 +42467,26 @@ function _trfDados() {
     if (x.comp) p.comp = true; if (x.inv) p.inv = x.inv; if (x.fx) { p.fx = x.fx; p.sc = x.sc || 0; }
     if (org) p.src = dk;
     var c = _trfCont(x.cont); if (c && !p.cont) p.cont = c; if (x.nome && x.nome.length > p.nome.length) p.nome = x.nome;
-  });
+  };
+  if (!XS.ord) { for (i = 0; i < nL; i++) umLead(LS[i], i); }   // rede de segurança: se os leads não estiverem em ordem de data, faz a volta inteira como antes
+  else {
+    var iA = _trfLB(LS, P.ini), iB = _trfLB(LS, P.fim);
+    if (!ev) { for (i = iA; i < iB; i++) umLead(LS[i], i); }
+    else {   // só as pessoas que chegaram no período ou que têm linha na planilha de vendas com data no período (as outras saem da tela de qualquer jeito)
+      var marca = new Uint8Array(XS.np), pid = XS.pid, tV = X2.t, pd;
+      for (i = iA; i < iB; i++) marca[pid[i]] = 1;
+      for (i = 0; i < rowsV.length; i++) { var tt = tV[i]; if (tt >= P.ini && tt < P.fim && X2.t8[i]) { pd = XS.pidDe.get(X2.t8[i]); if (pd !== undefined) marca[pd] = 1; } }
+      for (i = 0; i < nL; i++) if (marca[pid[i]]) umLead(LS[i], i);
+    }
+  }
+  var limA = P.ini, limB = P.fim, VAZIO = [];
   var todas = Object.keys(pes).map(function(k) {
-    var p = pes[k]; p.mql = _vfMql(p.inv); p.ck = org ? (p.src || 'sem') : (p.cont ? _chaveAnuncio(p.cont) : '');
+    var p = pes[k]; p.mql = _trfMql(p.inv); p.ck = org ? (p.src || 'sem') : (p.cont ? _trfChave(p.cont) : '');
     var kv = org ? (p.src === 'manychat' ? 'org' : 'bio') : 'pago';   // a reunião e a venda são do funil da ORIGEM escrita na planilha de vendas
-    var rs = ((p.t8 && porTel[p.t8]) || []).filter(function(r) { return r.date && r.date.getTime() >= p.t - 2 * 864e5 && _trfOrigemLinha(r.origem) === kv; });   // no orgânico, reunião que a planilha marca como [Ads] fica com o tráfego pago   // venda de evento (workshop, ILD) segue a origem da planilha: não é venda do tráfego
-    if (ev) rs = rs.filter(function(r) { var t = r.date.getTime(); return t >= P.ini && t < P.fim; });   // só o que tem data dentro do período
+    var rs0 = (p.t8 && porTel[p.t8]) || VAZIO;
+    if (!rs0.length) { p.marc = false; p.real = false; p.apar = false; p.sim = false; p.pag = false; p.valor = 0; p.dv = 0; return p; }
+    var rs = rs0.filter(function(r) { return r.date && r.date.getTime() >= p.t - 2 * 864e5 && _trfOrigemLinha(r.origem) === kv; });   // no orgânico, reunião que a planilha marca como [Ads] fica com o tráfego pago   // venda de evento (workshop, ILD) segue a origem da planilha: não é venda do tráfego
+    if (ev) rs = rs.filter(function(r) { var t = r.date.getTime(); return t >= limA && t < limB; });   // só o que tem data dentro do período
     var vd = rs.filter(function(r) { return r.sn === 'vendido'; });
     p.marc = rs.length > 0; p.real = rs.some(function(r) { return isReal(r.sn); }); p.apar = rs.some(function(r) { return isComp(r.sn); }); p.sim = rs.some(function(r) { return isFechouReuniao(r.sn); });
     p.pag = vd.length > 0; p.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); p.dv = vd.length ? Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })) : 0;
@@ -42288,87 +42496,95 @@ function _trfDados() {
   // anúncios da Meta (só os do diagnóstico), somados por criativo
   var ads = {};
   ((M && M.an) || []).forEach(function(a) {
-    if (metaTipoCampanha(a.campanha) !== 'diagnostico') return;
-    var o = metaOrigemDiag(a.campanha); if (TRF.fam !== 'todos' && o !== TRF.fam) return;
-    var k = _chaveAnuncio(a.anuncio), x = ads[k] || (ads[k] = { k: k, nome: a.anuncio, gasto: 0, imp: 0, cli: 0, foto: '', _m: -1 });
+    if (_trfTipoC(a.campanha) !== 'diagnostico') return;
+    var o = _trfOrigC(a.campanha); if (fam !== 'todos' && o !== fam) return;
+    var k = _trfChave(a.anuncio), x = ads[k] || (ads[k] = { k: k, nome: a.anuncio, gasto: 0, imp: 0, cli: 0, foto: '', _m: -1 });
     var g = +a.gasto || 0; x.gasto += g; x.imp += +a.impressoes || 0; x.cli += +a.cliques || 0; if (g > x._m) { x._m = g; if (a.foto) x.foto = a.foto; if (a.adId) x.adId = a.adId; x.nome = a.anuncio; }
   });
   // visitas na página (sessões): por página (visPag: dia, página, origem, n) e por criativo (visCri: dia, criativo, n)
-  var pags = {}, visCri = {}, visTot = 0, noPer = function(d) { var t = new Date(d + 'T12:00:00').getTime(); return t >= P.ini && t < P.fim; };
+  var pags = {}, visCri = {}, visTot = 0, noPer = function(d) { var t = _trfT12(d); return t >= P.ini && t < P.fim; };
   ((S && S.visPag) || []).forEach(function(v) { if (!noPer(v[0]) || (org ? v[2] !== 'o' : v[2] === 'o')) return; visTot += v[3]; var pg = pags[v[1]] || (pags[v[1]] = _trfPgNova(v[1])); pg.vis += v[3]; });
   if (org) ((S && S.visOrg) || []).forEach(function(v) { if (!noPer(v[0])) return; var f = _trfSrc(v[1]); visCri[f] = (visCri[f] || 0) + v[2]; });
-  else ((S && S.visCri) || []).forEach(function(v) { if (!noPer(v[0])) return; var ck = _chaveAnuncio(_trfCont(v[1])); if (ck) visCri[ck] = (visCri[ck] || 0) + v[2]; });
-  if (TRF.cri) visTot = visCri[TRF.cri] || 0;
+  else ((S && S.visCri) || []).forEach(function(v) { if (!noPer(v[0])) return; var ck = _trfChave(_trfCont(v[1])); if (ck) visCri[ck] = (visCri[ck] || 0) + v[2]; });
+  if (criSel) visTot = visCri[criSel] || 0;
   // criativos: Meta + pessoas
   var cri = {}, novoC = function(k, nome) { return cri[k] || (cri[k] = { k: k, nome: nome, gasto: 0, imp: 0, cli: 0, vis: 0, ini: 0, comp: 0, mql: 0, marc: 0, real: 0, apar: 0, sim: 0, vd: 0, fat: 0, foto: '' }); };
   Object.keys(ads).forEach(function(k) { var a = ads[k], c = novoC(k, a.nome); c.gasto = a.gasto; c.imp = a.imp; c.cli = a.cli; c.foto = a.foto; c.adId = a.adId || ''; });
   if (org) Object.keys(TRF_ORG).forEach(function(k) { novoC(k, TRF_ORG[k][1]); });
   todas.forEach(function(p) { if (!p.ck) return; var c = novoC(p.ck, p.cont); if (p.ini) { c.ini++; if (p.comp) c.comp++; if (p.mql) c.mql++; } if (p.marc) c.marc++; if (p.real) c.real++; if (p.apar) c.apar++; if (p.sim) c.sim++; if (p.pag) { c.vd++; c.fat += p.valor; } });
   Object.keys(cri).forEach(function(k) { cri[k].vis = visCri[k] || 0; });
-  var lista = TRF.cri ? todas.filter(function(p) { return p.ck === TRF.cri; }) : todas;
+  var lista = criSel ? todas.filter(function(p) { return p.ck === criSel; }) : todas;
   lista.forEach(function(p) { var pg = pags[p.pg] || (pags[p.pg] = _trfPgNova(p.pg)); if (p.ini) { pg.ini++; if (p.comp) pg.comp++; if (p.mql) pg.mql++; } if (p.marc) pg.marc++; if (p.apar) pg.apar++; if (p.pag) { pg.vd++; pg.fat += p.valor; } });
   // uma página escolhida: só quem entrou por ela. O gasto, as impressões e os cliques não se separam por página (o mesmo anúncio manda gente para várias).
   var soPg = !org && TRF.pg && pags[TRF.pg] ? TRF.pg : '';
   if (soPg) { lista = lista.filter(function(p) { return p.pg === soPg; }); visTot = pags[soPg].vis; }
   var z = { gasto: 0, imp: 0, cli: 0, vis: visTot, ini: 0, comp: 0, mql: 0, marc: 0, real: 0, apar: 0, sim: 0, pag: 0, valor: 0, fx: { A: 0, B: 0, C: 0, D: 0 } };
-  if (!soPg) Object.keys(ads).forEach(function(k) { if (TRF.cri && k !== TRF.cri) return; z.gasto += ads[k].gasto; z.imp += ads[k].imp; z.cli += ads[k].cli; });
-  lista.forEach(function(p) { ['ini', 'comp', 'mql', 'marc', 'real', 'apar', 'sim', 'pag'].forEach(function(c) { if (_trfTem(p, c)) z[c]++; }); z.valor += p.valor; if (p.ini && z.fx[p.fx] != null) z.fx[p.fx]++; });
+  if (!soPg) Object.keys(ads).forEach(function(k) { if (criSel && k !== criSel) return; z.gasto += ads[k].gasto; z.imp += ads[k].imp; z.cli += ads[k].cli; });
+  for (i = 0; i < lista.length; i++) { var pz = lista[i];
+    if (pz.ini) { z.ini++; if (pz.comp) z.comp++; if (pz.mql) z.mql++; } if (pz.marc) z.marc++; if (pz.real) z.real++; if (pz.apar) z.apar++; if (pz.sim) z.sim++; if (pz.pag) z.pag++;
+    z.valor += pz.valor; if (pz.ini && z.fx[pz.fx] != null) z.fx[pz.fx]++; }
   var rowsEv = null;
-  if (ev && !soPg && (org || !TRF.cri) && (V2.carregado || (V2.rows || []).length)) {
-    var KV = !org ? 'pago' : TRF.cri === 'manychat' ? 'org' : 'bio'; rowsEv = [];
-    (V2.rows || []).forEach(function(r, i) { if (!r.date) return; var d = r.date.getTime(); if (d < P.ini || d >= P.fim || _trfOrigemLinha(r.origem) !== KV) return; var t8 = ldTel8(r.telefone || '');
-      if (KV === 'bio' && ((dono[t8] === 'sem') !== (TRF.cri === 'sem'))) return;   // [Org][Diag] de quem veio por link sem marcação fica no funil "sem marcação"; o resto, na bio
+  if (ev && !soPg && (org || !criSel) && (V2.carregado || (V2.rows || []).length)) {
+    var KV = !org ? 'pago' : criSel === 'manychat' ? 'org' : 'bio'; rowsEv = [];
+    for (i = 0; i < rowsV.length; i++) { var r = rowsV[i]; if (!r.date) continue; var d = X2.t[i]; if (d < P.ini || d >= P.fim || _trfOrigemLinha(r.origem) !== KV) continue; var t8 = X2.t8[i];
+      if (KV === 'bio' && ((dono[t8] === 'sem') !== (criSel === 'sem'))) continue;   // [Org][Diag] de quem veio por link sem marcação fica no funil "sem marcação"; o resto, na bio
       rowsEv.push({ k: 'r' + i, t8: t8, tel: String(r.telefone || ''), nome: String(r.nome || '').trim(), t: d, ini: true, comp: false, mql: false, fx: '', cont: '', pg: '', ck: '', marc: true, real: isReal(r.sn), apar: isComp(r.sn), sim: isFechouReuniao(r.sn), pag: r.sn === 'vendido',
-        valor: r.sn === 'vendido' ? (r.valor || 0) : 0, dv: d, deOnde: String(r.origem || ''), closer: r.closer || '', res: r.status || r.sn || '' }); });
+        valor: r.sn === 'vendido' ? (r.valor || 0) : 0, dv: d, deOnde: String(r.origem || ''), closer: r.closer || '', res: r.status || r.sn || '' }); }
     z.marc = rowsEv.length; z.real = 0; z.apar = 0; z.sim = 0; z.pag = 0; z.valor = 0;
     rowsEv.forEach(function(o) { if (o.real) z.real++; if (o.apar) z.apar++; if (o.sim) z.sim++; if (o.pag) { z.pag++; z.valor += o.valor; } });
   }
-  var topoOrg = org && TRF.cri !== 'sem', igOk = false;
+  var topoOrg = org && criSel !== 'sem';
   if (org) {
-    trfContCarregar(); trfCmtCarregar(); try { igOk = !!IGO.carregado; if (!igOk && !IGO.buscando) carregarIGOrganico(); } catch (eI) {}
-    if (!igOk && (TRF._igEsp = (TRF._igEsp || 0) + 1) < 25) setTimeout(function() { if ((TRF.canal === 'org' || TRF.canal === 'bio') && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1500);
     z.vw = 0; z.pf = 0; z.nposts = 0; z.nHoje = 0; (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { z.vw += x.v; z.pf += x.pf || 0; z.nposts++; if (x.hoje) z.nHoje++; } });
-    var quem = {}, comPs = [], _formT = {}; ((S && S.leads) || []).forEach(function(x) { if (!x.t8) return; var f = _formT[x.t8] || (_formT[x.t8] = { c: false }); if (x.comp) f.c = true; });
+    var quem = {}, comPs = [], _formT = _trfFormC(XS);
     var _nLd = (typeof LD !== 'undefined' && LD.rows) ? LD.rows.length : 0; if (!TRF._igL || TRF._igLn !== _nLd) { TRF._igL = {}; TRF._igLn = _nLd; }
-    try { (IGO.ped || []).forEach(function(q) { if (q.t == null || q.t < P.ini || q.t >= P.fim) return; var d = rkoDono(q.x, q.i); if (!d || d.f !== 'diag') return;
-      var pe = quem[q.u]; if (pe) { pe.nCom++; if (q.t < pe.t) pe.t = q.t; return; }
-      var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = igLeadPorInsta(q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
+    var XP = _trfIdxPed(), ped = XP.ped, nPed = ped.length, igP = _trfIgPMapa();
+    try { for (i = 0; i < nPed; i++) { var q = ped[i]; if (q.t == null || q.t < P.ini || q.t >= P.fim) continue; if (!_trfPedDiag(XP, i)) continue;
+      var pe = quem[q.u]; if (pe) { pe.nCom++; if (q.t < pe.t) pe.t = q.t; continue; }
+      var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = _trfIgLer(igP, q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
+      if (l) dlS.add(l);
       var rf = l && l.tel8 ? (_formT[l.tel8] || null) : null;
-      pe = quem[q.u] = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, com: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _vfMql(l.invest)),
+      pe = quem[q.u] = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, com: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _trfMql(l.invest)),
         fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 };
-      comPs.push(pe); }); } catch (eR) {}
+      comPs.push(pe); } } catch (eR) {}
     comPs.forEach(function(pe) { if (!pe.t8) return;
-      var rs = (porTel[pe.t8] || []).filter(function(r) { var n = v2norm(r.origem || ''); var kO = _trfOrigemLinha(r.origem); return r.date && r.date.getTime() >= pe.t - 2 * 864e5 && (kO === 'org' || kO === 'bio'); });
+      var rs = (porTel[pe.t8] || []).filter(function(r) { var kO = _trfOrigemLinha(r.origem); return r.date && r.date.getTime() >= pe.t - 2 * 864e5 && (kO === 'org' || kO === 'bio'); });
       pe.marc = rs.length > 0; pe.real = rs.some(function(r) { return isReal(r.sn); }); pe.apar = rs.some(function(r) { return isComp(r.sn); });
       var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); } });
     z.com = comPs.length; z.comPs = comPs;
     // quem comentou no post SEM a palavra (uma pessoa conta uma vez, mesmo comentando em vários posts)
-    var novaSem = function(q) { var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = igLeadPorInsta(q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
+    var novaSem = function(q) { var l = TRF._igL[q.u]; if (l === undefined) { l = null; try { l = _trfIgLer(igP, q.u) || null; } catch (e) {} if (l || (typeof LD !== 'undefined' && LD.carregado)) TRF._igL[q.u] = l; }
+      if (l) dlS.add(l);
       var rf = l && l.tel8 ? (_formT[l.tel8] || null) : null;
-      return { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, cmt: true, semPalavra: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _vfMql(l.invest)),
+      return { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t, cmt: true, semPalavra: true, nCom: 1, lkPost: q.lk || '', ini: !!l, comp: !!l && (rf ? rf.c : !!l.invest), mql: !!(l && _trfMql(l.invest)),
         fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 }; };
-    if (TRF.cmt && TRF.cmt.length) { var semPal = {}, cmtPs = [], cmtDesde = Infinity;
-      TRF.cmt.forEach(function(q) { if (q.t < cmtDesde) cmtDesde = q.t; if (q.t < P.ini || q.t >= P.fim || quem[q.u]) return;
-        var pe = semPal[q.u]; if (pe) { pe.nCom++; if (q.t > pe.t) { pe.t = q.t; pe.lkPost = q.lk; } return; }
-        pe = semPal[q.u] = novaSem(q); cmtPs.push(pe); });
+    var XC = null;
+    if (TRF.cmt && TRF.cmt.length) { XC = _trfIdxCmt(); var semPal = {}, cmtPs = [], cmtDesde = XC.desde, cm = XC.cmt;
+      for (i = 0; i < cm.length; i++) { var qc = cm[i]; if (qc.t < P.ini || qc.t >= P.fim || quem[qc.u]) continue;
+        var ps = semPal[qc.u]; if (ps) { ps.nCom++; if (qc.t > ps.t) { ps.t = qc.t; ps.lkPost = qc.lk; } continue; }
+        ps = semPal[qc.u] = novaSem(qc); cmtPs.push(ps); }
       z.cmtPs = cmtPs; z.cmt = cmtPs.length + comPs.length; z.cmtDesde = cmtDesde; z._semPal = semPal; }
     // 11/11/2026 (Bruno: "no orgânico e no evento coloque os criativos como no tráfego"): no orgânico o criativo é o POST — cada post publicado
     // no período com quem comentou a palavra nele, quem virou lead (pelo @), e as reuniões e vendas dessas pessoas depois do comentário.
-    var formDe = {}; ((S && S.leads) || []).forEach(function(x) { if (!x.t8) return; var f = formDe[x.t8] || (formDe[x.t8] = { c: false }); if (x.comp) f.c = true; });
+    var formDe = _formT;
     var posts = {}, vwLk = {}, pfLk = {}, hojeLk = {}; (TRF.cont || []).forEach(function(x) { if (x.lk) { vwLk[x.lk] = x.v; pfLk[x.lk] = x.pf || 0; if (x.hoje) hojeLk[x.lk] = 1; } });
     try { (IGO.posts || []).forEach(function(q) { if (!q.date || !q.link) return; var t = q.date.getTime(); if (t < P.ini || t >= P.fim) return;
       posts[q.link] = { lk: q.link, t: t, leg: String(q.legenda || ''), tipo: q.tipo || '', cur: q.curtidas || 0, cm: q.coment || 0, vw: vwLk[q.link] || 0, pf: pfLk[q.link] || 0, temVw: vwLk[q.link] != null, comp: 0, real: 0, vwHoje: (TRF.contHoje && TRF.contHoje[q.link]) ? TRF.contHoje[q.link].v : null, so7: !!(TRF.contHoje && TRF.contHoje[q.link] && hojeLk[q.link] !== 1), ps: [], com: 0, ld: 0, mql: 0, marc: 0, apar: 0, vd: 0, fat: 0, _u: {} }; });
-      (IGO.ped || []).forEach(function(q) { var o = posts[q.lk]; if (!o || o._u[q.u]) return; var d = rkoDono(q.x, q.i); if (!d || d.f !== 'diag') return; o._u[q.u] = 1; o.com++;
-        var l = null; try { l = igLeadPorInsta(q.u); } catch (e) {}
-        var _rf = l && l.tel8 ? (formDe[l.tel8] || null) : null, _cp = !!l && (_rf ? _rf.c : !!l.invest);   // formulário completo: pela base do site (ou, no formulário antigo, se respondeu o investimento)
-        var pe = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t || o.t, com: true, ini: !!l, comp: _cp, mql: !!(l && _vfMql(l.invest)), fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 }; o.ps.push(pe);
-        if (!l) return; o.ld++; if (pe.comp) o.comp++; if (pe.mql) o.mql++;
-        var rs = ((l.tel8 && porTel[l.tel8]) || []).filter(function(r) { var n = v2norm(r.origem || ''); var kO = _trfOrigemLinha(r.origem); return r.date && r.date.getTime() >= (q.t || o.t) - 2 * 864e5 && (kO === 'org' || kO === 'bio'); });
-        if (rs.length) { o.marc++; pe.marc = true; } pe.real = rs.some(function(r) { return isReal(r.sn); }); if (pe.real) o.real++; if (rs.some(function(r) { return isComp(r.sn); })) { o.apar++; pe.apar = true; }
-        var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { o.vd++; pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); o.fat += pe.valor; } });
+      Object.keys(posts).forEach(function(lk) { var o = posts[lk], ixs = XP.porLk.get(lk); if (!ixs) return;   // os comentários deste post, na ordem da planilha
+        for (var j = 0; j < ixs.length; j++) { var q = ped[ixs[j]]; if (o._u[q.u]) continue; if (!_trfPedDiag(XP, ixs[j])) continue; o._u[q.u] = 1; o.com++;
+          var l = null; try { l = _trfIgLer(igP, q.u); } catch (e) { l = null; }
+          if (l) dlS.add(l);
+          var _rf = l && l.tel8 ? (formDe[l.tel8] || null) : null, _cp = !!l && (_rf ? _rf.c : !!l.invest);   // formulário completo: pela base do site (ou, no formulário antigo, se respondeu o investimento)
+          var pe = { k: 'ig:' + q.u, ig: q.u, t8: l ? (l.tel8 || '') : '', tel: l ? (l.tel || '') : '', nome: l && l.nome ? l.nome : '@' + q.u, t: q.t || o.t, com: true, ini: !!l, comp: _cp, mql: !!(l && _trfMql(l.invest)), fx: '', cont: '', pg: '', ck: '', marc: false, real: false, apar: false, pag: false, valor: 0, dv: 0 }; o.ps.push(pe);
+          if (!l) continue; o.ld++; if (pe.comp) o.comp++; if (pe.mql) o.mql++;
+          var rs0 = (l.tel8 && porTel[l.tel8]) || VAZIO; if (!rs0.length) { pe.real = false; continue; }
+          var tq = (q.t || o.t) - 2 * 864e5, rs = rs0.filter(function(r) { var kO = _trfOrigemLinha(r.origem); return r.date && r.date.getTime() >= tq && (kO === 'org' || kO === 'bio'); });
+          if (rs.length) { o.marc++; pe.marc = true; } pe.real = rs.some(function(r) { return isReal(r.sn); }); if (pe.real) o.real++; if (rs.some(function(r) { return isComp(r.sn); })) { o.apar++; pe.apar = true; }
+          var vd = rs.filter(function(r) { return r.sn === 'vendido'; }); if (vd.length) { o.vd++; pe.pag = true; pe.valor = vd.reduce(function(a, r) { return a + (r.valor || 0); }, 0); pe.dv = Math.min.apply(null, vd.map(function(r) { return r.date.getTime(); })); o.fat += pe.valor; } } });
     } catch (eP) {}
-    if (TRF.cmt && TRF.cmt.length) TRF.cmt.forEach(function(q) { var o = posts[q.lk]; if (!o || o._u[q.u]) return; o._c = o._c || {}; if (o._c[q.u]) return;   // quem comentou neste post SEM a palavra
-      var pe = (z._semPal && z._semPal[q.u]) || novaSem(q); o._c[q.u] = pe; (o.cs = o.cs || []).push(pe); });
+    if (XC) Object.keys(posts).forEach(function(lk) { var o = posts[lk], ixs = XC.porLk.get(lk); if (!ixs) return;   // quem comentou neste post SEM a palavra
+      for (var j = 0; j < ixs.length; j++) { var q = XC.cmt[ixs[j]]; if (o._u[q.u]) continue; o._c = o._c || {}; if (o._c[q.u]) continue;
+        var pe = (z._semPal && z._semPal[q.u]) || novaSem(q); o._c[q.u] = pe; (o.cs = o.cs || []).push(pe); } });
     z.posts = Object.keys(posts).map(function(k) { return posts[k]; });
   }
   var semOrg = org && !(S && S.visOrg);   // visitas por origem: só depois que a função da base do site passar a devolver esse recorte
@@ -42533,7 +42749,7 @@ function _trfFotosPedir(L) {
     if (!d || !d.success || !(d.itens || []).length) return;
     d.itens.forEach(function(it) { if (it.id) META_CRI.porId[it.id] = it; if (it.nome) META_CRI.porNome[_chaveAnuncio(it.nome)] = it; });
     try { guardarCriativos(); } catch (e2) {}
-    if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego();
+    _trfPedirRender();
   };
   sc.onerror = function() { try { delete window[nome]; } catch (e) {} };
   sc.src = APPS_SCRIPT_URL + '?callback=' + nome + '&payload=' + encodeURIComponent(JSON.stringify({ action: 'metaCriativosPorIds', ids: ids }));
@@ -42792,7 +43008,7 @@ function _trfCriativosWs(D) {
 // Cada bloco entra quando aparece na tela (rolagem): os números contam, as barras sobem, a linha se desenha e o funil desce em cascata.
 // Só anima quando os dados estão prontos e quando muda o período ou o filtro; as redesenhadas de bastidor (foto que chega) não repetem.
 // Quem pediu "menos movimento" no computador não vê animação nenhuma.
-function trfAbrir() { TRF._rev = null; renderTrafego(); }
+function trfAbrir() { TRF._rev = null; TRF_R.acao = Date.now(); renderTrafego(); }
 function _trfSemMov() { try { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
 function _trfContar(raiz) {
   if (_trfSemMov()) return;
@@ -42830,7 +43046,14 @@ function _trfAnimar(el, D) {
     setTimeout(function() { pend.forEach(function(x) { try { if (x.isConnected && x.getBoundingClientRect().top < window.innerHeight * 0.9) soltar(x); } catch (e) {} }); }, 1600);   // rede de segurança: nada visível fica escondido
   } catch (e) { try { [].forEach.call(el.querySelectorAll('.trf-esp'), function(x) { x.classList.remove('trf-esp'); }); } catch (e2) {} }
 }
+// ⚡ todo desenho passa por aqui: cancela o redesenho de bastidor que estava marcado (este já resolve), anota quais fontes ainda faltam
+// e, no fim, arma UM relógio de espera para elas (no lugar dos vários setTimeout que cada desenho armava) e adianta o aquecimento.
 function renderTrafego() {
+  if (TRF_R.rT) { clearTimeout(TRF_R.rT); TRF_R.rT = 0; }
+  TRF_R.vigQ = {}; TRF_R.n.render++;
+  try { _trfRender0(); } finally { _trfVigArmar(); try { _trfAquecerIg(); } catch (eA) {} }
+}
+function _trfRender0() {
   var el = document.getElementById('trf-corpo'); if (!el) return;
   if (!trfPode()) { el.innerHTML = '<div class="panel trf-vazio">🔒 Esta aba é só para a gestão e o time de conteúdo e tráfego.</div>'; return; }
   if (TRF.canal === 'todos') { _trfRenderTodos(el); return; }
@@ -42840,7 +43063,7 @@ function renderTrafego() {
   // palavra (ManyChat; o link sem etiqueta fica como um cartão à parte) e 🔗 Link na bio = quem foi ao perfil e clicou na bio.
   if (TRF.canal === 'bio') TRF.cri = 'bio'; else if (TRF.canal === 'org' && TRF.cri !== 'sem') TRF.cri = 'manychat';
   trfSiteCarregar(false);
-  if (!V2.carregado && !(V2.rows || []).length) { if ((TRF._esp = (TRF._esp || 0) + 1) < 40) setTimeout(function() { if (typeof telaVisivel !== 'function' || telaVisivel('s-trafego')) renderTrafego(); }, 900); }
+  if (!V2.carregado && !(V2.rows || []).length) _trfVigiar('v2');
   var D = _trfDados(), z = D.z; window._trfCtx = D;
   var ret = z.gasto ? z.valor / z.gasto : 0, pend = z.ini - z.comp;
   var avisos = '';
@@ -42916,12 +43139,36 @@ function trfCentralCarregar() {
   if (!TRF_CENTRAL_SB.url) return;
   TRF.centralPed = true;
   try { var h = new XMLHttpRequest(); h.open('POST', TRF_CENTRAL_SB.url + '/rest/v1/rpc/' + TRF_CENTRAL_SB.rpc); h.setRequestHeader('apikey', TRF_CENTRAL_SB.key); h.setRequestHeader('Content-Type', 'application/json'); h.timeout = 30000;
-    h.onload = function() { TRF.centralPed = false; var d = null; try { d = JSON.parse(h.responseText); } catch (e) {} if (h.status < 300 && d && d.cri) { TRF.central = d; if (TRF.canal === 'ws' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); } };
+    h.onload = function() { TRF.centralPed = false; var d = null; try { d = JSON.parse(h.responseText); } catch (e) {} if (h.status < 300 && d && d.cri) { TRF.central = d; if (TRF.canal === 'ws') _trfPedirRender(); } };
     h.onerror = h.ontimeout = function() { TRF.centralPed = false; }; h.send('{}'); } catch (e) { TRF.centralPed = false; }
 }
 function _trfCentralEd(slug) { var m = String(slug || '').match(/(janeiro|fevereiro|marco|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)-(\d{4})/i); return m ? (/^ild/i.test(slug) ? 'p:' : 'o:') + m[1].slice(0, 3).toLowerCase() + '/' + m[2].slice(2) : ''; }
 function _trfCriNome(c) { c = String(c || ''); return c === '(sem anúncio)' ? '🌱 Sem anúncio (orgânico ou link direto)' : /^organic_bio$/i.test(c) || /^\{/.test(c) ? '🔗 Link da bio' : /recuperacao/i.test(c) ? '🛒 Recuperação de carrinho' : /\{\{/.test(c) ? 'Anúncio sem nome (etiqueta quebrada)' : c === '(outros criativos)' ? 'Outros criativos (somados)' : c; }
-function _trfDadosWs() {
+// ⚡ a conta do workshop fica guardada enquanto nada mudar (edição escolhida, tipo, app do workshop, planilha de vendas, lista do evento
+// presencial, Central e as respostas da Meta de cada edição). Na chave Todos ela é pedida SEM os anúncios (semMeta): lá só se usam
+// inscritos, presença e aplicações por edição — antes, abrir a chave Todos disparava pedidos à Meta para a captação de todas as edições.
+function _trfDadosWs(semMeta) {
+  trfCentralCarregar();
+  var hoje = new Date(), d0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime(), ok = typeof WSL !== 'undefined' && WSL.carregado;
+  var ildF = typeof ildPessoas === 'function' && typeof ILDV !== 'undefined', iv = ildF ? ILDV : null;
+  var sig = [TRF.wed, TRF.wtipo, TRF.wpub, !!semMeta, d0, typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15, ok, ok ? WSL.porTel : null, _trfV2(), TRF.central, window.TRF_CENTRAL_LOCAL, ildF,
+    iv ? iv.base : null, iv ? iv.app : null, iv ? iv.ab : null, iv && iv.base && iv.base.rows ? iv.base.rows.length : 0, iv && iv.app && iv.app.rows ? iv.app.rows.length : 0, iv && iv.ab && iv.ab.rows ? iv.ab.rows.length : 0, iv ? iv.quando : 0];
+  var chave = 'w|' + TRF.wed + '|' + TRF.wtipo + '|' + TRF.wpub + '|' + (semMeta ? 1 : 0), e = _trfMemoVer(chave, sig);
+  if (e) {
+    var okM = true, J = e.x.jan;   // as respostas da Meta de cada edição continuam as mesmas? (perguntar também dispara o pedido, como antes)
+    for (var i = 0; i < J.length; i += 3) if (_trfMeta({ ini: J[i], fim: J[i + 1] }) !== J[i + 2]) okM = false;
+    if (okM) { if (e.x.ildFalta) { try { ildCarregar(false); } catch (eC) {} _trfVigiar('ild'); }
+      if (e.x.ag.length) { var na = new Date().getTime(); for (var g = 0; g < e.x.ag.length; g++) e.x.ag[g].t = na; }   // quem entrou com a hora da conta recebe a hora de agora (como se a conta fosse refeita)
+      TRF_R.n.guardado++; return e.D; }
+  }
+  TRF_R.n.conta++; TRF_R.wsJ = []; TRF_R.wsIld = false; TRF_R.wsAg = new Set();
+  var D, ag = [];
+  try { D = _trfDadosWsConta(semMeta); } finally { var agS = TRF_R.wsAg; TRF_R.wsAg = null; }
+  if (agS.size) D.eds.forEach(function(ed) { for (var k in ed.pes) { var p = ed.pes[k]; if (p.semCad === false && p.insc === false && agS.has(p.t)) ag.push(p); } });
+  _trfMemoPor(chave, sig, D, { jan: TRF_R.wsJ, ildFalta: TRF_R.wsIld, ag: ag });
+  return D;
+}
+function _trfDadosWsConta(semMeta) {
   var dia0 = function(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }, JAN = typeof WS_JANELA_DIAS !== 'undefined' ? WS_JANELA_DIAS : 15;
   var ok = typeof WSL !== 'undefined' && WSL.carregado, E = {}, ehIld = function(x) { return /ild/i.test(x.prog || ''); }, fora = 0, foraV = 0, foraR = 0;
   var nova = function(pres, m, x) {
@@ -42931,7 +43178,7 @@ function _trfDadosWs() {
   };
   var pessoa = function(e, k, x, r) {
     return e.pes[k] || (e.pes[k] = { k: k, t8: x ? x.t8 : (r ? ldTel8(r.telefone || '') : ''), tel: x ? x.tel : String((r && r.telefone) || ''), nome: String((x ? x.nome : r && r.nome) || '').trim(), ini: true, semCad: !x, ck: e.k,
-      t: x ? ((x.ing instanceof Date ? x.ing : x.apl instanceof Date ? x.apl : new Date()).getTime()) : (r && r.date ? r.date.getTime() : 0),
+      t: x ? ((x.ing instanceof Date ? x.ing : x.apl instanceof Date ? x.apl : _trfAgoraWs()).getTime()) : (r && r.date ? r.date.getTime() : 0),
       insc: !!(x && x.ing instanceof Date), p1: !!(x && x.p1), p2: !!(x && x.p2), part: !!(x && (x.p1 || x.p2 || x.p3)), aplT: !!(x && x.apl instanceof Date), apl: !!(x && x.apl instanceof Date && /^comprou/i.test(x.compra || '')), mql: !!(x && x.apl instanceof Date && _vfMql(x.inv)), comp: false, fx: '', cont: '', pg: '', rs: [] });
   };
   if (ok) Object.keys(WSL.porTel).forEach(function(t8) {
@@ -42973,7 +43220,7 @@ function _trfDadosWs() {
   var ildTipos = null;
   try { var edP = todasEd.filter(function(e) { return e.pres; }).pop();
     if (edP && typeof ildPessoas === 'function' && typeof ILDV !== 'undefined') {
-      if (!ILDV.base || !ILDV.app) { try { ildCarregar(false); } catch (eC) {} if ((TRF._ildEsp = (TRF._ildEsp || 0) + 1) < 25) setTimeout(function() { if (TRF.canal === 'ws' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1500); }
+      if (!ILDV.base || !ILDV.app) { try { ildCarregar(false); } catch (eC) {} TRF_R.wsIld = true; _trfVigiar('ild'); }
       else { var IP = ildPessoas().filter(function(q) { return q.tipo !== 'staff'; }); ildTipos = {}; IP.forEach(function(q) { var t = q.tipo || 'semtipo'; ildTipos[t] = (ildTipos[t] || 0) + 1; }); ildTipos._tot = IP.length;
         edP.pes = {}; edP.lista = true;
         IP.forEach(function(q) { if (TRF.wpub && (q.tipo || 'semtipo') !== TRF.wpub) return;
@@ -43007,8 +43254,8 @@ function _trfDadosWs() {
   if (CT) {
     (CT.cri || []).forEach(function(r) { if (!selEd[_trfCentralEd(r[0])]) return; var nm = /^\{[^{]/.test(r[1]) ? 'organic_bio' : r[1], ck = /^\(|^organic|recuperacao|\{\{/i.test(nm) ? 'x:' + nm : _chaveAnuncio(nm), c = criC[ck] || (criC[ck] = { k: ck, bruto: nm, nome: _trfCriNome(nm), ing: 0, apl: 0, marc: 0, apar: 0, vd: 0 });
       c.ing += +r[2] || 0; c.apl += +r[3] || 0; c.marc += +r[4] || 0; c.apar += +r[5] || 0; c.vd += +r[6] || 0; }); }
-  L.forEach(function(e) {
-    if (!e.jan || e.jan[1] <= e.jan[0]) return; var M = _trfMeta({ ini: e.jan[0], fim: e.jan[1] }); if (!M) { temMeta = false; return; } if (M.erro) metaRuim = true;
+  if (!semMeta) L.forEach(function(e) {
+    if (!e.jan || e.jan[1] <= e.jan[0]) return; var M = _trfMeta({ ini: e.jan[0], fim: e.jan[1] }); if (TRF_R.wsJ) TRF_R.wsJ.push(e.jan[0], e.jan[1], M); if (!M) { temMeta = false; return; } if (M.erro) metaRuim = true;
     var g = 0; (M.an || []).forEach(function(a) { var tp = metaTipoCampanha(a.campanha); if (e.pres ? tp !== 'imersao' : tp !== 'workshop') return; var ga = +a.gasto || 0; g += ga; z.imp += +a.impressoes || 0; z.cli += +a.cliques || 0;
       var ck = _chaveAnuncio(a.anuncio), x = adsWs[ck] || (adsWs[ck] = { k: ck, nome: a.anuncio, gasto: 0, imp: 0, cli: 0, res: 0, foto: '', adId: '', _m: -1 });
       x.gasto += ga; x.imp += +a.impressoes || 0; x.cli += +a.cliques || 0; x.res += +a.leadsMeta || 0; if (ga > x._m) { x._m = ga; x.nome = a.anuncio; if (a.foto) x.foto = a.foto; if (a.adId) x.adId = a.adId; } });
@@ -43038,7 +43285,7 @@ function _trfPagouHtml(D) {
 function _trfRenderWs(el) {
   var okWs = typeof WSL !== 'undefined' && WSL.carregado;
   if (!okWs) { try { if (!WSL.buscando) carregarWS(); } catch (e) {} }
-  if ((!okWs || (!V2.carregado && !(V2.rows || []).length)) && (TRF._wsEsp = (TRF._wsEsp || 0) + 1) < 40) setTimeout(function() { if (TRF.canal === 'ws' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1000);
+  if (!okWs) _trfVigiar('ws'); if (!V2.carregado && !(V2.rows || []).length) _trfVigiar('v2');
   var D = _trfDadosWs(), z = D.z; window._trfCtx = D;
   var tp = function(v, r) { return '<button type="button" class="pl-chip' + (TRF.wtipo === v ? ' on' : '') + '" onclick="trfFiltro(\'wtipo\',\'' + v + '\')">' + r + '</button>'; };
   var ab = function(k, r, sub) { return '<button type="button" class="trf-ed' + (D.sel === k ? ' on' : '') + '" onclick="trfFiltro(\'wed\',\'' + k + '\')">' + r + (sub ? '<small>' + sub + '</small>' : '') + '</button>'; };
@@ -43092,9 +43339,21 @@ function _trfRenderWs(el) {
     return orig.apply(this, arguments); };
   novo._trf = 1; window.__gvizWS = novo; } catch (e) {} })();
 var TRF_MCP_PRECO = 300;   // valor de cada MCP (Bruno, 11/11/2026)
-function _trfDadosMcp() {
-  var P = _trfPer(), ev = TRF.modo !== 'coorte', ok = typeof WSL !== 'undefined' && WSL.carregado, M = _trfMeta(P), todas = [], ultima = 0;
-  var porTel = {}; (V2.rows || []).forEach(function(r) { var t = ldTel8(r.telefone); if (t) (porTel[t] = porTel[t] || []).push(r); });
+function _trfDadosMcp() {   // ⚡ guardado pela assinatura (período, modo, app do workshop, planilha de vendas, planilha de leads e resposta da Meta)
+  var P = _trfPer(), ok = typeof WSL !== 'undefined' && WSL.carregado, M = _trfMeta(P), ldR = (typeof LD !== 'undefined' && LD.rows) || null;
+  var hoje = new Date(), d0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
+  var sig = [P.ini, P.fim, P.rot, TRF.modo !== 'coorte', ok, ok ? WSL.porTel : null, ok ? WSL.mcpEm : null, ok ? WSL.edDe : null, _trfV2(), M, ldR, ldR ? ldR.length : 0, d0];
+  var chave = 'm|' + P.ini + '|' + P.fim + '|' + TRF.modo, e = _trfMemoVer(chave, sig);
+  if (e) { var D0 = e.D, av = !!(D0.ultima && Math.min(P.fim, Date.now()) - D0.ultima > 6 * 864e5);   // o aviso "compras só até o dia tal" depende da hora: confere se continua igual
+    if (av === !!D0.aparte.insc) { TRF_R.n.guardado++; return D0; } }
+  TRF_R.n.conta++;
+  var D = _trfDadosMcpConta(P, M);
+  _trfMemoPor(chave, sig, D, null);
+  return D;
+}
+function _trfDadosMcpConta(P, M) {
+  var ev = TRF.modo !== 'coorte', ok = typeof WSL !== 'undefined' && WSL.carregado, todas = [], ultima = 0;
+  var porTel = _trfIdxV2().porTel;
   var edDe = (ok && WSL.edDe) || {}, mcpEm = (ok && WSL.mcpEm) || {}, primeiro = 0;
   if (ok) Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (/mcp/i.test(x.prog || '') && x.ing instanceof Date && (!primeiro || x.ing.getTime() < primeiro)) primeiro = x.ing.getTime(); });
   if (ok) Object.keys(WSL.porTel).forEach(function(t8) {
@@ -43122,7 +43381,7 @@ function _trfDadosMcp() {
 function _trfRenderMcp(el) {
   var okWs = typeof WSL !== 'undefined' && WSL.carregado;
   if (!okWs) { try { if (!WSL.buscando) carregarWS(); } catch (e) {} }
-  if ((!okWs || (!V2.carregado && !(V2.rows || []).length)) && (TRF._wsEsp = (TRF._wsEsp || 0) + 1) < 40) setTimeout(function() { if (TRF.canal === 'mcp' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1000);
+  if (!okWs) _trfVigiar('ws'); if (!V2.carregado && !(V2.rows || []).length) _trfVigiar('v2');
   var D = _trfDadosMcp(), z = D.z; window._trfCtx = D;
   var recMcp = z.insc * TRF_MCP_PRECO, ret = z.gasto ? (recMcp + z.valor) / z.gasto : 0, val = {}; D.PS.forEach(function(p) { val[p[0]] = z[p[0]]; });
   var avisos = '';
@@ -43154,7 +43413,25 @@ function _trfRenderMcp(el) {
 // na coluna Origem da planilha de vendas, na data da planilha. Por isso o total bate com a planilha (regra: sempre siga a planilha de vendas).
 // Dentro de cada funil a conta é pela pessoa (lead, inscrito), então os números podem diferir um pouco dos daqui — a tela avisa.
 // =====================================================================================================
-function _trfOrigemLinha(o) {
+// ⚡ a parte do Diagnóstico na chave Todos (leads, MQL, completos e visitas do período) fica guardada por período enquanto a base do site
+// e o "de quem é cada lead" forem os mesmos; a volta passa só pelos leads do período (estão em ordem de data).
+function _trfTodosDiag(S, P) {
+  var donoT = _trfDonoLeads(S, P.fim), chave = 't|' + P.ini + '|' + P.fim, sig = [P.ini, P.fim, S, S.leads, S.leads.length, S.visPag, S.visOrg, S.semVis, donoT], e = _trfMemoVer(chave, sig);
+  if (e) { TRF_R.n.guardado++; return e.D; }
+  TRF_R.n.conta++;
+  var compD = {}, visDiag = null, visDesdeT = '', v = { pago: {}, org: {}, bio: {} }, inv = {}, vSem = {};
+  _trfCadaNoPeriodo(S, P.ini, P.fim, function(l) { if (l.t < P.ini || l.t >= P.fim) return; var kL = l.t8 || ('n:' + l.nome), dk = donoT[kL] || _trfDonoDe(l), c = dk === 'pago' ? 'pago' : dk === 'manychat' ? 'org' : 'bio';
+    v[c][kL] = 1; if (dk === 'sem') vSem[kL] = 1; if (l.inv) inv[kL] = l.inv; if (l.comp) compD[kL] = 1; });   // os leads vêm em ordem de data: fica a resposta mais recente
+  if (S.visPag && !S.semVis) { visDiag = 0; var noPerV = function(d) { var tV = _trfT12(d); return tV >= P.ini && tV < P.fim; };
+    S.visPag.forEach(function(x) { if (!visDesdeT || x[0] < visDesdeT) visDesdeT = x[0]; if (noPerV(x[0]) && (x[2] !== 'o' || !S.visOrg)) visDiag += x[3]; });
+    (S.visOrg || []).forEach(function(x) { if (noPerV(x[0])) visDiag += x[2]; }); }
+  var q = 0, entr = {}, qual = {}; ['pago', 'org', 'bio'].forEach(function(c) { var ks2 = Object.keys(v[c]), nq = ks2.filter(function(kk) { return _trfMql(inv[kk]); }).length; entr[c] = ks2.length; qual[c] = nq; q += nq; });
+  var D = { compD: compD, visDiag: visDiag, visDesdeT: visDesdeT, nSem: Object.keys(vSem).length, entr: entr, qual: qual, mqlDiag: q };
+  _trfMemoPor(chave, sig, D, null); return D;
+}
+function _trfOrigemLinha(o) { var m = TRF_R.mOrig, r = m.get(o); if (r === undefined) { r = _trfOrigemLinha0(o); if (m.size > 5000) m.clear(); m.set(o, r); } return r; }   // ⚡ a mesma origem escrita dá sempre o mesmo funil: guarda
+function _trfCadaNoPeriodo(S, ini, fim, fn) { var XS = _trfIdxSite(S), L = XS.L, a = 0, b = L.length; if (XS.ord) { a = _trfLB(L, ini); b = _trfLB(L, fim); } for (var i = a; i < b; i++) fn(L[i]); }   // ⚡ só os leads do período (estão em ordem de data)
+function _trfOrigemLinha0(o) {
   var n = v2norm(o || '');
   if (/(^|[^a-z])ads([^a-z]|$)/.test(n)) return 'pago'; if (/mchat|manychat/.test(n)) return 'org'; if (/(^|[^a-z])org([^a-z]|$)/.test(n)) return 'bio';
   if (/(^|[^a-z])ild([^a-z]|$)|imers/.test(n)) return 'pres'; if (/workshop/.test(n) && /(^|[^a-z])(pre|pos)([^a-z]|$)/.test(n)) return 'pp'; if (/workshop/.test(n)) return 'ws'; if (/social/.test(n)) return 'ss'; if (/indica/.test(n)) return 'ind'; return 'out';
@@ -43163,7 +43440,7 @@ function _trfRenderTodos(el) {
   trfSiteCarregar(false); try { if (!WSL.carregado && !WSL.buscando) carregarWS(); } catch (e) {}
   _trfJuntarLD(TRF.site);
   var okWs = typeof WSL !== 'undefined' && WSL.carregado, okV = V2.carregado || (V2.rows || []).length;
-  if ((!okWs || !okV) && (TRF._tdEsp = (TRF._tdEsp || 0) + 1) < 40) setTimeout(function() { if (TRF.canal === 'todos' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 1000);
+  if (!okWs) _trfVigiar('ws'); if (!okV) _trfVigiar('v2');
   var P = _trfPer(), M = _trfMeta(P), S = TRF.site;
   var novo = function(rot, abre, ent) { return { rot: rot, abre: abre, ent: ent, gasto: 0, imp: 0, cli: 0, entr: null, reun: 0, real: 0, apar: 0, vend: 0, valor: 0 }; };
   var L = { pago: novo('📣 Tráfego pago', 'pago', 'leads'), org: novo('🌱 Orgânico · comentário (ManyChat)', 'org', 'leads'), bio: novo('🔗 Link na bio e orgânico direto', 'bio', 'leads'), pp: novo('🔁 Pré e pós workshop (pelo diagnóstico)', '', ''), ws: novo('🎓 Workshop on-line', 'ws', 'ingressos'),
@@ -43180,14 +43457,8 @@ function _trfRenderTodos(el) {
   ((M && M.an) || []).forEach(function(a) { var g = +a.gasto || 0, tp = metaTipoCampanha(a.campanha), od = tp === 'workshop' || tp === 'imersao' ? '' : metaOrigemDiag(a.campanha), x = tp === 'workshop' ? L.ws : tp === 'imersao' ? L.pres : od === 'mcp' ? L.mcp : od === 'quente' ? L.pago : L.dist;
     x.gasto += g; x.imp += +a.impressoes || 0; x.cli += +a.cliques || 0; });   // o tráfego pago aqui é o mesmo da chave dele (campanhas de diagnóstico); o resto do gasto aparece à parte
   var compD = {}, visDiag = null, visDesdeT = '';
-  if (S) { var donoT = _trfDonoLeads(S, P.fim), v = { pago: {}, org: {}, bio: {} }, inv = {}, nSem = 0, vSem = {};
-    S.leads.forEach(function(l) { if (l.t < P.ini || l.t >= P.fim) return; var kL = l.t8 || ('n:' + l.nome), dk = donoT[kL] || _trfDonoDe(l), c = dk === 'pago' ? 'pago' : dk === 'manychat' ? 'org' : 'bio';
-      v[c][kL] = 1; if (dk === 'sem') vSem[kL] = 1; if (l.inv) inv[kL] = l.inv; if (l.comp) compD[kL] = 1; });   // os leads vêm em ordem de data: fica a resposta mais recente
-    nSem = Object.keys(vSem).length; L.bio.nSem = nSem;
-    if (S.visPag && !S.semVis) { visDiag = 0; var noPerV = function(d) { var tV = new Date(d + 'T12:00:00').getTime(); return tV >= P.ini && tV < P.fim; };
-      S.visPag.forEach(function(x) { if (!visDesdeT || x[0] < visDesdeT) visDesdeT = x[0]; if (noPerV(x[0]) && (x[2] !== 'o' || !S.visOrg)) visDiag += x[3]; });
-      (S.visOrg || []).forEach(function(x) { if (noPerV(x[0])) visDiag += x[2]; }); }
-    var q = 0; ['pago', 'org', 'bio'].forEach(function(c) { var ks2 = Object.keys(v[c]), nq = ks2.filter(function(kk) { return _vfMql(inv[kk]); }).length; L[c].entr = ks2.length; L[c].qual = nq; L[c].qualRot = 'MQL'; q += nq; }); mqlDiag = q; }
+  if (S) { var TD = _trfTodosDiag(S, P); compD = TD.compD; visDiag = TD.visDiag; visDesdeT = TD.visDesdeT; L.bio.nSem = TD.nSem;
+    ['pago', 'org', 'bio'].forEach(function(c) { L[c].entr = TD.entr[c]; L[c].qual = TD.qual[c]; L[c].qualRot = 'MQL'; }); mqlDiag = TD.mqlDiag; }
   if (okWs) { mqlEv = 0; mqlEvPg = 0; L.ws.qual = 0; L.ws.qualPg = 0; L.pres.qual = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (/mcp/i.test(x.prog || '') || !(x.apl instanceof Date)) return; var t = x.apl.getTime(); if (t < P.ini || t >= P.fim) return;
       var ild = /ild/i.test(x.prog || ''), pg = ild || /^comprou/i.test(x.compra || ''); mqlEv++; if (pg) mqlEvPg++; if (ild) L.pres.qual++; else { L.ws.qual++; if (pg) L.ws.qualPg++; } });
     // presencial: a aplicação é a ficha em papel (lista do Evento ILD), não a do app
@@ -43195,7 +43466,7 @@ function _trfRenderTodos(el) {
       if (dI >= P.ini && dI < P.fim) {
         if (typeof ildPessoas === 'function' && typeof ILDV !== 'undefined' && ILDV.base && ILDV.app) { var ipL = ildPessoas().filter(function(q) { return q.tipo !== 'staff'; }), nf = ipL.filter(function(q) { return q.apl; }).length; L.pres.listaN = ipL.length;
           if (nf > L.pres.qual) { mqlEv += nf - L.pres.qual; mqlEvPg += nf - L.pres.qual; L.pres.qual = nf; } }
-        else { L.pres.qual = null; if (!TRF._ildT && typeof ildCarregar === 'function') { TRF._ildT = 1; try { ildCarregar(false); } catch (eC) {} setTimeout(function() { TRF._ildT = 0; if (TRF.canal === 'todos' && (typeof telaVisivel !== 'function' || telaVisivel('s-trafego'))) renderTrafego(); }, 5000); } } } } catch (eI) {}
+        else { L.pres.qual = null; if (typeof ildCarregar === 'function') { try { ildCarregar(false); } catch (eC) {} _trfVigiar('ild'); } } } } catch (eI) {}
     L.ws.qualRot = 'aplicaram' + (L.ws.qual ? ' · ' + _trfN(L.ws.qualPg) + ' pagas' : ''); L.pres.qualRot = 'aplicaram (ficha)'; }
   if (okWs) { L.ws.entr = 0; L.pres.entr = 0; L.mcp.entr = 0; Object.keys(WSL.porTel).forEach(function(t8) { var x = WSL.porTel[t8]; if (!(x.ing instanceof Date)) return; var t = x.ing.getTime(); if (t < P.ini || t >= P.fim) return;
     if (/mcp/i.test(x.prog || '')) { if (!(WSL.mcpEm && WSL.mcpEm[t8] instanceof Date)) L.mcp.entr++; } else if (/ild/i.test(x.prog || '')) L.pres.entr++; else L.ws.entr++; });
@@ -43208,7 +43479,7 @@ function _trfRenderTodos(el) {
   impAds = zf.imp; zf.imp += vwOrg;
   var semMql = TRF.tprod === 'diag' ? mqlDiag == null : TRF.tprod === 'ws' ? mqlEv == null : (mqlDiag == null && mqlEv == null); zf.mql = (TRF.tprod === 'ws' ? 0 : (mqlDiag || 0)) + (TRF.tprod === 'diag' ? 0 : (mqlEv || 0));
   var wsEd = null;
-  try { var _sv = [TRF.wed, TRF.wtipo, TRF.wpub]; TRF.wed = '*'; TRF.wtipo = ''; TRF.wpub = ''; var DW = null; try { DW = _trfDadosWs(); } catch (eW) {} TRF.wed = _sv[0]; TRF.wtipo = _sv[1]; TRF.wpub = _sv[2];
+  try { var _sv = [TRF.wed, TRF.wtipo, TRF.wpub]; TRF.wed = '*'; TRF.wtipo = ''; TRF.wpub = ''; var DW = null; try { DW = _trfDadosWs(true); } catch (eW) {} TRF.wed = _sv[0]; TRF.wtipo = _sv[1]; TRF.wpub = _sv[2];
     if (DW && DW.cri) { var we = { insc: 0, d1: 0, d2: 0, apl: 0, aplPg: 0, nomes: [], semPres: false };
       Object.keys(DW.cri).forEach(function(k) { var c = DW.cri[k]; if (c.fut || !(c.d1 >= P.ini && c.d1 < P.fim)) return; we.insc += c.insc || 0; we.apl += c.aplT || 0; we.aplPg += c.apl || 0; we.nomes.push(String(c.nome || '').replace(/^\S+\s/, ''));
         if (c.pres) { we.d1 += c.part || 0; we.d2 += c.part || 0; } else { var f = TRF_WS_PRES_FIXA[k]; if (f) { we.d1 += f[0]; we.d2 += f[1]; } else we.semPres = true; } });
