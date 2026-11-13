@@ -20,6 +20,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css" media="print" onload="this.media='all'">
+<script>let LINK_BASE = 'https://app.clint.digital';   // Lead Center (slice 24): base dos links do CRM; o robô troca na abertura (alvoInfo)</script>
 <script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js" onload="try { if (typeof montarFiltros === 'function' && window.V2 && V2.rows && V2.rows.length) montarFiltros(); } catch (e) {}"></script>
 <style>
@@ -2953,7 +2954,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-12-1232';
+var VERSAO_DASH = '2026-11-13-1400';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -5678,7 +5679,7 @@ function v2row(r) {
   var igBt = crInstaBotao(r, rx);
   // 26/09/2026 (Bruno: "link deve ser da Clint, não do WhatsApp"): o botão abre a conversa na Clint — se o endereço
   // ainda não é conhecido, o robô procura a pessoa (abrirAtendimentoClintPor) e abre a conversa ou o contato
-  var acts = igBt + ((r.telefone || r.nome) ? '<a class="ld-wa cr-clint" href="' + (lkC || 'https://app.clint.digital/chat') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint" aria-label="Abrir na Clint">🟣 Clint</a>' : '');
+  var acts = igBt + ((r.telefone || r.nome) ? '<a class="ld-wa cr-clint" href="' + (lkC || LINK_BASE + '/chat') + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(r.telefone || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(r.nome || '')).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint" aria-label="Abrir na Clint">🟣 Clint</a>' : '');
   var q = [r.nome, r.telefone, rx.insta, r.closer, r.sdr, r.origem, r.produto, r.status, r.leadId].filter(Boolean).join(' ').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   return '<div class="cliente-row cr2" data-q="' + q + '" onclick="event.stopPropagation();abrirLead(' + i + ');">'
     + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(r.nome) + ');">' + v2ini(r.nome) + '</div>'
@@ -6858,7 +6859,7 @@ function abrirAtendimentoClint(ev, i) {
   var direto = clintPrecisaPerguntar(l) ? '' : clintLinkApp(l);
   if (direto) { clintAbrir(direto); return false; }
   var t8 = ldTel8(l.tel);
-  if (!t8) { clintAbrir('https://app.clint.digital/chat'); return false; }
+  if (!t8) { clintAbrir(LINK_BASE + '/chat'); return false; }
   // 2) nao conhecemos: pergunta ao robo (3 a 10 s), com andamento e botao se o navegador bloquear a aba
   var win = null;   // no celular nao abre aba em branco: a caixinha embaixo leva direto ao app
   try { win = ehCelular() ? null : window.open('', '_blank'); } catch (e) { win = null; }
@@ -6886,7 +6887,7 @@ function abrirAtendimentoClint(ev, i) {
     clearInterval(timer);
     try { s.remove(); } catch (e) {} try { delete window[nome]; } catch (e) {}
     if (d && d.success) { CLINT[t8] = d; try { clintIdsGuardar(t8, d); } catch (eG) {} }
-    var alvo = clintLinkApp(l) || 'https://app.clint.digital/chat';
+    var alvo = clintLinkApp(l) || LINK_BASE + '/chat';
     var achou = !!(d && d.success && d.achou);
     var aviso = achou ? '✅ Encontrado na Clint.' : '⚠️ Essa pessoa não está na Clint' + (d && d.error ? ' (' + String(d.error).replace(/</g, '&lt;') + ')' : '') + ' — abrindo a lista.';
     if (win && !win.closed) {
@@ -6916,20 +6917,20 @@ function abrirAtendimentoClintPor(ev, tel, nome) {
 function clintChatLink(l) {   // endereco da CONVERSA (a Clint nem sempre aceita de fora)
   var t = ldTel8(l.tel || l.telefone);
   var c = CLINT[t];
-  return (c && c.success && c.chatId) ? 'https://app.clint.digital/chat/' + c.chatId : '';
+  return (c && c.success && c.chatId) ? LINK_BASE + '/chat/' + c.chatId : '';
 }
 function clintLink(l) {
   var t = ldTel8(l.tel || l.telefone);
   var c = CLINT[t];
   // cadastro do contato: e o endereco que a Clint abre de fora (o da conversa volta para a lista — 05/09/2026)
-  if (c && c.success && c.contatoId) return 'https://app.clint.digital/contacts/' + c.contatoId;
+  if (c && c.success && c.contatoId) return LINK_BASE + '/contacts/' + c.contatoId;
   // painel geral: o mapa traz o id do contato de TODOS os leads com negócio na Clint
   if (CLINT_PAINEL && CLINT_PAINEL.success && t) {
     var r = CLINT_PAINEL.mapa[t];
-    if (r && r[2]) return 'https://app.clint.digital/contacts/' + r[2];
+    if (r && r[2]) return LINK_BASE + '/contacts/' + r[2];
   }
   // sem telefone (ou telefone que não bate): tenta pelo nome, se for único na Clint
-  if (l.nome) { var pn = clintPorNome(l.nome); if (pn && pn.contatoId) return 'https://app.clint.digital/contacts/' + pn.contatoId; }
+  if (l.nome) { var pn = clintPorNome(l.nome); if (pn && pn.contatoId) return LINK_BASE + '/contacts/' + pn.contatoId; }
   return '';
 }
 // ===== 📱 NO CELULAR, ABRIR NO APLICATIVO DA CLINT (Bruno 06/09/2026) =====
@@ -6943,10 +6944,10 @@ function ehCelular() {
 function clintLinkApp(l) {   // no celular, conversa ou negocio (o app so assume /chat/... e /deal/...)
   if (ehCelular()) {
     var t8a = ldTel8(l.tel || l.telefone), c = CLINT[t8a], g = CLINT_IDS[t8a];
-    if (c && c.success && c.chatId) return 'https://app.clint.digital/chat/' + c.chatId;
-    if (c && c.success && c.negocioId) return 'https://app.clint.digital/deal/' + c.negocioId;
-    if (g && g.c) return 'https://app.clint.digital/chat/' + g.c;        // guardado de outra vez neste aparelho
-    if (g && g.n) return 'https://app.clint.digital/deal/' + g.n;
+    if (c && c.success && c.chatId) return LINK_BASE + '/chat/' + c.chatId;
+    if (c && c.success && c.negocioId) return LINK_BASE + '/deal/' + c.negocioId;
+    if (g && g.c) return LINK_BASE + '/chat/' + g.c;        // guardado de outra vez neste aparelho
+    if (g && g.n) return LINK_BASE + '/deal/' + g.n;
   }
   return clintLink(l);
 }
@@ -14951,7 +14952,7 @@ function _renderLeadsCorpo(agora) {
     var espWa = esp.rec.filter(function(x){ return !/insta/i.test(x.canal || ''); });
     var linhaEsp = function(x) {
       // com o numero da conversa, abre direto no modulo de atendimento (chat)
-      var linkEsp = x.chatId ? 'https://app.clint.digital/chat/' + x.chatId : 'https://app.clint.digital/contacts/' + x.contatoId;
+      var linkEsp = x.chatId ? LINK_BASE + '/chat/' + x.chatId : LINK_BASE + '/contacts/' + x.contatoId;
       return '<a href="' + linkEsp + '" target="_blank" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;flex-wrap:wrap;">'
         + '<b style="font-size:.76rem;flex:1;min-width:110px;">' + (x.nome || ldNomePorTel8(x.tel8) || (x.tel8 ? '📱 final ' + x.tel8 : 'Sem nome')) + '</b>'
         + (x.texto ? '<span style="flex-basis:100%;order:9;font-size:.7rem;color:var(--muted);font-style:italic;padding-top:3px;">💬 “' + String(x.texto).replace(/</g, '&lt;') + '”</span>' : '')
@@ -15038,7 +15039,7 @@ function _renderLeadsCorpo(agora) {
       if (pAberto) {
         h += '<div style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">';
         estL.forEach(function(x) {
-          h += '<a href="https://app.clint.digital/contacts/' + x.contatoId + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
+          h += '<a href="' + LINK_BASE + '/contacts/' + x.contatoId + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--text);flex-shrink:0;">'
             + '<b style="font-size:.76rem;flex:1;">' + (x.nome || ldNomePorTel8(x.tel8) || 'Sem nome') + '</b>'
             + '<span class="ld-tag" style="background:rgba(246,163,80,.15);color:#f6a350;">' + (x.tipo === 'qualificacao' ? 'Em qualificação' : 'Nutrição') + ' há ' + x.dias + ' dias</span>'
             + (x.dono ? '<span class="dono-chip">' + tmMao(x.dono) + x.dono + '</span>' : '')
@@ -15116,7 +15117,7 @@ function _renderLeadsCorpo(agora) {
           + (mc
               ? '<span class="ld-tag" style="background:rgba(108,71,255,.16);color:#8f6bff;" title="Já está na Clint">🟣 ' + (etapaC || 'na Clint') + '</span>'
                 + (donoC ? '<span class="dono-chip">' + tmMao(donoC) + donoC + '</span>' : '<span class="ld-tag" style="background:rgba(255,107,107,.14);color:#ff6b6b;">sem responsável</span>')
-                + (mc[2] ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="https://app.clint.digital/contacts/' + mc[2] + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir</a>' : '')
+                + (mc[2] ? '<a class="ld-wa" style="background:rgba(108,71,255,.14);border-color:rgba(108,71,255,.45);color:#8f6bff;" href="' + LINK_BASE + '/contacts/' + mc[2] + '" target="_blank" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(String(x.tel8 || '')).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(x.nome || '')).replace(/"/g, '&quot;') + ')">🟣 abrir</a>' : '')
               : '<span class="ld-tag" style="background:rgba(246,163,80,.16);color:#f6a350;" title="Não existe na Clint">⚠️ fora da Clint</span>'
                 + '<button class="btn-assumir" style="padding:4px 8px;font-size:.68rem;" onclick="event.stopPropagation();criarPendenteNaClint(' + JSON.stringify(x.tel8).replace(/"/g, '&quot;') + ', this);" title="Cria o contato na Clint, no funil (etapa Base IA)">➕ criar na Clint</button>')
           + (x.date ? '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97;">⏱ ' + tempoDesde(x.date) + '</span>' : '')
@@ -17075,6 +17076,22 @@ function alternarEdicaoPag() {
 // https://script.google.com/macros/s/AKfycbxj7EtQMHIB7VSZFh8Fea3uhp10dI2ubIlTy9MEJakGNtfhYilg3v4hyPEJAPi7ydku/exec (05/09 19h, sem clintMensagensBrutas)
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxj7EtQMHIB7VSZFh8Fea3uhp10dI2ubIlTy9MEJakGNtfhYilg3v4hyPEJAPi7ydku/exec';   // 08/09/2026: TODAS as chamadas apontam para a mesma implantacao (v113+). Antes esta constante ficou presa na de 05/09 e a aba Contratos falava com robo velho.
 
+// Lead Center (slice 24, R21): a base dos links do CRM vem do robô (action alvoInfo). Sem resposta válida, fica a Clint.
+(function alvoInfoCarregar() {
+  var nome = 'alvoInfo' + Math.random().toString(36).slice(2, 9), sc = document.createElement('script'), feito = false;
+  var fim = function (d, motivo) {
+    if (feito) return; feito = true;
+    window[nome] = function () {};
+    try { sc.remove(); } catch (e) {}
+    if (d && d.success === true && typeof d.baseLinks === 'string' && /^https:\/\/[^\s'"<>]+$/.test(d.baseLinks)) { LINK_BASE = d.baseLinks.replace(/\/+$/, ''); return; }
+    console.warn('[alvoInfo] base dos links não veio do robô (' + (motivo || (d && d.error) || 'resposta inválida') + '); fica a Clint.');
+  };
+  window[nome] = function (d) { fim(d); };
+  sc.onerror = function () { fim(null, 'falha ao chamar o robô'); };
+  setTimeout(function () { fim(null, 'sem resposta em 15 s'); }, 15000);
+  sc.src = APPS_SCRIPT_URL + '?action=alvoInfo&callback=' + nome;
+  (document.head || document.documentElement).appendChild(sc);
+})();
 function sendToGAS(data) {
   return new Promise(function(resolve) {
     var uid = 'gas_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
@@ -20796,7 +20813,7 @@ function abrirAgendarCom(dur, dataStr, hora, ck, tipo) {
       po('ag-email', c.emailClint);
       var igC = String(c.instaClint || '').replace(/^@+/, '');
       if (igC && /^[A-Za-z0-9._]+$/.test(igC)) po('ag-insta', '@' + igC);
-      po('ag-clint', c.chatId ? 'https://app.clint.digital/chat/' + c.chatId : (c.contatoId ? 'https://app.clint.digital/contacts/' + c.contatoId : ''));
+      po('ag-clint', c.chatId ? LINK_BASE + '/chat/' + c.chatId : (c.contatoId ? LINK_BASE + '/contacts/' + c.contatoId : ''));
     };
     try {
       var _cJa = _le.tel8 ? CLINT[_le.tel8] : null;
@@ -27887,7 +27904,7 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
     var nomeF = ((doc.getElementById('fl-nome') || {}).textContent || '').trim();
     if ((tel || nomeF) && !ehVisitante()) {
       // Bruno 26/09/2026: "link deve ser da Clint, não do WhatsApp"
-      h += '<a class="clint" href="https://app.clint.digital/chat" target="_blank" rel="noopener" onclick="event.stopPropagation();return abrirAtendimentoClintPor(event,' + JSON.stringify(tel).replace(/"/g, '&quot;') + ',' + JSON.stringify(nomeF).replace(/"/g, '&quot;') + ');">🟣 Abrir na Clint</a>'
+      h += '<a class="clint" href="' + LINK_BASE + '/chat" target="_blank" rel="noopener" onclick="event.stopPropagation();return abrirAtendimentoClintPor(event,' + JSON.stringify(tel).replace(/"/g, '&quot;') + ',' + JSON.stringify(nomeF).replace(/"/g, '&quot;') + ');">🟣 Abrir na Clint</a>'
         + (tel ? '<a href="tel:+55' + tel + '" onclick="event.stopPropagation();">📞 Ligar</a>' : '');
     }
     // 28/09/2026 (Bruno: "coloque o insta em todos"): o Instagram vem da planilha, das anotações ("Instagram: @…") ou da aba Leads
@@ -43743,7 +43760,7 @@ function _trfListaDesenhar() {
         + '<span class="trf-igp-v">ver →</span></div>';
     } catch (eIg) {} }
     var tel = String(p.tel || '').replace(/\D/g, '');
-    return '<div class="trf-pess"><span><b>' + _trfE(p.nome || '—') + '</b><small>' + info + '</small></span>' + (tel ? '<a class="trf-clint" href="https://app.clint.digital/chat" target="_blank" rel="noopener" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(tel).replace(/"/g, '&quot;') + ',' + JSON.stringify(p.nome || '').replace(/"/g, '&quot;') + ');">🟣 Clint</a>' : p.ig ? '<a class="trf-clint" href="https://www.instagram.com/' + encodeURIComponent(p.ig) + '/" target="_blank" rel="noopener">📷 Instagram</a>' : '') + '</div>';
+    return '<div class="trf-pess"><span><b>' + _trfE(p.nome || '—') + '</b><small>' + info + '</small></span>' + (tel ? '<a class="trf-clint" href="' + LINK_BASE + '/chat" target="_blank" rel="noopener" onclick="return abrirAtendimentoClintPor(event,' + JSON.stringify(tel).replace(/"/g, '&quot;') + ',' + JSON.stringify(p.nome || '').replace(/"/g, '&quot;') + ');">🟣 Clint</a>' : p.ig ? '<a class="trf-clint" href="https://www.instagram.com/' + encodeURIComponent(p.ig) + '/" target="_blank" rel="noopener">📷 Instagram</a>' : '') + '</div>';
   };
   var corte = 150, h = lista.slice(0, corte).map(linha).join('') + (lista.length > corte ? '<div class="trf-nota" style="padding:10px 2px;">Mostrando os ' + corte + ' mais recentes de ' + lista.length + '. Use os filtros acima para afinar.</div>' : '');
   var g = function(id) { return document.getElementById(id); }; if (!g('modal-b')) return;
