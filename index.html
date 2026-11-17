@@ -2954,7 +2954,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-17-0905';
+var VERSAO_DASH = '2026-11-17-0934';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -6964,6 +6964,24 @@ function clintAbrir(url) {
   if (/iphone|ipad|ipod|android/i.test(navigator.userAgent || '')) { try { window.location.href = url; return; } catch (e) {} }
   window.open(url, '_blank');
 }
+// 17/11/2026 (Bruno): a última mensagem do lead é só despedida ou agradecimento ("Amém. Muito obrigada.")? então ninguém está esperando resposta
+function clintDespedida(txt) {
+  var s = String(txt || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  if (!s || s.length > 80 || s.indexOf('?') >= 0) return false;
+  var limpo = s.replace(/obrigad[oa]s?|\bobg\b|\bbrigad[oa]s?\b|\bamem\b|gratidao|fico (muito )?grat[oa]|agradec[a-z]*|\bvaleu\b|\bvlw\b|deus (te |lhe |os |vos )?abencoe[a-z]*|igualmente|(pra|para) voce(s)? tambem|boa noite|bom dia|boa tarde|ate (mais|logo|breve)|abraco[s]?|\btchau\b|fique com deus|\bde nada\b|\bimagina\b/g, '');
+  if (limpo === s) return false;                      // nenhuma palavra de despedida: não é
+  limpo = limpo.replace(/\b(muito|muita|por|tudo|pela|pelo|atencao|a|o|e|deus|paz|ta|bom|ok|sim|querid[oa]|irma[o]?|pastor[a]?|viu|mesmo|de|coracao|eu|que)\b/g, '').replace(/[^a-z0-9]/g, '');
+  return limpo.length <= 3;                           // sobrou texto de verdade (um pedido, uma dúvida): não é despedida
+}
+function clintLeadEsperando(c) { return !!(c && c.quem === 'lead' && !clintDespedida(c.ultimaMensagem)); }
+// a IA encerrou por falta de verba, ou o lead já está em Desqualificado: não há conversa para o dono assumir
+function gmDispensaDono(l, g) {
+  try {
+    if (g && g.estado === 'fim' && g.etapa === '2b' && !g.verbaOk) return 'a IA encerrou por falta de verba';
+    if (l && ldEtapaDe(l) === 'desq') return 'o lead está em Desqualificado';
+  } catch (e) {}
+  return '';
+}
 // texto do tempo sem resposta, já dizendo de quem é a bola
 function clintTexto(l) {
   var c = CLINT[ldTel8(l.tel)];
@@ -6972,7 +6990,7 @@ function clintTexto(l) {
   if (!c.achou) return { txt: '💬 sem cadastro na Clint', cor: 'var(--muted)' };
   if (!c.temConversa) return { txt: '💬 sem conversa na Clint (só a IA falou)', cor: '#f6a350' };   // Bruno 08/09/2026: "como é só marcar se não tem conversa?"—a IA falou no GPT Maker; na Clint ninguém chamou
   var t = ldTempoTexto(c.horas);
-  if (c.quem === 'lead') return { txt: '🔴 lead esperando resposta há ' + t, cor: '#ff6b6b' };
+  if (c.quem === 'lead') return clintDespedida(c.ultimaMensagem) ? { txt: '👋 lead se despediu há ' + t + ' · nada em aberto', cor: 'var(--muted)' } : { txt: '🔴 lead esperando resposta há ' + t, cor: '#ff6b6b' };
   return { txt: '⏱ sem resposta do lead há ' + t, cor: c.horas >= 48 ? '#ff6b6b' : c.horas >= 24 ? '#f6a350' : 'var(--muted)' };
 }
 
@@ -7087,11 +7105,20 @@ function gmEstadoTxt(g, l) {
   return { txt: '🤖 IA atendendo' + et + (g.ultimaDe === 'lead' ? ' · lead esperando' : ''), cor: '#8f6bff', k: 'ia' };
 }
 // o DONO do lead ja assumiu a conversa? (pela Clint: nos ja falamos com ele; ou humano no GPT Maker)
+// tabela do 1º contato humano por telefone (feita uma vez por carga dos dados)
+function gmTcDe(t8) {
+  if (!t8 || !TC || !TC.dados || !TC.dados.leads) return null;
+  if (gmTcDe._de !== TC.dados) { var m = {}; TC.dados.leads.forEach(function(x) { m[x.t8] = x; }); gmTcDe._m = m; gmTcDe._de = TC.dados; }
+  return gmTcDe._m[t8] || null;
+}
 function gmDonoAssumiu(l, g) {
   var dono = ''; try { var ci = clintInfoDe(l); dono = (ci && ci.dono) || l.dono || ''; } catch (e) { dono = l.dono || ''; }
   var c = l.tel8 ? CLINT[l.tel8] : null;
   var falouClint = !!(c && c.success && c.temConversa && (c.respondemos || c.quem === 'nos'));
   var humanoGm = false;   // "humano" no GPT Maker e o modo espera do roteiro, nao prova que o dono falou
+  // 17/11/2026: alguém do time já escreveu para este lead na Clint (o mesmo "1º contato humano" do cartão)? então a conversa foi assumida,
+  // mesmo que o lead tenha falado por último
+  if (!falouClint) { try { var _t8a = l.tel8 || ldTel8(l.tel || l.telefone), _tca = gmTcDe(_t8a); if (_tca && _tca.humano) falouClint = true; } catch (e) {} }
   var assumiu = falouClint;
   var quando = c && c.success && c.temConversa && c.horas != null ? ldTempoTexto(c.horas) : '';
   return { dono: dono, assumiu: assumiu, por: falouClint ? 'pela Clint' : (humanoGm ? 'no GPT Maker' : ''), quando: quando, consultando: c === null };
@@ -7101,7 +7128,7 @@ function gmChip(l) {
   if (!e) return '';
   var g = gmInfoDe(l);
   var extra = '';
-  if (g.estado === 'fim') { var d = gmDonoAssumiu(l, g); if (!d.consultando) extra = d.assumiu ? '<span class="et-chip" style="background:rgba(61,220,151,.12);color:#3ddc97;border-color:rgba(61,220,151,.4);" title="O dono já falou com o lead">✅ dono assumiu</span>' : '<span class="et-chip" style="background:rgba(255,107,107,.12);color:#ff6b6b;border-color:rgba(255,107,107,.4);" title="A IA terminou e o dono ainda não falou com o lead">⚠️ dono ainda não assumiu</span>'; }
+  if (g.estado === 'fim') { var d = gmDonoAssumiu(l, g); if (!d.consultando) extra = d.assumiu ? '<span class="et-chip" style="background:rgba(61,220,151,.12);color:#3ddc97;border-color:rgba(61,220,151,.4);" title="O dono já falou com o lead">✅ dono assumiu</span>' : gmDispensaDono(l, g) ? '' : '<span class="et-chip" style="background:rgba(255,107,107,.12);color:#ff6b6b;border-color:rgba(255,107,107,.4);" title="A IA terminou e o dono ainda não falou com o lead">⚠️ dono ainda não assumiu</span>'; }
   var q = g && g.quando ? new Date(g.quando) : null;
   return '<span class="et-chip" style="background:' + e.cor + '22;color:' + e.cor + ';border-color:' + e.cor + '66;" title="Conversa do agente de IA (GPT Maker)' + (q ? ' · última atividade ' + q.toLocaleDateString('pt-BR') + ' ' + q.toLocaleTimeString('pt-BR').slice(0, 5) : '') + (g && g.agente ? ' · agente ' + g.agente : '') + (g && g.motivo ? '\n📝 ' + String(g.motivo).replace(/"/g, '&quot;') : '') + '">' + e.txt + '</span>' + extra;
 }
@@ -13996,7 +14023,7 @@ function ldRow(l, quente) {
   var cl = clintTexto(l);
   var cInfo = CLINT[ldTel8(l.tel)];
   // lead que falou por último e está esperando resposta nossa = pisca
-  var piscando = !!(cInfo && cInfo.success && cInfo.temConversa && cInfo.quem === 'lead');
+  var piscando = !!(cInfo && cInfo.success && cInfo.temConversa && clintLeadEsperando(cInfo));
   var espera = cl
     ? '<span class="et-chip' + (piscando ? ' pisca' : '') + '" style="background:rgba(255,255,255,.06);color:' + cl.cor + ';border-color:rgba(255,255,255,.14);" title="Vem da conversa no WhatsApp (Clint)">' + cl.txt + '</span>'
     : ((ek === 'novo' && hs >= 2)
@@ -14112,6 +14139,7 @@ function abrirFichaLead(i) {
         h += '<div style="margin-top:6px;font-size:.76rem;">👤 Dono: <b>' + (d.dono ? String(d.dono).replace(/</g, '&lt;') : 'sem dono') + '</b> · '
           + (d.consultando ? '<span class="hint">consultando a Clint…</span>'
             : d.assumiu ? '<b style="color:#3ddc97;">✅ já assumiu a conversa</b> <span class="hint">(' + d.por + (d.quando ? ', há ' + d.quando : '') + ')</span>'
+            : gmDispensaDono(l, g) ? '<span class="hint">não precisa assumir: ' + gmDispensaDono(l, g) + '</span>'
             : '<b style="color:' + (g.estado === 'fim' ? '#ff6b6b' : '#f6a350') + ';">⚠️ ainda não assumiu a conversa</b>' + (g.estado === 'fim' ? ' <span class="hint">— a IA terminou, é a hora do especialista</span>' : '')) + '</div>';
         return h; })(), 'html'],
     ['🔁', 'Preencheu o formulário', (l.vezes && l.vezes > 1) ? listaPreenchimentos(l) : '', 'html'],
@@ -14317,7 +14345,9 @@ function abrirFichaLead(i) {
         if (c && c.success && c.temConversa) {
           var t = ldTempoTexto(c.horas);
           return '<div class="hint" style="margin-top:9px;line-height:1.7;">'
-            + (c.quem === 'lead'
+            + (c.quem === 'lead' && clintDespedida(c.ultimaMensagem)
+                ? '👋 <b>O lead se despediu há ' + t + '</b> — a última mensagem é um agradecimento, sem pergunta em aberto'
+                : c.quem === 'lead'
                 ? '🔴 <b style="color:#ff6b6b;">O lead falou por último há ' + t + '</b> — está esperando resposta de vocês'
                 : '⏱ <b>Sem resposta do lead há ' + t + '</b> (a última mensagem foi de vocês)')
             + (c.ultimaMensagem ? '<br><span style="opacity:.75;">Última mensagem: “' + c.ultimaMensagem.replace(/</g,'&lt;') + '”</span>' : '')
@@ -43496,7 +43526,7 @@ function _trfDadosWsConta(semMeta) {
   var temPres = z.d1 > 0 && z.d2 > 0 && comPres === L.length;   // só quando TODAS as edições escolhidas têm a presença (senão a soma engana)
   if (temPres) { some = some.filter(function(k) { return k !== 'part'; }); }
   var soPres = L.length === 1 && L[0].pres && L[0].lista;
-  var PS = TRF_PASSOS.slice(0, 2); TRF_WS_PASSOS.forEach(function(p) { if (soPres && p[0] === 'insc') p = ['insc', 'Participantes', 'todos na lista do evento' + (TRF.wpub ? ' deste tipo' : ': compradores, acompanhantes, mentorados e cortesias')]; if (soPres && p[0] === 'aplT') p = ['aplT', 'Aplicaram', 'preencheram a ficha de aplicação no evento']; else if (p[0] === 'aplT' && z.aplT > z.apl) p = ['aplT', 'Aplicaram', _trfN(z.apl) + ' pagaram a aplicação · ' + _trfN(z.aplT - z.apl) + ' não pagaram']; if (soPres && p[0] === 'part') p = ['part', 'Compareceram ao evento', 'check-in, presença confirmada pelo time ou aplicação feita no evento']; if (p[0] === 'part') { if (temPres) { PS.push(['d1', 'Presentes no 1º dia', 'inscritos que entraram na sala no dia 1']); PS.push(['d2', 'Presentes no dia do pitch', 'inscritos que entraram na sala no dia 2 (o do pitch)']); } else if (some.indexOf('part') < 0) PS.push(p); } else if (some.indexOf(p[0]) < 0) PS.push(p); });
+  var PS = TRF_PASSOS.slice(0, 2); TRF_WS_PASSOS.forEach(function(p) { if (soPres && p[0] === 'insc') p = ['insc', 'Participantes', 'todos na lista do evento' + (TRF.wpub ? ' deste tipo' : ': compradores, acompanhantes, mentorados e cortesias')]; if (soPres && p[0] === 'aplT') p = ['aplT', 'Aplicaram', 'preencheram a ficha de aplicação no evento']; else if (p[0] === 'aplT' && z.aplT > z.apl) p = ['aplT', 'Aplicaram', _trfN(z.apl) + ' pagaram a aplicação · ' + _trfN(z.aplT - z.apl) + ' não pagaram']; if (soPres && p[0] === 'part') p = ['part', 'Compareceram ao evento', 'check-in, presença confirmada pelo time ou aplicação feita no evento']; if (p[0] === 'part') { if (temPres) { PS.push(['d1', 'Presentes no 1º dia', 'inscritos que entraram na sala no dia 1']); PS.push(['d2', 'Presentes no dia do pitch', 'inscritos que entraram na sala no dia 2 (o do pitch)']); } else if (comPres > 0 && z.d2 > 0) { var _semL = L.filter(function(e) { var pr = presEd[e.k]; return !(pr && (+pr[0] || 0) > 0); }).map(function(e) { return String(e.nome || '').replace(/^\S+\s/, ''); }); PS.push(['d2', 'Presentes no dia do pitch', 'entraram na sala no dia do pitch' + (_semL.length ? ' · ainda sem a lista de ' + _semL.join(', ') : '')]); } else if (some.indexOf('part') < 0) PS.push(p); } else if (some.indexOf(p[0]) < 0) PS.push(p); });
   var um = L.length === 1 ? L[0] : null;
   return { ws: true, ev: true, P: { rot: um ? 'edição ' + um.nome.replace(/^\S+\s/, '') + (um.pres ? ' (presencial)' : ' (on-line)') : 'todas as edições' + (TRF.wtipo ? (TRF.wtipo === 'pres' ? ' presenciais' : ' on-line') : '') },
     z: z, mom: mom, lista: lista, todas: todas, cri: cri, eds: eds, sel: sel, um: um, PS: PS, some: some, fora: fora, foraV: foraV, foraR: foraR, ads: Object.keys(adsWs).map(function(k) { return adsWs[k]; }), criC: CT ? criC : null, temPres: temPres, ildTipos: ildTipos, soPres: soPres, temSite: ok, temMeta: temMeta, metaRuim: metaRuim, semVis: false, soPg: '', dias: {} };
