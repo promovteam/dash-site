@@ -75,6 +75,17 @@
   .nota { color:var(--muted); font-size:.76rem; }
   @media (max-width:640px) { h1 { font-size:1.3rem; } .lead { grid-template-columns:1fr; } .lead-a { grid-row:auto; grid-column:1; justify-content:flex-start; } .topo-d { margin-left:0; } }
   @media (prefers-reduced-motion:no-preference) { .lead { transition:opacity .2s; } }
+  /* 18/11 (Bruno: "coloca uma visualização melhor para mim como gestor"): painel do time no topo */
+  .pg { display:grid; grid-template-columns:repeat(auto-fit, minmax(215px, 1fr)); gap:12px; }
+  .pp { background:var(--panel); border:1px solid var(--borda); border-radius:18px; padding:16px; display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .pp-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .pp-top b { font-size:1.08rem; } .pp-top small { display:block; color:var(--muted); font-size:.72rem; }
+  .st { font-size:.7rem; font-weight:800; border-radius:999px; padding:4px 9px; white-space:nowrap; }
+  .st.ok { background:rgba(61,220,151,.15); color:var(--green); } .st.meio { background:rgba(255,209,102,.15); color:var(--yellow); } .st.nao { background:rgba(255,107,107,.15); color:#ffb4b4; }
+  .barra { height:8px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; } .barra i { display:block; height:100%; background:var(--green); border-radius:99px; }
+  .pp-n { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; } .pp-n div { min-width:0; } .pp-n small { display:block; font-size:.6rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); } .pp-n b { font-size:1.15rem; font-variant-numeric:tabular-nums; }
+  .pp-f { font-size:.8rem; color:var(--text2); } .pp-f b { color:var(--text); }
+  .pp-pe { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.74rem; color:var(--muted); flex-wrap:wrap; }
 </style>
 </head>
 <body>
@@ -113,13 +124,15 @@
     var t = tok(), c = document.getElementById('corpo');
     if (!t) { c.innerHTML = '<div class="card aviso"><b>Abra pelo seu link pessoal</b>Esta lista abre pelo link que a gestão te mandou, ou para quem já entrou no dash neste navegador.<br><br><a class="b ab" href="./">Abrir o dash e entrar</a></div>'; return; }
     var bt = document.getElementById('bAt'); bt.disabled = true; bt.textContent = 'Atualizando…';
+    if (!D) { try { var gu = JSON.parse(localStorage.getItem('sdrlCache') || 'null'); if (gu && gu.t === t && Date.now() - gu.em < 12 * 3600e3 && gu.d && gu.d.leads) { D = gu.d; D.porLink = /^lk:/.test(t); D.rec = D.rec || []; D.guardada = gu.em; if (!D.gestor) EST.lista = D.rec.indexOf(D.eu) !== -1 ? 'rec' : 'sdr'; desenhar(); } } catch (eG) {} }
     var demora = setTimeout(function() { if (!D) c.innerHTML = '<div class="card aviso"><b>Ainda montando a lista…</b>O robô está lendo as conversas. Falta pouco: não precisa recarregar.</div>'; }, 25000);
     robo({ action: 'sdrLista', tok: t }, function(d) {
       clearTimeout(demora); bt.disabled = false; bt.textContent = '↻ Atualizar';
       if (!d || !d.success) { c.innerHTML = '<div class="card aviso"><b>' + esc((d && d.error) || 'O robô não respondeu') + '</b>' + (d && d.sair ? '<br><a class="b ab" href="./">Abrir o dash e entrar de novo</a>' : 'Tente de novo em instantes.') + '</div>'; return; }
+      try { localStorage.setItem('sdrlCache', JSON.stringify({ t: t, em: Date.now(), d: d })); } catch (eS) { try { localStorage.removeItem('sdrlCache'); } catch (eR) {} }
       D = d; D.porLink = /^lk:/.test(t); D.rec = d.rec || []; if (!d.gestor) EST.lista = d.leads.some(function(p) { return p.rec; }) && !d.leads.some(function(p) { return !p.rec; }) || D.rec.indexOf(d.eu) !== -1 ? 'rec' : 'sdr';
       desenhar();
-    }, function(e) { clearTimeout(demora); bt.disabled = false; bt.textContent = '↻ Atualizar'; c.innerHTML = '<div class="card aviso"><b>Não consegui falar com o robô</b>' + esc(e) + '</div>'; });
+    }, function(e) { clearTimeout(demora); bt.disabled = false; bt.textContent = '↻ Atualizar'; if (D && D.leads) return; c.innerHTML = '<div class="card aviso"><b>Não consegui falar com o robô</b>' + esc(e) + '</div>'; });
   }
   function visiveis() {
     var b = semAcento(EST.busca.trim());
@@ -133,9 +146,33 @@
       if (EST.idade !== '') { var d = (Date.now() - p.cr) / 864e5, fx = d <= 7 ? '7' : d <= 30 ? '30' : d <= 90 ? '90' : '99'; if (fx !== EST.idade) return false; }
       return true; });
   }
-  function sair() { try { localStorage.removeItem('sdrlLink'); } catch (e) {} location.href = location.pathname; }
+  function sair() { try { localStorage.removeItem('sdrlLink'); localStorage.removeItem('sdrlCache'); } catch (e) {} location.href = location.pathname; }
   function lista(k) { EST.lista = k; EST.aba = k === 'rec' ? 'ev' : 'mql'; EST.de = 'todos'; EST.ver = 60; limparSem(); desenhar(); }
   function limparSem() { EST.inv = EST.nota = EST.etapa = EST.idade = ''; }
+  // 18/11: painel do gestor — uma ficha por pessoa (os 2 SDRs e os 2 da recuperação), com o que fez hoje, o andamento e os resultados
+  function painelGestor() {
+    var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+    var gente = (D.sdrs || []).map(function(k) { return [k, 'Lista dos SDRs']; }).concat((D.rec || []).map(function(k) { return [k, 'Recuperação']; }));
+    var T = { pend: 0, hoje: 0, reu: 0, comp: 0, vend: 0, valor: 0 };
+    var cards = gente.map(function(g) {
+      var k = g[0], P = D.placar[k] || {}, a = (D.acessos || {})[k], feitos = (P.feitos || 0) + (P.vistos || 0), tot = feitos + (P.pendentes || 0), pc = tot ? Math.round(100 * feitos / tot) : 0;
+      T.pend += P.pendentes || 0; T.hoje += P.feitosHoje || 0; T.reu += P.reunioes || 0; T.comp += P.compareceram || 0; T.vend += P.vendas || 0; T.valor += P.valor || 0;
+      var st = (P.feitosHoje || 0) > 0 ? '<span class="st ok">✅ trabalhando hoje</span>' : a && a.hoje ? '<span class="st meio">🟡 abriu, sem abordar</span>' : '<span class="st nao">🔴 não entrou hoje</span>';
+      return '<div class="pp"><div class="pp-top"><div><b>' + esc(nomeDe(k)) + '</b><small>' + g[1] + '</small></div>' + st + '</div>'
+        + '<div><div class="barra" title="' + pc + '% da lista trabalhada"><i style="width:' + pc + '%"></i></div><div class="pp-f" style="margin-top:4px"><b>' + pc + '%</b> da lista trabalhada · ' + feitos + ' de ' + tot + '</div></div>'
+        + '<div class="pp-n"><div><small>Para chamar</small><b style="color:var(--accent)">' + (P.pendentes || 0) + '</b></div><div><small>Hoje</small><b>' + (P.feitosHoje || 0) + '</b></div><div><small>Pela Clint</small><b>' + (P.vistos || 0) + '</b></div></div>'
+        + '<div class="pp-f">📅 <b>' + (P.reunioes || 0) + '</b> reuniões → <b>' + (P.compareceram || 0) + '</b> compareceram → 💰 <b>' + (P.vendas || 0) + '</b> vendas' + (P.vendas ? ' · ' + rs(P.valor) : '') + '</div>'
+        + '<div class="pp-pe"><span>Última entrada: ' + (a && a.ultima ? hora(a.ultima) : 'nunca') + '</span><button type="button" class="chip" onclick="gerarLink(\'' + k + '\')">' + ((D.links || {})[k] ? '🔗 Trocar link' : '🔗 Gerar link') + '</button></div></div>';
+    }).join('');
+    var tm = D.placar.time || {};
+    return '<div class="card"><h2>Painel do time</h2><div class="kpis" style="margin:10px 0 14px">'
+      + '<div class="kpi q"><small>Para chamar</small><b>' + T.pend + '</b><span>+ ' + (tm.pendentes || 0) + ' da Sarah (compartilhados)</span></div>'
+      + '<div class="kpi v"><small>Trabalhados hoje</small><b>' + T.hoje + '</b><span>cliques em Abordei hoje</span></div>'
+      + '<div class="kpi"><small>Reuniões</small><b>' + T.reu + '</b><span>' + T.comp + ' compareceram</span></div>'
+      + '<div class="kpi v"><small>Vendas</small><b>' + T.vend + '</b><span>' + (T.vend ? rs(T.valor) : 'desde 17/11') + '</span></div></div>'
+      + '<div class="pg">' + cards + '</div><div id="linkBox"></div>'
+      + '<p class="nota" style="margin:10px 0 0">"Hoje" é o botão Abordei. "Pela Clint" é mensagem de uma pessoa vista na conversa. Reuniões, comparecimento e vendas vêm da planilha de vendas, de 17/11 em diante.</p></div>';
+  }
   function rs(v) { return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); }
   function desenhar() {
     var rec = EST.lista === 'rec', L = visiveis(), G = { mql: [], comp: [], inc: [], ev: [], q: [], m: [], fr: [], reu: [], feitos: [] }; L.forEach(function(p) { G[grupo(p)].push(p); });
@@ -147,6 +184,8 @@
     var sub = 'Olá, ' + D.nome + '. ' + (D.gestor ? 'Você vê as listas do time inteiro.' : rec ? 'Esta é a sua lista de recuperação: leads que nunca fizeram reunião nem compraram.' : 'Você vê os seus leads e os do time (os da Sarah e os sem dono), que são de quem chamar primeiro.');
     document.getElementById('sub').textContent = sub;
     var h = '';
+    if (D.guardada) h += '<p class="nota" style="margin:0">Mostrando a lista de ' + hora(D.guardada) + ' enquanto busca a mais nova…</p>';
+    if (D.gestor) h += painelGestor();
     if (D.gestor) h += '<div class="abas">' + [['sdr', '📋 Lista dos SDRs'], ['rec', '♻️ Recuperação']].map(function(a) { return '<button type="button" class="aba" aria-selected="' + (EST.lista === a[0]) + '" onclick="lista(\'' + a[0] + '\')">' + a[1] + '</button>'; }).join('') + '</div>';
     else if (D.porLink) h += '<p class="nota" style="margin:0">Você entrou pelo seu link pessoal. Não encaminhe este link: ele abre a sua lista. <a href="#" onclick="sair();return false" style="color:var(--accent)">Sair deste acesso</a></p>';
     h += '<div class="kpis"><div class="kpi q"><small>Para chamar</small><b>' + pend + '</b><span>' + (rec ? 'na ordem da pontuação' : 'sem contato de uma pessoa') + '</span></div>'
@@ -154,14 +193,6 @@
       + '<div class="kpi v"><small>Trabalhados hoje</small><b>' + feitosHoje + '</b><span>' + trab.length + ' no total</span></div>'
       + '<div class="kpi"><small>📅 Reuniões marcadas</small><b>' + G.reu.length + '</b><span>' + G.reu.filter(function(p) { return p.res.comp; }).length + ' compareceram</span></div>'
       + '<div class="kpi v"><small>💰 Vendas</small><b>' + vend.length + '</b><span>' + (vend.length ? rs(vend.reduce(function(s, p) { return s + (p.res.valor || 0); }, 0)) : 'saídas desta lista') + '</span></div></div>';
-    if (D.gestor) {
-      var ks = rec ? D.rec : D.sdrs.concat(['time']);
-      h += '<div class="card"><h2>Acompanhamento: quem está trabalhando a lista</h2><div class="rolo"><table><thead><tr><th>Quem</th><th>Para chamar</th><th>Abordou hoje</th><th>Abordou no total</th><th>Chamou pela Clint</th><th>Já tinha abordado</th><th>Reuniões</th><th>Compareceram</th><th>Vendas</th><th>Abriu a página</th><th>Link pessoal</th></tr></thead><tbody>'
-        + ks.map(function(k) { var P = D.placar[k] || {}, a = (D.acessos || {})[k], t = k === 'time', n = function(v) { return t ? '—' : (v || 0); };
-          return '<tr><td><b>' + esc(nomeDe(k)) + '</b></td><td>' + (P.pendentes || 0) + '</td><td>' + n(P.feitosHoje) + '</td><td>' + n(P.feitos) + '</td><td>' + (P.vistos || 0) + '</td><td>' + n(P.jaTinha) + '</td><td>' + (P.reunioes || 0) + '</td><td>' + (P.compareceram || 0) + '</td><td>' + (P.vendas ? P.vendas + ' · ' + rs(P.valor) : 0) + '</td><td>'
-            + (t ? '—' : a && a.ultima ? (a.hoje ? '✅ hoje' : '🚫 hoje não') + ' · ' + hora(a.ultima) : '🚫 nunca') + '</td><td>' + (t ? '—' : '<button type="button" class="chip" onclick="gerarLink(\'' + k + '\')">' + ((D.links || {})[k] ? 'Trocar link' : 'Gerar link') + '</button>') + '</td></tr>'; }).join('')
-        + '</tbody></table></div><div id="linkBox"></div><p class="nota" style="margin:10px 0 0">"Abordou" é o botão Abordei. "Chamou pela Clint" é mensagem de uma pessoa vista na conversa. Reuniões, comparecimento e vendas vêm da planilha de vendas, de 17/11 em diante.</p></div>';
-    }
     h += '<div class="card"><h2>Quem chamar primeiro</h2><ol class="ordem">' + (rec
       ? '<li><b>Workshop e eventos</b>Aplicou, pediu diagnóstico ou esteve no evento, e nunca fez reunião. Comece por aqui.</li><li><b>Quentes (70 pontos ou mais)</b>Quase todos responderam a alguém do time e ficaram sem retorno.</li><li><b>Mornos (50 a 69)</b>Marcaram investimento e deram algum sinal na conversa.</li><li><b>Frios</b>Só depois de zerar os de cima.</li>'
       : '<li><b>MQL de R$ 2 mil ou mais</b>Marcou o investimento mais alto. Chame hoje, mesmo que seja antigo.</li><li><b>MQL em etapa ativa</b>Está em Base IA, Conexão ou Qualificação: a conversa ainda está aberta.</li><li><b>MQL com nota A ou B</b>Do mais novo para o mais antigo.</li><li><b>Os outros MQL</b>Marcaram investimento, mas com nota C ou D.</li><li><b>Completos sem MQL</b>Responderam tudo, sem investimento. Pela nota.</li><li><b>Incompletos</b>Não terminaram o formulário. Pela nota.</li>')
