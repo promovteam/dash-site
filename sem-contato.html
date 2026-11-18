@@ -64,6 +64,13 @@
   .lead-a { grid-row:1 / span 2; grid-column:2; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
   .b.cl { color:var(--blue); } .b.ab { background:var(--accent); color:#1b1206; border-color:var(--accent); } .b.ab:hover { filter:brightness(1.07); background:var(--accent); } .b.des { color:var(--muted); }
   .b:disabled { opacity:.5; cursor:default; }
+  select { font:inherit; font-size:.8rem; font-weight:700; color:var(--text); background:var(--panel); border:1px solid var(--borda); border-radius:11px; padding:8px 10px; max-width:100%; }
+  select.on { border-color:rgba(246,163,80,.6); color:var(--accent); }
+  .lead-n { cursor:pointer; } .lead-n .ver { font-size:.72rem; font-weight:700; color:var(--muted); }
+  .ficha { grid-column:1 / -1; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px; padding-top:10px; border-top:1px dashed var(--borda); }
+  .ficha div { background:var(--panel2); border:1px solid var(--borda); border-radius:10px; padding:8px 10px; min-width:0; }
+  .ficha small { display:block; font-size:.6rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .ficha span { font-size:.8rem; overflow-wrap:anywhere; } .ficha p { grid-column:1 / -1; margin:0; font-size:.8rem; color:var(--text2); }
   .aviso { text-align:center; padding:36px 18px; color:var(--text2); } .aviso b { display:block; color:var(--text); font-size:1.05rem; margin-bottom:6px; }
   .nota { color:var(--muted); font-size:.76rem; }
   @media (max-width:640px) { h1 { font-size:1.3rem; } .lead { grid-template-columns:1fr; } .lead-a { grid-row:auto; grid-column:1; justify-content:flex-start; } .topo-d { margin-left:0; } }
@@ -78,14 +85,16 @@
       <p id="sub">Quem chegou no SPARK / GROWTH e ainda não recebeu mensagem de uma pessoa.</p></div>
     <div class="topo-d"><button type="button" class="b" id="bAt" onclick="carregar(true)">↻ Atualizar</button><a class="b" href="./">Abrir o dash</a></div>
   </header>
-  <div id="corpo"><div class="card aviso"><b>Abrindo a lista…</b>Leva alguns segundos.</div></div>
+  <div id="corpo"><div class="card aviso"><b>Abrindo a lista…</b>A primeira vez pode levar até 1 minuto. Pode deixar a página aberta.</div></div>
 </main>
 <script>
   var ROBO = 'https://script.google.com/macros/s/AKfycbxj7EtQMHIB7VSZFh8Fea3uhp10dI2ubIlTy9MEJakGNtfhYilg3v4hyPEJAPi7ydku/exec';
   var CLINT = 'https://app.clint.digital/contacts/', LEADC = 'https://leads.legado.club/ir/contacts/';
-  var D = null, EST = { aba: 'mql', de: 'todos', busca: '', ver: 60 };
+  var D = null, EST = { lista: 'sdr', aba: 'mql', de: 'todos', busca: '', ver: 60, inv: '', nota: '', etapa: '', idade: '' }, FICHAS = {}, ABERTAS = {};
   var esc = function(t) { return String(t == null ? '' : t).replace(/[<>&"]/g, function(c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); };
-  function tok() { try { return localStorage.getItem('comPainelTok') || localStorage.getItem('scoreTok') || ''; } catch (e) { return ''; } }
+  // 17/11 (Bruno: "quero acesso sem precisar entrar no dash"): link pessoal (…#k=lk:quem.segredo). Fica guardado neste navegador e sai do endereço.
+  function tok() { try { var m = /[#&]k=([^&]+)/.exec(location.hash); if (m) { localStorage.setItem('sdrlLink', decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname); }
+    return localStorage.getItem('sdrlLink') || localStorage.getItem('comPainelTok') || localStorage.getItem('scoreTok') || ''; } catch (e) { return ''; } }
   function robo(corpo, ok, falha) {
     fetch(ROBO, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(corpo) })
       .then(function(r) { return r.json(); }).then(ok).catch(function(e) { falha(e && e.message || String(e)); });
@@ -96,68 +105,125 @@
   // QUEM CHAMAR PRIMEIRO: 1 investimento alto · 2 MQL em etapa ativa · 3 MQL nota A ou B · 4 demais MQL · depois, pela nota e do mais novo para o mais antigo
   function faixa(p) { if (p.nv >= 3) return 1; if (p.nv && ATIVA.test(semAcento(p.etapa))) return 2; if (p.nv && /^[AB]$/.test(p.nota)) return 3; if (p.nv) return 4; return 5; }
   function ordem(a, b) { var n = function(p) { return { A: 0, B: 1, C: 2, D: 3 }[p.nota] == null ? 4 : { A: 0, B: 1, C: 2, D: 3 }[p.nota]; }; return faixa(a) - faixa(b) || b.nv - a.nv || n(a) - n(b) || b.cr - a.cr; }
-  function grupo(p) { return p.marc ? 'feitos' : p.nv ? 'mql' : p.form === 'Completo' ? 'comp' : 'inc'; }
+  function grupo(p) { if (p.res) return 'reu'; if (p.marc || p.ct) return 'feitos'; if (p.rec) return (p.grp === 'workshop' || p.grp === 'ild') ? 'ev' : p.pt >= 70 ? 'q' : p.pt >= 50 ? 'm' : 'fr'; return p.nv ? 'mql' : p.form === 'Completo' ? 'comp' : 'inc'; }
   function ha(t) { var d = Math.floor((Date.now() - t) / 864e5); return d <= 0 ? 'hoje' : d === 1 ? 'ontem' : 'há ' + d + ' dias'; }
   function hora(t) { var d = new Date(t); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
-  function nomeDe(k) { return k === 'time' ? 'Do time (Sarah e sem dono)' : k.charAt(0).toUpperCase() + k.slice(1); }
+  function nomeDe(k) { return k === 'time' ? 'Do time (Sarah e sem dono)' : (D && D.nomes && D.nomes[k]) || k.charAt(0).toUpperCase() + k.slice(1); }
   function carregar(forcar) {
     var t = tok(), c = document.getElementById('corpo');
-    if (!t) { c.innerHTML = '<div class="card aviso"><b>Entre no dash primeiro</b>Esta lista abre para quem já entrou no dash neste navegador.<br><br><a class="b ab" href="./">Abrir o dash e entrar</a></div>'; return; }
+    if (!t) { c.innerHTML = '<div class="card aviso"><b>Abra pelo seu link pessoal</b>Esta lista abre pelo link que a gestão te mandou, ou para quem já entrou no dash neste navegador.<br><br><a class="b ab" href="./">Abrir o dash e entrar</a></div>'; return; }
     var bt = document.getElementById('bAt'); bt.disabled = true; bt.textContent = 'Atualizando…';
+    var demora = setTimeout(function() { if (!D) c.innerHTML = '<div class="card aviso"><b>Ainda montando a lista…</b>O robô está lendo as conversas. Falta pouco: não precisa recarregar.</div>'; }, 25000);
     robo({ action: 'sdrLista', tok: t }, function(d) {
-      bt.disabled = false; bt.textContent = '↻ Atualizar';
+      clearTimeout(demora); bt.disabled = false; bt.textContent = '↻ Atualizar';
       if (!d || !d.success) { c.innerHTML = '<div class="card aviso"><b>' + esc((d && d.error) || 'O robô não respondeu') + '</b>' + (d && d.sair ? '<br><a class="b ab" href="./">Abrir o dash e entrar de novo</a>' : 'Tente de novo em instantes.') + '</div>'; return; }
-      D = d; if (!d.gestor && EST.de === 'todos') EST.de = 'todos';
+      D = d; D.porLink = /^lk:/.test(t); D.rec = d.rec || []; if (!d.gestor) EST.lista = d.leads.some(function(p) { return p.rec; }) && !d.leads.some(function(p) { return !p.rec; }) || D.rec.indexOf(d.eu) !== -1 ? 'rec' : 'sdr';
       desenhar();
-    }, function(e) { bt.disabled = false; bt.textContent = '↻ Atualizar'; c.innerHTML = '<div class="card aviso"><b>Não consegui falar com o robô</b>' + esc(e) + '</div>'; });
+    }, function(e) { clearTimeout(demora); bt.disabled = false; bt.textContent = '↻ Atualizar'; c.innerHTML = '<div class="card aviso"><b>Não consegui falar com o robô</b>' + esc(e) + '</div>'; });
   }
   function visiveis() {
     var b = semAcento(EST.busca.trim());
-    return D.leads.filter(function(p) { return (EST.de === 'todos' || p.dono === EST.de) && (!b || semAcento(p.nome).indexOf(b) !== -1); });
+    return D.leads.filter(function(p) {
+      if (!!p.rec !== (EST.lista === 'rec')) return false;
+      if (EST.de !== 'todos' && p.dono !== EST.de) return false;
+      if (b && semAcento(p.nome).indexOf(b) === -1) return false;
+      if (EST.inv !== '' && String(p.nv) !== EST.inv && !(EST.inv === 'mql' && p.nv > 0) && !(EST.inv === 'alto' && p.nv >= 3)) return false;
+      if (EST.nota !== '' && (p.nota || '-') !== EST.nota) return false;
+      if (EST.etapa !== '' && (p.etapa || '—') !== EST.etapa) return false;
+      if (EST.idade !== '') { var d = (Date.now() - p.cr) / 864e5, fx = d <= 7 ? '7' : d <= 30 ? '30' : d <= 90 ? '90' : '99'; if (fx !== EST.idade) return false; }
+      return true; });
   }
+  function sair() { try { localStorage.removeItem('sdrlLink'); } catch (e) {} location.href = location.pathname; }
+  function lista(k) { EST.lista = k; EST.aba = k === 'rec' ? 'ev' : 'mql'; EST.de = 'todos'; EST.ver = 60; limparSem(); desenhar(); }
+  function limparSem() { EST.inv = EST.nota = EST.etapa = EST.idade = ''; }
+  function rs(v) { return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); }
   function desenhar() {
-    var L = visiveis(), G = { mql: [], comp: [], inc: [], feitos: [] }; L.forEach(function(p) { G[grupo(p)].push(p); });
-    ['mql', 'comp', 'inc'].forEach(function(k) { G[k].sort(ordem); }); G.feitos.sort(function(a, b) { return (b.marc.em || 0) - (a.marc.em || 0); });
-    var pend = G.mql.length + G.comp.length + G.inc.length, alto = G.mql.filter(function(p) { return p.nv >= 3; }).length, hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
-    var feitosHoje = G.feitos.filter(function(p) { return (p.marc.em || 0) >= hoje0.getTime(); }).length;
-    document.getElementById('sub').textContent = 'Olá, ' + D.nome + '. ' + (D.gestor ? 'Você vê a lista do time inteiro.' : 'Você vê os seus leads e os do time (os da Sarah e os sem dono), que são de quem chamar primeiro.');
-    var h = '<div class="kpis"><div class="kpi q"><small>Para chamar</small><b>' + pend + '</b><span>sem contato de uma pessoa</span></div>'
-      + '<div class="kpi"><small>🔥 MQL</small><b>' + G.mql.length + '</b><span>' + alto + ' de R$ 2 mil ou mais</span></div>'
-      + '<div class="kpi v"><small>Feitos hoje</small><b>' + feitosHoje + '</b><span>' + G.feitos.length + ' no total</span></div>'
-      + '<div class="kpi"><small>Já tinham abordado</small><b>' + G.feitos.filter(function(p) { return p.marc.tipo === 'jatinha'; }).length + '</b><span>e não aparecia aqui</span></div></div>';
+    var rec = EST.lista === 'rec', L = visiveis(), G = { mql: [], comp: [], inc: [], ev: [], q: [], m: [], fr: [], reu: [], feitos: [] }; L.forEach(function(p) { G[grupo(p)].push(p); });
+    ['mql', 'comp', 'inc'].forEach(function(k) { G[k].sort(ordem); }); ['ev', 'q', 'm', 'fr'].forEach(function(k) { G[k].sort(function(a, b) { return b.pt - a.pt || b.cr - a.cr; }); });
+    var quando = function(p) { return (p.marc && p.marc.em) || (p.ct && p.ct.em) || (p.res && p.res.em) || 0; };
+    G.feitos.sort(function(a, b) { return quando(b) - quando(a); }); G.reu.sort(function(a, b) { return (b.res.vend - a.res.vend) || (b.res.em - a.res.em); });
+    var abertos = (rec ? ['ev', 'q', 'm', 'fr'] : ['mql', 'comp', 'inc']), pend = abertos.reduce(function(s, k) { return s + G[k].length; }, 0), hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+    var trab = G.feitos.concat(G.reu), feitosHoje = trab.filter(function(p) { return quando(p) >= hoje0.getTime(); }).length, vend = G.reu.filter(function(p) { return p.res.vend; });
+    var sub = 'Olá, ' + D.nome + '. ' + (D.gestor ? 'Você vê as listas do time inteiro.' : rec ? 'Esta é a sua lista de recuperação: leads que nunca fizeram reunião nem compraram.' : 'Você vê os seus leads e os do time (os da Sarah e os sem dono), que são de quem chamar primeiro.');
+    document.getElementById('sub').textContent = sub;
+    var h = '';
+    if (D.gestor) h += '<div class="abas">' + [['sdr', '📋 Lista dos SDRs'], ['rec', '♻️ Recuperação']].map(function(a) { return '<button type="button" class="aba" aria-selected="' + (EST.lista === a[0]) + '" onclick="lista(\'' + a[0] + '\')">' + a[1] + '</button>'; }).join('') + '</div>';
+    else if (D.porLink) h += '<p class="nota" style="margin:0">Você entrou pelo seu link pessoal. Não encaminhe este link: ele abre a sua lista. <a href="#" onclick="sair();return false" style="color:var(--accent)">Sair deste acesso</a></p>';
+    h += '<div class="kpis"><div class="kpi q"><small>Para chamar</small><b>' + pend + '</b><span>' + (rec ? 'na ordem da pontuação' : 'sem contato de uma pessoa') + '</span></div>'
+      + (rec ? '<div class="kpi"><small>🔥 Quentes</small><b>' + G.q.length + '</b><span>70 pontos ou mais</span></div>' : '<div class="kpi"><small>🔥 MQL</small><b>' + G.mql.length + '</b><span>' + G.mql.filter(function(p) { return p.nv >= 3; }).length + ' de R$ 2 mil ou mais</span></div>')
+      + '<div class="kpi v"><small>Trabalhados hoje</small><b>' + feitosHoje + '</b><span>' + trab.length + ' no total</span></div>'
+      + '<div class="kpi"><small>📅 Reuniões marcadas</small><b>' + G.reu.length + '</b><span>' + G.reu.filter(function(p) { return p.res.comp; }).length + ' compareceram</span></div>'
+      + '<div class="kpi v"><small>💰 Vendas</small><b>' + vend.length + '</b><span>' + (vend.length ? rs(vend.reduce(function(s, p) { return s + (p.res.valor || 0); }, 0)) : 'saídas desta lista') + '</span></div></div>';
     if (D.gestor) {
-      var ks = D.sdrs.concat(['time']);
-      h += '<div class="card"><h2>Quem está trabalhando a lista</h2><div class="rolo"><table><thead><tr><th>Quem</th><th>Para chamar</th><th>MQL</th><th>Feitos hoje</th><th>Feitos no total</th><th>Já tinham abordado</th><th>Abriu a página</th></tr></thead><tbody>'
-        + ks.map(function(k) { var P = D.placar[k] || {}, a = (D.acessos || {})[k]; return '<tr><td><b>' + esc(nomeDe(k)) + '</b></td><td>' + (P.pendentes || 0) + '</td><td>' + (P.mql || 0) + '</td><td>' + (k === 'time' ? '—' : (P.feitosHoje || 0)) + '</td><td>' + (k === 'time' ? '—' : (P.feitos || 0)) + '</td><td>' + (k === 'time' ? '—' : (P.jaTinha || 0)) + '</td><td>' + (k === 'time' ? '—' : a && a.ultima ? (a.hoje ? '✅ hoje, ' + a.hoje + (a.hoje === 1 ? ' vez' : ' vezes') : '🚫 não abriu hoje') + ' · última ' + hora(a.ultima) : '🚫 nunca abriu') + '</td></tr>'; }).join('')
-        + '</tbody></table></div><p class="nota" style="margin:10px 0 0">"Feitos" são os leads marcados como Abordei ou Já tinha abordado. O trabalho feito direto na Clint aparece no resumo do WhatsApp.</p></div>';
+      var ks = rec ? D.rec : D.sdrs.concat(['time']);
+      h += '<div class="card"><h2>Acompanhamento: quem está trabalhando a lista</h2><div class="rolo"><table><thead><tr><th>Quem</th><th>Para chamar</th><th>Abordou hoje</th><th>Abordou no total</th><th>Chamou pela Clint</th><th>Já tinha abordado</th><th>Reuniões</th><th>Compareceram</th><th>Vendas</th><th>Abriu a página</th><th>Link pessoal</th></tr></thead><tbody>'
+        + ks.map(function(k) { var P = D.placar[k] || {}, a = (D.acessos || {})[k], t = k === 'time', n = function(v) { return t ? '—' : (v || 0); };
+          return '<tr><td><b>' + esc(nomeDe(k)) + '</b></td><td>' + (P.pendentes || 0) + '</td><td>' + n(P.feitosHoje) + '</td><td>' + n(P.feitos) + '</td><td>' + (P.vistos || 0) + '</td><td>' + n(P.jaTinha) + '</td><td>' + (P.reunioes || 0) + '</td><td>' + (P.compareceram || 0) + '</td><td>' + (P.vendas ? P.vendas + ' · ' + rs(P.valor) : 0) + '</td><td>'
+            + (t ? '—' : a && a.ultima ? (a.hoje ? '✅ hoje' : '🚫 hoje não') + ' · ' + hora(a.ultima) : '🚫 nunca') + '</td><td>' + (t ? '—' : '<button type="button" class="chip" onclick="gerarLink(\'' + k + '\')">' + ((D.links || {})[k] ? 'Trocar link' : 'Gerar link') + '</button>') + '</td></tr>'; }).join('')
+        + '</tbody></table></div><div id="linkBox"></div><p class="nota" style="margin:10px 0 0">"Abordou" é o botão Abordei. "Chamou pela Clint" é mensagem de uma pessoa vista na conversa. Reuniões, comparecimento e vendas vêm da planilha de vendas, de 17/11 em diante.</p></div>';
     }
-    h += '<div class="card"><h2>Quem chamar primeiro</h2><ol class="ordem">'
-      + '<li><b>MQL de R$ 2 mil ou mais</b>Marcou o investimento mais alto. Chame hoje, mesmo que seja antigo.</li>'
-      + '<li><b>MQL em etapa ativa</b>Está em Base IA, Conexão ou Qualificação: a conversa ainda está aberta.</li>'
-      + '<li><b>MQL com nota A ou B</b>Do mais novo para o mais antigo.</li>'
-      + '<li><b>Os outros MQL</b>Marcaram investimento, mas com nota C ou D.</li>'
-      + '<li><b>Completos sem MQL</b>Responderam tudo, sem investimento. Pela nota.</li>'
-      + '<li><b>Incompletos</b>Não terminaram o formulário. Pela nota.</li></ol>'
-      + '<p class="nota" style="margin:12px 0 0">A lista já vem nesta ordem. A cor da borda de cada lead mostra em qual dos passos ele está.</p></div>';
-    var abas = [['mql', '🔥 MQL'], ['comp', 'Completos'], ['inc', 'Incompletos'], ['feitos', '✅ Feitos']];
+    h += '<div class="card"><h2>Quem chamar primeiro</h2><ol class="ordem">' + (rec
+      ? '<li><b>Workshop e eventos</b>Aplicou, pediu diagnóstico ou esteve no evento, e nunca fez reunião. Comece por aqui.</li><li><b>Quentes (70 pontos ou mais)</b>Quase todos responderam a alguém do time e ficaram sem retorno.</li><li><b>Mornos (50 a 69)</b>Marcaram investimento e deram algum sinal na conversa.</li><li><b>Frios</b>Só depois de zerar os de cima.</li>'
+      : '<li><b>MQL de R$ 2 mil ou mais</b>Marcou o investimento mais alto. Chame hoje, mesmo que seja antigo.</li><li><b>MQL em etapa ativa</b>Está em Base IA, Conexão ou Qualificação: a conversa ainda está aberta.</li><li><b>MQL com nota A ou B</b>Do mais novo para o mais antigo.</li><li><b>Os outros MQL</b>Marcaram investimento, mas com nota C ou D.</li><li><b>Completos sem MQL</b>Responderam tudo, sem investimento. Pela nota.</li><li><b>Incompletos</b>Não terminaram o formulário. Pela nota.</li>')
+      + '</ol><p class="nota" style="margin:12px 0 0">A lista já vem nesta ordem.' + (rec ? ' Os pontos somam o potencial (investimento, renda, seguidores, workshop), a resposta do lead na conversa e há quanto tempo ele chegou. O motivo aparece em cada lead.' : ' A cor da borda de cada lead mostra em qual dos passos ele está.') + '</p></div>';
+    var abas = (rec ? [['ev', '🎓 Workshop e eventos'], ['q', '🔥 Quentes'], ['m', '🟠 Mornos'], ['fr', '🔵 Frios']] : [['mql', '🔥 MQL'], ['comp', 'Completos'], ['inc', 'Incompletos']]).concat([['reu', '📅 Com reunião'], ['feitos', '✅ Abordados']]);
+    if (!abas.some(function(a) { return a[0] === EST.aba; })) EST.aba = abas[0][0];
     h += '<div class="abas" role="tablist">' + abas.map(function(a) { return '<button type="button" class="aba" role="tab" aria-selected="' + (EST.aba === a[0]) + '" onclick="aba(\'' + a[0] + '\')">' + a[1] + ' <small>' + G[a[0]].length + '</small></button>'; }).join('') + '</div>';
-    var donos = ['todos'].concat((D.gestor ? D.sdrs : [D.eu]).concat(['time']));
-    h += '<div class="filtros">' + donos.map(function(k) { return '<button type="button" class="chip' + (EST.de === k ? ' on' : '') + '" onclick="de(\'' + k + '\')">' + (k === 'todos' ? 'Todos' : k === D.eu ? 'Meus' : esc(nomeDe(k))) + '</button>'; }).join('')
+    var donos = ['todos'].concat(rec ? (D.gestor ? D.rec : []) : (D.gestor ? D.sdrs : [D.eu]).concat(['time']));
+    h += '<div class="filtros">' + (donos.length > 1 ? donos.map(function(k) { return '<button type="button" class="chip' + (EST.de === k ? ' on' : '') + '" onclick="de(\'' + k + '\')">' + (k === 'todos' ? 'Todos' : k === D.eu ? 'Meus' : esc(nomeDe(k))) + '</button>'; }).join('') : '')
       + '<input type="search" placeholder="Procurar pelo nome…" value="' + esc(EST.busca) + '" oninput="busca(this.value)" aria-label="Procurar lead pelo nome"></div>';
-    var lst = G[EST.aba];
+    var sel = function(k, rot, ops) { return '<select class="' + (EST[k] !== '' ? 'on' : '') + '" onchange="filtro(\'' + k + '\', this.value)" aria-label="' + rot + '"><option value="">' + rot + ': todos</option>' + ops.map(function(o) { return '<option value="' + esc(o[0]) + '"' + (EST[k] === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; };
+    var cont = {}; D.leads.forEach(function(p) { if (!!p.rec === rec && (EST.de === 'todos' || p.dono === EST.de)) { var e = p.etapa || '—'; cont[e] = (cont[e] || 0) + 1; } });
+    var etapas = Object.keys(cont).sort(function(a, b) { return cont[b] - cont[a]; }).map(function(e) { return [e, e + ' (' + cont[e] + ')']; });
+    var temF = EST.inv !== '' || EST.nota !== '' || EST.etapa !== '' || EST.idade !== '';
+    h += '<div class="filtros">' + sel('inv', 'Investimento', [['alto', 'R$ 2 mil ou mais'], ['4', 'R$ 3 a 4 mil'], ['3', 'R$ 2 a 3 mil'], ['2', 'R$ 500 a 1 mil'], ['1', 'R$ 500'], ['mql', 'Qualquer valor (MQL)'], ['0', 'Não marcou ou sem disponibilidade']])
+      + sel('nota', 'Nota', [['A', 'Nota A'], ['B', 'Nota B'], ['C', 'Nota C'], ['D', 'Nota D'], ['-', 'Sem nota']]) + sel('etapa', 'Etapa', etapas)
+      + sel('idade', 'Chegou', [['7', 'nos últimos 7 dias'], ['30', 'de 8 a 30 dias'], ['90', 'de 1 a 3 meses'], ['99', 'há mais de 3 meses']])
+      + (temF ? '<button type="button" class="chip" onclick="limpar()">✕ Limpar filtros</button>' : '') + '</div>';
+    var lst = G[EST.aba], vazio = { feitos: 'Nenhum lead abordado ainda', reu: 'Nenhuma reunião marcada ainda a partir desta lista' }[EST.aba] || 'Nenhum lead aqui 🎉';
     h += lst.length ? '<div class="lista" id="lst">' + lst.slice(0, EST.ver).map(cartao).join('') + '</div>' + (lst.length > EST.ver ? '<div style="text-align:center"><button type="button" class="b" onclick="mais()">Mostrar mais ' + Math.min(60, lst.length - EST.ver) + ' (faltam ' + (lst.length - EST.ver) + ')</button></div>' : '')
-      : '<div class="card aviso"><b>' + (EST.aba === 'feitos' ? 'Nenhum lead marcado ainda' : 'Nenhum lead aqui 🎉') + '</b>' + (EST.busca ? 'Nada com esse nome.' : '') + '</div>';
-    h += '<p class="nota" style="text-align:center">Conferido conversa por conversa na Clint. O lead sai da lista quando alguém do time manda mensagem pela Clint ou marca reunião. Ligação e WhatsApp pessoal não aparecem: nesses casos, use "Já tinha abordado".</p>';
+      : '<div class="card aviso"><b>' + vazio + '</b>' + (EST.busca || temF ? 'Nada com esse filtro.' : '') + '</div>';
+    h += '<p class="nota" style="text-align:center">Conferido conversa por conversa na Clint. Quando alguém do time manda mensagem pela Clint, o lead vai sozinho para "Abordados"; quando a reunião entra na planilha de vendas, vai para "Com reunião". Ligação e WhatsApp pessoal não aparecem: nesses casos, use "Já tinha abordado".</p>';
     document.getElementById('corpo').innerHTML = h;
   }
   function cartao(p) {
-    var f = faixa(p), m = p.marc, id = esc(p.id), nome = p.nome || 'Contato sem nome';
-    var tags = (p.nv ? '<span class="tag ' + (p.nv >= 3 ? 'alto' : 'inv') + '">🔥 ' + FX[p.nv] + '</span>' : '') + (p.nota ? '<span class="tag nota">Nota ' + esc(p.nota) + '</span>' : '') + (m ? '<span class="tag ok">' + (m.tipo === 'jatinha' ? '🔎 já tinha abordado' : '✅ abordado') + ' · ' + esc(m.quem) + '</span>' : '');
+    var f = p.rec ? (p.pt >= 70 ? 1 : p.pt >= 50 ? 2 : p.pt >= 30 ? 3 : 4) : faixa(p), m = p.marc, r = p.res, id = esc(p.id), nome = p.nome || 'Contato sem nome', feito = !!(m || p.ct || r);
+    var tags = (p.rec ? '<span class="tag inv">⭐ ' + p.pt + ' pontos</span>' : '') + (p.nv ? '<span class="tag ' + (p.nv >= 3 ? 'alto' : 'inv') + '">🔥 ' + FX[p.nv] + '</span>' : '') + (p.nota ? '<span class="tag nota">Nota ' + esc(p.nota) + '</span>' : '')
+      + (r ? '<span class="tag ' + (r.vend ? 'ok' : r.comp ? 'nota' : 'inv') + '">' + (r.vend ? '💰 comprou · ' + rs(r.valor) : r.comp ? '✅ compareceu · ' + esc(r.st) : /no.?show/i.test(r.st) ? '🚫 faltou à reunião' : '📅 reunião marcada') + '</span>' : '')
+      + (m ? '<span class="tag ok">' + (m.tipo === 'jatinha' ? '🔎 já tinha abordado' : '✅ abordado') + ' · ' + esc(m.quem) + '</span>' : p.ct ? '<span class="tag ok">💬 chamado pela Clint' + (p.ct.por ? ' · ' + esc(p.ct.por) : '') + '</span>' : '');
     var links = (p.lc ? '' : '<a class="b cl" href="' + CLINT + encodeURIComponent(p.id) + '" target="_blank" rel="noopener">Clint ↗</a>') + '<a class="b cl" href="' + LEADC + encodeURIComponent(p.id) + '" target="_blank" rel="noopener">Lead Center ↗</a>';
-    var acao = m ? '<button type="button" class="b des" onclick="marcar(this,\'' + id + '\',\'desfazer\')">Desfazer</button>' : '<button type="button" class="b ab" onclick="marcar(this,\'' + id + '\',\'abordei\')">✅ Abordei</button><button type="button" class="b" onclick="marcar(this,\'' + id + '\',\'jatinha\')" title="Você já tinha falado com o lead e não apareceu aqui">🔎 Já tinha abordado</button>';
-    return '<div class="lead ' + (m ? 'feito' : 't' + Math.min(f, 5)) + '"><div class="lead-n"><b>' + esc(nome) + '</b>' + tags + '</div><div class="lead-a">' + links + acao + '</div>'
-      + '<div class="lead-f"><span>👤 ' + esc(p.dono === 'time' ? (p.resp ? p.resp.split(' ')[0] + ' · do time' : 'sem dono · do time') : nomeDe(p.dono)) + '</span><span>📍 ' + esc(p.etapa || '—') + '</span><span>📝 ' + esc(p.form || '—') + '</span><span>📅 chegou ' + ha(p.cr) + '</span>' + (m && m.em ? '<span>marcado em ' + hora(m.em) + '</span>' : '') + '</div></div>';
+    var acao = m ? '<button type="button" class="b des" onclick="marcar(this,\'' + id + '\',\'desfazer\')">Desfazer</button>' : (p.ct || r) ? '' : '<button type="button" class="b ab" onclick="marcar(this,\'' + id + '\',\'abordei\')">✅ Abordei</button><button type="button" class="b" onclick="marcar(this,\'' + id + '\',\'jatinha\')" title="Você já tinha falado com o lead e não apareceu aqui">🔎 Já tinha abordado</button>';
+    return '<div class="lead ' + (feito ? 'feito' : 't' + Math.min(f, 5)) + '"><div class="lead-n" role="button" tabindex="0" onclick="ficha(\'' + id + '\')" onkeydown="if(event.key===\'Enter\')ficha(\'' + id + '\')" title="Clique para ver como o lead preencheu o formulário"><b>' + esc(nome) + '</b>' + tags + '<span class="ver">' + (ABERTAS[p.id] ? '▴ fechar' : '▾ ver respostas') + '</span></div><div class="lead-a">' + links + acao + '</div>'
+      + '<div class="lead-f"><span>👤 ' + esc(p.dono === 'time' ? (p.resp ? p.resp.split(' ')[0] + ' · do time' : 'sem dono · do time') : nomeDe(p.dono)) + '</span><span>📍 ' + esc(p.etapa || '—') + '</span><span>📝 ' + esc(p.form || '—') + '</span><span>📅 chegou ' + ha(p.cr) + '</span>'
+      + (r ? '<span>🗓 reunião ' + new Date(r.em).toLocaleDateString('pt-BR') + (r.closer ? ' · ' + esc(r.closer) : '') + '</span>' : '') + (m && m.em ? '<span>marcado em ' + hora(m.em) + '</span>' : p.ct && p.ct.em ? '<span>chamado em ' + hora(p.ct.em) + '</span>' : '') + '</div>'
+      + (p.rec && p.mot ? '<div class="lead-f" style="color:var(--text)">💡 ' + esc(p.mot) + '</div>' : '') + (ABERTAS[p.id] ? fichaHtml(p) : '') + '</div>';
   }
+  function gerarLink(k) {
+    var bx = document.getElementById('linkBox'); bx.innerHTML = '<p class="nota">Gerando o link…</p>';
+    robo({ action: 'sdrLinks', tok: tok(), quem: k }, function(d) {
+      if (!d || !d.success) { bx.innerHTML = '<p class="nota">' + esc((d && d.error) || 'Não consegui gerar.') + '</p>'; return; }
+      D.links = D.links || {}; D.links[k] = Date.now();
+      bx.innerHTML = '<div class="ficha" style="border:0;padding-top:12px"><div style="grid-column:1/-1"><small>Link pessoal de ' + esc(d.nome) + ' · abre a lista dela(e) sem entrar no dash</small><span id="lkTxt">' + esc(d.link) + '</span></div><p><button type="button" class="b ab" onclick="copiar()">Copiar link</button> &nbsp;O link só aparece agora: copie e mande para ' + esc(d.nome) + '. Gerar de novo troca o link e o antigo para de funcionar.</p></div>';
+    }, function() { bx.innerHTML = '<p class="nota">Não consegui falar com o robô.</p>'; });
+  }
+  function copiar() { var t = document.getElementById('lkTxt').textContent; try { navigator.clipboard.writeText(t); } catch (e) {} }
+  function fichaHtml(p) {
+    var f = FICHAS[p.id];
+    if (!f) return '<div class="ficha"><p>Buscando as respostas do formulário…</p></div>';
+    if (f.erro) return '<div class="ficha"><p>' + esc(f.erro) + '</p></div>';
+    if (f.semTelefone) return '<div class="ficha"><p>Este lead não tem telefone na lista, então não dá para achar o formulário dele. Abra na Clint ou no Lead Center.</p></div>';
+    if (!f.vezes) return '<div class="ficha"><p>Não achei formulário deste telefone: o lead entrou por outro caminho (anúncio direto no WhatsApp, indicação ou cadastro manual).</p></div>';
+    return '<div class="ficha">' + f.respostas.map(function(r) { return '<div><small>' + esc(r[0]) + '</small><span>' + esc(r[1]) + '</span></div>'; }).join('') + '<p>Preenchido em ' + esc(f.em || '—') + (f.vezes > 1 ? ' · preencheu ' + f.vezes + ' vezes (estas são as respostas mais recentes)' : '') + '</p></div>';
+  }
+  function ficha(id) {
+    if (ABERTAS[id]) { delete ABERTAS[id]; desenhar(); return; }
+    ABERTAS[id] = 1; desenhar();
+    if (FICHAS[id]) return;
+    robo({ action: 'sdrFicha', tok: tok(), id: id }, function(d) { FICHAS[id] = d && d.success ? d : { erro: (d && d.error) || 'Não consegui buscar as respostas.' }; if (ABERTAS[id]) desenhar(); },
+      function() { FICHAS[id] = { erro: 'Não consegui falar com o robô. Feche e abra de novo.' }; if (ABERTAS[id]) desenhar(); });
+  }
+  function filtro(k, v) { EST[k] = v; EST.ver = 60; desenhar(); }
+  function limpar() { EST.inv = EST.nota = EST.etapa = EST.idade = ''; EST.ver = 60; desenhar(); }
   function aba(k) { EST.aba = k; EST.ver = 60; desenhar(); }
   function de(k) { EST.de = k; EST.ver = 60; desenhar(); }
   function busca(v) { EST.busca = v; EST.ver = 60; var s = document.activeElement, pos = s && s.selectionStart; desenhar(); var i = document.querySelector('input[type=search]'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (e) {} } }
