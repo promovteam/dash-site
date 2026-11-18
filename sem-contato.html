@@ -250,7 +250,7 @@
       + '<div class="lead-f"><span>👤 ' + esc(p.dono === 'time' ? (p.resp ? p.resp.split(' ')[0] + ' · do time' : 'sem dono · do time') : nomeDe(p.dono)) + '</span><span>📍 ' + esc(p.etapa || '—') + '</span><span>📝 ' + esc(p.form || '—') + '</span><span>' + (p.ev ? '🎓 evento ' + ha(p.cr) : '📅 chegou ' + ha(p.cr)) + '</span>'
       + (r ? '<span>🗓 reunião ' + new Date(r.em).toLocaleDateString('pt-BR') + (r.closer ? ' · ' + esc(r.closer) : '') + '</span>' : '') + (m && m.em ? '<span>marcado em ' + hora(m.em) + '</span>' : p.ct && p.ct.em ? '<span>chamado em ' + hora(p.ct.em) + '</span>' : '') + '</div>'
       + ((p.rec || p.ev) && p.mot ? '<div class="lead-f" style="color:var(--text)">💡 ' + esc(p.mot) + '</div>' : '')
-      + (p.ev && !feito ? roteiroHtml(p) : '') + (ABERTAS[p.id] ? fichaHtml(p) : '') + '</div>';
+      + (!feito ? roteiroHtml(p) : '') + (ABERTAS[p.id] ? fichaHtml(p) : '') + '</div>';
   }
   function gerarLink(k) {
     var bx = document.getElementById('linkBox'); bx.innerHTML = '<p class="nota">Gerando o link…</p>';
@@ -275,8 +275,30 @@
     var abre = ild
       ? [N + 'tem um diagnóstico reservado no seu nome 🎁', 'aqui é ' + quem + ', da equipe do João Stecca 😊', 'pra quem esteve no ' + ev.replace(/ \(.*\)/, '') + ', separamos um diagnóstico individual do perfil, sem custo.', 'posso te fazer 2 perguntas rápidas pra marcar o seu?']
       : [N + 'o João separou um presente pra você 🎁', 'aqui é ' + quem + ', da equipe dele 😊', 'pra algumas pessoas do workshop' + (mes ? ' de ' + mes : '') + ', ele liberou um diagnóstico individual do perfil, sem custo. ' + (pag ? 'como você garantiu sua aplicação e a conversa não aconteceu, você foi uma das pessoas escolhidas 🙏' : apl ? 'como você aplicou pra conversar com a gente, foi uma das pessoas escolhidas 🙏' : 'como você pediu o diagnóstico lá, foi uma das pessoas escolhidas 🙏'), 'posso te fazer 2 perguntas rápidas pra reservar o seu?'];
+    // 18/11 (Bruno: "coloca em todos a sugestão de abordagem com base da origem, tempo e etc"): para quem NÃO veio de evento, a abertura
+    // muda pela origem (anúncio, ManyChat, bio, orgânico — lida da ficha do formulário), pelo tempo desde que chegou, pelo formulário
+    // (completo ou não), pelo investimento marcado e, na recuperação, pelo que aconteceu na conversa. Os passos 2 a 7 são os mesmos.
+    var d1 = 'A 1ª linha é o que aparece na notificação: ela precisa fazer abrir. Mande um balão de cada vez. ' + (ild ? 'Reconexão: fale do evento antes de oferecer.' : 'Presente do João, para poucos: reciprocidade e escassez. Não diga que é para todos.');
+    if (!p.ev) {
+      ild = true; pres = 'seu diagnóstico';
+      var org = '', fi = FICHAS[p.id]; if (fi && fi.respostas) fi.respostas.forEach(function(r) { if (r[0] === 'Origem') org = String(r[1] || '').toLowerCase(); });
+      var dias = p.cr ? Math.floor((Date.now() - p.cr) / 864e5) : 30, quando = dias <= 1 ? 'agora há pouco' : dias <= 6 ? 'há ' + dias + ' dias' : dias <= 13 ? 'semana passada' : dias <= 45 ? 'há umas semanas' : 'há um tempo';
+      var como = /mchat|manychat/.test(org) ? 'você comentou num post do João pedindo o diagnóstico' : /bio/.test(org) ? 'você pediu o diagnóstico pelo link da bio do João' : /ads/.test(org) ? 'você pediu o diagnóstico do seu Instagram' : /org/.test(org) ? 'você pediu o diagnóstico pelo Instagram do João' : 'você pediu o diagnóstico do seu Instagram';
+      var conv = /respondeu a uma pessoa/.test(mot), soIa = /só à IA|so a IA/i.test(mot), inc = /incomplet/i.test(p.form || '');
+      var gancho = conv ? N + 'te devo um retorno, e vim cumprir 🙏' : dias <= 2 ? N + 'seu diagnóstico gratuito tá liberado 🙌' : dias <= 14 ? N + 'seu diagnóstico gratuito ainda tá separado 🎁' : dias <= 60 ? N + 'lembra do diagnóstico do seu Instagram? 🎁' : N + 'abri uma vaga de diagnóstico pra você 🎁';
+      var meio = conv ? 'a gente conversou ' + quando + ' e eu fiquei de te dar um retorno sobre o diagnóstico do seu Instagram.'
+        : soIa ? como + ' ' + quando + ' e falou com a nossa assistente, mas ninguém do time te chamou ainda. me desculpa 🙏'
+        : dias <= 2 ? como + ' ' + quando + ', que bênção! já vou organizar sua reunião gratuita com um especialista.'
+        : dias <= 60 ? como + ' ' + quando + ' e ficou pendente do nosso lado. me desculpa a demora 🙏 ainda quer fazer?'
+        : como + ' ' + quando + ' e acabou ficando sem atendimento. o João liberou alguns horários pra quem ficou pra trás, e eu separei um pra você.';
+      abre = [gancho, 'aqui é ' + quem + ', da equipe do João Stecca 😊', meio, inc ? 'vi que o formulário ficou pela metade, sem problema: faço 2 perguntas rápidas por aqui mesmo, pode ser?' : 'posso te fazer 2 perguntas rápidas pra marcar o seu?'];
+      d1 = 'A 1ª linha é o que aparece na notificação: ela precisa fazer abrir. Mande um balão de cada vez. '
+        + (org ? 'Origem: ' + (/mchat|manychat/.test(org) ? 'comentou no post (ManyChat)' : /bio/.test(org) ? 'link da bio' : /ads/.test(org) ? 'anúncio' : 'orgânico') + '. ' : (p.tf && !fi ? 'Abra "ver respostas" para a mensagem usar a origem do lead. ' : ''))
+        + 'Chegou ' + (dias <= 1 ? 'há pouco' : 'há ' + dias + ' dias') + (dias > 14 ? ': reconheça a demora, sem rodeio, e ofereça um horário concreto.' : ': quanto antes, mais ele lembra do pedido.')
+        + (p.nv >= 3 ? ' Marcou investimento alto: priorize hoje.' : '');
+    }
     return [
-      ['1 · Abertura', abre, 'A 1ª linha é o que aparece na notificação: ela precisa fazer abrir. Mande um balão de cada vez. ' + (ild ? 'Reconexão: fale do evento antes de oferecer.' : 'Presente do João, para poucos: reciprocidade e escassez. Não diga que é para todos.') + ' Se "tô sem tempo": "É rapidinho! Prefere agora ou mais tarde?"'],
+      ['1 · Abertura', abre, d1 + ' Se "tô sem tempo": "É rapidinho! Prefere agora ou mais tarde?"'],
       ['2 · Já vende? O que trava?', ['Hoje você já vende alguma coisa? 😊', '(depois da resposta) E o que mais te trava pra crescer?'], 'Duas perguntas curtas medem os 2 pilares que mais pesam. 🟢 já vende e assume a própria parte. 🔴 começa do zero e sem renda: corte com gentileza.'],
       ['3 · Por que agora?', ['E por que agora, e não daqui 6 meses? 🙏'], 'Se a resposta vier morna: "E se continuar assim até lá, o que muda pra você?" 🟢 dor ou prazo. 🔴 "seria bom um dia": nutrir.'],
       ['4 · O diagnóstico e o investimento', ['Amei! Faz total sentido você aproveitar ' + (ild ? 'esse diagnóstico' : 'esse presente') + ' 🙌', 'O especialista analisa seu perfil em 5 pontos e te mostra o que fazer pra destravar.', 'E pra eu te direcionar certo: se no fim fizer sentido, os programas ficam entre R$2 e 4 mil/mês. Caberia hoje, ou tá apertado?'], (fx ? 'No formulário marcou ' + fx + '. ' : '') + 'Mande o case (print ou vídeo) depois do 2º balão. O valor de preferência em áudio, nunca seco. Se travar, desça um degrau: R$1.500 a 2.000 → R$500 a 1.500. "Não era grátis?": "O diagnóstico é 100% gratuito! Pergunto só por zelo."'],
@@ -299,7 +321,9 @@
   // cada passo do roteiro é uma aba que abre e fecha (o 1º já vem aberto)
   var PASSO = {};
   function verPasso(id, i) { var k = id + '|' + i; PASSO[k] = !(PASSO[k] != null ? PASSO[k] : i === 0); desenhar(); }
-  function verRot(id) { if (ROT[id]) delete ROT[id]; else ROT[id] = 1; desenhar(); }
+  function verRot(id) { if (ROT[id]) delete ROT[id]; else ROT[id] = 1; desenhar();
+    var p = ROT[id] && D.leads.filter(function(x) { return x.id === id; })[0];
+    if (p && !p.ev && p.tf && !FICHAS[id]) robo({ action: 'sdrFicha', tok: tok(), id: id }, function(d) { FICHAS[id] = d && d.success ? d : { erro: (d && d.error) || 'Não consegui buscar as respostas.' }; if (ROT[id] || ABERTAS[id]) desenhar(); }, function() {}); }
   function copiarMsg(id, bt) { var el = document.getElementById('abd-' + id); if (!el) return; var t = el.textContent, o = bt.textContent, ok = function() { bt.textContent = '✅ Copiada'; setTimeout(function() { bt.textContent = o; }, 2000); };
     try { navigator.clipboard.writeText(t).then(ok, function() { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }); } catch (e) {} }
   function copiar() { var t = document.getElementById('lkTxt').textContent; try { navigator.clipboard.writeText(t); } catch (e) {} }
