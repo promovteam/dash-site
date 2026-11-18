@@ -86,6 +86,10 @@
   .pp-n { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; } .pp-n div { min-width:0; } .pp-n small { display:block; font-size:.6rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); } .pp-n b { font-size:1.15rem; font-variant-numeric:tabular-nums; }
   .pp-f { font-size:.8rem; color:var(--text2); } .pp-f b { color:var(--text); }
   .pp-pe { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.74rem; color:var(--muted); flex-wrap:wrap; }
+  .abd { grid-column:1 / -1; min-width:0; margin-top:2px; background:rgba(246,163,80,.07); border:1px solid rgba(246,163,80,.25); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:6px; }
+  .abd small { font-size:.62rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); } .abd p { margin:0; font-size:.88rem; line-height:1.5; } .abd p { white-space:pre-line; } .abd-b { display:flex; gap:8px; flex-wrap:wrap; }
+  .rot { margin:6px 0 0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:10px; } .rot li { background:rgba(255,255,255,.03); border:1px solid var(--borda); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:6px; } .rot li > .b { align-self:flex-start; }
+  .dic { margin:0; font-size:.78rem; color:var(--text2); white-space:normal; }
 </style>
 </head>
 <body>
@@ -101,7 +105,7 @@
 <script>
   var ROBO = 'https://script.google.com/macros/s/AKfycbxj7EtQMHIB7VSZFh8Fea3uhp10dI2ubIlTy9MEJakGNtfhYilg3v4hyPEJAPi7ydku/exec';
   var CLINT = 'https://app.clint.digital/contacts/', LEADC = 'https://leads.legado.club/ir/contacts/';
-  var D = null, EST = { lista: 'sdr', aba: 'mql', de: 'todos', busca: '', ver: 60, inv: '', nota: '', etapa: '', idade: '' }, FICHAS = {}, ABERTAS = {};
+  var D = null, EST = { lista: 'sdr', aba: 'ev', de: 'todos', busca: '', ver: 60, inv: '', nota: '', etapa: '', idade: '' }, FICHAS = {}, ABERTAS = {};
   var esc = function(t) { return String(t == null ? '' : t).replace(/[<>&"]/g, function(c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); };
   // 17/11 (Bruno: "quero acesso sem precisar entrar no dash"): link pessoal (…#k=lk:quem.segredo). Fica guardado neste navegador e sai do endereço.
   function tok() { try { var m = /[#&]k=([^&]+)/.exec(location.hash); if (m) { localStorage.setItem('sdrlLink', decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname); }
@@ -116,7 +120,7 @@
   // QUEM CHAMAR PRIMEIRO: 1 investimento alto · 2 MQL em etapa ativa · 3 MQL nota A ou B · 4 demais MQL · depois, pela nota e do mais novo para o mais antigo
   function faixa(p) { if (p.nv >= 3) return 1; if (p.nv && ATIVA.test(semAcento(p.etapa))) return 2; if (p.nv && /^[AB]$/.test(p.nota)) return 3; if (p.nv) return 4; return 5; }
   function ordem(a, b) { var n = function(p) { return { A: 0, B: 1, C: 2, D: 3 }[p.nota] == null ? 4 : { A: 0, B: 1, C: 2, D: 3 }[p.nota]; }; return faixa(a) - faixa(b) || b.nv - a.nv || n(a) - n(b) || b.cr - a.cr; }
-  function grupo(p) { if (p.res) return 'reu'; if (p.marc || p.ct) return 'feitos'; if (p.rec) return (p.grp === 'workshop' || p.grp === 'ild') ? 'ev' : p.pt >= 70 ? 'q' : p.pt >= 50 ? 'm' : 'fr'; return p.nv ? 'mql' : p.form === 'Completo' ? 'comp' : 'inc'; }
+  function grupo(p) { if (p.res) return 'reu'; if (p.marc || p.ct) return 'feitos'; if (p.ev) return 'ev'; if (p.rec) return (p.grp === 'workshop' || p.grp === 'ild') ? 'ev' : p.pt >= 70 ? 'q' : p.pt >= 50 ? 'm' : 'fr'; return p.nv ? 'mql' : p.form === 'Completo' ? 'comp' : 'inc'; }
   function ha(t) { var d = Math.floor((Date.now() - t) / 864e5); return d <= 0 ? 'hoje' : d === 1 ? 'ontem' : 'há ' + d + ' dias'; }
   function hora(t) { var d = new Date(t); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
   function nomeDe(k) { return k === 'time' ? 'Do time (Sarah e sem dono)' : (D && D.nomes && D.nomes[k]) || k.charAt(0).toUpperCase() + k.slice(1); }
@@ -147,7 +151,7 @@
       return true; });
   }
   function sair() { try { localStorage.removeItem('sdrlLink'); localStorage.removeItem('sdrlCache'); } catch (e) {} location.href = location.pathname; }
-  function lista(k) { EST.lista = k; EST.aba = k === 'rec' ? 'ev' : 'mql'; EST.de = 'todos'; EST.ver = 60; limparSem(); desenhar(); }
+  function lista(k) { EST.lista = k; EST.aba = 'ev'; EST.de = 'todos'; EST.ver = 60; limparSem(); desenhar(); }
   function limparSem() { EST.inv = EST.nota = EST.etapa = EST.idade = ''; }
   // 18/11: painel do gestor — uma ficha por pessoa (os 2 SDRs e os 2 da recuperação), com o que fez hoje, o andamento e os resultados
   function painelGestor() {
@@ -175,11 +179,12 @@
   }
   function rs(v) { return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); }
   function desenhar() {
+    if (EST.lista !== 'rec' && EST.aba === 'ev' && !D.leads.some(function(p) { return p.ev; })) EST.aba = 'mql';   // sem eventos (robô antigo): abre no MQL
     var rec = EST.lista === 'rec', L = visiveis(), G = { mql: [], comp: [], inc: [], ev: [], q: [], m: [], fr: [], reu: [], feitos: [] }; L.forEach(function(p) { G[grupo(p)].push(p); });
-    ['mql', 'comp', 'inc'].forEach(function(k) { G[k].sort(ordem); }); ['ev', 'q', 'm', 'fr'].forEach(function(k) { G[k].sort(function(a, b) { return b.pt - a.pt || b.cr - a.cr; }); });
+    ['mql', 'comp', 'inc'].forEach(function(k) { G[k].sort(ordem); }); ['ev', 'q', 'm', 'fr'].forEach(function(k) { G[k].sort(function(a, b) { return (!rec && k === 'ev') ? (b.cr - a.cr || (b.pg || 0) - (a.pg || 0) || b.pt - a.pt) : (b.pt - a.pt || b.cr - a.cr); }); });
     var quando = function(p) { return (p.marc && p.marc.em) || (p.ct && p.ct.em) || (p.res && p.res.em) || 0; };
     G.feitos.sort(function(a, b) { return quando(b) - quando(a); }); G.reu.sort(function(a, b) { return (b.res.vend - a.res.vend) || (b.res.em - a.res.em); });
-    var abertos = (rec ? ['ev', 'q', 'm', 'fr'] : ['mql', 'comp', 'inc']), pend = abertos.reduce(function(s, k) { return s + G[k].length; }, 0), hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+    var abertos = (rec ? ['ev', 'q', 'm', 'fr'] : ['ev', 'mql', 'comp', 'inc']), pend = abertos.reduce(function(s, k) { return s + G[k].length; }, 0), hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
     var trab = G.feitos.concat(G.reu), feitosHoje = trab.filter(function(p) { return quando(p) >= hoje0.getTime(); }).length, vend = G.reu.filter(function(p) { return p.res.vend; });
     var sub = 'Olá, ' + D.nome + '. ' + (D.gestor ? 'Você vê as listas do time inteiro.' : rec ? 'Esta é a sua lista de recuperação: leads que nunca fizeram reunião nem compraram.' : 'Você vê os seus leads e os do time (os da Sarah e os sem dono), que são de quem chamar primeiro.');
     document.getElementById('sub').textContent = sub;
@@ -195,9 +200,9 @@
       + '<div class="kpi v"><small>💰 Vendas</small><b>' + vend.length + '</b><span>' + (vend.length ? rs(vend.reduce(function(s, p) { return s + (p.res.valor || 0); }, 0)) : 'saídas desta lista') + '</span></div></div>';
     h += '<div class="card"><h2>Quem chamar primeiro</h2><ol class="ordem">' + (rec
       ? '<li><b>Workshop e eventos</b>Aplicou, pediu diagnóstico ou esteve no evento, e nunca fez reunião. Comece por aqui.</li><li><b>Quentes (70 pontos ou mais)</b>Quase todos responderam a alguém do time e ficaram sem retorno.</li><li><b>Mornos (50 a 69)</b>Marcaram investimento e deram algum sinal na conversa.</li><li><b>Frios</b>Só depois de zerar os de cima.</li>'
-      : '<li><b>MQL de R$ 2 mil ou mais</b>Marcou o investimento mais alto. Chame hoje, mesmo que seja antigo.</li><li><b>MQL em etapa ativa</b>Está em Base IA, Conexão ou Qualificação: a conversa ainda está aberta.</li><li><b>MQL com nota A ou B</b>Do mais novo para o mais antigo.</li><li><b>Os outros MQL</b>Marcaram investimento, mas com nota C ou D.</li><li><b>Completos sem MQL</b>Responderam tudo, sem investimento. Pela nota.</li><li><b>Incompletos</b>Não terminaram o formulário. Pela nota.</li>')
+      : '<li><b>🎓 Eventos</b>Esteve no workshop ou no ILD, aplicou ou pediu diagnóstico, e nunca fez reunião. Do evento mais recente ao mais antigo. Cada um tem uma mensagem sugerida: copie, ajuste e mande.</li><li><b>MQL de R$ 2 mil ou mais</b>Marcou o investimento mais alto. Chame hoje, mesmo que seja antigo.</li><li><b>MQL em etapa ativa</b>Está em Base IA, Conexão ou Qualificação: a conversa ainda está aberta.</li><li><b>MQL com nota A ou B</b>Do mais novo para o mais antigo.</li><li><b>Os outros MQL</b>Marcaram investimento, mas com nota C ou D.</li><li><b>Completos sem MQL</b>Responderam tudo, sem investimento. Pela nota.</li><li><b>Incompletos</b>Não terminaram o formulário. Pela nota.</li>')
       + '</ol><p class="nota" style="margin:12px 0 0">A lista já vem nesta ordem.' + (rec ? ' Os pontos somam o potencial (investimento, renda, seguidores, workshop), a resposta do lead na conversa e há quanto tempo ele chegou. O motivo aparece em cada lead.' : ' A cor da borda de cada lead mostra em qual dos passos ele está.') + '</p></div>';
-    var abas = (rec ? [['ev', '🎓 Workshop e eventos'], ['q', '🔥 Quentes'], ['m', '🟠 Mornos'], ['fr', '🔵 Frios']] : [['mql', '🔥 MQL'], ['comp', 'Completos'], ['inc', 'Incompletos']]).concat([['reu', '📅 Com reunião'], ['feitos', '✅ Abordados']]);
+    var abas = (rec ? [['ev', '🎓 Workshop e eventos'], ['q', '🔥 Quentes'], ['m', '🟠 Mornos'], ['fr', '🔵 Frios']] : [['ev', '🎓 Eventos'], ['mql', '🔥 MQL'], ['comp', 'Completos'], ['inc', 'Incompletos']]).concat([['reu', '📅 Com reunião'], ['feitos', '✅ Abordados']]);
     if (!abas.some(function(a) { return a[0] === EST.aba; })) EST.aba = abas[0][0];
     h += '<div class="abas" role="tablist">' + abas.map(function(a) { return '<button type="button" class="aba" role="tab" aria-selected="' + (EST.aba === a[0]) + '" onclick="aba(\'' + a[0] + '\')">' + a[1] + ' <small>' + G[a[0]].length + '</small></button>'; }).join('') + '</div>';
     var donos = ['todos'].concat(rec ? (D.gestor ? D.rec : []) : (D.gestor ? D.sdrs : [D.eu]).concat(['time']));
@@ -218,16 +223,17 @@
     document.getElementById('corpo').innerHTML = h;
   }
   function cartao(p) {
-    var f = p.rec ? (p.pt >= 70 ? 1 : p.pt >= 50 ? 2 : p.pt >= 30 ? 3 : 4) : faixa(p), m = p.marc, r = p.res, id = esc(p.id), nome = p.nome || 'Contato sem nome', feito = !!(m || p.ct || r);
-    var tags = (p.rec ? '<span class="tag inv">⭐ ' + p.pt + ' pontos</span>' : '') + (p.nv ? '<span class="tag ' + (p.nv >= 3 ? 'alto' : 'inv') + '">🔥 ' + FX[p.nv] + '</span>' : '') + (p.nota ? '<span class="tag nota">Nota ' + esc(p.nota) + '</span>' : '')
+    var f = p.ev ? 1 : p.rec ? (p.pt >= 70 ? 1 : p.pt >= 50 ? 2 : p.pt >= 30 ? 3 : 4) : faixa(p), m = p.marc, r = p.res, id = esc(p.id), nome = p.nome || 'Contato sem nome', feito = !!(m || p.ct || r);
+    var tags = (p.ev ? '<span class="tag alto">🎓 ' + esc(p.evn || 'Evento') + '</span>' + (p.pg ? '<span class="tag inv">pagou a aplicação</span>' : '') : '') + (p.rec ? '<span class="tag inv">⭐ ' + p.pt + ' pontos</span>' : '') + (p.nv ? '<span class="tag ' + (p.nv >= 3 ? 'alto' : 'inv') + '">🔥 ' + FX[p.nv] + '</span>' : '') + (p.nota ? '<span class="tag nota">Nota ' + esc(p.nota) + '</span>' : '')
       + (r ? '<span class="tag ' + (r.vend ? 'ok' : r.comp ? 'nota' : 'inv') + '">' + (r.vend ? '💰 comprou · ' + rs(r.valor) : r.comp ? '✅ compareceu · ' + esc(r.st) : /no.?show/i.test(r.st) ? '🚫 faltou à reunião' : '📅 reunião marcada') + '</span>' : '')
       + (m ? '<span class="tag ok">' + (m.tipo === 'jatinha' ? '🔎 já tinha abordado' : '✅ abordado') + ' · ' + esc(m.quem) + '</span>' : p.ct ? '<span class="tag ok">💬 chamado pela Clint' + (p.ct.por ? ' · ' + esc(p.ct.por) : '') + '</span>' : '');
     var links = (p.lc ? '' : '<a class="b cl" href="' + CLINT + encodeURIComponent(p.id) + '" target="_blank" rel="noopener">Clint ↗</a>') + '<a class="b cl" href="' + LEADC + encodeURIComponent(p.id) + '" target="_blank" rel="noopener">Lead Center ↗</a>';
     var acao = m ? '<button type="button" class="b des" onclick="marcar(this,\'' + id + '\',\'desfazer\')">Desfazer</button>' : (p.ct || r) ? '' : '<button type="button" class="b ab" onclick="marcar(this,\'' + id + '\',\'abordei\')">✅ Abordei</button><button type="button" class="b" onclick="marcar(this,\'' + id + '\',\'jatinha\')" title="Você já tinha falado com o lead e não apareceu aqui">🔎 Já tinha abordado</button>';
     return '<div class="lead ' + (feito ? 'feito' : 't' + Math.min(f, 5)) + '"><div class="lead-n" role="button" tabindex="0" onclick="ficha(\'' + id + '\')" onkeydown="if(event.key===\'Enter\')ficha(\'' + id + '\')" title="Clique para ver como o lead preencheu o formulário"><b>' + esc(nome) + '</b>' + tags + '<span class="ver">' + (ABERTAS[p.id] ? '▴ fechar' : '▾ ver respostas') + '</span></div><div class="lead-a">' + links + acao + '</div>'
-      + '<div class="lead-f"><span>👤 ' + esc(p.dono === 'time' ? (p.resp ? p.resp.split(' ')[0] + ' · do time' : 'sem dono · do time') : nomeDe(p.dono)) + '</span><span>📍 ' + esc(p.etapa || '—') + '</span><span>📝 ' + esc(p.form || '—') + '</span><span>📅 chegou ' + ha(p.cr) + '</span>'
+      + '<div class="lead-f"><span>👤 ' + esc(p.dono === 'time' ? (p.resp ? p.resp.split(' ')[0] + ' · do time' : 'sem dono · do time') : nomeDe(p.dono)) + '</span><span>📍 ' + esc(p.etapa || '—') + '</span><span>📝 ' + esc(p.form || '—') + '</span><span>' + (p.ev ? '🎓 evento ' + ha(p.cr) : '📅 chegou ' + ha(p.cr)) + '</span>'
       + (r ? '<span>🗓 reunião ' + new Date(r.em).toLocaleDateString('pt-BR') + (r.closer ? ' · ' + esc(r.closer) : '') + '</span>' : '') + (m && m.em ? '<span>marcado em ' + hora(m.em) + '</span>' : p.ct && p.ct.em ? '<span>chamado em ' + hora(p.ct.em) + '</span>' : '') + '</div>'
-      + (p.rec && p.mot ? '<div class="lead-f" style="color:var(--text)">💡 ' + esc(p.mot) + '</div>' : '') + (ABERTAS[p.id] ? fichaHtml(p) : '') + '</div>';
+      + ((p.rec || p.ev) && p.mot ? '<div class="lead-f" style="color:var(--text)">💡 ' + esc(p.mot) + '</div>' : '')
+      + (p.ev && !feito ? roteiroHtml(p) : '') + (ABERTAS[p.id] ? fichaHtml(p) : '') + '</div>';
   }
   function gerarLink(k) {
     var bx = document.getElementById('linkBox'); bx.innerHTML = '<p class="nota">Gerando o link…</p>';
@@ -237,6 +243,41 @@
       bx.innerHTML = '<div class="ficha" style="border:0;padding-top:12px"><div style="grid-column:1/-1"><small>Link pessoal de ' + esc(d.nome) + ' · abre a lista dela(e) sem entrar no dash</small><span id="lkTxt">' + esc(d.link) + '</span></div><p><button type="button" class="b ab" onclick="copiar()">Copiar link</button> &nbsp;O link só aparece agora: copie e mande para ' + esc(d.nome) + '. Gerar de novo troca o link e o antigo para de funcionar.</p></div>';
     }, function() { bx.innerHTML = '<p class="nota">Não consegui falar com o robô.</p>'; });
   }
+  // 18/11 (Bruno: "em todos eles sugira uma abordagem" · "coloque na lista a abordagem que deve ser feita com cada um até a marcação, bem
+  // persuasiva e baseada no nosso passo a passo"): roteiro do Manual do SDR (abertura · estrutura e objetivo · desafio · já investiu · por que
+  // agora · vender a reunião · investimento com zelo · decisor ANTES do horário · 2 horários · confirmação), adaptado ao que o lead fez no evento.
+  var ROT = {};
+  function pnome(n) { var w = String(n || '').trim().split(/\s+/)[0] || ''; return /^[A-Za-zÀ-ÿ]{2,}$/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ''; }
+  function roteiro(p) {
+    var nm = pnome(p.nome), oi = 'Graça e paz' + (nm ? ', ' + nm : '') + '! 🙌', quem = D.gestor ? nomeDe(p.dono) : (D.nome || nomeDe(p.dono)), eu = 'aqui é ' + quem + ', da equipe do João Stecca 😊';
+    var ev = p.evn || 'workshop', ild = p.grp === 'ild' || /ILD/.test(ev), mot = String(p.mot || ''), pag = !!p.pg, apl = /aplicou/.test(mot);
+    var ab = ild ? 'você esteve com a gente no ' + ev.replace(/ \(.*\)/, '') + ', que alegria ter você lá! como está o seu projeto desde então?\nquero te oferecer um diagnóstico gratuito do seu perfil com um especialista, pra você enxergar o próximo passo com clareza. posso te fazer umas perguntas rápidas? 2 minutinhos no máximo 😊'
+      : pag ? 'vi que você esteve no ' + ev + ' e garantiu a sua aplicação pra conversar com a gente, e essa conversa acabou não acontecendo 🙏\nnão quero que você fique sem ela! posso te fazer umas perguntas rápidas pra já deixar tudo certo? 2 minutinhos no máximo 😊'
+      : apl ? 'vi que depois do ' + ev + ' você aplicou pra conversar com a gente, que bênção! essa conversa ainda não aconteceu e eu quero te garantir esse horário.\nposso te fazer umas perguntas rápidas? 2 minutinhos no máximo 😊'
+      : 'no ' + ev + ' você pediu o diagnóstico gratuito do seu Instagram, e ele ficou pendente do nosso lado. me desculpa a demora 🙏\nquero organizar ele pra você agora. posso te fazer umas perguntas rápidas? 2 minutinhos no máximo 😊';
+    var fx = { 4: 'R$ 3 a 4 mil por mês', 3: 'R$ 2 a 3 mil por mês', 2: 'R$ 500 a 1 mil por mês', 1: 'R$ 500 por mês' }[p.nv], lugar = ild ? 'no evento' : 'no workshop';
+    return [
+      ['1 · Abertura', oi + '\n' + eu + '\n' + ab, 'Gatilho do compromisso: foi ' + (nm || 'o lead') + ' quem ' + (ild ? 'foi ao evento' : pag ? 'pagou a aplicação' : apl ? 'aplicou' : 'pediu o diagnóstico') + '. Lembre isso com leveza, sem cobrar. Se disser "tô sem tempo": "Amém, entendo a correria! É rapidinho. Prefere agora ou te chamo num horário melhor?"'],
+      ['2 · Estrutura e objetivo', 'Que bênção! 🙌\nme conta um pouco da sua jornada: como tá sua estrutura hoje no digital? você já vende alguma coisa?\n(pode responder por escrito ou me mandar um áudio 🎙️ fica à vontade!)', 'Depois da resposta: "e qual é o seu principal objetivo agora, depois do que você viu ' + lugar + '?" Se vier vago ("crescer"): "Crescer é faturar mais, ter mais clientes ou cobrar melhor pelo seu trabalho?" 🟢 já vende + quer faturar.'],
+      ['3 · O maior desafio', 'Poxa, entendi... 🙏\ne hoje, o que mais tá te travando pra viver esse chamado por completo?', 'Aprofunde: "Isso já te trava há quanto tempo?" Se minimizar: "E se continuasse do mesmo jeito por mais um ano, como você se sentiria?" 🟢 assume a própria parte ("sei o conteúdo, não sei o como").'],
+      ['4 · Já investiu?', 'E você, além ' + (ild ? 'do evento' : 'do workshop') + ', já investiu ou investe de algum jeito pra alcançar esse objetivo? como tem sido essa caminhada até aqui?', 'Ele já investiu em vocês: isso mostra caixa e mentalidade. Se disser "já gastei e me arrependi": "Poxa, entendo. E o que faltou lá? Saber isso ajuda a não repetir o erro."'],
+      ['5 · Por que agora?', 'E por que você sente que é agora, e não daqui uns 6 meses? o que você viu ' + lugar + ' que fez isso virar prioridade aí no seu coração?', 'O que ele viu no evento é a ponte: traga a emoção de lá para hoje. Se "não é tão urgente": "O que precisaria acontecer pra virar prioridade de verdade?" Urgência baixa = nutrir, não agendar.'],
+      ['6 · Vender a reunião', 'Amei' + (nm ? ', ' + nm : '') + '! Faz total sentido você passar pelo diagnóstico. deixa eu te explicar como funciona, tá? 🙏\no especialista faz um diagnóstico bem profundo do seu momento: ele analisa os 5 pontos pra você se tornar uma referência no digital (autoridade, audiência qualificada, engenharia de leads, métricas e faturamento), mostra onde você tá travado e por quê, e o que fazer pra destravar.', 'Logo em seguida, mande o case com print ou vídeo (use um case real). Toda pergunta sobre o programa: "Ótima pergunta, é exatamente isso que o especialista vai destrinchar com você lá dentro."'],
+      ['7 · Investimento, com zelo', 'e olha, como o nosso objetivo é te ajudar de verdade, no final, se fizer sentido pros dois, a gente te apresenta um dos nossos programas 🙏\nsó pra eu já te direcionar certo e sem nenhum compromisso: os programas ficam numa faixa de R$2 a 4 mil por mês. hoje isso caberia pra você, ou tá mais apertado?', (fx ? 'No formulário marcou ' + fx + '. ' : '') + 'O manual pede: de preferência por áudio ou ligação, nunca o valor seco. Se travar, desça um degrau por vez: "É fluxo de caixa agora ou tá fora da realidade?" → R$1.500 a 2.000 → R$500 a 1.500. Se perguntar "não era grátis?": "O diagnóstico é 100% gratuito! Pergunto só pra não te apresentarem algo fora da sua realidade. É zelo com o seu momento."'],
+      ['8 · Decisor, antes do horário', 'Deixa eu te perguntar uma coisa' + (nm ? ', ' + nm : '') + ':\nquando é uma decisão importante, tipo investir ou dar um passo grande, você costuma decidir sozinho(a)? ou tem alguém que decide junto com você (tipo esposo(a), sócio)?', 'Se decide junto: "Ai que sabedoria decidir junto, viu 🙏 então o ideal é [ele/ela] participar com você, aí vocês entendem tudo na mesma hora. Consegue chamar [ele/ela] pra estar junto?" Com o decisor na reunião, 50% compram; sem ele, 8%.'],
+      ['9 · Horário (sempre 2 opções)', 'Perfeito! pra você (e [decisor]), fica melhor [dia] às 10h ou [dia] às 14h15? 😊', 'Nunca pergunte "quando você pode?". Se "depois vejo minha agenda": "Posso já deixar reservado sem compromisso, e você remarca comigo numa boa? Prefere [C] ou [D]?"'],
+      ['10 · Confirmação', 'Fechado, [dia] às [hora]! 🙌 é por vídeo, pelo computador ou tablet (o celular atrapalha), e dura mais ou menos 1h40. separa um lugar tranquilo e sem pressa (com [decisor] junto), tá? me confirma aqui que anotou certinho? 🙂', 'Peça o "ok": é o 1º micro-compromisso e corta a falta. Programe na Clint os lembretes de 1 dia antes e de 1 a 2 horas antes, com o link.']
+    ];
+  }
+  function roteiroHtml(p) {
+    var id = esc(p.id), R = roteiro(p), ab = !!ROT[p.id];
+    var h = '<div class="abd"><small>💬 1ª mensagem sugerida</small><p id="abd-' + id + '-0">' + esc(R[0][1]) + '</p><div class="abd-b"><button type="button" class="b" onclick="copiarMsg(\'' + id + '-0\', this)">Copiar mensagem</button><button type="button" class="b" onclick="verRot(\'' + id + '\')">' + (ab ? '▴ fechar o roteiro' : '📋 Roteiro até a marcação') + '</button></div>';
+    if (ab) h += '<ol class="rot">' + R.map(function(x, i) { return '<li><b>' + esc(x[0]) + '</b>' + (i ? '<p id="abd-' + id + '-' + i + '">' + esc(x[1]) + '</p><button type="button" class="b" onclick="copiarMsg(\'' + id + '-' + i + '\', this)">Copiar</button>' : '<p class="dic">A 1ª mensagem está acima.</p>') + '<p class="dic">💡 ' + esc(x[2]) + '</p></li>'; }).join('') + '</ol><p class="dic">Uma mensagem de cada vez: espere a resposta antes da próxima. Se faltar tração ou urgência, corte com gentileza: "Acho mais honesto a gente se falar mais pra frente. Posso te mandar conteúdos e retomar na hora certa? Deus abençoe! 🙏"</p>';
+    return h + '</div>';
+  }
+  function verRot(id) { if (ROT[id]) delete ROT[id]; else ROT[id] = 1; desenhar(); }
+  function copiarMsg(id, bt) { var el = document.getElementById('abd-' + id); if (!el) return; var t = el.textContent, o = bt.textContent, ok = function() { bt.textContent = '✅ Copiada'; setTimeout(function() { bt.textContent = o; }, 2000); };
+    try { navigator.clipboard.writeText(t).then(ok, function() { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }); } catch (e) {} }
   function copiar() { var t = document.getElementById('lkTxt').textContent; try { navigator.clipboard.writeText(t); } catch (e) {} }
   function fichaHtml(p) {
     var f = FICHAS[p.id];
