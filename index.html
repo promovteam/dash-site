@@ -2996,7 +2996,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-18-1700';
+var VERSAO_DASH = '2026-11-19-1000';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -14144,6 +14144,368 @@ function ldAtual(l) {   // versao mais nova do mesmo lead (a planilha e relida a
   for (var k = 0; k < (LD.rows || []).length; k++) if (LD.rows[k].tel8 === l.tel8) return LD.rows[k];
   return l;
 }
+
+// ===== 🧭 CAMINHO DO LEAD (18/11/2026) =====
+function ldJornadaEventos(l) {
+  var ev = [], vistos = {};
+  var add = function(d, tipo, txt, det, fun) {
+    var t = d instanceof Date ? d.getTime() : (typeof d === 'number' ? d : (d ? new Date(d).getTime() : NaN));
+    if (!t || isNaN(t)) return;
+    var k = new Date(t).toDateString() + '|' + tipo + '|' + txt; if (vistos[k]) return; vistos[k] = 1;
+    ev.push({ t: t, tipo: tipo, txt: txt, det: det || '', f: fun || '' });
+  };
+  try {
+    var forms = [l._esteAqui || { date: l.date, origem: l.origem, anuncio: l.anuncio, invest: l.invest }].concat(l.outrasVezes || []);
+    forms.forEach(function(v) {
+      var an = v.anuncio ? ldAnuncioLimpo(v.anuncio) : '';
+      var br = String(v.origem || '') + ' ' + an;
+      var pago = /\[ads\]|\bads?\d|paid|advsl|ads_|campanha/i.test(br) || (!!an && !/\[org\]|mchat|manychat|bio|organic/i.test(br));
+      add(v.date, pago ? 'pago' : 'organico', '🧾 Preencheu o formulário' + (v.invest ? ' · ' + v.invest : ''),
+        (an ? '📣 ' + an : '') + (v.origem ? (an ? ' · ' : '') + '🧲 ' + v.origem : ''), ldFunilDe(br, pago));
+    });
+  } catch (eF) {}
+  try {
+    var p = igPedidoDoLead(l);
+    if (p && p.quando) add(new Date(p.quando), 'organico', '💬 Comentou pedindo diagnóstico no Instagram' + (p.vezes > 1 ? ' (' + p.vezes + ' vezes)' : ''), p.post ? '<a href="' + p.post + '" target="_blank" style="color:#3ddc97;">abrir o post ↗</a>' : '', 'Comentário');
+  } catch (eP) {}
+  try {
+    var ultEv_ = '';
+    wsCaminho(l.tel).forEach(function(e) {
+      if (/^🧾/.test(e.t)) return;   // os formulários já entram acima, com o anúncio
+      var ev_ = /^📅/.test(e.t) ? (/vendid/i.test(e.t) ? 'venda' : 'reuniao') : 'evento';
+      if (ev_ === 'evento') ultEv_ = /imers/i.test(e.t) ? 'ILD presencial' : /workshop/i.test(e.t) ? 'Workshop' : (ultEv_ || 'Workshop');   // aplicação e pesquisa seguem o evento delas
+      add(e.d, ev_, e.t, '', ev_ === 'evento' ? ultEv_ : '');
+    });
+  } catch (eW) {}
+  try {
+    var c = tcInfoDe(l);
+    if (c) {
+      if (c.ia) add(c.ia, 'contato', '🤖 A IA falou com o lead', c.respondeuIa ? 'ele respondeu' : 'sem resposta');
+      if (c.humano) add(c.humano, 'contato', '📞 Primeiro contato humano', c.humanoPor || c.dono || '');
+    }
+  } catch (eC) {}
+  // 19/11/2026 (Bruno, no caso do Diego: "neste caso não é ILD? já que foi por onde ele veio por último"): formulário orgânico
+  // preenchido do 1º dia do evento até 15 dias depois do 2º dia (a mesma janela do workshop) conta para o EVENTO, não para o orgânico.
+  try {
+    var xw = WSL.porTel[ldTel8(l.tel)];
+    if (xw && xw.d1 instanceof Date) {
+      var iniE = new Date(xw.d1.getFullYear(), xw.d1.getMonth(), xw.d1.getDate()).getTime(), fimE = ((xw.d2 instanceof Date ? xw.d2 : xw.d1).getTime()) + 16 * 864e5;
+      var nomeE = xw.prog === 'ILD' ? 'ILD presencial' : 'Workshop', oque = xw.prog === 'ILD' ? 'na imersão' : 'no workshop';
+      ev.forEach(function(e) { if (e.tipo === 'organico' && /^🧾/.test(e.txt) && e.t >= iniE && e.t <= fimE) { e.f = nomeE; e.tipo = 'evento'; e.det = '🎓 preenchido ' + oque + ' · conta para ' + nomeE + (e.det ? ' · ' + e.det : ''); e.doEvento = nomeE; } });
+    }
+  } catch (eJ) {}
+  ev.sort(function(a, b) { return a.t - b.t; });
+  return ev;
+}
+// o funil de um toque (a mesma régua da aba Gestão de funis: [Org][Diag] = link na bio e orgânico direto)
+function ldFunilDe(br, pago) {
+  var b = String(br || '').toLowerCase();
+  if (/ild|imers|central legado/.test(b)) return 'ILD presencial';
+  if (/wld|workshop/.test(b)) return 'Workshop';
+  if (/mchat|manychat/.test(b)) return 'Comentário';
+  if (/social|\bss\b/.test(b)) return 'Social Selling';
+  if (pago) return 'Tráfego pago';
+  return 'Orgânico / link na bio';
+}
+var LD_FUN_COR = { 'Tráfego pago': '#6ea8ff', 'Comentário': '#3ddc97', 'Orgânico / link na bio': '#8ef0c6', 'Workshop': '#f6a350', 'ILD presencial': '#ff8fc0', 'Social Selling': '#b98aff' };
+function ldFaixaFunis(l, ev, venda) {
+  var seq = [];
+  ev.forEach(function(e) { if (e.f && (!venda || e.t <= venda.t) && seq[seq.length - 1] !== e.f) seq.push(e.f); });
+  if (!seq.length) return '';
+  var conta = '';
+  try { var t8 = ldTel8(l.tel); (V2.rows || []).forEach(function(r) { if (r.sn === 'vendido' && ldTel8(r.telefone) === t8 && r.origem) conta = r.origem; }); } catch (e) {}
+  var pill = function(f) { var c = LD_FUN_COR[f] || '#9aa3b2'; return '<span style="padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:800;color:' + c + ';background:' + c + '1f;border:1px solid ' + c + '55;white-space:nowrap;">' + f + '</span>'; };
+  var seta = '<span style="color:var(--muted);font-size:.8rem;">→</span>';
+  return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;padding:10px;border-radius:12px;background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.12);">'
+    + '<span style="font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;font-weight:800;color:var(--muted);margin-right:4px;">Funis por onde passou</span>'
+    + seq.map(pill).join(seta)
+    + (venda ? seta + '<span style="padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:900;color:#0b1a12;background:#3ddc97;white-space:nowrap;">💰 Venda' + (conta ? ' · contada em ' + String(conta).replace(/</g, '&lt;') : '') + '</span>' : '')
+    + '</div>';
+}
+function ldJornadaHtml(l) {
+  var ev = ldJornadaEventos(l); if (!ev.length) return '';
+  var COR = { pago: '#6ea8ff', organico: '#3ddc97', contato: '#b98aff', evento: '#f6a350', reuniao: '#ffd166', venda: '#3ddc97' };
+  var NOME = { pago: 'anúncio', organico: 'orgânico', contato: 'contato', evento: 'evento', reuniao: 'reunião', venda: 'venda' };
+  var dt = function(t) { var d = new Date(t); return d.toLocaleDateString('pt-BR').slice(0, 5) + (d.getFullYear() !== new Date().getFullYear() ? '/' + String(d.getFullYear()).slice(2) : '') + ' ' + ('0' + d.getHours()).slice(-2) + 'h' + ('0' + d.getMinutes()).slice(-2); };
+  var agora = Date.now();
+  var toques = ev.filter(function(e) { return e.t <= agora && (e.tipo === 'pago' || e.tipo === 'organico' || (e.tipo === 'evento' && (/ingresso/i.test(e.txt) || e.doEvento))); });
+  var venda = ev.filter(function(e) { return e.tipo === 'venda'; })[0];
+  var antes = venda ? toques.filter(function(e) { return e.t <= venda.t; }) : toques;
+  var p1 = antes[0], ult = antes[antes.length - 1];
+  var fim = venda ? venda.t : Date.now(), dias = p1 ? Math.max(0, Math.round((fim - p1.t) / 864e5)) : null;
+  var chip = function(rot, val, cor) { return '<div style="flex:1;min-width:140px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);"><div style="font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;">' + rot + '</div><div style="font-size:.78rem;font-weight:800;margin-top:2px;' + (cor ? 'color:' + cor + ';' : '') + '">' + val + '</div></div>'; };
+  var cortar = function(x) { x = String(x || '').replace(/<[^>]+>/g, ''); return x.length > 46 ? x.slice(0, 44) + '…' : x; };
+  var h = '<div class="fs-pag" style="margin-top:0;margin-bottom:14px;">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><div class="g-label" style="margin:0;">🧭 Caminho do lead</div><span class="hint">' + ev.length + ' passos' + (toques.length > 1 ? ' · ' + toques.length + ' toques de marketing' : '') + '</span></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+    + chip('Primeiro toque', p1 ? cortar(p1.det || p1.txt) : '—', p1 ? COR[p1.tipo] : '')
+    + chip(venda ? 'Último toque antes da venda' : 'Último toque', ult ? (ult.doEvento ? '🎓 ' + ult.doEvento + ' (formulário no evento)' : cortar(ult.det || ult.txt)) : '—', ult ? COR[ult.tipo] : '')
+    + chip(venda ? 'Do 1º toque à venda' : 'Desde o 1º toque', dias == null ? '—' : dias + (dias === 1 ? ' dia' : ' dias'), venda ? '#3ddc97' : '')
+    + '</div>' + ldFaixaFunis(l, ev, venda) + '<div style="position:relative;padding-left:18px;">'
+    + '<div style="position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:rgba(255,255,255,.12);border-radius:2px;"></div>';
+  ev.forEach(function(e) {
+    var c = COR[e.tipo] || '#9aa3b2';
+    h += '<div style="position:relative;margin-bottom:9px;">'
+      + '<span style="position:absolute;left:-17px;top:4px;width:10px;height:10px;border-radius:50%;background:' + c + ';box-shadow:0 0 0 3px rgba(0,0,0,.25);"></span>'
+      + '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;"><span class="hint" style="min-width:74px;font-variant-numeric:tabular-nums;">' + dt(e.t) + '</span>'
+      + '<b style="font-size:.76rem;">' + e.txt + '</b>'
+      + '<span class="ld-tag" style="background:' + c + '1f;color:' + c + ';">' + NOME[e.tipo] + '</span></div>'
+      + (e.det ? '<div class="hint" style="margin:2px 0 0 82px;line-height:1.45;">' + e.det + '</div>' : '')
+      + '</div>';
+  });
+  return h + '</div></div>';
+}
+var LD_FICHA_GRUPOS = [
+  ['📇 Contato', ['WhatsApp', 'Instagram', 'E-mail']],
+  ['🏅 Perfil e qualificação', ['Nota de qualificação', 'Quanto pode investir', 'Fonte de renda hoje', 'Objetivos', 'Seguidores', 'Link na bio', 'Score', 'Diagnóstico']],
+  ['🧲 De onde veio', ['Origem', 'Anúncio que trouxe', 'Conjunto de anúncios', 'Campanha', 'Veio por', 'Página de origem', 'Preencheu o formulário']],
+  ['⏱ Atendimento', ['Chegou em', 'Tempo até o contato', 'Agente de IA (GPT Maker)', 'Workshop']]
+];
+function ldFichaGrupos(campos) {
+  var usados = {}, h = '';
+  var linha = function(c) { var v = c[3] === 'html' ? String(c[2]) : String(c[2]).replace(/</g, '&lt;'); return '<div class="fs-calc-linha"><span>' + c[0] + ' ' + c[1] + '</span><b style="text-align:right;max-width:62%;">' + v + '</b></div>'; };
+  var bloco = function(tit, cs) { if (!cs.length) return ''; return '<div style="margin-top:12px;"><div style="font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;font-weight:800;color:var(--muted);margin-bottom:2px;">' + tit + '</div>' + cs.map(linha).join('') + '</div>'; };
+  LD_FICHA_GRUPOS.forEach(function(g) {
+    var cs = campos.filter(function(c) { return g[1].indexOf(c[1]) !== -1 && !usados[c[1]]; });
+    cs.forEach(function(c) { usados[c[1]] = 1; });
+    h += bloco(g[0], cs);
+  });
+  h += bloco('📌 Outros', campos.filter(function(c) { return !usados[c[1]]; }));
+  return h;
+}
+// ===== 🗂 FICHA DA REUNIÃO EM ABAS (19/11/2026) =====
+// Bruno, vendo a ficha: "está bagunçado, como seria a melhor forma?" → aprovou o desenho do exemplo ("pode aplicar"):
+// uma coluna só · topo com o resumo (situação, valor, produto, closer, data) · faixa do caminho sempre à vista ·
+// abas Resumo | Caminho | Formulário | Pagamento | Anotações · botões secundários atrás de "⋯ Mais" · cada dado uma vez só.
+// Não muda conta nem gravação: só arruma na tela os mesmos blocos que a ficha já desenhava.
+var FV2 = { aba: 'resumo', mais: false, obs: null, t: 0 };
+(function() {
+  var st = document.createElement('style'); st.id = 'fv2-css';
+  st.textContent = ''
+    + '#modal-lead .modal.fv2{display:block!important;width:min(920px,94vw)!important;}'
+    + '#modal-lead .modal.fv2>[data-fv2]{margin-top:14px;}'
+    + '#modal-lead .modal.fv2>[data-fv2][hidden]{display:none!important;}'
+    + '#fv2-res{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:4px;font-size:.8rem;color:var(--muted);}'
+    + '#fv2-res b{color:var(--text);} #fv2-res .st{padding:1px 10px;border-radius:999px;font-size:.72rem;font-weight:900;}'
+    + '#fv2-faixa{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 12px;margin-top:12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.12);}'
+    + '#fv2-faixa>small{font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;font-weight:900;color:var(--muted);margin-right:4px;}'
+    + '#fv2-faixa .dias{margin-left:auto;font-size:.72rem;color:var(--muted);} #fv2-faixa .dias b{color:#3ddc97;}'
+    + '#fv2-abas{display:flex;gap:2px;margin-top:12px;border-bottom:1px solid var(--border);overflow-x:auto;position:sticky;top:0;z-index:3;background:var(--panel,#14171d);}'
+    + '#fv2-abas button{font:inherit;font-size:.8rem;font-weight:800;padding:11px 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;}'
+    + '#fv2-abas button.on{color:var(--text);border-bottom-color:var(--accent);}'
+    + '#fv2-abas button i{font-style:normal;font-size:.62rem;opacity:.7;margin-left:4px;}'
+    + '.fv2:not(.fv2-mais) .fl-atalhos>button:not(.ficha),.fv2:not(.fv2-mais) #fl-apres,.fv2:not(.fv2-mais) #fl-prop-st{display:none!important;}'
+    + '#fv2-mais{margin-left:auto;font:inherit;font-size:.7rem;font-weight:800;padding:4px 12px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);cursor:pointer;}'
+    + '.fv2 #lead-info{grid-template-columns:repeat(3,minmax(0,1fr));}'
+    + '.fv2 #lead-info .dtl-line[data-k="produto"],.fv2 #lead-info .dtl-line[data-k="telefone"],.fv2 #lead-info .dtl-line[data-k="nome"]{grid-column:auto;}'
+    + '.fv2 #fl-formulario .dtl-line.fv2-rep{display:none;}'
+    + '.fv2-alerta{font-size:.76rem;padding:8px 12px;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);color:#ffb3b3;margin-bottom:10px;}'
+    + '@media (max-width:640px){.fv2 #lead-info{grid-template-columns:1fr 1fr;} #fv2-faixa .dias{margin-left:0;width:100%;}}';
+  document.head.appendChild(st);
+})();
+function fv2Aba(a) {
+  FV2.aba = a;
+  var m = document.querySelector('#modal-lead .modal'); if (!m) return;
+  [].forEach.call(m.querySelectorAll(':scope > [data-fv2]'), function(el) { el.hidden = el.getAttribute('data-fv2') !== a || el.getAttribute('data-vazio') === '1'; });
+  [].forEach.call(m.querySelectorAll('#fv2-abas button'), function(b) { b.classList.toggle('on', b.getAttribute('data-a') === a); });
+}
+function fv2Mais() { FV2.mais = !FV2.mais; var m = document.querySelector('#modal-lead .modal'); if (m) m.classList.toggle('fv2-mais', FV2.mais); var b = document.getElementById('fv2-mais'); if (b) b.textContent = FV2.mais ? '✕ Menos' : '⋯ Mais'; }
+function fv2Arrumar() {
+  var m = document.querySelector('#modal-lead .modal'); if (!m) return;
+  var r = _v2reg[_fichaAtual]; if (!r) return;
+  m.classList.add('fv2'); m.classList.toggle('fv2-mais', FV2.mais);
+  var head = m.querySelector('.modal-head'), form = document.getElementById('fl-formulario');
+  // ---- topo: resumo numa linha (situação · valor · produto · closer · data)
+  var sub = document.getElementById('fl-sub');
+  if (sub) [].forEach.call(sub.childNodes, function(n) { if (n.nodeType === 3) n.nodeValue = ''; });
+  var res = document.getElementById('fv2-res');
+  if (!res && sub) { res = document.createElement('div'); res.id = 'fv2-res'; sub.parentNode.insertBefore(res, sub); }
+  if (res) {
+    var sn = r.sn || '', cor = sn === 'vendido' ? ['#3ddc97', '#0b1a12'] : sn === 'entrada' || sn.indexOf('bloqueio') !== -1 ? ['#ffd166', '#191204'] : /no show|nao vendido|estorno/.test(sn) ? ['#ff6b6b', '#1a0a0a'] : ['#6ea8ff', '#06101f'];
+    var e = function(t) { return String(t || '').replace(/</g, '&lt;'); };
+    res.innerHTML = '<b class="st" style="background:' + cor[0] + ';color:' + cor[1] + ';">' + e(r.status || 'sem status') + '</b>'
+      + (r.valor ? '<b style="color:#3ddc97;">' + v2moeda(r.valor) + '</b>' : '') + (r.produto ? '<span>' + e(r.produto) + '</span>' : '')
+      + (r.closer ? '<span>Closer <b>' + e(r.closer) + '</b></span>' : '') + (r.date ? '<span>Reunião <b>' + r.date.toLocaleDateString('pt-BR').slice(0, 5) + '</b></span>' : '');
+  }
+  // ---- botões: os de uso diário ficam; o resto vai para "⋯ Mais"
+  if (res && !document.getElementById('fv2-mais')) { var bm = document.createElement('button'); bm.type = 'button'; bm.id = 'fv2-mais'; bm.title = 'Copiar dados · Link de cadastro · Proposta · Apresentação'; bm.textContent = FV2.mais ? '✕ Menos' : '⋯ Mais'; bm.onclick = function(ev) { ev.stopPropagation(); fv2Mais(); }; res.appendChild(bm); }
+  // ---- o caminho sai de dentro do formulário e ganha a aba dele; a faixa dos funis fica sempre à vista
+  var pc = document.getElementById('fv2-caminho');
+  if (!pc) { pc = document.createElement('div'); pc.id = 'fv2-caminho'; pc.setAttribute('data-fv2', 'caminho'); m.insertBefore(pc, form); }
+  var cam = form && form.querySelector('#fl-caminho'); if (cam) { pc.innerHTML = ''; pc.appendChild(cam); }
+  pc.setAttribute('data-vazio', pc.children.length ? '0' : '1');
+  var fx = document.getElementById('fv2-faixa'), l = flLeadDaReuniao(r), hf = '';
+  try {
+    var ev = ldJornadaEventos(l), venda = ev.filter(function(x) { return x.tipo === 'venda'; })[0], seq = [];
+    ev.forEach(function(x) { if (x.f && (!venda || x.t <= venda.t) && seq[seq.length - 1] !== x.f) seq.push(x.f); });
+    var p1 = ev.filter(function(x) { return x.f; })[0];
+    if (seq.length) {
+      var pill = function(f) { var c = LD_FUN_COR[f] || '#9aa3b2'; return '<span style="padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:800;color:' + c + ';background:' + c + '1f;border:1px solid ' + c + '55;white-space:nowrap;">' + f + '</span>'; };
+      var seta = '<span style="color:var(--muted);font-size:.75rem;">→</span>';
+      hf = '<small>Caminho</small>' + seq.map(pill).join(seta) + (venda ? seta + '<span style="padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:900;color:#0b1a12;background:#3ddc97;">💰 Venda</span>' : '')
+        + (p1 ? '<span class="dias"><b>' + Math.max(0, Math.round(((venda ? venda.t : Date.now()) - p1.t) / 864e5)) + ' dias</b> ' + (venda ? 'do 1º toque à venda' : 'desde o 1º toque') + '</span>' : '');
+    }
+  } catch (eF) {}
+  if (!fx) { fx = document.createElement('div'); fx.id = 'fv2-faixa'; fx.style.cursor = 'pointer'; fx.title = 'Ver o caminho completo'; fx.onclick = function() { fv2Aba('caminho'); }; head.parentNode.insertBefore(fx, head.nextSibling); }
+  fx.innerHTML = hf; fx.style.display = hf ? '' : 'none';
+  // ---- pagamento: sai do meio do formulário e ganha a aba dele
+  var pp = document.getElementById('fv2-pag');
+  if (!pp) { pp = document.createElement('div'); pp.id = 'fv2-pag'; pp.className = 'dtl-card'; pp.setAttribute('data-fv2', 'pag'); m.insertBefore(pp, form.nextSibling); }
+  var pg = null; if (form) [].forEach.call(form.querySelectorAll('.g-label'), function(g) { if (/Pagamento/.test(g.textContent)) pg = g.parentNode; });
+  if (pg) {
+    pp.innerHTML = ''; pp.appendChild(pg);
+    try { var ff = ''; [].forEach.call(pg.querySelectorAll('.dtl-line'), function(d) { if (/Forma/.test((d.firstElementChild || {}).textContent || '')) ff = (d.querySelector('b') || {}).textContent || ''; });
+      if (ff && r.forma && v2norm(ff) !== v2norm(r.forma)) pp.insertAdjacentHTML('afterbegin', '<div class="fv2-alerta">⚠️ A planilha de vendas diz “' + String(r.forma).replace(/</g, '&lt;') + '” e o formulário de venda diz “' + String(ff).replace(/</g, '&lt;') + '”.</div>'); } catch (eP) {}
+  }
+  pp.setAttribute('data-vazio', pp.children.length ? '0' : '1');
+  // ---- formulário: some o que já está no Resumo (Instagram, e-mail) e a data vira data de gente
+  if (form) [].forEach.call(form.querySelectorAll('.dtl-line'), function(d) {
+    var rot = (d.firstElementChild || {}).textContent || '';
+    if (/Instagram|E-mail/.test(rot) && d.parentNode.id !== 'fv2-pag') d.classList.add('fv2-rep');
+    if (/Preencheu em/.test(rot)) { var b = d.querySelector('b'), mm = b && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(b.textContent.trim()); if (mm) { var dd = new Date(Date.UTC(+mm[1], +mm[2] - 1, +mm[3], +mm[4], +mm[5])); b.textContent = dd.toLocaleDateString('pt-BR') + ' às ' + ('0' + dd.getHours()).slice(-2) + 'h' + ('0' + dd.getMinutes()).slice(-2); } }
+  });
+  // ---- cada bloco na sua aba
+  var kids = [].slice.call(m.children), info = null, notas = null;
+  kids.forEach(function(c) { if (c.classList.contains('dtl-card') && !c.id) { if (c.querySelector('#lead-info')) info = c; else if (c.querySelector('#fl-notas')) notas = c; } });
+  var poe = function(el, a) { if (el) el.setAttribute('data-fv2', a); };
+  poe(document.getElementById('card-gravacao'), 'resumo'); poe(info, 'resumo'); poe(document.getElementById('fl-score'), 'resumo'); poe(form, 'form'); poe(notas, 'notas');
+  // ---- as abas
+  var ab = document.getElementById('fv2-abas');
+  if (!ab) { ab = document.createElement('div'); ab.id = 'fv2-abas'; ab.setAttribute('role', 'tablist'); fx.parentNode.insertBefore(ab, fx.nextSibling);
+    ab.addEventListener('click', function(ev2) { var b = ev2.target.closest('button[data-a]'); if (b) fv2Aba(b.getAttribute('data-a')); }); }
+  var temNota = !!String(r.obs || '').trim();
+  ab.innerHTML = [['resumo', 'Resumo', ''], ['caminho', 'Caminho', ''], ['form', 'Formulário', ''], ['pag', 'Pagamento', ''], ['notas', 'Anotações', temNota ? '●' : '']]
+    .filter(function(x) { return !(x[0] === 'caminho' && pc.getAttribute('data-vazio') === '1') && !(x[0] === 'pag' && pp.getAttribute('data-vazio') === '1'); })
+    .map(function(x) { return '<button type="button" role="tab" data-a="' + x[0] + '">' + x[1] + (x[2] ? '<i>' + x[2] + '</i>' : '') + '</button>'; }).join('');
+  if (!ab.querySelector('[data-a="' + FV2.aba + '"]')) FV2.aba = 'resumo';
+  fv2Aba(FV2.aba);
+  // o formulário pode ser redesenhado depois (quando a Clint ou os pagamentos chegam): arruma de novo
+  if (!FV2.obs && form && window.MutationObserver) { FV2.obs = new MutationObserver(function() { clearTimeout(FV2.t); FV2.t = setTimeout(function() { try { if (document.getElementById('modal-lead').classList.contains('open')) fv2Arrumar(); } catch (e) {} }, 60); }); FV2.obs.observe(form, { childList: true }); }
+}
+
+// ===== 🗂 FICHA DO LEAD EM ABAS (19/11/2026 — Bruno: "faz os dois e depois publica") =====
+// A ficha do lead (a do formulário) ganha o mesmo desenho: faixa do caminho e botões no alto · abas Resumo | Caminho | Reunião |
+// Pagamento | Histórico. Só muda de lugar o que a ficha já desenhava.
+var LFV2 = { aba: 'resumo' };
+(function() {
+  var st = document.createElement('style'); st.id = 'lfv2-css';
+  st.textContent = '#mb-lista>[data-lfv2][hidden]{display:none!important;}'
+    + '#lfv2-faixa{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 12px;margin-bottom:10px;border-radius:12px;background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.12);cursor:pointer;}'
+    + '#lfv2-faixa>small{font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;font-weight:900;color:var(--muted);margin-right:4px;}'
+    + '#lfv2-faixa .dias{margin-left:auto;font-size:.72rem;color:var(--muted);} #lfv2-faixa .dias b{color:#3ddc97;}'
+    + '#lfv2-abas{display:flex;gap:2px;margin:10px 0 14px;border-bottom:1px solid var(--border);overflow-x:auto;}'
+    + '#lfv2-abas button{font:inherit;font-size:.8rem;font-weight:800;padding:10px 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;}'
+    + '#lfv2-abas button.on{color:var(--text);border-bottom-color:var(--accent);}'
+    + '#lfv2-botoes{display:flex;flex-wrap:wrap;gap:6px;} #lfv2-botoes>div{display:contents;}'
+    + '#lfv2-botoes .ld-wa{flex:0 0 auto!important;width:auto!important;min-width:0!important;padding:6px 11px!important;font-size:.7rem!important;margin:0!important;}'
+    + '@media (max-width:640px){#lfv2-faixa .dias{margin-left:0;width:100%;}}';
+  document.head.appendChild(st);
+})();
+function lfv2Aba(a) {
+  LFV2.aba = a; var box = document.getElementById('mb-lista'); if (!box) return;
+  [].forEach.call(box.querySelectorAll(':scope > [data-lfv2]'), function(el) { el.hidden = el.getAttribute('data-lfv2') !== a; });
+  [].forEach.call(box.querySelectorAll('#lfv2-abas button'), function(b) { b.classList.toggle('on', b.getAttribute('data-a') === a); });
+}
+function lfv2Arrumar(l, aba) {
+  var box = document.getElementById('mb-lista'); if (!box || !l || document.getElementById('lfv2-abas')) return;
+  var tem = {}, botoes = [];
+  [].slice.call(box.children).forEach(function(c) {
+    var rot = ((c.querySelector('.g-label') || {}).textContent || '').trim(), a = '';
+    if (/Caminho do lead/.test(rot)) a = 'caminho';
+    else if (/Atendimento/.test(rot)) a = 'resumo';
+    else if (/A reunião/.test(rot)) a = 'reuniao';
+    else if (/pagamento/i.test(rot)) a = 'pag';
+    else if (/Histórico/.test(rot)) a = 'hist';
+    else if (c.id === 'lf-score' || c.classList.contains('fs-pag') || c.classList.contains('dtl-card')) a = 'resumo';
+    else if (c.querySelector(':scope > .ld-wa')) { botoes.push(c); return; }
+    else a = 'resumo';
+    c.setAttribute('data-lfv2', a); tem[a] = 1;
+  });
+  // a faixa dos funis + os botões de ação ficam sempre à vista, no alto
+  var hf = '';
+  try {
+    var ev = ldJornadaEventos(l), venda = ev.filter(function(x) { return x.tipo === 'venda'; })[0], seq = [];
+    ev.forEach(function(x) { if (x.f && (!venda || x.t <= venda.t) && seq[seq.length - 1] !== x.f) seq.push(x.f); });
+    var p1 = ev.filter(function(x) { return x.f; })[0];
+    if (seq.length) {
+      var pill = function(f) { var c = LD_FUN_COR[f] || '#9aa3b2'; return '<span style="padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:800;color:' + c + ';background:' + c + '1f;border:1px solid ' + c + '55;white-space:nowrap;">' + f + '</span>'; };
+      var seta = '<span style="color:var(--muted);font-size:.75rem;">→</span>';
+      hf = '<small>Caminho</small>' + seq.map(pill).join(seta) + (venda ? seta + '<span style="padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:900;color:#0b1a12;background:#3ddc97;">💰 Venda</span>' : '')
+        + (p1 ? '<span class="dias"><b>' + Math.max(0, Math.round(((venda ? venda.t : Date.now()) - p1.t) / 864e5)) + ' dias</b> ' + (venda ? 'do 1º toque à venda' : 'desde o 1º toque') + '</span>' : '');
+    }
+  } catch (e) {}
+  var topo = document.createElement('div'); topo.id = 'lfv2-topo';
+  topo.innerHTML = (hf ? '<div id="lfv2-faixa" title="Ver o caminho completo" onclick="lfv2Aba(\'caminho\')">' + hf + '</div>' : '') + '<div id="lfv2-botoes"></div>'
+    + '<div id="lfv2-abas" role="tablist">' + [['resumo', 'Resumo'], ['caminho', 'Caminho'], ['reuniao', 'Reunião'], ['pag', 'Pagamento'], ['hist', 'Histórico']].filter(function(x) { return tem[x[0]]; })
+      .map(function(x) { return '<button type="button" role="tab" data-a="' + x[0] + '" onclick="lfv2Aba(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>';
+  box.insertBefore(topo, box.firstChild);
+  var bb = document.getElementById('lfv2-botoes'); botoes.forEach(function(b) { b.style.margin = '0'; bb.appendChild(b); });
+  lfv2Aba(tem[aba] ? aba : 'resumo');
+}
+(function() {
+  if (typeof abrirFichaLead !== 'function') return;
+  var a0 = abrirFichaLead;
+  abrirFichaLead = function(i) {
+    var mesma = false; try { var lA = _ldReg[i]; mesma = !!lA && (_ldFichaAberta === lA || (_ldFichaAberta && lA.tel8 && _ldFichaAberta.tel8 === lA.tel8)) && !!document.getElementById('lfv2-abas'); } catch (e) {}
+    var r = a0.apply(this, arguments);
+    try { lfv2Arrumar(_ldReg[i], mesma ? LFV2.aba : 'resumo'); } catch (e2) {}
+    return r;
+  };
+})();
+
+function ldReunioesDoLead(l) {
+  var t8 = ldTel8(l && l.tel); if (!t8) return [];
+  return (V2.rows || []).filter(function(r) { return ldTel8(r.telefone) === t8; }).sort(function(a, b) { return (a.date || 0) - (b.date || 0); });
+}
+function ldApagarRepetida(i) {
+  if (!ehAdm()) { alert('Só o Bruno e o Adm podem apagar reuniões.'); return; }
+  var l = _ldReg[i]; if (!l) return;
+  var rs = ldReunioesDoLead(l); if (rs.length < 2) { alert('Este lead tem só uma reunião na planilha.'); return; }
+  var dia = function(r) { return r.date ? r.date.toLocaleDateString('pt-BR') : 'sem data'; };
+  var txt = 'Este lead está ' + rs.length + ' vezes na planilha de vendas:\n\n' + rs.map(function(r, k) { return (k + 1) + ') ' + dia(r) + ' · ' + (r.closer || 'sem closer') + ' · ' + (r.status || 'sem status') + (r.produto ? ' · ' + r.produto : '') + (r.valor ? ' · R$ ' + Math.round(r.valor).toLocaleString('pt-BR') : ''); }).join('\n')
+    + '\n\nEscolha a que está REPETIDA. Ela sai só da planilha de vendas (a agenda não é mexida). Não tem desfazer.';
+  caixaPromov({ ico: '🗑', titulo: 'Apagar reunião repetida', texto: txt,
+    botoes: [{ t: 'Cancelar' }].concat(rs.map(function(r, k) { return { t: 'Apagar a ' + (k + 1), ao: function() { _apagarLeadVai(r, 'planilha'); } }; })) });
+}
+function flLeadDaReuniao(r) {
+  var t8 = ldTel8(r && r.telefone); if (!t8) return null;
+  var l = (LD.rows || []).filter(function(x) { return x.tel8 === t8; })[0];
+  return l || { tel: r.telefone, tel8: t8, nome: r.nome };
+}
+function flCaminhoNaReuniao(r) {
+  var f = document.getElementById('fl-formulario'); if (!f) return;
+  var old = document.getElementById('fl-caminho'); if (old) old.remove();
+  var l = flLeadDaReuniao(r); if (!l) return;
+  var hc = ldJornadaHtml(l); if (!hc) return;
+  f.insertAdjacentHTML('afterbegin', '<div id="fl-caminho" class="dtl-card" style="padding:0;background:none;border:0;">' + hc + '</div>');
+}
+// os dados da reunião em dois grupos + clique no cartão para editar
+(function() {
+  if (typeof desenharInfo !== 'function') return;
+  var d0 = desenharInfo;
+  desenharInfo = function() {
+    d0.apply(this, arguments);
+    try {
+      var box = document.getElementById('lead-info'); if (!box || _modoEdicao) return;
+      var r = _v2reg[_fichaAtual]; if (!r) return;
+      [].forEach.call(box.querySelectorAll('.dtl-line'), function(el) { var b = el.querySelector('b'); if (/ID do lead/.test((el.firstElementChild || {}).textContent || '') && b && b.textContent.trim() === '—') el.style.display = 'none'; });   // ID vazio não ocupa lugar
+      var cab = function(t, ord) { return '<div class="fl-grupo" style="order:' + ord + ';grid-column:1/-1;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;font-weight:900;color:var(--accent);margin-top:' + (ord ? '10px' : '0') + ';">' + t + '</div>'; };
+      var l = flLeadDaReuniao(r) || {}, extra = '';
+      var card = function(k, ico, nome, v) { return '<div class="dtl-line" data-k="' + k + '" style="order:' + (k === 'insta' ? 11 : 12) + ';"><span>' + ico + ' ' + nome + '</span><b>' + v + '</b></div>'; };
+      if (l.insta) extra += card('insta', '📸', 'Instagram', '<a href="https://instagram.com/' + String(l.insta).replace(/^@/, '').replace(/[^\w.]/g, '') + '" target="_blank" rel="noopener" class="ig-link" onclick="event.stopPropagation();">@' + String(l.insta).replace(/^@/, '').replace(/</g, '&lt;') + ' ↗</a>');
+      if (l.email) extra += card('email', '✉️', 'E-mail', String(l.email).replace(/</g, '&lt;'));
+      box.insertAdjacentHTML('afterbegin', cab('📅 A reunião', 0) + cab('👤 Pessoal', 9));
+      if (extra) box.insertAdjacentHTML('beforeend', extra);
+      var pode = !(typeof soOlhar === 'function' && soOlhar()) && document.getElementById('btn-editar') && document.getElementById('btn-editar').style.display !== 'none';
+      if (pode) [].forEach.call(box.querySelectorAll('.dtl-line'), function(el) {
+        var k = el.getAttribute('data-k') || ''; if (/^(telefone|id|insta|email)$/.test(k)) return;
+        el.style.cursor = 'pointer'; el.title = 'Clique para editar';
+        el.insertAdjacentHTML('beforeend', '<i style="position:absolute;top:8px;right:10px;font-style:normal;font-size:.7rem;opacity:.45;">✏️</i>'); el.style.position = 'relative';
+        el.addEventListener('click', function(ev) { if (ev.target.closest('a')) return; alternarEdicao(); });
+      });
+    } catch (e) {}
+  };
+})();
 function abrirFichaLead(i) {
   var l = _ldReg[i];
   if (!l) return;
@@ -14322,7 +14684,7 @@ function abrirFichaLead(i) {
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
     + '<div class="g-label" style="margin:0;">✋ Atendimento</div>'
     + (ldPodeEditarLead(l) ? '<button class="btn-assumir" style="padding:5px 10px;font-size:.66rem;" onclick="ldCorrigirNome(' + i + ')" title="Corrige o nome na planilha de leads">✏️ Corrigir nome</button>'
-        + '<button class="btn-assumir" style="padding:5px 10px;font-size:.66rem;background:rgba(255,107,107,.14);color:#ff6b6b;border-color:rgba(255,107,107,.45);" onclick="ldExcluirLead(' + i + ')" title="Tira o lead da planilha (vai para a aba Leads excluídos)">🗑 Excluir</button>' : '')
+        + (ldReunioesDoLead(l).length > 1 && ehAdm() ? '<button class="btn-assumir" style="padding:5px 10px;font-size:.66rem;background:rgba(255,107,107,.14);color:#ff6b6b;border-color:rgba(255,107,107,.45);" onclick="ldApagarRepetida(' + i + ')" title="Este lead tem mais de uma reunião na planilha de vendas: escolha a repetida para apagar">🗑 Reunião repetida (' + ldReunioesDoLead(l).length + ')</button>' : '') : '')
     + '<span style="flex:1;"></span>'
     + (function() {
         var cc = CLINT[ldTel8(l.tel)];
@@ -14404,16 +14766,13 @@ function abrirFichaLead(i) {
     + (ek === 'agend' ? '<div class="hint" style="margin-top:9px;color:#3ddc97;">📅 Este lead já tem reunião na planilha de vendas — a etapa vira "Agendado" sozinha.</div>' : '')
     + (l.motivo ? '<div class="hint" style="margin-top:9px;">Motivo: <b>' + l.motivo + '</b></div>' : '')
     + '</div>';
-  var h = hAt + '<div class="fs-pag" style="margin-top:0;">'
+  var h = ldJornadaHtml(l) + hAt + '<div class="fs-pag" style="margin-top:0;">'
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">'
     + '<span class="ld-selo" style="background:' + FX[1] + '22;color:' + FX[1] + ';border:1px solid ' + FX[1] + '66;">' + FX[0] + '</span>'
     + '<span class="ld-selo morno">' + sit + '</span>' + seloBloqueio(l.tel, l.nome) + seloVendaSemForm(l)
     + '<span class="et-chip" style="background:' + ei.cor + '22;color:' + ei.cor + ';border-color:' + ei.cor + '66;">' + ei.ico + ' ' + ei.nome + '</span></div>';
-  campos.forEach(function(c) {
-    // c[3] === 'html' = o campo já vem pronto (usado no link do anúncio)
-    var valorC = c[3] === 'html' ? String(c[2]) : String(c[2]).replace(/</g, '&lt;');
-    h += '<div class="fs-calc-linha"><span>' + c[0] + ' ' + c[1] + '</span><b style="text-align:right;max-width:62%;">' + valorC + '</b></div>';
-  });
+  // 18/11/2026: a ficha em blocos (Contato · Perfil · De onde veio · Atendimento)
+  h += ldFichaGrupos(campos);
   h += '</div>';
   // ===== 📅 A REUNIÃO E O PAGAMENTO DESTE LEAD (Bruno 19/08/2026) =====
   // Se a pessoa virou reunião (e venda), tudo aparece aqui: quem atendeu, o que
@@ -15739,10 +16098,13 @@ function abrirLead(i) {
   _modoEdicao = false;
   desenharInfo();
   mostrarFormularioDoLead(r);
+  try { flCaminhoNaReuniao(r); } catch (eCm) {}
+  FV2.aba = 'resumo'; FV2.mais = false;
   try { ildFichaNoLead(r); } catch (eFi) {}   // 10/11/2026: ficha de aplicação em papel (ILD)
   document.getElementById('modal-lead').classList.add('open');
   preencherGravacao(r);
   try { if (typeof scFichaReuniao === 'function') scFichaReuniao(r); } catch (eSc) {}
+  try { fv2Arrumar(); } catch (eV2) {}
 }
 // ===== 📋 O QUE A PESSOA RESPONDEU NO FORMULÁRIO — dentro da ficha da reunião =====
 // A reunião mora na aba de vendas e o formulário na aba do diagnóstico;
@@ -32586,7 +32948,7 @@ function wsFichaHtml(tel, ref) {
   if (x.pqF || x.pqN !== '') L.push('🏅 Pesquisa do workshop: ' + (x.pqF || '—') + (x.pqN !== '' ? ' (' + x.pqN + ')' : ''));
   if (x.crm || x.sdr || x.closer) L.push('📋 No app: ' + [x.crm, x.sdr ? 'SDR ' + x.sdr : '', x.closer ? 'closer ' + x.closer : ''].filter(Boolean).map(dspEsc).join(' · '));
   try {
-    var cam = wsCaminho(tel);
+    var cam = typeof ldJornadaHtml === 'function' ? [] : wsCaminho(tel);   // 18/11: o caminho completo fica no alto das fichas
     if (cam.length > 1) L.push('<div style="margin-top:6px;"><b>🛤️ Caminho</b>' + cam.slice(-14).map(function(e) {
       return '<div style="display:flex;gap:8px;margin-top:3px;font-size:.78em;"><span class="hint" style="min-width:38px;font-variant-numeric:tabular-nums;">' + _wsDm(new Date(e.d)) + '</span><span>' + dspEsc(e.t) + '</span></div>'; }).join('') + '</div>');
   } catch (eCam) {}
@@ -43481,7 +43843,7 @@ function _trfLembrar() { try { localStorage.setItem('trfVista', JSON.stringify({
 // 11/11/2026 (Bruno, no funil do workshop: "aqui deveria ter a etapa dos inscritos presentes"): presença das edições que JÁ ACONTECERAM
 // (quem clicou para entrar na sala no dia 1, no dia 2 = pitch, e no dia 3), lida da Central do workshop em 11/11/2026. Edição passada não
 // muda, por isso fica anotada aqui; as próximas vêm da Central quando a porta de contagem existir (TRF.central.pres tem prioridade).
-var TRF_WS_PRES_FIXA = { 'o:jul/26': [277, 239, 139], 'o:ago/26': [425, 324, 196], 'o:set/26': [482, 408, 257], 'o:out/26': [465, 407, 242] };
+var TRF_WS_PRES_FIXA = { 'o:jul/26': [277, 239, 139], 'o:ago/26': [425, 324, 196], 'o:set/26': [482, 408, 257], 'o:out/26': [465, 407, 242], 'o:nov/26': [235, 169, 114] };
 var TRF_CENTRAL_SB = { url: '', key: '', rpc: 'dash_workshop_funil' };
 function trfCentralCarregar() {
   if (TRF.central || TRF.centralPed) return;
