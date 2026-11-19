@@ -2996,7 +2996,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-19-1100';
+var VERSAO_DASH = '2026-11-19-1628';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -44125,7 +44125,7 @@ function _trfRenderMcp(el) {
 // reunião, comparecimento e venda vêm da planilha de vendas, pelo telefone (regra: sempre siga a planilha de vendas).
 // 12/11/2026 (Bruno: "não é melhor já ir do respondeu para marcado?"): sem passo "Qualificado" — de "Lead respondeu" direto para "Reunião marcada".
 // =====================================================================================================
-var TRF_SDR_PS = [['sl', 'Leads recebidos', 'negócios que entraram na Clint no período'], ['smql', 'MQL', 'dos leads recebidos, quem marcou algum investimento no formulário'], ['sc', '1º contato humano', 'receberam a 1ª mensagem de uma pessoa do time'], ['sr', 'Lead respondeu', 'responderam depois do 1º contato'],
+var TRF_SDR_PS = [['sl', 'Leads recebidos', 'negócios que entraram na Clint no período'], ['smql', 'MQL', 'dos leads recebidos, quem marcou algum investimento no formulário (mesma conta dos outros funis)'], ['sc', '1º contato humano', 'receberam a 1ª mensagem de uma pessoa do time'], ['sr', 'Lead respondeu', 'responderam depois do 1º contato'],
   ['marc', 'Reunião marcada', 'reuniões na planilha com data no período'], ['apar', 'Compareceu', 'o lead apareceu (planilha)'], ['pag', 'Venda', 'status Vendido na planilha']];
 // 13/11/2026 (Bruno: "hoje · 3 dias · semana · 15 dias · mês"): o funil do SDR tem os períodos dele, curtos, para cobrar o dia a dia
 var TRF_SDR_PER = [['hoje', 'Hoje', 1, 'hoje'], ['3', '3 dias', 3, 'os últimos 3 dias'], ['sem', 'Semana', 7, 'os últimos 7 dias'], ['15', '15 dias', 15, 'os últimos 15 dias'], ['mes', 'Mês', 0, 'o mês atual']];
@@ -44143,6 +44143,11 @@ function _trfSdrPer() {
   return { ini: h0 - (o[2] - 1) * 864e5, fim: h0 + 864e5, rot: o[3], id: o[0] };
 }
 function trfSdrQuem(n) { TRF.sdr = TRF.sdr === n ? '' : n; renderTrafego(); }
+// 19/11/2026: MQL do SDR pela base do site (a mesma dos outros funis); a planilha de leads só quando o site não tem o lead
+function _trfSdrSite() { var S = TRF.site; if (!S || !S.leads) return {}; var g = TRF_R._sdrSite; if (g && g.S === S) return g.m; var m = {};
+  S.leads.forEach(function(l) { if (!l.t8) return; var o = m[l.t8] || (m[l.t8] = { inv: '', comp: 0 }); if (l.inv) o.inv = l.inv; if (l.comp) o.comp = 1; }); TRF_R._sdrSite = { S: S, m: m }; return m; }
+function _trfSdrMql(f, tel) { var s = _trfSdrSite()[ldTel8(tel)]; if (s && s.inv) return _vfMql(s.inv); return !!(f && _vfMql(f.invest)); }
+function _trfSdrInv(f, tel) { var s = _trfSdrSite()[ldTel8(tel)]; return (s && s.inv) || (f && f.invest) || ''; }
 function _trfSdrConta(L, porTel) {
   var z = { sl: 0, sc: 0, sr: 0, sq: 0, marc: 0, real: 0, apar: 0, falt: 0, pag: 0, valor: 0, hor: 0, m5: 0, m15: 0, m30: 0, m60: 0, semC: 0, iaSem: 0, med: null }, VAZIO = [], tempos = [];
   L.forEach(function(x) {
@@ -44251,13 +44256,13 @@ function trfSdrLista(tipo, filtro) {
     marc: function(x) { return _trfSdrRs(x, C.porTel).length > 0; }, apar: function(x) { return _trfSdrRs(x, C.porTel).some(function(r) { return isComp(r.sn); }); }, pag: function(x) { return _trfSdrRs(x, C.porTel).some(function(r) { return r.sn === 'vendido'; }); },
     tempo: hor, m5: hor, m30: hor,   // 13/11 (Bruno: "não acha que deve ter filtro de quem não foi chamado neste tempo?"): a lista traz todos do horário, com as pílulas dentro × fora do prazo
     ia: function(x) { return !(x.em > 0) && (x.ia > 0 || x.leadEscr > 0); }, esp: function() { return true; },
-    mqlM: function(x) { var f = fichasM[ldTel8(x.tel)]; return !!(f && _vfMql(f.invest)); }, mqlC: function(x) { var f = fichasM[ldTel8(x.tel)]; return !!(f && _vfMql(f.invest)); } };
+    mqlM: function(x) { return _trfSdrMql(fichasM[ldTel8(x.tel)], x.tel); }, mqlC: function(x) { return _trfSdrMql(fichasM[ldTel8(x.tel)], x.tel); } };
   var lst0 = L.filter(F[tipo] || F.sl);
   var fichas0 = {}; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichas0[k]; if (!o || (l.date || 0) > (o.date || 0)) fichas0[k] = l; }); } catch (eF0) {}
   // 13/11/2026 (Bruno: "o filtro deve ser segundo o funil, como fizemos no tráfego"): as pílulas de cada lista mostram o PRÓXIMO passo do
   // funil (quem avançou e quem parou), depois MQL e a nota A/B/C/D, como nas listas do tráfego; o SDR só aparece no "time todo"
   var tagsL = function(x) { var t = ['s:' + String(x.resp || 'sem').split(' ')[0]], f = fichas0[ldTel8(x.tel)], rs = _trfSdrRs(x, C.porTel), nn = /·\s*nota\s+([A-D])\s*$/i.exec(String(x.nome || '')), fx = (f && f.faixaNova) || (nn ? nn[1].toUpperCase() : '');
-    if (fx) t.push(fx); t.push(f && _vfMql(f.invest) ? 'mql' : 'nmql');
+    if (fx) t.push(fx); t.push(_trfSdrMql(f, x.tel) ? 'mql' : 'nmql');
     t.push(x.em > 0 ? 'sc' : 'semc'); t.push(x.respEm > 0 ? 'resp' : 'nresp'); t.push(rs.length ? 'reu' : 'nreu');
     var comp = rs.some(function(r) { return isRe(r.sn); }), nsh = rs.some(function(r) { return r.sn === 'no show'; }), vd = rs.some(function(r) { return r.sn === 'vendido'; });
     if (rs.length) t.push(comp ? 'comp' : nsh ? 'ns' : 'vai'); if (comp) t.push(vd ? 'vd' : 'nvd');
@@ -44283,7 +44288,7 @@ function trfSdrLista(tipo, filtro) {
   var pil = function(txt, cls) { return '<span class="sdrc-p' + (cls ? ' ' + cls : '') + '">' + txt + '</span>'; };
   var linha = function(x) {
     var rs = _trfSdrRs(x, C.porTel), ult = rs.slice().sort(function(a, b) { return b.date - a.date; })[0], vd = rs.filter(function(r) { return r.sn === 'vendido'; }).reduce(function(a, r) { return a + (r.valor || 0); }, 0);
-    var f = fichas[ldTel8(x.tel)], fx = f ? (f.faixaNova || '') : '', mql = f && _vfMql(f.invest), inc = f && f.status && /incomplet/i.test(f.status);
+    var f = fichas[ldTel8(x.tel)], fx = f ? (f.faixaNova || '') : '', mql = _trfSdrMql(f, x.tel), sS = _trfSdrSite()[ldTel8(x.tel)], inc = f && f.status && /incomplet/i.test(f.status) && !(sS && sS.comp);
     var nm = String(x.nome || ''), nn = /\s*·\s*nota\s+([A-D])\s*$/i.exec(nm); if (nn) { nm = nm.slice(0, nn.index); if (!fx) { fx = nn[1].toUpperCase(); } }   // a Base da Sarah escreve a nota no nome do cartão
     var sit = vd ? 'vd' : x.semResp > 0 ? 'esp' : !(x.em > 0) && !x.ja ? 'sem' : ult ? 'reu' : 'ok';
     var corFx = (typeof TRF_FX !== 'undefined' && TRF_FX[fx]) || '#8b8b9a';
@@ -44296,7 +44301,7 @@ function trfSdrLista(tipo, filtro) {
       + col('1º contato', [x.em > 0 ? ln('⏱ em ' + _csdTempo(Math.max(0, mi(x))), mi(x) <= 5 ? 'bom' : mi(x) > 60 ? 'ruim' : '') : x.ja ? ln('já conversava antes') : ln('sem contato humano', 'ruim')])
       + col('Conversa', [x.respEm > 0 ? ln('💬 respondeu', 'bom') : (x.em > 0 ? ln('🔇 não respondeu', 'fraco') : ''), x.ia > 0 ? ln('🤖 ' + x.ia + ' msg com a IA') : (x.leadEscr > 0 ? ln('✍️ escreveu') : ''), x.semResp > 0 ? ln('⏳ esperando há ' + _csdTempo((agora - x.semResp) / 60000), 'alr') : ''].concat(!(x.respEm > 0) && !(x.em > 0) && !(x.ia > 0) && !(x.leadEscr > 0) && !(x.semResp > 0) ? [ln('—', 'fraco')] : []))
       + col('Reunião', ult ? [ln('📅 ' + ult.date.toLocaleDateString('pt-BR')), ult.sdr ? ln('marcada por ' + _trfE(String(ult.sdr).replace(/^(SS|SDR)\s+/i, '')), String(ult.sdr).toLowerCase().indexOf(String(x.resp || '').split(' ')[0].toLowerCase()) < 0 ? 'alr' : 'fraco') : '', ln(_trfE(ult.status || ult.sn || ''), vd ? 'bom' : (isReal(ult.sn) && !isComp(ult.sn)) ? 'ruim' : ''), vd ? ln('💰 ' + _trfRs(vd), 'bom') : ''] : [ln('sem reunião', 'fraco')]);
-    var resp = f ? [['Seguidores', f.seg], ['Renda', f.renda], ['Objetivo', f.obj], ['Investimento', f.invest]].filter(function(r) { return String(r[1] || '').trim(); })
+    var resp = f ? [['Seguidores', f.seg], ['Renda', f.renda], ['Objetivo', f.obj], ['Investimento', _trfSdrInv(f, x.tel)]].filter(function(r) { return String(r[1] || '').trim(); })
       .map(function(r) { return '<div><small>' + r[0] + '</small><span' + (r[0] === 'Investimento' && mql ? ' class="mql"' : '') + '>' + curto(r[1]) + '</span></div>'; }).join('') : '';
     var tl = String(x.tel || '').replace(/\D/g, '');   // 13/11 (Bruno: "ao clicar deve puxar todas as informações do lead"): o cartão abre a ficha completa do dash
     return '<div class="sdrc ' + sit + (tl ? ' clic' : '') + '"' + (tl ? ' role="button" tabindex="0" title="Clique para abrir a ficha completa do lead" onclick="trfSdrFicha(\'' + tl + '\')" onkeydown="if(event.key===\'Enter\'&&event.target===this)trfSdrFicha(\'' + tl + '\')"' : '') + '>' + topo + '<div class="sdrc-fatos">' + fatos + '</div>' + (resp ? '<div class="sdrc-resp">' + resp + '</div>' : '') + '</div>';
@@ -44374,6 +44379,7 @@ function _psNorm(s) { return String(s || '').toLowerCase().normalize('NFD').repl
 var TRF_SDR_COM_SARAH = false;
 function _trfRenderSdr(el) {
   try { csdCarregar(false); } catch (e) {}
+  try { trfSiteCarregar(false); } catch (eS) {}   // 19/11: o MQL vem da base do site
   var okC = typeof CSD !== 'undefined' && CSD.carregado; if (!okC) _trfVigiar('csd');
   var okV = !!(V2.carregado || (V2.rows || []).length); if (!okV) _trfVigiar('v2');
   var P = _trfSdrPer(), porTel = _trfIdxV2().porTel, tudo = okC ? CSD.rows : [], base = tudo.filter(function(x) { return /spark/i.test(x.funil || ''); }), desde = Infinity, vistos = {};
@@ -44391,7 +44397,7 @@ function _trfRenderSdr(el) {
   var nomes = Object.keys(porSdr).sort(function(a, b) { return porSdr[b].length - porSdr[a].length; });
   if (TRF.sdr && !porSdr[TRF.sdr]) TRF.sdr = '';
   var L = TRF.sdr ? porSdr[TRF.sdr] : noPer, z = _trfSdrConta(L, porTel), val = {}; TRF_SDR_PS.forEach(function(p) { val[p[0]] = z[p[0]]; });
-  var D = { z: z, P: P, ev: false, temMeta: true, temSite: true, naoBase: { smql: 1 }, aparte: { marc: 'reuniões com data no período, pela planilha (coluna SDR): não são só os leads de cima' } }; window._trfCtx = null;   // o 1º contato segue medido sobre os leads recebidos
+  var D = { z: z, P: P, ev: false, temMeta: true, temSite: true, naoBase: { smql: 1 }, aparte: {} }; window._trfCtx = null;   // o 1º contato segue medido sobre os leads recebidos
   // fila de AGORA (não depende do período): leads cuja última mensagem foi deles e o time ainda não respondeu
   var agora = Date.now(), vE = {}, esp = tudo.filter(function(x) { if (!(x.semResp > 0) || vE[x.id] || !(TRF_SDR_COM_SARAH ? /spark|sarah/i : /spark/i).test(x.funil || '')) return false; vE[x.id] = 1; if (TRF.sdr && (x.resp || 'Sem responsável') !== TRF.sdr) return false;
     // 13/11/2026 (Bruno: "não pode contar quem já fez reunião nem quem comprou"): sai da fila quem já teve reunião realizada ou comprou
@@ -44416,7 +44422,7 @@ function _trfRenderSdr(el) {
   var espR = esp.filter(function(x) { return agora - x.semResp <= 7 * 864e5; }).length;
   // 13/11/2026 (Bruno: "conversão de lead recebido para marcado é importante · ou compareceu?"): as duas, só dos MQL, seguindo os mesmos leads
   var fichasC = {}; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichasC[k]; if (!o || (l.date || 0) > (o.date || 0)) fichasC[k] = l; }); } catch (eFc) {}
-  var mqlL = L.filter(function(x) { var f = fichasC[ldTel8(x.tel)]; return !!(f && _vfMql(f.invest)); }), mqlM = 0, mqlC = 0;
+  var mqlL = L.filter(function(x) { return _trfSdrMql(fichasC[ldTel8(x.tel)], x.tel); }), mqlM = 0, mqlC = 0;
   mqlL.forEach(function(x) { var rs = _trfSdrRs(x, porTel); if (rs.length) mqlM++; if (rs.some(function(r) { return isRe(r.sn); })) mqlC++; });
   val.smql = mqlL.length;
   var pc1 = function(a, b) { return b ? (Math.round(a / b * 1000) / 10).toString().replace('.', ',') + '%' : '—'; };
