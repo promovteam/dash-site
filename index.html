@@ -2996,7 +2996,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-19-1628';
+var VERSAO_DASH = '2026-11-19-1635';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -42149,6 +42149,11 @@ button.trf-kpi:hover { transform:translateY(-2px); box-shadow:0 10px 26px -14px 
 .sdrc-tag.mql { background:rgba(255,122,48,.16); color:#ff9a5a; }
 .sdrc-crm { flex:none; font-size:.74rem; font-weight:800; padding:7px 12px; border-radius:10px; text-decoration:none; color:#c9b5ff; background:rgba(154,107,255,.14); border:1px solid rgba(154,107,255,.38); white-space:nowrap; }
 .sdrc-crm:hover, .sdrc-crm:focus-visible { background:rgba(154,107,255,.28); outline:none; }
+.sdrc-bts { display:flex; gap:8px; flex:none; flex-wrap:wrap; justify-content:flex-end; }
+button.sdrc-crm { cursor:pointer; font-family:inherit; }
+.sdrc-crm.dados { color:#9fd0ff; background:rgba(110,168,255,.14); border-color:rgba(110,168,255,.4); }
+.sdrc-crm.dados:hover, .sdrc-crm.dados:focus-visible { background:rgba(110,168,255,.28); }
+@media (max-width:560px) { .sdrc-bts { justify-content:flex-start; } }
 .sdrc-passos{margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.09)}.sdrc-alerta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.sdrc-alerta span{font-size:.74rem;line-height:1.3;padding:4px 9px;border-radius:8px;background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.32);color:#ffb4b4}
 .sdrc-fatos { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 .sdrc-p { font-size:.71rem; font-weight:650; padding:4px 9px; border-radius:8px; background:rgba(255,255,255,.06); color:var(--text, #e9e9f1); line-height:1.3; }
@@ -44172,6 +44177,20 @@ var TRF_SDR_LST = { sl: ['Leads recebidos', 'negócios que entraram no período'
   mqlM: ['Marcação dos MQL', 'MQL que entraram no período · use as pílulas para ver quem marcou e quem não marcou'], mqlC: ['MQL que compareceram', 'MQL que entraram no período · use as pílulas para ver quem compareceu, faltou ou ainda não marcou'],
   esp: ['Esperando o time agora', 'a última mensagem foi do lead · quem espera há mais tempo primeiro'] };
 function _trfSdrRs(x, porTel) { var t8 = ldTel8(x.tel), rs0 = (t8 && porTel[t8]) || []; return rs0.filter(function(r) { return r.date && r.date.getTime() >= x.cr - 2 * 864e5; }); }
+// 19/11/2026 (Bruno: "ver os dados do lead e a conversa fácil"): os dois botões do alto de cada cartão do SDR
+function _trfSdrBts(tel, nome, cid) {
+  var tl = String(tel || '').replace(/\D/g, ''), base = (typeof LINK_BASE !== 'undefined' ? LINK_BASE : 'https://app.clint.digital'), h = '';
+  if (tl) h += '<button type="button" class="sdrc-crm dados" title="Abre a ficha completa do lead: formulário, caminho, reuniões e pagamento" onclick="event.stopPropagation();trfSdrFicha(\'' + tl + '\')">📋 Dados do lead</button>';
+  if (cid) h += '<a class="sdrc-crm" href="' + base + '/contacts/' + encodeURIComponent(cid) + '" target="_blank" rel="noopener" title="Abre a conversa deste lead na Clint" onclick="event.stopPropagation()">💬 Conversa ↗</a>';
+  else if (tl) h += '<a class="sdrc-crm" href="' + base + '/chat" target="_blank" rel="noopener" title="Procura este lead na Clint e abre a conversa" onclick="event.stopPropagation();try{return abrirAtendimentoClintPor(event,' + JSON.stringify(tl).replace(/"/g, '&quot;') + ',' + JSON.stringify(String(nome || '')).replace(/"/g, '&quot;') + ')}catch(e){}">💬 Conversa ↗</a>';
+  return h ? '<div class="sdrc-bts">' + h + '</div>' : '';
+}
+function _trfSdrRespHtml(f, tel) {
+  var curto = function(v) { v = String(v || '').trim(); return _trfE(v.length > 90 ? v.slice(0, 88) + '…' : v); }, inv = _trfSdrInv(f, tel), mql = _trfSdrMql(f, tel);
+  var L = [['Instagram', f && f.insta ? '@' + String(f.insta).replace(/^@/, '') : ''], ['Seguidores', f && f.seg], ['Renda', f && f.renda], ['Objetivo', f && f.obj], ['Investimento', inv], ['Nota do lead', f && f.faixaNova ? 'Nota ' + f.faixaNova : '']].filter(function(r) { return String(r[1] || '').trim(); });
+  if (!L.length) return '<div class="sdrc-resp"><div><small>Formulário</small><span style="opacity:.7">este lead não preencheu o formulário do diagnóstico</span></div></div>';
+  return '<div class="sdrc-resp">' + L.map(function(r) { return '<div><small>' + r[0] + '</small><span' + (r[0] === 'Investimento' && mql ? ' class="mql"' : '') + '>' + curto(r[1]) + '</span></div>'; }).join('') + '</div>';
+}
 function trfSdrFicha(tel) {   // a lista fica aberta embaixo: a ficha sobe por cima dela e, ao fechar, a pessoa volta para a lista
   ['modal-b', 'modal-lead'].forEach(function(id) { var m = document.getElementById(id); if (m) m.style.zIndex = '10000'; });
   try { abrirFichaDoTelefone(tel); } catch (e2) {}
@@ -44239,10 +44258,10 @@ function _trfSdrPlanLista(tipo, filtro) {
   var lst = _trfSdrFiltra(L, tags, filtro, grupos);
   lst.sort(function(a, b) { return /^(pagP|spkP|grwP)$/.test(tb) ? (b.valor || 0) - (a.valor || 0) : (b.date || 0) - (a.date || 0); });
   var cor = { pagP: 'vd', spkP: 'vd', grwP: 'vd', nsP: 'sem', nsrP: 'sem', compP: 'reu', marcP: 'ok' }[tb] || 'ok', T = TRF_SDR_PLST[tb];
-  var passosI = _trfSdrPassosIdx();
-  var card = function(r) { var tl = String(r.telefone || '').replace(/\D/g, '');
-    return '<div class="sdrc ' + (r.sn === 'vendido' ? 'vd' : r.sn === 'no show' ? 'sem' : isRe(r.sn) ? 'reu' : cor) + (tl ? ' clic' : '') + '"' + (tl ? ' role="button" tabindex="0" title="Clique para abrir a ficha completa do lead" onclick="trfSdrFicha(\'' + tl + '\')"' : '') + '><div class="sdrc-top"><div class="sdrc-nome"><b>' + _trfE(r.nome || '—') + '</b>' + (r.sn === 'vendido' ? '<span class="sdrc-tag mql">💰 ' + _trfRs(r.valor || 0) + '</span>' : '<span class="sdrc-tag' + (r.sn === 'no show' ? ' ns' : '') + '">' + _trfE(r.status || r.sn || '') + '</span>') + '</div></div>'
-      + '<div class="sdrc-fatos"><span class="sdrc-p">👤 ' + _trfE(r.sdr || '—') + '</span><span class="sdrc-p">🎯 closer ' + _trfE(r.closer || '—') + '</span>' + (r.produto ? '<span class="sdrc-p">📦 ' + _trfE(r.produto) + '</span>' : '') + (r.date ? '<span class="sdrc-p">📅 reunião ' + r.date.toLocaleDateString('pt-BR') + '</span>' : '') + (+r.carimboT ? '<span class="sdrc-p neutro">marcada em ' + new Date(+r.carimboT).toLocaleDateString('pt-BR') + '</span>' : '') + (r.origem ? '<span class="sdrc-p neutro">' + _trfE(r.origem) + '</span>' : '') + '</div>' + _trfSdrPassos(r, passosI) + '</div>'; };
+  var passosI = _trfSdrPassosIdx(), fichasP = {}; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichasP[k]; if (!o || (l.date || 0) > (o.date || 0)) fichasP[k] = l; }); } catch (eFp) {}
+  var card = function(r) { var tl = String(r.telefone || '').replace(/\D/g, ''), k8 = ldTel8(String(r.telefone || '')), xC = k8 ? passosI[k8] : null;
+    return '<div class="sdrc ' + (r.sn === 'vendido' ? 'vd' : r.sn === 'no show' ? 'sem' : isRe(r.sn) ? 'reu' : cor) + (tl ? ' clic' : '') + '"' + (tl ? ' role="button" tabindex="0" title="Clique para abrir a ficha completa do lead" onclick="trfSdrFicha(\'' + tl + '\')"' : '') + '><div class="sdrc-top"><div class="sdrc-nome"><b>' + _trfE(r.nome || '—') + '</b>' + (r.sn === 'vendido' ? '<span class="sdrc-tag mql">💰 ' + _trfRs(r.valor || 0) + '</span>' : '<span class="sdrc-tag' + (r.sn === 'no show' ? ' ns' : '') + '">' + _trfE(r.status || r.sn || '') + '</span>') + '</div>' + _trfSdrBts(tl, r.nome, xC && xC.cid) + '</div>'
+      + '<div class="sdrc-fatos"><span class="sdrc-p">👤 ' + _trfE(r.sdr || '—') + '</span><span class="sdrc-p">🎯 closer ' + _trfE(r.closer || '—') + '</span>' + (r.produto ? '<span class="sdrc-p">📦 ' + _trfE(r.produto) + '</span>' : '') + (r.date ? '<span class="sdrc-p">📅 reunião ' + r.date.toLocaleDateString('pt-BR') + '</span>' : '') + (+r.carimboT ? '<span class="sdrc-p neutro">marcada em ' + new Date(+r.carimboT).toLocaleDateString('pt-BR') + '</span>' : '') + (r.origem ? '<span class="sdrc-p neutro">' + _trfE(r.origem) + '</span>' : '') + '</div>' + _trfSdrPassos(r, passosI) + (tl ? _trfSdrRespHtml(fichasP[k8], tl) : '') + '</div>'; };
   var h = '<h3>' + T[0] + ' · ' + _trfN(lst.length) + (filtro ? ' <small style="opacity:.7">de ' + _trfN(L.length) + '</small>' : '') + '</h3><p class="trf-nota">pela planilha de vendas · ' + T[1] + ' (' + _trfE(P.rot) + ')' + (C.emp ? ' · empresa toda (todas as reuniões, como na Visão Geral)' : C.quem ? ' · só ' + _trfE(C.quem) : ' · time de SDR') + '</p>'
     + _trfSdrChips(tipo, L, tags, filtro, grupos) + (lst.length ? '<p class="trf-nota">Em cada cartão: os passos do lead na Clint (últimos 35 dias). "A empresa falou" conta mensagem do time ou da IA; ligação e WhatsApp pessoal não aparecem.</p><div class="sdrc-lista">' + lst.map(card).join('') + '</div>' : '<p class="trf-nota">Nenhuma reunião aqui.</p>');
   window._vfModal = window._vfModal || {}; window._vfModal.trfsdr = h; vfAbrir('trfsdr');
@@ -44294,7 +44313,7 @@ function trfSdrLista(tipo, filtro) {
     var corFx = (typeof TRF_FX !== 'undefined' && TRF_FX[fx]) || '#8b8b9a';
     var selo = (f || fx) ? '<span class="sdrc-nota" style="--c:' + corFx + '">' + (fx ? 'Nota ' + fx : 'Sem nota') + '</span>' : '<span class="sdrc-nota" style="--c:#6d6d7a">Sem formulário</span>';
     var topo = '<div class="sdrc-top"><div class="sdrc-nome"><b>' + _trfE(nm || '—') + '</b>' + selo + (mql ? '<span class="sdrc-tag mql">🔥 MQL</span>' : '') + (inc ? '<span class="sdrc-tag">formulário incompleto</span>' : '') + (x.etapa ? '<span class="sdrc-tag etapa">' + _trfE(x.etapa) + '</span>' : '') + '</div>'
-      + (x.cid ? '<a class="sdrc-crm" href="' + base + '/contacts/' + encodeURIComponent(x.cid) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Abrir no CRM ↗</a>' : '') + '</div>';
+      + _trfSdrBts(x.tel, nm, x.cid) + '</div>';
     // 13/11/2026 (Bruno: "os cards organize"): os fatos em 4 colunas fixas, na ordem do funil — chegada · 1º contato · conversa · reunião
     var col = function(rot, linhas) { return '<div class="sdrc-col"><small>' + rot + '</small>' + linhas.filter(Boolean).join('') + '</div>'; }, ln = function(t, cls) { return '<span class="sdrc-l' + (cls ? ' ' + cls : '') + '">' + t + '</span>'; };
     var fatos = col('Chegou', [ln(quando(x.cr)), ln('👤 ' + _trfE(String(x.resp || 'sem responsável').split(' ')[0])), hor(x) ? '' : ln('fora do horário', 'fraco')])
