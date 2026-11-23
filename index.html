@@ -2996,7 +2996,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-23-1006';
+var VERSAO_DASH = '2026-11-23-1019';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -44149,6 +44149,9 @@ function _trfSdrPer() {
   return { ini: h0 - (o[2] - 1) * 864e5, fim: h0 + 864e5, rot: o[3], id: o[0] };
 }
 function trfSdrQuem(n) { TRF.sdr = TRF.sdr === n ? '' : n; renderTrafego(); }
+function trfSdrVista(v) { TRF.sdrVista = v; try { localStorage.setItem('trfSdrVista', v); } catch (e) {} renderTrafego(); }   // 23/11/2026: funil Detalhado × Simples
+function _trfSdrVista() { if (!TRF.sdrVista) { try { TRF.sdrVista = localStorage.getItem('trfSdrVista') || ''; } catch (e) {} } return TRF.sdrVista === 'simples' ? 'simples' : 'detalhado'; }
+function _trfSdrPassosFunil() { var s = _trfSdrVista() === 'simples'; return TRF_SDR_PS.filter(function(p) { return p[0] !== 'smql' && !(s && (p[0] === 'sc' || p[0] === 'sr')); }); }
 // 19/11/2026: MQL do SDR pela base do site (a mesma dos outros funis); a planilha de leads só quando o site não tem o lead
 function _trfSdrSite() { var S = TRF.site; if (!S || !S.leads) return {}; var g = TRF_R._sdrSite; if (g && g.S === S) return g.m; var m = {};
   S.leads.forEach(function(l) { if (!l.t8) return; var o = m[l.t8] || (m[l.t8] = { inv: '', comp: 0 }); if (l.inv) o.inv = l.inv; if (l.comp) o.comp = 1; }); TRF_R._sdrSite = { S: S, m: m }; return m; }
@@ -44474,7 +44477,8 @@ function _trfRenderSdr(el) {
     + kb('esp', 'Esperando o time agora', okC ? _trfN(esp.length) : '…', esp.length ? _trfN(esp24) + ' há mais de 24 horas · a última mensagem foi do lead' : 'ninguém esperando resposta', '')
     + '</div>'   // 13/11 (Bruno: "tira essa parte e coloca dentro da meta, clicável"): compareceu, vendido, Spark e Growth foram para o bloco da meta, no fim; o no-show ficou nos pontos de atenção
     + '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🔻 Funil do SDR' + (TRF.sdr ? ' · ' + _trfE(TRF.sdr) : ' · time todo') + '</h3><span class="trf-sub">em cima: leads que entraram em ' + _trfE(P.rot) + ' · embaixo: reuniões e vendas da planilha no mesmo período</span></div>'
-    +   '<div class="trf-fns">' + _trfFnBlocos(TRF_SDR_PS, val, 0, D, function(k) { return 'trfSdrLista(\'' + ({ marc: 'marcP', apar: 'compP', pag: 'pagP', smql: 'mqlM' }[k] || k) + '\')'; }) + '</div>'
+    +   '<div class="pl-chips" style="margin:2px 0 10px"><button type="button" class="pl-chip' + (_trfSdrVista() === 'simples' ? ' on' : '') + '" aria-pressed="' + (_trfSdrVista() === 'simples') + '" onclick="trfSdrVista(\'simples\')">Simples</button><button type="button" class="pl-chip' + (_trfSdrVista() === 'detalhado' ? ' on' : '') + '" aria-pressed="' + (_trfSdrVista() === 'detalhado') + '" onclick="trfSdrVista(\'detalhado\')">Detalhado</button></div>'
+    +   '<div class="trf-fns">' + _trfFnBlocos(_trfSdrPassosFunil(), val, 0, D, function(k) { return 'trfSdrLista(\'' + ({ marc: 'marcP', apar: 'compP', pag: 'pagP', smql: 'mqlM' }[k] || k) + '\')'; }) + '</div>'
     +   '<p class="trf-nota">Leads, 1º contato e resposta vêm da Clint, anotados pelo robô: ' + (ehS(TRF.sdr) ? 'aqui entra o funil "Sarah" (quem comentou no Instagram).' : (TRF_SDR_COM_SARAH ? 'funil SPARK / GROWTH mais o funil "Sarah" (quem comentou no Instagram).' : 'funil SPARK / GROWTH (os leads da Sarah não entram aqui).')) + ' O tempo da 1ª resposta conta só os leads que chegaram de segunda a sexta, das 8h às 18h, do momento em que o lead entrou até a 1ª mensagem de uma pessoa do time. Reunião marcada, compareceu e venda vêm da planilha de vendas pelo dia da reunião em ' + _trfE(P.rot) + ', com a mesma conta da Visão Geral e do Relatório por função (por isso podem incluir leads que entraram antes do período).' + (zp.pend ? ' <a href="#" onclick="trfSdrLista(\'pendP\');return false">' + _trfN(zp.pend) + ' reuniões já passaram e estão sem resultado lançado</a>.' : '') + '</p>'
     +   '</div>'
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>👥 SDR por SDR</h3><span class="trf-sub">clique numa linha para ver o funil só dessa pessoa</span></div>'
