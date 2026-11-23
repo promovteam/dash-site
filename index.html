@@ -2996,7 +2996,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-23-1109';
+var VERSAO_DASH = '2026-11-23-1644';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -43403,11 +43403,12 @@ function _trfFnBlocos(PS, val, gasto, D, clique) {
     var semDado0 = 0, semDado = (k === 'imp' || k === 'cli') ? !D.temMeta : k === 'vis' ? D.semVis : k === 'ent' ? !!D.semEnt : k === 'mql' ? !!D.semMql : (k === 'vw' || k === 'pf') ? D.semVw : k === 'com' ? D.semCom : !!(D.semDado && D.semDado[k]);
     if (semDado) conv = null;
     var apTxt = (D.aparte && D.aparte[k]) || '', semLig = !!apTxt; if (semLig) conv = null;
+    var pcP = D.pct && D.pct[k]; if (pcP && !semDado) conv = pcP[0];   // 23/11/2026: % própria do passo (ex.: comparecimento sobre as reuniões que já aconteceram)
     var C = TRF_COR[TRF_COR_PASSO[k]] || TRF_COR.az, bb = b - 10, est = ' style="--i:' + i + ';--m:' + (Math.round((a * .42 + bb * .58) * 10) / 10) + ';--c:' + C[1] + '"';
     h += (ck ? '<button type="button" class="trf-fn' + (k === pior ? ' pior' : '') + '"' + est + ' onclick="' + ck + '" title="' + p[2] + ' · clique para ver">' : '<div class="trf-fn parado' + (k === pior ? ' pior' : '') + '"' + est + ' title="' + p[2] + '">')
       + '<span class="trf-fn-rot"><b>' + p[1] + '</b><small>' + p[2] + '</small></span>'
       + '<span class="trf-fn-meio">' + _trfAnel(a, bb, C, 66, 10) + '<b>' + (semDado ? (D.semDado && D.semDado[k] ? '—' : '…') : _trfN(v)) + '</b></span>'
-      + '<span class="trf-fn-lado"><span class="trf-fn-conv"' + (conv != null && conv > 100 ? ' title="' + _trfE(MAIOR[k] || 'Este passo conta gente que não passou pelo passo de cima.') + '"' : '') + '>' + (D.semDado && D.semDado[k] ? '<em class="trf-maior" style="color:var(--text2);">falta registrar</em><small>' + _trfE(D.semDado[k]) + '</small>' : semLig ? '<em class="trf-maior" style="color:var(--text2);">' + (apTxt.charAt(0) === '~' ? 'número parcial' : 'contagem à parte') + '</em><small>' + _trfE(apTxt.replace(/^~/, '')) + '</small>' : conv == null ? '&nbsp;' : conv > 100 ? '<em class="trf-maior">↑ maior que o de cima</em><small>não é parte dele · veja a nota</small>' : '↓ ' + (conv >= 10 ? Math.round(conv) : conv.toFixed(conv < 1 ? 2 : 1).replace('.', ',')) + '%<small>do passo anterior</small>' + (k === pior ? '<em class="trf-pior">⚠ maior perda</em>' : '')) + '</span>'
+      + '<span class="trf-fn-lado"><span class="trf-fn-conv"' + (conv != null && conv > 100 ? ' title="' + _trfE(MAIOR[k] || 'Este passo conta gente que não passou pelo passo de cima.') + '"' : '') + '>' + (D.semDado && D.semDado[k] ? '<em class="trf-maior" style="color:var(--text2);">falta registrar</em><small>' + _trfE(D.semDado[k]) + '</small>' : semLig ? '<em class="trf-maior" style="color:var(--text2);">' + (apTxt.charAt(0) === '~' ? 'número parcial' : 'contagem à parte') + '</em><small>' + _trfE(apTxt.replace(/^~/, '')) + '</small>' : conv == null ? '&nbsp;' : conv > 100 ? '<em class="trf-maior">↑ maior que o de cima</em><small>não é parte dele · veja a nota</small>' : '↓ ' + (conv >= 10 ? Math.round(conv) : conv.toFixed(conv < 1 ? 2 : 1).replace('.', ',')) + '%<small>' + (pcP ? _trfE(pcP[1]) : 'do passo anterior') + '</small>' + (k === pior ? '<em class="trf-pior">⚠ maior perda</em>' : '')) + '</span>'
       + '<span class="trf-fn-custo">' + (cst == null ? '&nbsp;' : (cst >= 10 ? _trfRs(cst) : 'R$ ' + cst.toFixed(2).replace('.', ',')) + '<small>cada</small>') + '</span></span>' + (ck ? '</button>' : '</div>');
     if (!semDado && !(D.naoBase && D.naoBase[k])) ant = v;
   });
@@ -44341,14 +44342,16 @@ function trfSdrLista(tipo, filtro) {
 // 13/11/2026 (Bruno: "mas o certo não é a planilha?"): reuniões, comparecimento e vendas de cada SDR vêm DIRETO da planilha de vendas,
 // pela coluna SDR (o primeiro nome do responsável da Clint: "Selina Souza" → Selina, "Sarah Andressa" → SS Sarah).
 // Marcadas = registradas no período (carimbo) · Compareceram/faltaram/vendas = reuniões com data no período.
+var TRF_SDR_TIME = [['Luana', /^luana/i], ['João Victor', /^jo[aã]o\s*v/i]];   // 23/11/2026: SDRs novos aparecem mesmo sem lead na Clint
+function _trfSdrChave(n) { var s = _psNorm(String(n || '').replace(/^\s*(SS|SDR)\s+/i, '')); return /^joao\s*v/.test(s) ? 'joaovictor' : s.split(/\s+/)[0]; }
 function _trfSdrPlan(nomes, P) {
   // 13/11/2026 (Bruno: "preciso de números exatos que batem com todas as outras abas"): usa a MESMA conta do Relatório por função
   // (rlCalc) e da Visão Geral (v2calc): reunião pelo DIA DA REUNIÃO no período · marcou = agendada ou com resultado · apareceu = não vendido,
   // bloqueio, entrada, vendido, estorno ou remarcada · no-show = status No-Show · comparecimento = apareceu ÷ (apareceu + no-show) · venda = Vendido.
-  var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(function(n) { return _psNorm(String(n || '').split(' ')[0]); }).filter(Boolean);
+  var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean);
   var z = { marc: 0, ja: 0, comp: 0, falt: 0, pag: 0, valor: 0, pend: 0, rows: [], L: { marcP: [], compP: [], nsP: [], pagP: [], pendP: [] } };
   if (!chaves.length) return z;
-  var dele = function(r) { var p = _psNorm(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : String(r.sdr || '').replace(/^\s*(SS|SDR)\s+/i, '')).split(/\s+/)[0]; return !!p && chaves.indexOf(p) >= 0; };
+  var dele = function(r) { var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
   var c = typeof rlCalc === 'function' ? rlCalc({ ini: P.ini, fim: P.fim }, dele) : null;
   if (c) { var t = c.t; z.marc = t.marc; z.comp = t.re; z.falt = t.ns; z.ja = t.re + t.ns; z.pag = t.vd; z.valor = t.vdV; z.pend = t.pend; z.rows = c.rows;
     z.L = { marcP: t.l.marc, compP: t.l.re, nsP: t.l.ns, pagP: t.l.vd, pendP: t.l.pend }; return _trfSdrProd(z); }
@@ -44421,6 +44424,7 @@ function _trfRenderSdr(el) {
     if (TRF_SDR_COM_SARAH && nmSarah && daSarah.length) { porSdr[nmSarah] = (porSdr[nmSarah] || []).concat(daSarah); noPer = noPer.concat(daSarah); } }
   if (!TRF_SDR_COM_SARAH) { Object.keys(porSdr).forEach(function(n) { if (/sarah/i.test(n)) { noPer = noPer.filter(function(x) { return (x.resp || 'Sem responsável') !== n; }); delete porSdr[n]; } }); nmSarah = ''; }   // Bruno, 13/11: "entra" na soma do time
   var ehS = function(n) { return !!nmSarah && n === nmSarah; };
+  if (okC) TRF_SDR_TIME.forEach(function(t) { if (!Object.keys(porSdr).some(function(n) { return t[1].test(n); })) porSdr[t[0]] = []; });   // 23/11/2026
   var nomes = Object.keys(porSdr).sort(function(a, b) { return porSdr[b].length - porSdr[a].length; });
   if (TRF.sdr && !porSdr[TRF.sdr]) TRF.sdr = '';
   var L = TRF.sdr ? porSdr[TRF.sdr] : noPer, z = _trfSdrConta(L, porTel), val = {}; TRF_SDR_PS.forEach(function(p) { val[p[0]] = z[p[0]]; });
@@ -44441,6 +44445,7 @@ function _trfRenderSdr(el) {
     + nomes.map(function(n) { return '<button type="button" class="pl-chip' + (TRF.sdr === n ? ' on' : '') + '" onclick="trfSdrQuem(\'' + _trfE(n).replace(/\\/g, '').replace(/&#39;/g, '') + '\')">' + pri(n) + ' · ' + _trfN(porSdr[n].length) + '</button>'; }).join('') + '</div></div>';
   var jaFoi = z.apar + z.falt, zp = _trfSdrPlan(TRF.sdr ? [TRF.sdr] : nomes, P); window._trfSdrCtx.zp = zp;
   val.marc = zp.marc; val.apar = zp.comp; val.pag = zp.pag;
+  D.pct = { apar: [zp.ja ? zp.comp / zp.ja * 100 : null, 'das ' + _trfN(zp.ja) + ' reuniões que já aconteceram · ' + _trfN(zp.falt) + ' no-show'] };   // 23/11/2026: igual às outras telas
   // 13/11/2026 (Bruno: "se está certo é maravilhoso para ver"): faixa comparando com a empresa toda (a mesma conta da Visão Geral)
   var zE = null, zT = _trfSdrPlan(nomes, P); try { var cE = rlCalc({ ini: P.ini, fim: P.fim }); zE = { comp: cE.t.re, falt: cE.t.ns, ja: cE.t.re + cE.t.ns, pag: cE.t.vd, valor: cE.t.vdV, marc: cE.t.marc, L: { nsP: cE.t.l.ns } }; } catch (eE) {}
   if (window._trfSdrCtx) { window._trfSdrCtx.zt = zT; window._trfSdrCtx.ze = zE; }
