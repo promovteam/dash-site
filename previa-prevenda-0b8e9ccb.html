@@ -44521,6 +44521,38 @@ function pvComo(n) {
 }
 function pvEu() { if (window._pvComo) return window._pvComo; try { var lg = localStorage.getItem('v2Login') || '', k = _trfSdrChave(lg); for (var i = 0; i < PV_SDRS.length; i++) if (_trfSdrChave(PV_SDRS[i]) === k) return PV_SDRS[i]; } catch (e) {} return ''; }
 function pvAbrir() { try { csdCarregar(false); } catch (e) {} pvRender(); }
+function pvAba(k) { PV.aba = k; pvRender(); }
+function pvOrigem(k) { PV.ori = k; pvRender(); }
+// 🧲 funil das origens: o mesmo funil, um por origem. Os leads vêm da Clint (Anúncio · Orgânico · Bio · Outras) e as reuniões e vendas
+// da planilha (coluna Origem, a mesma régua da aba Todos). Eventos (workshop e presencial) não têm lead no funil da Clint do diagnóstico.
+var PV_ORI = [
+  { k: 'pago', rot: '📣 Tráfego pago', cl: /an[uú]ncio|\bads\b/i, pl: { pago: 1 } },
+  { k: 'org', rot: '🌱 Orgânico e link na bio', cl: /org[aâ]nico|\bbio\b|manychat/i, pl: { org: 1, bio: 1 } },
+  { k: 'ev', rot: '🎟️ Eventos', cl: null, pl: { ws: 1, pres: 1 } },
+  { k: 'out', rot: 'Outras origens', cl: 'resto', pl: { pp: 1, ss: 1, ind: 1, out: 1 } }
+];
+function _pvOrigensHtml(L, zp, porTel, P, quem) {
+  var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
+  var dados = PV_ORI.map(function(o) {
+    var Lg = o.cl === null ? [] : L.filter(function(x) { var og = String(x.orig || ''); return o.cl === 'resto' ? !PV_ORI.some(function(q) { return q.cl && q.cl !== 'resto' && q.cl.test(og); }) : o.cl.test(og); });
+    var zc = _trfSdrConta(Lg, porTel), R = (zp.rows || []).filter(function(r) { return o.pl[_trfOrigemLinha(r.origem)]; });
+    var comp = R.filter(function(r) { return isComp(r.sn || ''); }), ns = R.filter(function(r) { return (r.sn || '') === 'no show'; }), vd = R.filter(function(r) { return (r.sn || '') === 'vendido'; });
+    return { o: o, zc: zc, semLead: o.cl === null, marc: R.length, comp: comp.length, falt: ns.length, ja: comp.length + ns.length, pag: vd.length, valor: vd.reduce(function(s, r) { return s + (r.valor || 0); }, 0),
+      Ls: { marcP: R, compP: comp, nsP: ns, pagP: vd } }; });
+  var sel = dados.filter(function(d) { return d.o.k === PV.ori; })[0] || dados.slice().sort(function(a, b) { return b.marc - a.marc; })[0];
+  PV._ctx = { L: [], esp: [], porTel: porTel, P: P, quem: quem, zp: { L: sel.Ls }, filtroTxt: ' · ' + sel.o.rot.replace(/^\S+\s/, ''), nome: 'pré-venda' };
+  var passos = (sel.semLead ? [] : [TRF_SDR_PS[0], TRF_SDR_PS[2]]).concat(TRF_SDR_PS.filter(function(p) { return /^(marc|apar|pag)$/.test(p[0]); }));
+  var val = { sl: sel.zc.sl, sc: sel.zc.sc, marc: sel.marc, apar: sel.comp, pag: sel.pag };
+  var D = { z: sel.zc, P: P, ev: false, temMeta: true, temSite: true, naoBase: {}, aparte: {}, pct: { apar: [sel.ja ? sel.comp / sel.ja * 100 : null, 'das ' + _trfN(sel.ja) + ' que já aconteceram · ' + _trfN(sel.falt) + ' no-show'] } };
+  var linhas = dados.map(function(d) { var on = d === sel, c = function(t) { return '<td style="padding:10px 12px">' + t + '</td>'; };
+    return '<tr role="button" tabindex="0" onclick="pvOrigem(\'' + d.o.k + '\')" style="cursor:pointer;border-top:1px solid var(--border);' + (on ? 'background:rgba(246,163,80,.10)' : '') + '"><td style="padding:10px 12px;font-weight:800">' + d.o.rot + '</td>'
+      + c(d.semLead ? '—' : _trfN(d.zc.sl)) + c(d.semLead ? '—' : _trfN(d.zc.sc) + ' <small style="opacity:.65">' + pc(d.zc.sc, d.zc.sl) + '</small>') + c(_trfN(d.marc)) + c(_trfN(d.comp) + ' <small style="opacity:.65">de ' + _trfN(d.ja) + ' · ' + pc(d.comp, d.ja) + '</small>')
+      + c(d.ja ? pc(d.falt, d.ja) : '—') + c(_trfN(d.pag) + (d.comp ? ' <small style="opacity:.65">' + pc(d.pag, d.comp) + '</small>' : '')) + c(d.valor ? _trfRs(d.valor) : '—') + '</tr>'; }).join('');
+  return '<div class="panel" style="margin-bottom:16px;overflow-x:auto"><h3 style="margin:0 0 10px">🧲 Uma linha por origem <small style="font-weight:600;opacity:.6">clique numa linha para ver o funil dela</small></h3>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:.86rem"><thead><tr style="text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;opacity:.65"><th style="padding:6px 12px">Origem</th><th style="padding:6px 12px">Leads recebidos</th><th style="padding:6px 12px">1º contato</th><th style="padding:6px 12px">Marcadas</th><th style="padding:6px 12px">Lead apareceu</th><th style="padding:6px 12px">No-show</th><th style="padding:6px 12px">Vendas</th><th style="padding:6px 12px">Vendido</th></tr></thead><tbody>' + linhas + '</tbody></table></div>'
+    + '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 Funil · ' + sel.o.rot + '</h3><span class="trf-sub">' + (sel.semLead ? 'Eventos não têm lead no funil de diagnóstico da Clint: o funil começa na reunião marcada' : 'em cima: leads da Clint com essa origem · embaixo: reuniões e vendas da planilha com essa origem') + '</span></div>'
+    + '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : ''; }) + '</div></div>';
+}
 function pvPer(v) { TRF.sper = v; pvRender(); }
 function pvQuem(n) { PV.quem = n; pvRender(); }
 function pvLista(tipo) { var C = PV._ctx; if (!C) return; window._trfSdrCtx = C; trfCloLista(tipo); }
@@ -44552,6 +44584,7 @@ function pvRender() {
   var h = '<div style="display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin-bottom:16px">' + selQuem
     + '<div class="pl-chips" style="margin:0">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'pvPer(\'' + o[0] + '\')'); }).join('') + '</div>'
     + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">' + (!eu ? '<button type="button" class="btn" onclick="pvComo(\'' + _trfE(quem || 'Selina') + '\')" title="Mostra o dash exatamente como o SDR vê: menu só com a pré-venda">👁 Ver como o SDR vê</button>' : '') + '<a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
+  var hCab = h; h = '';
   // 1ª fileira: do lead até a venda, com os mesmos nomes do funil da Visão Geral
   h += '<div class="kpis">'
     + card(quem ? 'Leads que recebi' : 'Leads recebidos', okC ? _trfN(zc.sl) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', '', 'negócios que entraram na Clint em ' + _trfE(P.rot), okC && zc.sl ? [pc(zc.sc, zc.sl), '1º contato de uma pessoa: ' + zc.sc + ' de ' + zc.sl, 'tiveram 1º contato'] : null)
@@ -44561,6 +44594,15 @@ function pvRender() {
     + card('Lead apareceu', okV ? _trfN(zp.comp) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', 'compP', '↳ ' + pc(zp.comp, zp.ja) + ' das realizadas' + (zp.falt ? ' · ' + _trfN(zp.falt) + (zp.falt === 1 ? ' faltou' : ' faltaram') : ''))
     + card('Pagou tudo', okV ? _trfN(zp.pag) : '…', '#3ddc97', 'rgba(61,220,151,.14)', 'pagP', zp.valor ? _trfRs(zp.valor) + ' vendidos' : 'status Vendido na planilha', zp.comp ? [pc(zp.pag, zp.comp), 'Pagou tudo ÷ lead apareceu: ' + zp.pag + ' de ' + zp.comp, 'de quem apareceu'] : null)
     + '</div>';
+  var hA = h; h = '';
+  // 🔻 o funil do SDR, o mesmo desenho da Gestão de funis (24/11/2026, Bruno: "cadê o funil do SDR?"): Simples × Detalhado
+  var simplesF = _trfSdrVista() === 'simples', valF = { sl: zc.sl, sc: zc.sc, sr: zc.sr, marc: zp.marc, apar: zp.comp, pag: zp.pag };
+  var Df = { z: zc, P: P, ev: false, temMeta: true, temSite: true, naoBase: {}, aparte: {}, pct: { apar: [zp.ja ? zp.comp / zp.ja * 100 : null, 'das ' + _trfN(zp.ja) + ' que já aconteceram · ' + _trfN(zp.falt) + ' no-show'] } };
+  var vistaBt = function(v, rot) { var on = (v === 'simples') === simplesF; return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="TRF.sdrVista=\'' + v + '\';try{localStorage.setItem(\'trfSdrVista\',\'' + v + '\')}catch(e){};pvRender()">' + rot + '</button>'; };
+  h += '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 ' + (quem ? 'Meu funil' : 'Funil da pré-venda') + (quem && !eu ? ' · ' + _trfE(quem) : '') + '</h3><span class="trf-sub">em cima: leads que entraram em ' + _trfE(P.rot) + ' · embaixo: reuniões e vendas da planilha no mesmo período</span></div>'
+    + '<div class="pl-chips" style="margin:2px 0 10px">' + vistaBt('simples', 'Simples') + vistaBt('detalhado', 'Detalhado') + '</div>'
+    + '<div class="trf-fns">' + _trfFnBlocos(_trfSdrPassosFunil(), valF, 0, Df, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : ''; }) + '</div></div>';
+  var hF = h; h = '';
   // 2ª fileira: o que a pré-venda controla — rapidez, falta e o que ficou sem lançar
   var nsAlto = zp.ja >= 5 && zp.falt / zp.ja > 0.15;
   h += '<div class="kpis">'
@@ -44577,6 +44619,10 @@ function pvRender() {
       return '<tr style="cursor:pointer;border-top:1px solid var(--border)" onclick="pvQuem(\'' + _trfE(n) + '\')"><td style="padding:9px 12px;font-weight:800">' + _trfE(n) + '</td>' + c(_trfN(f)) + c(_trfN(q.marc)) + c(_trfN(q.comp) + ' <small style="opacity:.65">de ' + _trfN(q.ja) + '</small>') + c(q.ja ? pc(q.falt, q.ja) : '—') + c(_trfN(q.pag)) + c(q.valor ? _trfRs(q.valor) : '—') + '</tr>'; }).join('');
     h += '<div class="panel" style="margin-top:18px;overflow-x:auto"><h3 style="margin:0 0 10px">👥 SDR por SDR <small style="font-weight:600;opacity:.6">clique numa linha para ver só a pessoa</small></h3><table style="width:100%;border-collapse:collapse;font-size:.86rem"><thead><tr style="text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;opacity:.65"><th style="padding:6px 12px">SDR</th><th style="padding:6px 12px">Marcou no período</th><th style="padding:6px 12px">Marcadas</th><th style="padding:6px 12px">Lead apareceu</th><th style="padding:6px 12px">No-show</th><th style="padding:6px 12px">Vendas</th><th style="padding:6px 12px">Vendido</th></tr></thead><tbody>' + linhas + '</tbody></table></div>';
   }
+  // abas da casa (24/11/2026, Bruno: "coloca uma aba separada para o funil do SDR e outra funil das origens")
+  var aba = PV.aba || 'resumo', hB = h, abaBt = function(k, rot) { var on = aba === k; return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" role="tab" aria-selected="' + on + '" onclick="pvAba(\'' + k + '\')" style="font-size:.86rem;padding:9px 16px">' + rot + '</button>'; };
+  var hAbas = '<div class="pl-chips" role="tablist" style="margin:0 0 16px;gap:8px">' + abaBt('resumo', '🏠 Resumo') + abaBt('funil', '🔻 Funil do SDR') + abaBt('origens', '🧲 Funil das origens') + '</div>';
+  h = hCab + hAbas + (aba === 'funil' ? hF : aba === 'origens' ? _pvOrigensHtml(L, zp, porTel, P, quem) : hA + hB);
   h += '<p class="hint" style="margin-top:14px">Reuniões, comparecimento e vendas vêm da planilha de vendas, pela coluna SDR e pelo dia da reunião, com a mesma conta da Visão Geral (remarcada não conta como apareceu). Leads e tempo de resposta vêm da Clint. "Marquei no período" conta pelo dia em que a reunião foi marcada.</p>';
   TRF.sfun = sfun;
   el.innerHTML = h;
