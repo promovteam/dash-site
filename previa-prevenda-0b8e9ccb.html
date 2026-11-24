@@ -44512,7 +44512,7 @@ var TRF_SDR_COM_SARAH = false;
 // contas das outras telas: reuniões pela planilha de vendas (coluna SDR, dia da reunião), leads e 1º contato pela Clint, faixa da comissão.
 // O SDR entra e vê só os números dele; a gestão escolhe o time ou uma pessoa.
 // =====================================================================================================
-var PV = { quem: '' }, PV_SDRS = ['Selina', 'Ismael', 'Luana', 'João Victor', 'De fechamento'];   // 24/11/2026 (Bruno: "pode colocar o de fechamento"): as reuniões com "de fechamento" na coluna SDR (ILD) entram na pré-venda
+var PV = { quem: '' }, PV_SDRS = ['Selina', 'Ismael', 'Luana', 'João Victor', 'De fechamento', 'Sarah'];   // 24/11/2026 (Bruno: "pode colocar o de fechamento"): as reuniões com "de fechamento" na coluna SDR (ILD) entram na pré-venda
 function pvPode() { try { var lg = localStorage.getItem('v2Login'); if (lg === null) return true; if (lg === 'Visitante') return false; if (typeof ehIld === 'function' && ehIld()) return false; if (typeof ehConteudo === 'function' && ehConteudo()) return false; return true; } catch (e) { return false; } }
 function pvMostrarMenu() { var it = document.querySelector('.nav-item[data-s="prevenda"]'); if (it) it.style.display = pvPode() ? '' : 'none'; }
 // quem está logado é SDR? devolve o nome dele na lista (o SDR não troca de pessoa)
@@ -44545,7 +44545,11 @@ var PV_ORI = [
   { k: 'org', rot: '🌱 Orgânico', cl: /org[aâ]nico|manychat/i, pl: { org: 1 } },
   { k: 'bio', rot: '🔗 Link na bio', cl: /\bbio\b/i, pl: { bio: 1 } },
   { k: 'ev', rot: '🎟️ Eventos', cl: null, pl: { ws: 1, pres: 1 } },
-  { k: 'out', rot: 'Outras origens', cl: 'resto', pl: { pp: 1, ss: 1, ind: 1, out: 1 } }
+  // 24/11/2026 (Bruno: "pode criar um funil separado caso tenha outro"): cada origem com o seu funil; a aba só aparece quando tem reunião ou lead
+  { k: 'pp', rot: '🔁 Pós workshop e Call Meet', cl: null, pl: { pp: 1 } },
+  { k: 'ind', rot: '🤝 Indicação', cl: null, pl: { ind: 1 } },
+  { k: 'ss', rot: '💬 Social Selling', cl: null, pl: { ss: 1 } },
+  { k: 'out', rot: '🩹 Recuperação e sem origem', cl: 'resto', pl: { out: 1 } }
 ];
 // 24/11/2026 (Bruno: "link na bio"): Orgânico e Link na bio separados, como na Gestão de funis. A Clint escreve quase tudo como "Orgânico";
 // o que separa é a base do site: o lead que entrou pelo link da bio (src = bio) vai para Link na bio, o do ManyChat fica no Orgânico.
@@ -44560,6 +44564,7 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
     var comp = R.filter(function(r) { return isComp(r.sn || ''); }), ns = R.filter(function(r) { return (r.sn || '') === 'no show'; }), vd = R.filter(function(r) { return (r.sn || '') === 'vendido'; });
     return { o: o, zc: zc, semLead: o.cl === null, marc: R.length, comp: comp.length, falt: ns.length, ja: comp.length + ns.length, pag: vd.length, valor: vd.reduce(function(s, r) { return s + (r.valor || 0); }, 0),
       Ls: { marcP: R, compP: comp, nsP: ns, pagP: vd } }; });
+  dados = dados.filter(function(d) { return d.marc > 0 || (d.zc && d.zc.sl > 0); }); if (!dados.length) return '<div class="panel">Nenhuma reunião nem lead no período.</div>';
   var sel = dados.filter(function(d) { return d.o.k === PV.ori; })[0] || dados.slice().sort(function(a, b) { return b.marc - a.marc; })[0];
   PV._ctx = { L: [], esp: [], porTel: porTel, P: P, quem: quem, zp: { L: sel.Ls }, filtroTxt: ' · ' + sel.o.rot.replace(/^\S+\s/, ''), nome: 'pré-venda' };
   // 24/11/2026 (Bruno: "coloque igual a Gestão de funis, como no principal"): abas grandes por origem (as mesmas da Gestão de funis),
@@ -44574,14 +44579,14 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
   var nav = '<div class="trf-nav" style="margin-bottom:14px"><h2 class="trf-canal">' + dados.map(function(d) { var on = d === sel; return '<button type="button" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="pvOrigem(\'' + d.o.k + '\')">' + d.o.rot + ' <small style="opacity:.7;font-weight:700">' + _trfN(d.marc) + '</small></button>'; }).join('') + '</h2></div>';
   var kpi = function(cls, rot, v, sub, tipo) { return '<div class="trf-kpi ' + cls + '"' + (tipo ? ' role="button" tabindex="0" style="cursor:pointer" onclick="pvLista(\'' + tipo + '\')"' : '') + '><span>' + rot + '</span><b>' + v + '</b><small>' + sub + '</small></div>'; };
   var kp = '<div class="trf-kpis k6" style="margin-bottom:16px">'
-    + kpi('', 'Leads recebidos', sel.semLead ? '—' : _trfN(sel.zc.sl), sel.semLead ? 'evento não tem lead na Clint' : 'entraram na Clint', sel.semLead ? '' : 'L:sl')
+    + kpi('', 'Leads recebidos', sel.semLead ? '—' : _trfN(sel.zc.sl), sel.semLead ? 'a Clint não marca esta origem' : 'entraram na Clint', sel.semLead ? '' : 'L:sl')
     + kpi('', 'MQL', sel.semLead ? '—' : _trfN(mql), sel.semLead ? '' : pc(mql, sel.zc.sl) + ' marcaram investimento', sel.semLead ? '' : 'L:mqlM')
     + kpi('', 'Marcadas', _trfN(sel.marc), sel.semLead ? 'reuniões na planilha' : pc(sel.marc, mql) + ' dos MQL', 'marcP')
     + kpi(sel.ja && sel.comp / sel.ja >= 0.85 ? 'bom' : '', 'Lead apareceu', _trfN(sel.comp), pc(sel.comp, sel.ja) + ' · ' + _trfN(sel.falt) + ' no-show', 'compP')
     + kpi('', 'Vendas', _trfN(sel.pag), pc(sel.pag, sel.comp) + ' de quem apareceu', 'pagP')
     + kpi('vd', 'Vendido', sel.valor ? _trfRs(sel.valor) : '—', sel.pag ? 'ticket ' + _trfRs(sel.valor / sel.pag) : 'vendas fechadas', 'pagP') + '</div>';
   return nav + kp
-    + '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 Funil · ' + sel.o.rot + '</h3><span class="trf-sub">' + (sel.semLead ? 'Eventos não têm lead no funil de diagnóstico da Clint: o funil começa na reunião marcada' : 'clique num passo · em cima: leads da Clint com essa origem · embaixo: reuniões e vendas da planilha') + '</span></div>'
+    + '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 Funil · ' + sel.o.rot + '</h3><span class="trf-sub">' + (sel.semLead ? (sel.o.k === 'ev' ? 'Eventos não têm lead no funil de diagnóstico da Clint' : 'A Clint não marca esta origem no lead') + ': o funil começa na reunião marcada' : 'clique num passo · em cima: leads da Clint com essa origem · embaixo: reuniões e vendas da planilha') + '</span></div>'
     + '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : 'pvLista(\'L:' + k + '\')'; }) + '</div></div>';
 }
 function pvProd(k) { PV.prod = k; pvRender(); }
@@ -44640,7 +44645,7 @@ function pvRender() {
   var okV = !!(V2.carregado || (V2.rows || []).length), okC = typeof CSD !== 'undefined' && CSD.carregado;
   if (!okV || !okC) { clearTimeout(PV._t); PV._t = setTimeout(function() { var s = document.querySelector('.screen.active'); if (s && s.id === 's-prevenda') pvRender(); }, 1500); }
   var eu = pvEu(), quem = eu || PV.quem, nomes = quem ? [quem] : PV_SDRS, P = _trfSdrPer();
-  var sfun = TRF.sfun, sori0 = TRF.sori, evF = /^(ws|ild|wld)$/.test(PV.fun || ''); TRF.sfun = evF ? 'ws' : (PV.fun || ''); TRF.sori = PV.fun === 'ild' ? 'pres' : PV.fun === 'wld' ? 'ws' : ''; if (PV.ori2) TRF.sori = { pago: 'pago', org: 'org', bio: 'bio', out: 'pp,ss,ind,out' }[PV.ori2];   // 24/11: filtro de origem (Bruno: "coloca um filtro de origem")   // 24/11: Eventos = ILD (presencial) + WLD (workshop on-line)   // Diagnóstico × Eventos pelo funil da origem da planilha (a mesma régua do principal)
+  var sfun = TRF.sfun, sori0 = TRF.sori, evF = /^(ws|ild|wld)$/.test(PV.fun || ''); TRF.sfun = evF ? 'ws' : (PV.fun || ''); TRF.sori = PV.fun === 'ild' ? 'pres' : PV.fun === 'wld' ? 'ws' : ''; if (PV.ori2) TRF.sori = { pago: 'pago', org: 'org', bio: 'bio', pp: 'pp', ind: 'ind', ss: 'ss', out: 'out' }[PV.ori2];   // 24/11: filtro de origem (Bruno: "coloca um filtro de origem")   // 24/11: Eventos = ILD (presencial) + WLD (workshop on-line)   // Diagnóstico × Eventos pelo funil da origem da planilha (a mesma régua do principal)
   var sprod0 = TRF.sprod; TRF.sprod = PV.prod || '';   // 24/11/2026 (Bruno: "poderia ter um filtro HT e Legado")
   var zp = _trfSdrPlan(nomes, P), fez = _trfSdrFez(nomes, P), chaves = nomes.map(_trfSdrChave), porTel = _trfIdxV2().porTel, vistos = {};
   var L = (okC ? CSD.rows : []).filter(function(x) { if (!/spark/i.test(x.funil || '') || vistos[x.id]) return false; vistos[x.id] = 1; return x.cr >= P.ini && x.cr < P.fim && chaves.indexOf(_trfSdrChave(x.resp)) !== -1; });
@@ -44669,7 +44674,7 @@ function pvRender() {
   var h = '<div style="display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin-bottom:16px">' + selQuem
     + '<div class="pl-chips" style="margin:0">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'pvPer(\'' + o[0] + '\')'); }).join('') + '</div>'
     + pvSel('Produto', 'pvProd', PV.prod || '', [['', 'Todos'], ['ht', '💎 HT (R$ 2 mil ou mais)'], ['leg', '📗 Legado (R$ 500 a 1 mil)']])
-    + pvSel('Origem', 'pvOri2', PV.ori2 || '', [['', 'Todas'], ['pago', '📣 Tráfego pago'], ['org', '🌱 Orgânico'], ['bio', '🔗 Link na bio'], ['out', 'Outras origens']])
+    + pvSel('Origem', 'pvOri2', PV.ori2 || '', [['', 'Todas'], ['pago', '📣 Tráfego pago'], ['org', '🌱 Orgânico'], ['bio', '🔗 Link na bio'], ['pp', '🔁 Pós workshop e Call Meet'], ['ind', '🤝 Indicação'], ['ss', '💬 Social Selling'], ['out', '🩹 Recuperação e sem origem']])
     + pvSel('Funil', 'pvFun', PV.fun || '', [['', 'Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎟️ Eventos (ILD + WLD)'], ['ild', '　🏛️ ILD · presencial'], ['wld', '　💻 WLD · workshop on-line']])
     + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">' + (window._pvDash && !pvEhSdr() ? '<button type="button" class="btn" onclick="pvSairDash()" title="Voltar para o dash com todas as áreas">↗ Dash completo</button>' : '') + (!eu && !window._pvDash ? '<button type="button" class="btn" onclick="pvComo(\'' + _trfE(quem || 'Selina') + '\')" title="Mostra o dash exatamente como o SDR vê: menu só com a pré-venda">👁 Ver como o SDR vê</button>' : '') + '<a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
   var hCab = h; h = '';
@@ -44738,7 +44743,7 @@ function pvRender() {
     + '<div class="g-label">✅ Lead apareceu</div><div class="g-value money">' + (okV ? _trfN(zp.comp) : '…') + '</div>'
     + '<div class="g-sub"><b>' + pc(zp.comp, zp.ja) + '</b> das ' + _trfN(zp.ja) + ' realizadas · ' + _trfN(zp.falt) + ' faltaram</div>'
     + (zpA ? '<div class="v2-cmp"><span class="v2-cmp-t">📅 ' + Pant.rot + '</span><div class="v2-cmp-v"><b>' + _trfN(zpA.comp) + '</b><small>apareceram</small>' + v2vs(zpH.comp, zpA.comp) + '</div></div>' : '')
-    + (quem && quem !== 'De fechamento' ? '<div class="g-rows"><div class="g-row"><span>🎯 Faixa ' + fx[0] + '</span><b>' + (prox ? 'faltam ' + fx[1] + ' para ' + prox : 'máxima') + '</b></div></div>' : '<div class="g-rows"><div class="g-row"><span>⏳ Sem resultado lançado</span><b>' + _trfN(zp.pend) + '</b></div></div>')
+    + (quem && quem !== 'De fechamento' && quem !== 'Sarah' ? '<div class="g-rows"><div class="g-row"><span>🎯 Faixa ' + fx[0] + '</span><b>' + (prox ? 'faltam ' + fx[1] + ' para ' + prox : 'máxima') + '</b></div></div>' : '<div class="g-rows"><div class="g-row"><span>⏳ Sem resultado lançado</span><b>' + _trfN(zp.pend) + '</b></div></div>')
     + '</div>';
   h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(61,220,151,.18);--tint:#3ddc97;" onclick="pvLista(\'pagP\')">'
     + '<div class="g-label">💰 Vendas ' + (quem ? 'das minhas reuniões' : 'das reuniões da pré-venda') + '</div><div class="g-value money">' + (okV ? _trfRs(zp.valor || 0) : '…') + '</div>'
