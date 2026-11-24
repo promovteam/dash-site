@@ -170,27 +170,43 @@
   function limparSem() { EST.inv = EST.nota = EST.etapa = EST.idade = ''; }
   // 18/11: painel do gestor — uma ficha por pessoa (os 2 SDRs e os 2 da recuperação), com o que fez hoje, o andamento e os resultados
   function painelGestor() {
-    var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
-    var gente = (D.sdrs || []).map(function(k) { return [k, 'Lista dos SDRs']; }).concat((D.rec || []).map(function(k) { return [k, 'Recuperação']; }));
-    var T = { pend: 0, hoje: 0, reu: 0, comp: 0, vend: 0, valor: 0 };
+    var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0); var h0 = hoje0.getTime();
+    // a conta de cada ficha sai dos leads (o placar do robô é por pessoa e misturava as duas listas de quem tem as duas)
+    var conta = function(L) { var o = { pend: 0, mql: 0, feitos: 0, hoje: 0, vistos: 0, reu: 0, comp: 0, vend: 0, valor: 0 };
+      L.forEach(function(p) { var m = p.marc; if (!m && !p.ct && !p.res) { o.pend++; if (p.nv) o.mql++; } if (m) { o.feitos++; if ((m.em || 0) >= h0) o.hoje++; } if (p.ct && !m) o.vistos++;
+        if (p.res) { o.reu++; if (p.res.comp) o.comp++; if (p.res.vend) { o.vend++; o.valor += p.res.valor || 0; } } }); return o; };
+    var de = function(k, rec) { return (D.leads || []).filter(function(p) { return p.dono === k && !!p.rec === rec; }); };
+    var gente = (D.sdrs || []).map(function(k) { return [k, 'Lista dos SDRs', de(k, false)]; }).concat((D.rec || []).map(function(k) { return [k, 'Recuperação', de(k, true)]; }));
+    var T = { pend: 0, hoje: 0, reu: 0, comp: 0, vend: 0, valor: 0 }, visto = {};
     var cards = gente.map(function(g) {
-      var k = g[0], P = D.placar[k] || {}, a = (D.acessos || {})[k], feitos = (P.feitos || 0) + (P.vistos || 0), tot = feitos + (P.pendentes || 0), pc = tot ? Math.round(100 * feitos / tot) : 0;
-      T.pend += P.pendentes || 0; T.hoje += P.feitosHoje || 0; T.reu += P.reunioes || 0; T.comp += P.compareceram || 0; T.vend += P.vendas || 0; T.valor += P.valor || 0;
-      var st = (P.feitosHoje || 0) > 0 ? '<span class="st ok">✅ trabalhando hoje</span>' : a && a.hoje ? '<span class="st meio">🟡 abriu, sem abordar</span>' : '<span class="st nao">🔴 não entrou hoje</span>';
+      var k = g[0], P = conta(g[2]), a = (D.acessos || {})[k], feitos = P.feitos + P.vistos, tot = feitos + P.pend, pc = tot ? Math.round(100 * feitos / tot) : 0, outra = visto[k]; visto[k] = 1;
+      T.pend += P.pend; T.hoje += P.hoje; T.reu += P.reu; T.comp += P.comp; T.vend += P.vend; T.valor += P.valor;
+      var st = P.hoje > 0 ? '<span class="st ok">✅ trabalhando hoje</span>' : a && a.hoje ? '<span class="st meio">🟡 abriu, sem abordar</span>' : '<span class="st nao">🔴 não entrou hoje</span>';
       return '<div class="pp"><div class="pp-top"><div><b>' + esc(nomeDe(k)) + '</b><small>' + g[1] + '</small></div>' + st + '</div>'
         + '<div><div class="barra" title="' + pc + '% da lista trabalhada"><i style="width:' + pc + '%"></i></div><div class="pp-f" style="margin-top:4px"><b>' + pc + '%</b> da lista trabalhada · ' + feitos + ' de ' + tot + '</div></div>'
-        + '<div class="pp-n"><div><small>Para chamar</small><b style="color:var(--accent)">' + (P.pendentes || 0) + '</b></div><div><small>Hoje</small><b>' + (P.feitosHoje || 0) + '</b></div><div><small>Pela Clint</small><b>' + (P.vistos || 0) + '</b></div></div>'
-        + '<div class="pp-f">📅 <b>' + (P.reunioes || 0) + '</b> reuniões → <b>' + (P.compareceram || 0) + '</b> compareceram → 💰 <b>' + (P.vendas || 0) + '</b> vendas' + (P.vendas ? ' · ' + rs(P.valor) : '') + '</div>'
-        + '<div class="pp-pe"><span>Última entrada: ' + (a && a.ultima ? hora(a.ultima) : 'nunca') + '</span><button type="button" class="chip" onclick="gerarLink(\'' + k + '\')">' + ((D.links || {})[k] ? '🔗 Trocar link' : '🔗 Gerar link') + '</button></div></div>';
+        + '<div class="pp-n"><div><small>Para chamar</small><b style="color:var(--accent)">' + P.pend + '</b></div><div><small>Hoje</small><b>' + P.hoje + '</b></div><div><small>Pela Clint</small><b>' + P.vistos + '</b></div></div>'
+        + '<div class="pp-f">📅 <b>' + P.reu + '</b> reuniões → <b>' + P.comp + '</b> compareceram → 💰 <b>' + P.vend + '</b> vendas' + (P.vend ? ' · ' + rs(P.valor) : '') + '</div>'
+        + '<div class="pp-pe"><span>Última entrada: ' + (a && a.ultima ? hora(a.ultima) : 'nunca') + '</span>' + (outra ? '' : '<button type="button" class="chip" onclick="gerarLink(\'' + k + '\')">' + ((D.links || {})[k] ? '🔗 Trocar link' : '🔗 Gerar link') + '</button>') + '</div></div>';
     }).join('');
     var tm = D.placar.time || {};
+    // leads que entraram na lista no período (só a Lista dos SDRs; recuperação e eventos são listas fechadas)
+    var per = EST.novos || 'hoje', ini = per === 'ontem' ? h0 - 864e5 : per === '7' ? h0 - 6 * 864e5 : h0, fim = per === 'ontem' ? h0 : h0 + 864e5;
+    var novos = (D.leads || []).filter(function(p) { return !p.rec && !p.ev && p.cr >= ini && p.cr < fim; });
+    var linhaN = function(rot, L) { var ch = L.filter(function(p) { return p.marc || p.ct || p.res; }).length, sem = L.length - ch, mqlSem = L.filter(function(p) { return !(p.marc || p.ct || p.res) && p.nv; }).length;
+      return '<tr><td style="padding:7px 10px;font-weight:700">' + rot + '</td><td style="padding:7px 10px">' + L.length + '</td><td style="padding:7px 10px;color:var(--green,#3ddc97)">' + ch + '</td><td style="padding:7px 10px;color:' + (sem ? 'var(--accent)' : 'inherit') + ';font-weight:700">' + sem + '</td><td style="padding:7px 10px">' + mqlSem + '</td></tr>'; };
+    var donos = (D.sdrs || []).concat(['time']);
+    var blocoN = '<h2 style="margin-top:18px">Leads que entraram na lista</h2><div class="abas" style="margin:8px 0">' + [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias']].map(function(o) { return '<button type="button" class="aba" aria-selected="' + (per === o[0]) + '" onclick="EST.novos=\'' + o[0] + '\';desenhar()">' + o[1] + '</button>'; }).join('') + '</div>'
+      + (novos.length ? '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.86rem"><thead><tr style="text-align:left;opacity:.7;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em"><th style="padding:6px 10px">De quem</th><th style="padding:6px 10px">Entraram</th><th style="padding:6px 10px">Já chamados</th><th style="padding:6px 10px">Sem contato</th><th style="padding:6px 10px">MQL sem contato</th></tr></thead><tbody>'
+        + donos.map(function(k) { var L = novos.filter(function(p) { return p.dono === k; }); return L.length ? linhaN(esc(nomeDe(k)), L) : ''; }).join('') + linhaN('Total', novos) + '</tbody></table></div>'
+        : '<p class="nota" style="margin:6px 0 0">Nenhum lead entrou na lista neste período.</p>')
+      + '<p class="nota" style="margin:8px 0 0">Entram aqui os leads que chegaram e ficaram sem contato de uma pessoa. Quem foi chamado na hora não entra na lista: para ver todos os leads do dia e o tempo de resposta, use o dash em Gestão de funis › SDR › Hoje.</p>';
     return '<div class="card"><h2>Painel do time</h2><div class="kpis" style="margin:10px 0 14px">'
       + '<div class="kpi q"><small>Para chamar</small><b>' + T.pend + '</b><span>+ ' + (tm.pendentes || 0) + ' da Sarah (compartilhados)</span></div>'
       + '<div class="kpi v"><small>Trabalhados hoje</small><b>' + T.hoje + '</b><span>cliques em Abordei hoje</span></div>'
       + '<div class="kpi"><small>Reuniões</small><b>' + T.reu + '</b><span>' + T.comp + ' compareceram</span></div>'
       + '<div class="kpi v"><small>Vendas</small><b>' + T.vend + '</b><span>' + (T.vend ? rs(T.valor) : 'desde 17/11') + '</span></div></div>'
-      + '<div class="pg">' + cards + '</div><div id="linkBox"></div>'
-      + '<p class="nota" style="margin:10px 0 0">"Hoje" é o botão Abordei. "Pela Clint" é mensagem de uma pessoa vista na conversa. Reuniões, comparecimento e vendas vêm da planilha de vendas, de 17/11 em diante.</p></div>';
+      + '<div class="pg">' + cards + '</div><div id="linkBox"></div>' + blocoN
+      + '<p class="nota" style="margin:10px 0 0">Cada ficha é uma lista de uma pessoa. "Hoje" é o botão Abordei. "Pela Clint" é mensagem de uma pessoa vista na conversa. Reuniões, comparecimento e vendas vêm da planilha de vendas, de 17/11 em diante.</p></div>';
   }
   function rs(v) { return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); }
   function desenhar() {
