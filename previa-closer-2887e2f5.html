@@ -44416,7 +44416,17 @@ var TRF_SDR_COM_SARAH = false;
 // resultado · compareceu = apareceu · comparecimento = apareceu ÷ (apareceu + no-show) · venda = Vendido. "Time todo" = todas as reuniões.
 // =====================================================================================================
 var TRF_CLO_PS = [['marc', 'Marcadas', 'reuniões na planilha com data no período'], ['real', 'Realizadas', 'o dia passou e o resultado foi lançado · inclui faltas'], ['apar', 'Lead apareceu', 'o lead entrou na reunião (remarcada não conta)'], ['sim', 'Disse sim na reunião', 'vendido, bloqueio de oferta ou entrada'], ['pag', 'Pagou tudo', 'status Vendido na planilha']];
-var TRF_CLO_WS = /workshop|ild|call meet|wld/i;
+// Workshop e eventos × Diagnóstico (24/11/2026, Bruno: "esses também são de diagnóstico" — Pós workshop e Call Meet): a MESMA regra do
+// Relatório por função (rlGrupoR): só é Workshop a reunião com origem Workshop dentro da janela da edição da pessoa; antecipação,
+// recuperação, pós workshop e Call Meet são Diagnóstico. O ILD (imersão presencial) entra em Workshop e eventos.
+function _trfCloEhWs(r) { var o = String(r.origem || ''); if (/\bild\b/i.test(o)) return true; if (/p[oó]s\s*workshop|recupera|antecipa|call\s*meet/i.test(o)) return false; try { return rlGrupoR(r) === 'Workshop'; } catch (e) { return /workshop/i.test(o); } }
+// a lista de cada cartão abre na MESMA janela da Visão Geral (Bruno: "por que esses cards são diferentes da Visão Geral? queria igual")
+var TRF_CLO_LST = { marcP: 'Reuniões marcadas', compP: 'Lead apareceu', nsP: 'No-show', pagP: 'Vendas', pendP: 'Sem resultado lançado', spkP: 'Vendas de Spark', grwP: 'Vendas de Growth', simP: 'Disse sim na reunião', legP: 'Vendas de Legado' };
+function trfCloLista(tipo) {
+  var C = window._trfSdrCtx, L = C && C.zp && C.zp.L && C.zp.L[tipo]; if (!L || typeof RL_L === 'undefined') return;
+  RL_L.clo = { tipo: 'v2', t: TRF_CLO_LST[tipo] || 'Reuniões', sub: 'Funil do closer · ' + rlE(C.quem ? 'só ' + C.quem : 'time todo') + rlE(C.filtroTxt || '') + ' · ' + rlE(C.P.rot), rows: L.slice().sort(function(a, b) { return (b.date || 0) - (a.date || 0); }) };
+  rlAbrirLista('clo');
+}
 function trfCloQuem(n) { TRF.clo = TRF.clo === n ? '' : n; renderTrafego(); }
 function trfCloFunil(v) { TRF.cfun = v; TRF.cori = ''; renderTrafego(); }
 function trfCloOrigem(v) { TRF.cori = TRF.cori === v ? '' : v; renderTrafego(); }
@@ -44430,12 +44440,13 @@ function _trfCloZ(P, filtro) {
   // Marcadas (agendada ou com resultado) › Realizadas (apareceu ou faltou · isReal) › Lead apareceu (isComp: remarcada NÃO conta) ›
   // Disse sim (isFe) › Pagou tudo (Vendido). Conversão = vendas ÷ quem apareceu.
   var c = rlCalc({ ini: P.ini, fim: P.fim }, filtro), t = c.t, comp = c.rows.filter(function(r) { return isComp(r.sn || ''); }), sim = c.rows.filter(function(r) { return isFe(r.sn || ''); }), rem = c.rows.filter(function(r) { return /^remarcada/.test(r.sn || ''); });
-  var z = { marc: t.marc, comp: comp.length, falt: t.ns, ja: comp.length + t.ns, sim: sim.length, simV: t.feV, rem: rem.length, pag: t.vd, valor: t.vdV, pend: t.pend, rows: c.rows, L: { marcP: t.l.marc, compP: comp, nsP: t.l.ns, pagP: t.l.vd, pendP: t.l.pend } };
-  return _trfSdrProd(z);
+  var z = { marc: t.marc, comp: comp.length, falt: t.ns, ja: comp.length + t.ns, sim: sim.length, simV: t.feV, rem: rem.length, pag: t.vd, valor: t.vdV, pend: t.pend, rows: c.rows, L: { marcP: t.l.marc, compP: comp, nsP: t.l.ns, pagP: t.l.vd, pendP: t.l.pend, simP: sim } };
+  z = _trfSdrProd(z); z.L.legP = z.L.pagP.filter(function(r) { return !/spark|growth/i.test(r.produto || ''); });
+  return z;
 }
 function _trfRenderCloser(el) {
   var okV = !!(V2.carregado || (V2.rows || []).length); if (!okV) _trfVigiar('v2');
-  var P = _trfSdrPer(), fun = TRF.cfun || '', ehWs = function(r) { return TRF_CLO_WS.test(r.origem || ''); };
+  var P = _trfSdrPer(), fun = TRF.cfun || '', ehWs = _trfCloEhWs;
   var fFun = function(r) { return fun === 'ws' ? ehWs(r) : fun === 'diag' ? !ehWs(r) : true; };
   var todas = rlLinhas({ ini: P.ini, fim: P.fim }), porClo = {}, porOri = {};
   todas.forEach(function(r) { if (!fFun(r)) return; var n = _trfCloNome(r); porClo[n] = (porClo[n] || 0) + 1; });
@@ -44455,13 +44466,13 @@ function _trfRenderCloser(el) {
       sim: [z.comp ? z.sim / z.comp * 100 : null, 'de quem apareceu'],
       pag: [z.comp ? z.pag / z.comp * 100 : null, 'de quem apareceu'] } };
   window._trfCtx = null;
-  window._trfSdrCtx = { L: [], esp: [], porTel: _trfIdxV2().porTel, P: P, quem: TRF.clo, zp: z, grupo: 'todos os closers' + (fun === 'ws' ? ' · workshop e eventos' : fun === 'diag' ? ' · diagnóstico' : '') + (TRF.cori ? ' · ' + TRF.cori : '') };
+  window._trfSdrCtx = { L: [], esp: [], porTel: _trfIdxV2().porTel, P: P, quem: TRF.clo, zp: z, filtroTxt: (fun === 'ws' ? ' · workshop e eventos' : fun === 'diag' ? ' · diagnóstico' : '') + (TRF.cori ? ' · ' + TRF.cori : '') };
   var simples = _trfSdrVista() === 'simples', passos = TRF_CLO_PS.filter(function(p) { return !(simples && (p[0] === 'real' || p[0] === 'sim')); });
   var chip = function(on, rot, ac) { return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="' + ac + '">' + rot + '</button>'; };
   var aspas = function(s) { return _trfE(s).replace(/\\/g, '').replace(/&#39;/g, ''); };
   var avisos = okV ? '' : '<div class="trf-aviso"><span class="mv-brilho-txt">Lendo a planilha de vendas…</span></div>';
   var conv = z.comp ? z.pag / z.comp : null, compP = z.ja ? z.comp / z.ja : null;
-  var kb = function(tipo, rot, v, sub, cls) { return '<button type="button" class="trf-kpi l ' + (cls || '') + '" onclick="trfSdrLista(\'' + tipo + '\')" title="Clique para ver as reuniões"><span>' + rot + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</button>'; };
+  var kb = function(tipo, rot, v, sub, cls) { return '<button type="button" class="trf-kpi l ' + (cls || '') + '" onclick="trfCloLista(\'' + tipo + '\')" title="Clique para ver as reuniões"><span>' + rot + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</button>'; };
   var linhas = nomes.map(function(n) { var q = _trfCloZ(P, function(r) { return fFun(r) && fOri(r) && _trfCloNome(r) === n; });
     var c = function(r, h) { return '<td data-r="' + r + '">' + h + '</td>'; }, al = function(ruim, t) { return ruim ? '<span style="color:#ff6b6b;font-weight:700">' + t + '</span>' : t; };
     return '<tr onclick="trfCloQuem(\'' + aspas(n) + '\')" style="cursor:pointer"' + (TRF.clo === n ? ' class="on"' : '') + '>' + c('Closer', '<b>' + _trfE(n) + '</b>') + c('Reuniões marcadas', _trfN(q.marc))
@@ -44495,9 +44506,9 @@ function _trfRenderCloser(el) {
     + kb('pendP', '⏳ Sem resultado lançado', _trfN(z.pend), 'a data já passou e a planilha ainda diz agendada', '') + '</div>'
     + '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🔻 Funil do closer' + (TRF.clo ? ' · ' + _trfE(TRF.clo) : ' · time todo') + (fun === 'ws' ? ' · workshop e eventos' : fun === 'diag' ? ' · diagnóstico' : '') + (TRF.cori ? ' · ' + _trfE(TRF.cori) : '') + '</h3><span class="trf-sub">reuniões da planilha de vendas com data em ' + _trfE(P.rot) + '</span></div>'
     +   '<div class="pl-chips" style="margin:2px 0 10px">' + chip(simples, 'Simples', 'trfSdrVista(\'simples\')') + chip(!simples, 'Detalhado', 'trfSdrVista(\'detalhado\')') + '</div>'
-    +   '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { return 'trfSdrLista(\'' + ({ marc: 'marcP', real: 'marcP', apar: 'compP', sim: 'pagP', pag: 'pagP' }[k]) + '\')'; }) + '</div>'
-    +   (simples ? '' : '<div class="trf-kpis" style="margin-top:10px">' + kb('pagP', 'Legado', _trfN(z.leg), 'vendas de Legado Digital e Club', '') + kb('spkP', '⚡ Spark', _trfN(z.spk), 'vendas de Spark', '') + kb('grwP', '🚀 Growth', _trfN(z.grw), 'vendas de Growth', '') + '</div>')
-    +   '<p class="trf-nota">Tudo vem da planilha de vendas, pelo dia da reunião, com a mesma conta da Visão Geral e do Relatório por função: os mesmos passos do funil da Visão Geral: realizadas = apareceu ou faltou; lead apareceu = vendido, não vendido, bloqueio, entrada ou estorno (remarcada não conta); conversão = vendas ÷ quem apareceu. Workshop e eventos = origem com Workshop, ILD, Call Meet ou WLD; o resto é Diagnóstico. Alertas: comparecimento abaixo de 80% e conversão abaixo de 30%.' + (z.rem ? ' Remarcadas no período: ' + _trfN(z.rem) + ' (ficam fora de realizadas).' : '') + '</p></div>'
+    +   '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { return 'trfCloLista(\'' + ({ marc: 'marcP', real: 'marcP', apar: 'compP', sim: 'simP', pag: 'pagP' }[k]) + '\')'; }) + '</div>'
+    +   (simples ? '' : '<div class="trf-kpis" style="margin-top:10px">' + kb('legP', 'Legado', _trfN(z.leg), 'vendas de Legado Digital e Club', '') + kb('spkP', '⚡ Spark', _trfN(z.spk), 'vendas de Spark', '') + kb('grwP', '🚀 Growth', _trfN(z.grw), 'vendas de Growth', '') + '</div>')
+    +   '<p class="trf-nota">Tudo vem da planilha de vendas, pelo dia da reunião, com a mesma conta da Visão Geral e do Relatório por função: os mesmos passos do funil da Visão Geral: realizadas = apareceu ou faltou; lead apareceu = vendido, não vendido, bloqueio, entrada ou estorno (remarcada não conta); conversão = vendas ÷ quem apareceu. Workshop e eventos = origem Workshop dentro da janela da edição da pessoa (a regra do Relatório) e o ILD; antecipação, recuperação, pós workshop e Call Meet contam em Diagnóstico. Alertas: comparecimento abaixo de 80% e conversão abaixo de 30%.' + (z.rem ? ' Remarcadas no período: ' + _trfN(z.rem) + ' (ficam fora de realizadas).' : '') + '</p></div>'
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>👥 Closer por closer</h3><span class="trf-sub">clique numa linha para ver o funil só dessa pessoa · segue os filtros de funil e origem</span></div>'
     +   (nomes.length ? '<div class="trf-tab-rol"><table class="trf-tab trf-tab-sdr"><thead><tr><th>Closer</th><th>Reuniões marcadas</th><th>Compareceram</th><th>No-show</th><th>Vendas</th><th>Conversão</th><th>Legado</th><th>Spark</th><th>Growth</th><th>Vendido</th></tr></thead><tbody>' + linhas + '</tbody></table></div>' : '<p class="trf-nota">' + (okV ? 'Nenhuma reunião neste período.' : 'Carregando…') + '</p>') + '</div>';
   _trfAnimar(el, D);
