@@ -192,12 +192,18 @@
     // leads que entraram na lista no período (só a Lista dos SDRs; recuperação e eventos são listas fechadas)
     var per = EST.novos || 'hoje', ini = per === 'ontem' ? h0 - 864e5 : per === '7' ? h0 - 6 * 864e5 : h0, fim = per === 'ontem' ? h0 : h0 + 864e5;
     var novos = (D.leads || []).filter(function(p) { return !p.rec && !p.ev && p.cr >= ini && p.cr < fim; });
-    var linhaN = function(rot, L) { var ch = L.filter(function(p) { return p.marc || p.ct || p.res; }).length, sem = L.length - ch, mqlSem = L.filter(function(p) { return !(p.marc || p.ct || p.res) && p.nv; }).length;
-      return '<tr><td style="padding:7px 10px;font-weight:700">' + rot + '</td><td style="padding:7px 10px">' + L.length + '</td><td style="padding:7px 10px;color:var(--green,#3ddc97)">' + ch + '</td><td style="padding:7px 10px;color:' + (sem ? 'var(--accent)' : 'inherit') + ';font-weight:700">' + sem + '</td><td style="padding:7px 10px">' + mqlSem + '</td></tr>'; };
+    var ehCh = function(p) { return !!(p.marc || p.ct || p.res); }, sel = EST.novosVer || null;
+    var FN = { todos: function() { return true; }, ch: ehCh, sem: function(p) { return !ehCh(p); }, mql: function(p) { return !ehCh(p) && p.nv; } }, RN = { todos: 'entraram', ch: 'já chamados', sem: 'sem contato', mql: 'MQL sem contato' };
+    var cel = function(k, t, n, cor) { var on = sel && sel.k === k && sel.t === t; return '<td style="padding:4px 10px"><button type="button" onclick="novosVer(\'' + k + '\',\'' + t + '\')" title="Clique para ver os leads" aria-pressed="' + !!on + '" style="min-width:44px;min-height:36px;padding:4px 10px;border-radius:10px;border:1px solid ' + (on ? 'var(--accent)' : 'rgba(255,255,255,.14)') + ';background:' + (on ? 'rgba(246,163,80,.16)' : 'transparent') + ';color:' + (cor || 'inherit') + ';font:inherit;font-weight:700;cursor:pointer">' + n + '</button></td>'; };
+    var linhaN = function(rot, L, k) { var ch = L.filter(ehCh).length, sem = L.length - ch, mqlSem = L.filter(FN.mql).length;
+      return '<tr><td style="padding:7px 10px;font-weight:700">' + rot + '</td>' + cel(k, 'todos', L.length) + cel(k, 'ch', ch, 'var(--green,#3ddc97)') + cel(k, 'sem', sem, sem ? 'var(--accent)' : '') + cel(k, 'mql', mqlSem) + '</tr>'; };
     var donos = (D.sdrs || []).concat(['time']);
-    var blocoN = '<h2 style="margin-top:18px">Leads que entraram na lista</h2><div class="abas" style="margin:8px 0">' + [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias']].map(function(o) { return '<button type="button" class="aba" aria-selected="' + (per === o[0]) + '" onclick="EST.novos=\'' + o[0] + '\';desenhar()">' + o[1] + '</button>'; }).join('') + '</div>'
+    var blocoN = '<h2 style="margin-top:18px">Leads que entraram na lista</h2><div class="abas" style="margin:8px 0">' + [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias']].map(function(o) { return '<button type="button" class="aba" aria-selected="' + (per === o[0]) + '" onclick="EST.novos=\'' + o[0] + '\';EST.novosVer=null;desenhar()">' + o[1] + '</button>'; }).join('') + '</div>'
       + (novos.length ? '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.86rem"><thead><tr style="text-align:left;opacity:.7;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em"><th style="padding:6px 10px">De quem</th><th style="padding:6px 10px">Entraram</th><th style="padding:6px 10px">Já chamados</th><th style="padding:6px 10px">Sem contato</th><th style="padding:6px 10px">MQL sem contato</th></tr></thead><tbody>'
-        + donos.map(function(k) { var L = novos.filter(function(p) { return p.dono === k; }); return L.length ? linhaN(esc(nomeDe(k)), L) : ''; }).join('') + linhaN('Total', novos) + '</tbody></table></div>'
+        + donos.map(function(k) { var L = novos.filter(function(p) { return p.dono === k; }); return L.length ? linhaN(esc(nomeDe(k)), L, k) : ''; }).join('') + linhaN('Total', novos, 'todos') + '</tbody></table></div>'
+        + (function() { if (!sel) return ''; var Ls = novos.filter(function(p) { return (sel.k === 'todos' || p.dono === sel.k) && FN[sel.t](p); }).sort(function(x, y) { return y.cr - x.cr; });
+            return '<div id="novosLista" style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px"><b>' + Ls.length + ' ' + RN[sel.t] + ' · ' + esc(sel.k === 'todos' ? 'time todo' : nomeDe(sel.k)) + '</b><button type="button" class="chip" onclick="novosVer(\'\',\'\')">✕ fechar</button></div>'
+              + (Ls.length ? Ls.slice(0, 60).map(cartao).join('') + (Ls.length > 60 ? '<p class="nota">Mostrando os 60 mais recentes de ' + Ls.length + '.</p>' : '') : '<p class="nota">Nenhum lead aqui.</p>') + '</div>'; })()
         : '<p class="nota" style="margin:6px 0 0">Nenhum lead entrou na lista neste período.</p>')
       + '<p class="nota" style="margin:8px 0 0">Entram aqui os leads que chegaram e ficaram sem contato de uma pessoa. Quem foi chamado na hora não entra na lista: para ver todos os leads do dia e o tempo de resposta, use o dash em Gestão de funis › SDR › Hoje.</p>';
     return '<div class="card"><h2>Painel do time</h2><div class="kpis" style="margin:10px 0 14px">'
@@ -208,6 +214,7 @@
       + '<div class="pg">' + cards + '</div><div id="linkBox"></div>' + blocoN
       + '<p class="nota" style="margin:10px 0 0">Cada ficha é uma lista de uma pessoa. "Hoje" é o botão Abordei. "Pela Clint" é mensagem de uma pessoa vista na conversa. Reuniões, comparecimento e vendas vêm da planilha de vendas, de 17/11 em diante.</p></div>';
   }
+  function novosVer(k, t) { var a = EST.novosVer; EST.novosVer = (!k || (a && a.k === k && a.t === t)) ? null : { k: k, t: t }; desenhar(); if (EST.novosVer) setTimeout(function() { var el = document.getElementById('novosLista'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 60); }
   function rs(v) { return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); }
   function desenhar() {
     if (EST.lista !== 'rec' && EST.aba === 'ev' && !D.leads.some(function(p) { return p.ev; })) EST.aba = 'mql';   // sem eventos (robô antigo): abre no MQL
