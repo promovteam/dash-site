@@ -44556,17 +44556,27 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
       Ls: { marcP: R, compP: comp, nsP: ns, pagP: vd } }; });
   var sel = dados.filter(function(d) { return d.o.k === PV.ori; })[0] || dados.slice().sort(function(a, b) { return b.marc - a.marc; })[0];
   PV._ctx = { L: [], esp: [], porTel: porTel, P: P, quem: quem, zp: { L: sel.Ls }, filtroTxt: ' · ' + sel.o.rot.replace(/^\S+\s/, ''), nome: 'pré-venda' };
-  var passos = (sel.semLead ? [] : [TRF_SDR_PS[0], TRF_SDR_PS[2]]).concat(TRF_SDR_PS.filter(function(p) { return /^(marc|apar|pag)$/.test(p[0]); }));
-  var val = { sl: sel.zc.sl, sc: sel.zc.sc, marc: sel.marc, apar: sel.comp, pag: sel.pag };
+  // 24/11/2026 (Bruno: "coloque igual a Gestão de funis, como no principal"): abas grandes por origem (as mesmas da Gestão de funis),
+  // a fileira de números (trf-kpis) e o funil com os passos do funil do SDR do principal (leads → 1º contato → respondeu → marcada → apareceu → venda).
+  var fichasO = {}; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichasO[k]; if (!o || (l.date || 0) > (o.date || 0)) fichasO[k] = l; }); } catch (eO) {}
+  var Lsel = sel.semLead ? [] : L.filter(function(x) { var og = String(x.orig || ''); var o = sel.o; return o.cl === 'resto' ? !PV_ORI.some(function(q) { return q.cl && q.cl !== 'resto' && q.cl.test(og); }) : o.cl.test(og); });
+  var mql = Lsel.filter(function(x) { return _trfSdrMql(fichasO[ldTel8(x.tel)], x.tel); }).length;
+  PV._ctx.L = Lsel;
+  var passos = TRF_SDR_PS.filter(function(p) { return p[0] !== 'smql' && !(sel.semLead && /^s(l|c|r)$/.test(p[0])); });
+  var val = { sl: sel.zc.sl, sc: sel.zc.sc, sr: sel.zc.sr, marc: sel.marc, apar: sel.comp, pag: sel.pag };
   var D = { z: sel.zc, P: P, ev: false, temMeta: true, temSite: true, naoBase: {}, aparte: {}, pct: { apar: [sel.ja ? sel.comp / sel.ja * 100 : null, 'das ' + _trfN(sel.ja) + ' que já aconteceram · ' + _trfN(sel.falt) + ' no-show'] } };
-  var linhas = dados.map(function(d) { var on = d === sel, c = function(t) { return '<td style="padding:10px 12px">' + t + '</td>'; };
-    return '<tr role="button" tabindex="0" onclick="pvOrigem(\'' + d.o.k + '\')" style="cursor:pointer;border-top:1px solid var(--border);' + (on ? 'background:rgba(246,163,80,.10)' : '') + '"><td style="padding:10px 12px;font-weight:800">' + d.o.rot + '</td>'
-      + c(d.semLead ? '—' : _trfN(d.zc.sl)) + c(d.semLead ? '—' : _trfN(d.zc.sc) + ' <small style="opacity:.65">' + pc(d.zc.sc, d.zc.sl) + '</small>') + c(_trfN(d.marc)) + c(_trfN(d.comp) + ' <small style="opacity:.65">de ' + _trfN(d.ja) + ' · ' + pc(d.comp, d.ja) + '</small>')
-      + c(d.ja ? pc(d.falt, d.ja) : '—') + c(_trfN(d.pag) + (d.comp ? ' <small style="opacity:.65">' + pc(d.pag, d.comp) + '</small>' : '')) + c(d.valor ? _trfRs(d.valor) : '—') + '</tr>'; }).join('');
-  return '<div class="panel" style="margin-bottom:16px;overflow-x:auto"><h3 style="margin:0 0 10px">🧲 Uma linha por origem <small style="font-weight:600;opacity:.6">clique numa linha para ver o funil dela</small></h3>'
-    + '<table style="width:100%;border-collapse:collapse;font-size:.86rem"><thead><tr style="text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;opacity:.65"><th style="padding:6px 12px">Origem</th><th style="padding:6px 12px">Leads recebidos</th><th style="padding:6px 12px">1º contato</th><th style="padding:6px 12px">Marcadas</th><th style="padding:6px 12px">Lead apareceu</th><th style="padding:6px 12px">No-show</th><th style="padding:6px 12px">Vendas</th><th style="padding:6px 12px">Vendido</th></tr></thead><tbody>' + linhas + '</tbody></table></div>'
-    + '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 Funil · ' + sel.o.rot + '</h3><span class="trf-sub">' + (sel.semLead ? 'Eventos não têm lead no funil de diagnóstico da Clint: o funil começa na reunião marcada' : 'em cima: leads da Clint com essa origem · embaixo: reuniões e vendas da planilha com essa origem') + '</span></div>'
-    + '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : ''; }) + '</div></div>';
+  var nav = '<div class="trf-nav" style="margin-bottom:14px"><h2 class="trf-canal">' + dados.map(function(d) { var on = d === sel; return '<button type="button" class="' + (on ? 'on' : '') + '" aria-pressed="' + on + '" onclick="pvOrigem(\'' + d.o.k + '\')">' + d.o.rot + ' <small style="opacity:.7;font-weight:700">' + _trfN(d.marc) + '</small></button>'; }).join('') + '</h2></div>';
+  var kpi = function(cls, rot, v, sub, tipo) { return '<div class="trf-kpi ' + cls + '"' + (tipo ? ' role="button" tabindex="0" style="cursor:pointer" onclick="pvLista(\'' + tipo + '\')"' : '') + '><span>' + rot + '</span><b>' + v + '</b><small>' + sub + '</small></div>'; };
+  var kp = '<div class="trf-kpis k6" style="margin-bottom:16px">'
+    + kpi('', 'Leads recebidos', sel.semLead ? '—' : _trfN(sel.zc.sl), sel.semLead ? 'evento não tem lead na Clint' : 'entraram na Clint', sel.semLead ? '' : 'L:sl')
+    + kpi('', 'MQL', sel.semLead ? '—' : _trfN(mql), sel.semLead ? '' : pc(mql, sel.zc.sl) + ' marcaram investimento', sel.semLead ? '' : 'L:mqlM')
+    + kpi('', 'Marcadas', _trfN(sel.marc), sel.semLead ? 'reuniões na planilha' : pc(sel.marc, mql) + ' dos MQL', 'marcP')
+    + kpi(sel.ja && sel.comp / sel.ja >= 0.85 ? 'bom' : '', 'Lead apareceu', _trfN(sel.comp), pc(sel.comp, sel.ja) + ' · ' + _trfN(sel.falt) + ' no-show', 'compP')
+    + kpi('', 'Vendas', _trfN(sel.pag), pc(sel.pag, sel.comp) + ' de quem apareceu', 'pagP')
+    + kpi('vd', 'Vendido', sel.valor ? _trfRs(sel.valor) : '—', sel.pag ? 'ticket ' + _trfRs(sel.valor / sel.pag) : 'vendas fechadas', 'pagP') + '</div>';
+  return nav + kp
+    + '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 Funil · ' + sel.o.rot + '</h3><span class="trf-sub">' + (sel.semLead ? 'Eventos não têm lead no funil de diagnóstico da Clint: o funil começa na reunião marcada' : 'clique num passo · em cima: leads da Clint com essa origem · embaixo: reuniões e vendas da planilha') + '</span></div>'
+    + '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : 'pvLista(\'L:' + k + '\')'; }) + '</div></div>';
 }
 function pvProd(k) { PV.prod = k; pvRender(); }
 function pvPer(v) { TRF.sper = v; pvRender(); }
