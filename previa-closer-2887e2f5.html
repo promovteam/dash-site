@@ -36139,6 +36139,8 @@ function rkoDados(chave) {
     }
     var P = D.posts[p.lk] = D.posts[p.lk] || { lk: p.lk, n: 0, q: {}, f: {} };
     P.n++; P.q[d.q] = (P.q[d.q] || 0) + 1; P.f[d.f] = (P.f[d.f] || 0) + 1;
+    if (l) { P.base = (P.base || 0) + 1; var clP = null; try { clP = classeDoLead(l); } catch (e4) {}   // 24/11/2026: formulário e MQL por post e por dia
+      if (clP && (clP.classe === 'A' || clP.classe === 'B') && !clP.semDisp) { P.mql = (P.mql || 0) + 1; (F.diaM = F.diaM || zeros())[di]++; (Q.diaM = Q.diaM || zeros())[di]++; } }
   });
   if (Object.keys(_rkoMemo).length > 12) _rkoMemo = {};
   _rkoMemo[ref] = D; return D;
@@ -36245,6 +36247,68 @@ function rkoGeralHtml(D) {
   }
   return h + '</section>';
 }
+// =====================================================================================================
+// 🏆 RANKING ORGÂNICO — posts com MQL, vídeo × carrossel e ritmo contra o mês anterior (24/11/2026 · Bruno: "adicionar MQL e lead gerado
+// por postagem, comparativo de pacing com o mês anterior — nesse mesmo dia tínhamos feito tanto —, separar carrossel de vídeo").
+// =====================================================================================================
+function rkoTipoPost(lk) { if (lk === 'story') return 'story'; var t = ((IGO.postDe || {})[lk] || {}).tipo; return t === 'VIDEO' ? 'video' : t === 'CAROUSEL_ALBUM' ? 'carrossel' : t ? 'foto' : 'outro'; }
+function rkoTipoPostSel(t) { RKO.tipoPost = t; renderRankOrg(); }
+function rkoPostsTodos() { RKO.postsTodos = !RKO.postsTodos; renderRankOrg(); }
+function rkoPostsHtml2(D) {
+  var todos = Object.keys(D.posts).map(function(k) { var P = D.posts[k]; P.tipo = rkoTipoPost(P.lk); return P; }).sort(function(a, b) { return b.n - a.n; });
+  if (!todos.length) return '';
+  var ROT = { video: '🎬 Vídeos', carrossel: '🖼️ Carrosséis', foto: '📷 Fotos', story: '📱 Stories', outro: 'Outros' }, G = {};
+  todos.forEach(function(P) { var g = G[P.tipo] || (G[P.tipo] = { posts: 0, n: 0, base: 0, mql: 0 }); g.posts++; g.n += P.n; g.base += P.base || 0; g.mql += P.mql || 0; });
+  var sel = RKO.tipoPost && G[RKO.tipoPost] ? RKO.tipoPost : '', ps = todos.filter(function(P) { return !sel || P.tipo === sel; }), lim = RKO.postsTodos ? 60 : 10;
+  var um = function(v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); };
+  var resumo = ['video', 'carrossel', 'foto', 'story'].filter(function(t) { return G[t]; }).map(function(t) { var g = G[t];
+    return '<button type="button" class="rko-tipo' + (sel === t ? ' on' : '') + '" aria-pressed="' + (sel === t) + '" onclick="rkoTipoPostSel(\'' + (sel === t ? '' : t) + '\')" style="text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid ' + (sel === t ? '#f6a350' : 'rgba(255,255,255,.1)') + ';border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;gap:3px;min-width:0">'
+      + '<b style="font-size:.86rem">' + ROT[t] + '</b><span style="font-size:1.25rem;font-weight:800">' + rkoN(g.n) + ' <small style="font-size:.68rem;font-weight:600;opacity:.7">leads</small></span>'
+      + '<small style="font-size:.7rem;opacity:.8">' + rkoN(g.posts) + ' post' + (g.posts === 1 ? '' : 's') + ' · ' + um(g.n / g.posts) + ' leads por post</small>'
+      + '<small style="font-size:.7rem;opacity:.8">' + rkoN(g.base) + ' preencheram · <b style="color:#3ddc97">' + rkoN(g.mql) + ' MQL</b>' + (g.n ? ' (' + rkoPct(g.mql, g.n) + '%)' : '') + '</small></button>'; }).join('');
+  var h = '<div class="rko-sec"><h3>Leads e MQL por post</h3><span class="rko-meta">no mês · toque num tipo para filtrar · clique no post para abrir no Instagram</span></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:10px">' + resumo + '</div><div class="panel rko-posts">';
+  ps.slice(0, lim).forEach(function(P, i) {
+    var info = (IGO.postDe || {})[P.lk] || {}, leg = String(info.legenda || '').replace(/\s+/g, ' ').trim(), dt = info.date ? ('0' + info.date.getDate()).slice(-2) + '/' + ('0' + (info.date.getMonth() + 1)).slice(-2) : '';
+    var donos = Object.keys(P.q).sort(function(a, b) { return P.q[b] - P.q[a]; }), story = P.lk === 'story';
+    h += (story ? '<div class="rko-post">' : '<a class="rko-post" href="' + dspEsc(P.lk) + '" target="_blank" rel="noopener">') + '<span class="rko-pos">' + (i + 1) + 'º</span>'
+      + (story ? '<span class="rko-post-t"><b>📱 Respostas aos stories</b><small>no direct, com a palavra</small></span>'
+        : '<span class="rko-post-t"><b>' + dspEsc(leg ? leg.slice(0, 90) + (leg.length > 90 ? '…' : '') : 'Post sem legenda') + '</b><small>' + [dt, { video: 'vídeo', carrossel: 'carrossel', foto: 'foto' }[P.tipo] || ''].filter(Boolean).join(' · ') + '</small></span>')
+      + '<span class="rko-post-q">' + donos.map(function(q) { return '<span class="rko-chip" style="--cor:' + RKO_CFG.pessoas[q].cor + '">' + rkoAvatar(q, 20) + dspEsc(RKO_CFG.pessoas[q].nome.split(' ')[0]) + ' <b>' + P.q[q] + '</b></span>'; }).join('') + '</span>'
+      + '<span class="rko-conta" title="leads = comentaram a palavra · preencheram o formulário · MQL = nota A ou B"><b>' + rkoN(P.n) + '</b><small>lead' + (P.n === 1 ? '' : 's') + ' · ' + rkoN(P.base || 0) + ' form. · <b style="color:#3ddc97">' + rkoN(P.mql || 0) + ' MQL</b></small></span>' + (story ? '</div>' : '</a>');
+  });
+  h += '</div>';
+  if (ps.length > 10) h += '<p style="margin:8px 0 0"><button type="button" class="pl-chip" onclick="rkoPostsTodos()">' + (RKO.postsTodos ? 'Mostrar só os 10 primeiros' : 'Ver os ' + rkoN(ps.length) + ' posts') + '</button></p>';
+  return h;
+}
+// ritmo: até o mesmo dia do mês anterior, quanto cada um tinha feito (leads = comentaram; MQL = nota A ou B)
+function rkoRitmoHtml(D) {
+  var ant = rkoMesAndar(D.chave, -1); if (ant < RKO_INICIO) return '';
+  var A = rkoDados(ant), k = D.atual ? D.diaHoje : D.dias, ka = Math.min(k, A.dias);
+  var soma = function(v, n) { var s = 0; for (var i = 0; i < n && v && i < v.length; i++) s += v[i] || 0; return s; };
+  var de = function(X, q, n, campo) { var s = 0; RKO_CFG.funis.forEach(function(f) { var r = X.funis[f.k].q[q]; if (r) s += soma(r[campo], n); }); return s; };
+  var seta = function(a, b) { if (!b) return a ? '<span style="color:#3ddc97">novo</span>' : '—'; var p = Math.round((a - b) / b * 100); return '<span style="color:' + (p >= 0 ? '#3ddc97' : '#ff6b6b') + ';font-weight:700">' + (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p) + '%</span>'; };
+  var tot = { n: 0, na: 0, m: 0, ma: 0 }, mesA = RKO_MESES[+ant.slice(5, 7) - 1];
+  var linhas = Object.keys(RKO_CFG.pessoas).map(function(q) {
+    var n = de(D, q, k, 'dia'), na = de(A, q, ka, 'dia'), m = de(D, q, k, 'diaM'), ma = de(A, q, ka, 'diaM'); tot.n += n; tot.na += na; tot.m += m; tot.ma += ma;
+    return '<tr><td>' + dspEsc(RKO_CFG.pessoas[q].nome) + '</td><td><b>' + rkoN(n) + '</b></td><td>' + rkoN(na) + '</td><td>' + seta(n, na) + '</td><td><b>' + rkoN(m) + '</b></td><td>' + rkoN(ma) + '</td><td>' + seta(m, ma) + '</td></tr>'; }).join('');
+  if (!tot.n && !tot.na) return '';
+  return '<div class="rko-sec"><h3>Ritmo contra ' + mesA + '</h3><span class="rko-meta">até o dia ' + k + ' de cada mês · neste mesmo dia de ' + mesA + ' o time tinha ' + rkoN(tot.na) + ' leads e ' + rkoN(tot.ma) + ' MQL</span></div>'
+    + '<div class="panel" style="overflow-x:auto"><table class="rko-tab"><thead><tr><th>Pessoa</th><th>Leads até o dia ' + k + '</th><th>Mesmo dia de ' + mesA + '</th><th>Leads</th><th>MQL até o dia ' + k + '</th><th>Mesmo dia de ' + mesA + '</th><th>MQL</th></tr></thead><tbody>' + linhas
+    + '<tr style="font-weight:800"><td>Time</td><td>' + rkoN(tot.n) + '</td><td>' + rkoN(tot.na) + '</td><td>' + seta(tot.n, tot.na) + '</td><td>' + rkoN(tot.m) + '</td><td>' + rkoN(tot.ma) + '</td><td>' + seta(tot.m, tot.ma) + '</td></tr></tbody></table></div>';
+}
+// 📈 Seguidores · "Melhor dia": o post publicado naquele dia (ou na véspera) que mais puxou gente. O Instagram não informa seguidores por
+// post; usa as visitas ao perfil do post (quando o dash já tem) e, sem elas, curtidas + comentários.
+function _sgdPostDoDia(d) {
+  try {
+    var t0 = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)).getTime(), pf = {}; ((typeof TRF !== 'undefined' && TRF.cont) || []).forEach(function(x) { if (x.lk) pf[x.lk] = x.pf || 0; });
+    var c = (IGO.posts || []).filter(function(p) { if (!p.date) return false; var t = p.date.getTime(); return t >= t0 - 864e5 && t < t0 + 864e5; });
+    if (!c.length) return '';
+    var nota = function(p) { return (pf[p.link] || 0) * 1000 + (p.curtidas || 0) + (p.coment || 0) * 2; }; c.sort(function(a, b) { return nota(b) - nota(a); });
+    var p = c[0], leg = String(p.legenda || '').replace(/\s+/g, ' ').trim(), tp = p.tipo === 'VIDEO' ? 'vídeo' : p.tipo === 'CAROUSEL_ALBUM' ? 'carrossel' : 'foto';
+    return '<br><a href="' + dspEsc(p.link) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Post publicado nesse dia ou na véspera com mais ' + (pf[p.link] ? 'visitas ao perfil' : 'curtidas e comentários') + '. O Instagram não informa quantos seguidores vieram de cada post." style="font-size:.7rem;font-weight:600">' + tp + ': ' + dspEsc(leg ? leg.slice(0, 34) + (leg.length > 34 ? '…' : '') : 'sem legenda') + ' ↗</a>';
+  } catch (e) { return ''; }
+}
 function rkoPostsHtml(D) {
   var ps = Object.keys(D.posts).map(function(k) { return D.posts[k]; }).sort(function(a, b) { return b.n - a.n; }).slice(0, 8);
   if (!ps.length) return '';
@@ -36331,7 +36395,8 @@ function renderRankOrg() {
   h += rkoGeralHtml(D);
   if (RKO.mes === atual) { try { h += rkoProducaoHtml(); } catch (eP) {} }
   h += '<div class="rko-sec"><h3>Meta do time por funil</h3><span class="rko-meta">a régua enche até a meta G</span></div><div class="rko-funis">' + RKO_CFG.funis.map(function(f) { return rkoFunilHtml(D, f); }).join('') + '</div>';
-  h += rkoPostsHtml(D);
+  try { h += rkoRitmoHtml(D); } catch (eRt) {}
+  try { h += rkoPostsHtml2(D); } catch (ePs) { h += rkoPostsHtml(D); }
   h += rkoRegrasHtml();
   if (adm) { try { h += rkoHistoricoHtml(); } catch (e3) {} }
   el.innerHTML = h;
@@ -36622,7 +36687,7 @@ function _sgdMesesHtml(atual) {
       var o = M[m], md = o.n ? o.s / o.n : 0, cheio = o.n >= _sgdDiasNoMes(m) || m < atual;
       return '<tr tabindex="0" onkeydown="if(event.key===\'Enter\')sgdVerMes(\'' + m + '\')" onclick="sgdVerMes(\'' + m + '\')" class="' + (SGD.per === 'mes' && (SGD.mes || atual) === m ? 'on' : '') + '"><td>' + _sgdMesCurto(m) + (m === atual ? ' <em>em curso</em>' : !cheio ? ' <em>' + o.n + ' dias</em>' : '') + '</td><td><b>' + _sgdSinal(o.s) + '</b></td>'
         + '<td><span class="sgd-mini"><i style="width:' + Math.max(3, Math.max(0, md) / mx * 100).toFixed(0) + '%"></i></span>' + _sgdSinal(md) + '</td>'
-        + '<td class="sgd-esc">' + (o.mm ? rkoN(o.mais) : '—') + '</td><td class="sgd-esc">' + (o.mm ? rkoN(o.menos) : '—') + '</td><td>' + (LM[m] ? rkoN(LM[m]) : '—') + '</td><td>' + _sgdPorLeadTxt(_sgdPorLead(o.s, LM[m])) + '</td><td class="sgd-esc">' + (o.best ? o.best.d.slice(8, 10) + '/' + o.best.d.slice(5, 7) + ' · ' + _sgdSinal(o.best.g) : '—') + '</td></tr>';
+        + '<td class="sgd-esc">' + (o.mm ? rkoN(o.mais) : '—') + '</td><td class="sgd-esc">' + (o.mm ? rkoN(o.menos) : '—') + '</td><td>' + (LM[m] ? rkoN(LM[m]) : '—') + '</td><td>' + _sgdPorLeadTxt(_sgdPorLead(o.s, LM[m])) + '</td><td class="sgd-esc">' + (o.best ? o.best.d.slice(8, 10) + '/' + o.best.d.slice(5, 7) + ' · ' + _sgdSinal(o.best.g) + _sgdPostDoDia(o.best.d) : '—') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 // ===== fim do 📈 seguidores (js) =====
