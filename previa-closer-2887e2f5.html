@@ -44261,12 +44261,10 @@ function _trfSdrPassos(r, I) {
 function _trfSdrPlanLista(tipo, filtro) {
   var C0 = window._trfSdrCtx, suf = (/P([MTE])$/.exec(tipo) || [])[1] || '', tb = suf ? tipo.slice(0, -1) : tipo, C = { zp: suf === 'M' ? C0.zm : suf === 'T' ? C0.zt : suf === 'E' ? C0.ze : C0.zp, P: suf === 'M' ? C0.Pm : C0.P, quem: suf === 'T' ? '' : suf === 'E' ? '' : C0.quem, emp: suf === 'E' }, P = C.P, R = (C.zp && C.zp.rows) || [], noP = function(r) { var t = r.date ? r.date.getTime() : 0; return t >= P.ini && t < P.fim; };
   var L = ((C.zp && C.zp.L && C.zp.L[tb]) || []).slice(), pri = function(v) { return String(v || '—').replace(/^(SS|SDR)\s+/i, '').split(' ')[0]; };
-  var oriN = function(r) { var o = String(r.origem || '').trim() || 'Sem origem'; return (typeof _trfCloOriNome === 'function' ? _trfCloOriNome(o) : o).replace(/[,'"\\]/g, ' '); };
-  var tags = function(r) { var t = ['s:' + pri(r.sdr), 'c:' + pri(r.closer), 'st:' + (r.sn || ''), 'o:' + oriN(r)]; if (/workshop|ild|call meet|wld/i.test(r.origem || '')) t.push('ws'); else t.push('nws'); return t; };
+  var tags = function(r) { var t = ['s:' + pri(r.sdr), 'c:' + pri(r.closer), 'st:' + (r.sn || '')]; if (/workshop|ild|call meet|wld/i.test(r.origem || '')) t.push('ws'); else t.push('nws'); return t; };
   var sdrs = {}, cls = {}, sts = {}; L.forEach(function(r) { sdrs[pri(r.sdr)] = 1; cls[pri(r.closer)] = 1; sts[r.sn || ''] = r.status || r.sn || '—'; });
   var grupos = [Object.keys(sdrs).map(function(n) { return ['s:' + n, '👤 ' + _trfE(n)]; }), Object.keys(cls).map(function(n) { return ['c:' + n, '🎯 ' + _trfE(n)]; }),
-    Object.keys(sts).map(function(k) { return ['st:' + k, _trfE(sts[k])]; }), [['nws', '🩺 diagnóstico'], ['ws', '🎓 workshop e eventos']],
-    (function() { var m = {}; L.forEach(function(r) { var o = oriN(r); m[o] = (m[o] || 0) + 1; }); return Object.keys(m).sort(function(a, b) { return m[b] - m[a]; }).slice(0, 12).map(function(o) { return ['o:' + o, _trfE(o)]; }); })()];
+    Object.keys(sts).map(function(k) { return ['st:' + k, _trfE(sts[k])]; }), [['nws', 'fora do workshop'], ['ws', 'workshop']]];
   var lst = _trfSdrFiltra(L, tags, filtro, grupos);
   lst.sort(function(a, b) { return /^(pagP|spkP|grwP)$/.test(tb) ? (b.valor || 0) - (a.valor || 0) : (b.date || 0) - (a.date || 0); });
   var cor = { pagP: 'vd', spkP: 'vd', grwP: 'vd', nsP: 'sem', nsrP: 'sem', compP: 'reu', marcP: 'ok' }[tb] || 'ok', T = TRF_SDR_PLST[tb];
@@ -44416,25 +44414,39 @@ var TRF_SDR_COM_SARAH = false;
 // resultado · compareceu = apareceu · comparecimento = apareceu ÷ (apareceu + no-show) · venda = Vendido. "Time todo" = todas as reuniões.
 // =====================================================================================================
 var TRF_CLO_PS = [['marc', 'Marcadas', 'reuniões na planilha com data no período'], ['real', 'Realizadas', 'o dia passou e o resultado foi lançado · inclui faltas'], ['apar', 'Lead apareceu', 'o lead entrou na reunião (remarcada não conta)'], ['sim', 'Disse sim na reunião', 'vendido, bloqueio de oferta ou entrada'], ['pag', 'Pagou tudo', 'status Vendido na planilha']];
-// Workshop e eventos × Diagnóstico (24/11/2026, Bruno: "esses também são de diagnóstico" — Pós workshop e Call Meet): a MESMA regra do
-// Relatório por função (rlGrupoR): só é Workshop a reunião com origem Workshop dentro da janela da edição da pessoa; antecipação,
-// recuperação, pós workshop e Call Meet são Diagnóstico. O ILD (imersão presencial) entra em Workshop e eventos.
-function _trfCloEhWs(r) { var o = String(r.origem || ''); if (/\bild\b/i.test(o)) return true; if (/p[oó]s\s*workshop|recupera|antecipa|call\s*meet/i.test(o)) return false; try { return rlGrupoR(r) === 'Workshop'; } catch (e) { return /workshop/i.test(o); } }
+// Funil e origem de cada reunião = a MESMA regra da aba 🧭 Todos (_trfOrigemLinha, pelo que está escrito na coluna Origem da planilha de
+// vendas), para os números baterem entre as abas (24/11/2026, Bruno: "analise se tudo está batendo"): Diagnóstico = tráfego pago, orgânico,
+// link na bio e pré/pós workshop · Workshop e eventos = workshop on-line e presencial (ILD) · o resto (Social Selling, indicação, outras) fica à parte.
+var TRF_CLO_ORI = { pago: '📣 Tráfego pago', org: '🌱 Orgânico · ManyChat', bio: '🔗 Link na bio', pp: '🔁 Pré e pós workshop', ws: '🎓 Workshop on-line', pres: '📍 Presencial (ILD)', ss: '💬 Social Selling', ind: '🤝 Indicação', out: 'Outras origens' };
+var TRF_CLO_FUN = { pago: 'diag', org: 'diag', bio: 'diag', pp: 'diag', ws: 'ws', pres: 'ws' };
+function _trfCloFunDe(r) { return TRF_CLO_FUN[_trfOrigemLinha(r.origem)] || 'out'; }
 // a lista de cada cartão abre na MESMA janela da Visão Geral (Bruno: "por que esses cards são diferentes da Visão Geral? queria igual")
 var TRF_CLO_LST = { marcP: 'Reuniões marcadas', compP: 'Lead apareceu', nsP: 'No-show', pagP: 'Vendas', pendP: 'Sem resultado lançado', spkP: 'Vendas de Spark', grwP: 'Vendas de Growth', simP: 'Disse sim na reunião', legP: 'Vendas de Legado' };
-function trfCloLista(tipo) {
+function trfCloLista(tipo, etapa) {
   var C = window._trfSdrCtx, L = C && C.zp && C.zp.L && C.zp.L[tipo]; if (!L || typeof RL_L === 'undefined') return;
-  RL_L.clo = { tipo: 'v2', t: TRF_CLO_LST[tipo] || 'Reuniões', sub: 'Funil do closer · ' + rlE(C.quem ? 'só ' + C.quem : 'time todo') + rlE(C.filtroTxt || '') + ' · ' + rlE(C.P.rot), rows: L.slice().sort(function(a, b) { return (b.date || 0) - (a.date || 0); }) };
-  rlAbrirLista('clo');
+  // dentro da janela, o filtro é só pela ETAPA da reunião (Bruno 24/11/2026: "os filtros dentro do card devem ser apenas para diferenciar a etapa")
+  var cont = {}, rot = {}; L.forEach(function(r) { var k = r.sn || ''; cont[k] = (cont[k] || 0) + 1; rot[k] = r.status || r.sn || 'sem etapa'; });
+  var ets = Object.keys(cont).sort(function(a, b) { return cont[b] - cont[a]; }); if (etapa && !cont[etapa]) etapa = '';
+  var rows = (etapa ? L.filter(function(r) { return (r.sn || '') === etapa; }) : L.slice()).sort(function(a, b) { return (b.date || 0) - (a.date || 0); });
+  // a MESMA janela dos cartões do funil da Visão Geral (modal-b, os mesmos cartões de lead · v2row)
+  var ICO = { marcP: '📅', compP: '🤝', nsP: '👻', pagP: '💰', pendP: '⏳', spkP: '⚡', grwP: '🚀', simP: '🏆', legP: '💰' };
+  var el = function(id) { return document.getElementById(id); }; if (!el('modal-b') || !el('mb-lista')) return;
+  el('mb-titulo').textContent = (TRF_CLO_LST[tipo] || 'Reuniões') + (etapa ? ' · ' + rot[etapa] : '') + ' — ' + rows.length + (rows.length === 1 ? ' reunião' : ' reuniões');
+  el('mb-ico').textContent = ICO[tipo] || '📋';
+  el('mb-sub').textContent = 'Funil do closer · ' + (C.quem ? 'só ' + C.quem : 'time todo') + (C.filtroTxt || '') + ' · ' + C.P.rot + ' · clique num lead para abrir a ficha';
+  var bt = function(k, t, n) { var on = (etapa || '') === k; return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="trfCloLista(\'' + tipo + '\',\'' + k.replace(/[^a-z0-9 ]/g, '') + '\')">' + _trfE(t) + ' <small style="opacity:.65">' + _trfN(n) + '</small></button>'; };
+  var chips = ets.length > 1 ? '<div class="pl-chips" style="margin:0 0 10px;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;opacity:.6">Etapa:</span>' + bt('', 'Todas', L.length) + ets.map(function(k) { return bt(k, rot[k], cont[k]); }).join('') + '</div>' : '';
+  el('mb-lista').innerHTML = chips + (rows.map(function(r) { return v2row(r); }).join('') || '<div style="color:var(--muted);font-size:.8rem;">Nenhuma reunião aqui.</div>');
+  var bq = el('mb-busca'); if (bq) { bq.value = ''; bq.style.display = ''; }
+  el('modal-b').classList.add('open');
 }
 function trfCloQuem(n) { TRF.clo = TRF.clo === n ? '' : n; renderTrafego(); }
 function trfCloFunil(v) { TRF.cfun = v; TRF.cori = ''; renderTrafego(); }
 function trfCloOrigem(v) { TRF.cori = TRF.cori === v ? '' : v; renderTrafego(); }
 function _trfCloNome(r) { return String(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.closer) : r.closer || '').trim() || 'Sem closer'; }
-// nome que o time entende para cada origem da planilha (o texto original fica na dica do botão)
-function _trfCloOriNome(o) { return /^\[ads\]/i.test(o) ? '📣 Anúncio' : /^\[org\].*mchat/i.test(o) ? '🌱 Orgânico · ManyChat' : /^\[org\]/i.test(o) ? '🔗 Link na bio' : /social/i.test(o) ? '💬 Social Selling' : /^indica/i.test(o) ? '🤝 Indicação' : /^ild/i.test(o) ? '🎟️ ' + o : /^p[oó]s workshop/i.test(o) ? '🔁 Pós workshop' : /^workshop$/i.test(o) ? '🎓 Workshop' : o; }
+function _trfCloOriNome(o) { return TRF_CLO_ORI[o] || o; }
 function trfCloLimpar() { TRF.clo = ''; TRF.cfun = ''; TRF.cori = ''; TRF.coriTodas = 0; renderTrafego(); }
-function _trfCloOrig(r) { return String(r.origem || '').trim() || 'Sem origem'; }
+function _trfCloOrig(r) { return _trfOrigemLinha(r.origem); }
 function _trfCloZ(P, filtro) {
   // 24/11/2026 (Bruno: "os números em todo o dash devem bater, principalmente com a Visão Geral"): os MESMOS passos do funil da Visão Geral —
   // Marcadas (agendada ou com resultado) › Realizadas (apareceu ou faltou · isReal) › Lead apareceu (isComp: remarcada NÃO conta) ›
@@ -44446,14 +44458,14 @@ function _trfCloZ(P, filtro) {
 }
 function _trfRenderCloser(el) {
   var okV = !!(V2.carregado || (V2.rows || []).length); if (!okV) _trfVigiar('v2');
-  var P = _trfSdrPer(), fun = TRF.cfun || '', ehWs = _trfCloEhWs;
-  var fFun = function(r) { return fun === 'ws' ? ehWs(r) : fun === 'diag' ? !ehWs(r) : true; };
+  var P = _trfSdrPer(), fun = TRF.cfun || '';
+  var fFun = function(r) { return !fun || _trfCloFunDe(r) === fun; };
   var todas = rlLinhas({ ini: P.ini, fim: P.fim }), porClo = {}, porOri = {};
   todas.forEach(function(r) { if (!fFun(r)) return; var n = _trfCloNome(r); porClo[n] = (porClo[n] || 0) + 1; });
   var nomes = Object.keys(porClo).sort(function(a, b) { return porClo[b] - porClo[a]; });
   if (TRF.clo && !porClo[TRF.clo]) TRF.clo = '';
   var fClo = function(r) { return !TRF.clo || _trfCloNome(r) === TRF.clo; };
-  var oriWs = {}; todas.forEach(function(r) { if (!fFun(r) || !fClo(r)) return; var o = _trfCloOrig(r); porOri[o] = (porOri[o] || 0) + 1; if (ehWs(r)) oriWs[o] = 1; });
+  todas.forEach(function(r) { if (!fFun(r) || !fClo(r)) return; var o = _trfCloOrig(r); porOri[o] = (porOri[o] || 0) + 1; });
   var origens = Object.keys(porOri).sort(function(a, b) { return porOri[b] - porOri[a]; });
   if (TRF.cori && !porOri[TRF.cori]) TRF.cori = '';
   var fOri = function(r) { return !TRF.cori || _trfCloOrig(r) === TRF.cori; };
@@ -44466,7 +44478,7 @@ function _trfRenderCloser(el) {
       sim: [z.comp ? z.sim / z.comp * 100 : null, 'de quem apareceu'],
       pag: [z.comp ? z.pag / z.comp * 100 : null, 'de quem apareceu'] } };
   window._trfCtx = null;
-  window._trfSdrCtx = { L: [], esp: [], porTel: _trfIdxV2().porTel, P: P, quem: TRF.clo, zp: z, filtroTxt: (fun === 'ws' ? ' · workshop e eventos' : fun === 'diag' ? ' · diagnóstico' : '') + (TRF.cori ? ' · ' + TRF.cori : '') };
+  window._trfSdrCtx = { L: [], esp: [], porTel: _trfIdxV2().porTel, P: P, quem: TRF.clo, zp: z, filtroTxt: (fun ? ' · ' + { diag: 'diagnóstico', ws: 'workshop e eventos', out: 'Social Selling e outras' }[fun] : '') + (TRF.cori ? ' · ' + _trfCloOriNome(TRF.cori).replace(/^\S+\s/, '') : '') };
   var simples = _trfSdrVista() === 'simples', passos = TRF_CLO_PS.filter(function(p) { return !(simples && (p[0] === 'real' || p[0] === 'sim')); });
   var chip = function(on, rot, ac) { return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="' + ac + '">' + rot + '</button>'; };
   var aspas = function(s) { return _trfE(s).replace(/\\/g, '').replace(/&#39;/g, ''); };
@@ -44480,22 +44492,21 @@ function _trfRenderCloser(el) {
       + c('No-show', q.falt ? _trfN(q.falt) + ' <small class="trf-td-q">' + pc(q.falt, q.ja) + '</small>' : '—')
       + c('Vendas', _trfN(q.pag)) + c('Conversão', q.comp ? al(q.comp >= 5 && q.pag / q.comp < 0.3, pc(q.pag, q.comp)) : '—')
       + c('Legado', q.leg ? _trfN(q.leg) : '—') + c('Spark', q.spk ? _trfN(q.spk) : '—') + c('Growth', q.grw ? _trfN(q.grw) : '—') + c('Vendido', q.valor ? _trfRs(q.valor) : '—') + '</tr>'; }).join('');
-  // 24/11/2026 (Bruno: "essa forma é ruim"): filtro em UMA barra só — o funil em três botões juntos e, ao lado, duas caixas de escolha
-  // (Closer e Origem). A origem vem agrupada por funil dentro da caixa. O que está filtrado aparece embaixo, com ✕ para tirar.
-  var oDiag = origens.filter(function(o) { return !oriWs[o]; }), oWsL = origens.filter(function(o) { return oriWs[o]; });
+  // 24/11/2026 (Bruno: "essa forma é ruim" · "achei muita coisa, pode ser com seletor"): o filtro é UMA linha com três seletores
+  // (Funil · Closer · Origem); a origem vem agrupada por funil e usa os mesmos nomes da aba Todos.
+  var FUNR = { '': 'Todos os funis', diag: '🩺 Diagnóstico', ws: '🎓 Workshop e eventos', out: '💬 Social Selling e outras' };
   var op = function(v, rot, sel) { return '<option value="' + _trfE(v) + '"' + (sel ? ' selected' : '') + '>' + _trfE(rot) + '</option>'; };
-  var cx = 'color-scheme:dark;appearance:none;-webkit-appearance:none;background:rgba(255,255,255,.06);color:inherit;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:9px 34px 9px 12px;font:inherit;font-size:13px;font-weight:700;min-width:170px;max-width:100%;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 17px) 55%,calc(100% - 12px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat';
-  var seg = function(on, rot, ac, pos) { return '<button type="button" aria-pressed="' + on + '" onclick="' + ac + '" style="border:0;padding:9px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;color:' + (on ? '#1a1206' : 'inherit') + ';background:' + (on ? '#ffc94d' : 'transparent') + ';border-radius:' + (pos === 0 ? '9px 0 0 9px' : pos === 2 ? '0 9px 9px 0' : '0') + (pos ? ';border-left:1px solid rgba(255,255,255,.14)' : '') + '">' + rot + '</button>'; };
-  var campo = function(rot, h) { return '<label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;opacity:.55">' + rot + '</span>' + h + '</label>'; };
-  var selClo = '<select style="' + cx + '" onchange="TRF.clo=this.value;renderTrafego()">' + op('', 'Time todo', !TRF.clo) + nomes.map(function(n) { return op(n, String(n).split(' ')[0] + ' · ' + _trfN(porClo[n]) + ' reuniões', TRF.clo === n); }).join('') + '</select>';
-  var ogrp = function(t, l) { return l.length ? '<optgroup label="' + t + '">' + l.map(function(o) { return op(o, _trfCloOriNome(o).replace(/^\S+\s/, function(m) { return /[A-Za-zÀ-ú\[]/.test(m) ? m : ''; }) + ' · ' + _trfN(porOri[o]), TRF.cori === o); }).join('') + '</optgroup>' : ''; };
-  var selOri = '<select style="' + cx + '" onchange="TRF.cori=this.value;renderTrafego()">' + op('', 'Todas as origens', !TRF.cori) + ogrp('Diagnóstico', oDiag) + ogrp('Workshop e eventos', oWsL) + '</select>';
-  var tira = function(rot, ac) { return '<button type="button" class="pl-chip on" onclick="' + ac + '" title="Tirar este filtro">' + _trfE(rot) + ' ✕</button>'; };
-  var ativos = (fun ? tira(fun === 'ws' ? 'Workshop e eventos' : 'Diagnóstico', 'trfCloFunil(\'\')') : '') + (TRF.clo ? tira(String(TRF.clo).split(' ')[0], 'trfCloQuem(\'\')') : '') + (TRF.cori ? tira(_trfCloOriNome(TRF.cori), 'trfCloOrigem(\'\')') : '');
-  var filtroHtml = '<div class="panel" style="padding:12px 14px;margin-bottom:12px"><div style="display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end">'
-    + campo('Funil', '<div role="group" style="display:inline-flex;border:1px solid rgba(255,255,255,.14);border-radius:10px;overflow:hidden">' + seg(!fun, 'Todos', 'trfCloFunil(\'\')', 0) + seg(fun === 'diag', '🩺 Diagnóstico', 'trfCloFunil(\'diag\')', 1) + seg(fun === 'ws', '🎓 Workshop e eventos', 'trfCloFunil(\'ws\')', 2) + '</div>')
-    + campo('Closer', selClo) + campo('Origem', selOri) + '</div>'
-    + (ativos ? '<div class="pl-chips" style="margin:12px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;opacity:.6">Filtrando por:</span>' + ativos + '<button type="button" class="pl-chip" onclick="trfCloLimpar()">Limpar tudo</button></div>' : '') + '</div>';
+  var cx = 'color-scheme:dark;appearance:none;-webkit-appearance:none;background-color:rgba(255,255,255,.06);color:inherit;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:9px 34px 9px 12px;font:inherit;font-size:13px;font-weight:700;width:100%;min-width:0;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 17px) 55%,calc(100% - 12px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat';
+  var campo = function(rot, h, on) { return '<label style="display:flex;flex-direction:column;gap:5px;flex:1 1 190px;min-width:0;max-width:300px"><span style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;opacity:' + (on ? '1;color:#ffc94d' : '.55') + '">' + rot + '</span>' + h + '</label>'; };
+  var funCont = { diag: 0, ws: 0, out: 0 }; todas.forEach(function(r) { if (fClo(r)) funCont[_trfCloFunDe(r)]++; });
+  var selFun = '<select style="' + cx + '" onchange="trfCloFunil(this.value)">' + op('', FUNR[''], !fun) + ['diag', 'ws', 'out'].filter(function(k) { return funCont[k] || fun === k; }).map(function(k) { return op(k, FUNR[k] + ' · ' + _trfN(funCont[k]), fun === k); }).join('') + '</select>';
+  var selClo = '<select style="' + cx + '" onchange="TRF.clo=this.value;renderTrafego()">' + op('', 'Time todo', !TRF.clo) + nomes.map(function(n) { return op(n, String(n).split(' ')[0] + ' · ' + _trfN(porClo[n]), TRF.clo === n); }).join('') + '</select>';
+  var ogrp = function(k) { var l = origens.filter(function(o) { return (TRF_CLO_FUN[o] || 'out') === k; }); return l.length ? '<optgroup label="' + _trfE(FUNR[k].replace(/^\S+\s/, '')) + '">' + l.map(function(o) { return op(o, _trfCloOriNome(o) + ' · ' + _trfN(porOri[o]), TRF.cori === o); }).join('') + '</optgroup>' : ''; };
+  var selOri = '<select style="' + cx + '" onchange="TRF.cori=this.value;renderTrafego()">' + op('', 'Todas as origens', !TRF.cori) + ogrp('diag') + ogrp('ws') + ogrp('out') + '</select>';
+  var temF = !!(fun || TRF.clo || TRF.cori);
+  var filtroHtml = '<div class="panel" style="padding:12px 14px;margin-bottom:12px"><div style="display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end">'
+    + campo('Funil', selFun, !!fun) + campo('Closer', selClo, !!TRF.clo) + campo('Origem', selOri, !!TRF.cori)
+    + (temF ? '<button type="button" class="pl-chip" style="margin-bottom:2px" onclick="trfCloLimpar()">✕ Limpar</button>' : '') + '</div></div>';
   el.innerHTML = _trfCanalHtml() + '<div class="trf-topo"><div><p>Funil do closer: da reunião marcada até a venda · reuniões com data em ' + _trfE(P.rot) + (TRF.clo ? ' · só ' + _trfE(TRF.clo) : '') + '</p></div>'
     + '<div class="trf-filtros"><div class="pl-chips">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'trfSdrPer(\'' + o[0] + '\')'); }).join('') + '<button type="button" class="pl-chip' + (P.id === 'pers' ? ' on' : '') + '" onclick="trfSdrDatas(this)">📅 ' + (P.id === 'pers' ? _trfE(P.rot.replace(/^o dia /, '')) : 'Escolher datas') + ' ▾</button></div></div></div>' + avisos
     + filtroHtml
@@ -44504,11 +44515,11 @@ function _trfRenderCloser(el) {
     + kb('compP', '✅ Lead apareceu', compP == null ? '—' : pc(z.comp, z.ja), _trfN(z.comp) + ' de ' + _trfN(z.ja) + ' realizadas' + (compP != null && z.ja >= 5 ? (compP < 0.8 ? ' · ⚠️ abaixo de 80%' : ' · dentro da meta (80%)') : ''), '')
     + kb('nsP', '🚫 No-show', _trfN(z.falt), z.ja ? pc(z.falt, z.ja) + ' das realizadas · ' + _trfN(z.nsr) + ' sem nova reunião' : 'nenhuma reunião passou ainda', '')
     + kb('pendP', '⏳ Sem resultado lançado', _trfN(z.pend), 'a data já passou e a planilha ainda diz agendada', '') + '</div>'
-    + '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🔻 Funil do closer' + (TRF.clo ? ' · ' + _trfE(TRF.clo) : ' · time todo') + (fun === 'ws' ? ' · workshop e eventos' : fun === 'diag' ? ' · diagnóstico' : '') + (TRF.cori ? ' · ' + _trfE(TRF.cori) : '') + '</h3><span class="trf-sub">reuniões da planilha de vendas com data em ' + _trfE(P.rot) + '</span></div>'
+    + '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🔻 Funil do closer' + (TRF.clo ? ' · ' + _trfE(TRF.clo) : ' · time todo') + (fun ? ' · ' + { diag: 'diagnóstico', ws: 'workshop e eventos', out: 'Social Selling e outras' }[fun] : '') + (TRF.cori ? ' · ' + _trfE(_trfCloOriNome(TRF.cori)) : '') + '</h3><span class="trf-sub">reuniões da planilha de vendas com data em ' + _trfE(P.rot) + '</span></div>'
     +   '<div class="pl-chips" style="margin:2px 0 10px">' + chip(simples, 'Simples', 'trfSdrVista(\'simples\')') + chip(!simples, 'Detalhado', 'trfSdrVista(\'detalhado\')') + '</div>'
     +   '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { return 'trfCloLista(\'' + ({ marc: 'marcP', real: 'marcP', apar: 'compP', sim: 'simP', pag: 'pagP' }[k]) + '\')'; }) + '</div>'
     +   (simples ? '' : '<div class="trf-kpis" style="margin-top:10px">' + kb('legP', 'Legado', _trfN(z.leg), 'vendas de Legado Digital e Club', '') + kb('spkP', '⚡ Spark', _trfN(z.spk), 'vendas de Spark', '') + kb('grwP', '🚀 Growth', _trfN(z.grw), 'vendas de Growth', '') + '</div>')
-    +   '<p class="trf-nota">Tudo vem da planilha de vendas, pelo dia da reunião, com a mesma conta da Visão Geral e do Relatório por função: os mesmos passos do funil da Visão Geral: realizadas = apareceu ou faltou; lead apareceu = vendido, não vendido, bloqueio, entrada ou estorno (remarcada não conta); conversão = vendas ÷ quem apareceu. Workshop e eventos = origem Workshop dentro da janela da edição da pessoa (a regra do Relatório) e o ILD; antecipação, recuperação, pós workshop e Call Meet contam em Diagnóstico. Alertas: comparecimento abaixo de 80% e conversão abaixo de 30%.' + (z.rem ? ' Remarcadas no período: ' + _trfN(z.rem) + ' (ficam fora de realizadas).' : '') + '</p></div>'
+    +   '<p class="trf-nota">Tudo vem da planilha de vendas, pelo dia da reunião, com a mesma conta da Visão Geral e do Relatório por função: os mesmos passos do funil da Visão Geral: realizadas = apareceu ou faltou; lead apareceu = vendido, não vendido, bloqueio, entrada ou estorno (remarcada não conta); conversão = vendas ÷ quem apareceu. O funil de cada reunião vem da coluna Origem da planilha, igual à aba Todos: Diagnóstico = tráfego pago, orgânico, link na bio e pré/pós workshop; Workshop e eventos = workshop on-line e presencial (ILD); Social Selling, indicação e outras ficam à parte. Alertas: comparecimento abaixo de 80% e conversão abaixo de 30%.' + (z.rem ? ' Remarcadas no período: ' + _trfN(z.rem) + ' (ficam fora de realizadas).' : '') + '</p></div>'
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>👥 Closer por closer</h3><span class="trf-sub">clique numa linha para ver o funil só dessa pessoa · segue os filtros de funil e origem</span></div>'
     +   (nomes.length ? '<div class="trf-tab-rol"><table class="trf-tab trf-tab-sdr"><thead><tr><th>Closer</th><th>Reuniões marcadas</th><th>Compareceram</th><th>No-show</th><th>Vendas</th><th>Conversão</th><th>Legado</th><th>Spark</th><th>Growth</th><th>Vendido</th></tr></thead><tbody>' + linhas + '</tbody></table></div>' : '<p class="trf-nota">' + (okV ? 'Nenhuma reunião neste período.' : 'Carregando…') + '</p>') + '</div>';
   _trfAnimar(el, D);
@@ -44629,7 +44640,7 @@ function _trfCadaNoPeriodo(S, ini, fim, fn) { var XS = _trfIdxSite(S), L = XS.L,
 function _trfOrigemLinha0(o) {
   var n = v2norm(o || '');
   if (/(^|[^a-z])ads([^a-z]|$)/.test(n)) return 'pago'; if (/mchat|manychat/.test(n)) return 'org'; if (/(^|[^a-z])org([^a-z]|$)/.test(n)) return 'bio';
-  if (/(^|[^a-z])ild([^a-z]|$)|imers/.test(n)) return 'pres'; if (/workshop/.test(n) && /(^|[^a-z])(pre|pos)([^a-z]|$)/.test(n)) return 'pp'; if (/workshop/.test(n)) return 'ws'; if (/social/.test(n)) return 'ss'; if (/indica/.test(n)) return 'ind'; return 'out';
+  if (/(^|[^a-z])ild([^a-z]|$)|imers/.test(n)) return 'pres'; if (/call ?meet/.test(n) || (/workshop/.test(n) && /(^|[^a-z])(pre|pos)([^a-z]|$)/.test(n))) return 'pp'; if (/workshop/.test(n)) return 'ws'; if (/social/.test(n)) return 'ss'; if (/indica/.test(n)) return 'ind'; return 'out';
 }
 function _trfRenderTodos(el) {
   trfSiteCarregar(false); try { if (!WSL.carregado && !WSL.buscando) carregarWS(); } catch (e) {}
