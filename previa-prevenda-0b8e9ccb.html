@@ -44542,14 +44542,20 @@ function pvOrigem(k) { PV.ori = k; pvRender(); }
 // da planilha (coluna Origem, a mesma régua da aba Todos). Eventos (workshop e presencial) não têm lead no funil da Clint do diagnóstico.
 var PV_ORI = [
   { k: 'pago', rot: '📣 Tráfego pago', cl: /an[uú]ncio|\bads\b/i, pl: { pago: 1 } },
-  { k: 'org', rot: '🌱 Orgânico e link na bio', cl: /org[aâ]nico|\bbio\b|manychat/i, pl: { org: 1, bio: 1 } },
+  { k: 'org', rot: '🌱 Orgânico', cl: /org[aâ]nico|manychat/i, pl: { org: 1 } },
+  { k: 'bio', rot: '🔗 Link na bio', cl: /\bbio\b/i, pl: { bio: 1 } },
   { k: 'ev', rot: '🎟️ Eventos', cl: null, pl: { ws: 1, pres: 1 } },
   { k: 'out', rot: 'Outras origens', cl: 'resto', pl: { pp: 1, ss: 1, ind: 1, out: 1 } }
 ];
+// 24/11/2026 (Bruno: "link na bio"): Orgânico e Link na bio separados, como na Gestão de funis. A Clint escreve quase tudo como "Orgânico";
+// o que separa é a base do site: o lead que entrou pelo link da bio (src = bio) vai para Link na bio, o do ManyChat fica no Orgânico.
+function pvOriLead(x) { var og = String(x.orig || ''); if (/\bbio\b/i.test(og)) return 'bio';
+  if (/org[aâ]nico|manychat/i.test(og)) { try { var t8 = ldTel8(x.tel), S = TRF.site; if (S && S.leads) { var m = TRF_R._pvBio; if (!m || m.S !== S) { m = { S: S, b: {} }; S.leads.forEach(function(l) { if (l.t8 && l.src === 'bio') m.b[l.t8] = 1; }); TRF_R._pvBio = m; } if (m.b[t8]) return 'bio'; } } catch (e) {} return 'org'; }
+  if (/an[uú]ncio|\bads\b/i.test(og)) return 'pago'; return 'out'; }
 function _pvOrigensHtml(L, zp, porTel, P, quem) {
   var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
   var dados = PV_ORI.map(function(o) {
-    var Lg = o.cl === null ? [] : L.filter(function(x) { var og = String(x.orig || ''); return o.cl === 'resto' ? !PV_ORI.some(function(q) { return q.cl && q.cl !== 'resto' && q.cl.test(og); }) : o.cl.test(og); });
+    var Lg = o.cl === null ? [] : L.filter(function(x) { return pvOriLead(x) === o.k; });
     var zc = _trfSdrConta(Lg, porTel), R = (zp.rows || []).filter(function(r) { return o.pl[_trfOrigemLinha(r.origem)]; });
     var comp = R.filter(function(r) { return isComp(r.sn || ''); }), ns = R.filter(function(r) { return (r.sn || '') === 'no show'; }), vd = R.filter(function(r) { return (r.sn || '') === 'vendido'; });
     return { o: o, zc: zc, semLead: o.cl === null, marc: R.length, comp: comp.length, falt: ns.length, ja: comp.length + ns.length, pag: vd.length, valor: vd.reduce(function(s, r) { return s + (r.valor || 0); }, 0),
@@ -44559,7 +44565,7 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
   // 24/11/2026 (Bruno: "coloque igual a Gestão de funis, como no principal"): abas grandes por origem (as mesmas da Gestão de funis),
   // a fileira de números (trf-kpis) e o funil com os passos do funil do SDR do principal (leads → 1º contato → respondeu → marcada → apareceu → venda).
   var fichasO = {}; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichasO[k]; if (!o || (l.date || 0) > (o.date || 0)) fichasO[k] = l; }); } catch (eO) {}
-  var Lsel = sel.semLead ? [] : L.filter(function(x) { var og = String(x.orig || ''); var o = sel.o; return o.cl === 'resto' ? !PV_ORI.some(function(q) { return q.cl && q.cl !== 'resto' && q.cl.test(og); }) : o.cl.test(og); });
+  var Lsel = sel.semLead ? [] : L.filter(function(x) { return pvOriLead(x) === sel.o.k; });
   var mql = Lsel.filter(function(x) { return _trfSdrMql(fichasO[ldTel8(x.tel)], x.tel); }).length;
   PV._ctx.L = Lsel;
   var passos = TRF_SDR_PS.filter(function(p) { return p[0] !== 'smql' && !(sel.semLead && /^s(l|c|r)$/.test(p[0])); });
