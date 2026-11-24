@@ -44599,14 +44599,53 @@ function pvRender() {
     + '<div class="pl-chips" style="margin:0">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'pvPer(\'' + o[0] + '\')'); }).join('') + '</div>'
     + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">' + (window._pvDash && !pvEhSdr() ? '<button type="button" class="btn" onclick="pvSairDash()" title="Voltar para o dash com todas as áreas">↗ Dash completo</button>' : '') + (!eu && !window._pvDash ? '<button type="button" class="btn" onclick="pvComo(\'' + _trfE(quem || 'Selina') + '\')" title="Mostra o dash exatamente como o SDR vê: menu só com a pré-venda">👁 Ver como o SDR vê</button>' : '') + '<a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
   var hCab = h; h = '';
-  // 1ª fileira: do lead até a venda, com os mesmos nomes do funil da Visão Geral
-  h += '<div class="kpis">'
-    + card(quem ? 'Leads que recebi' : 'Leads recebidos', okC ? _trfN(zc.sl) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', '', 'negócios que entraram na Clint em ' + _trfE(P.rot), okC && zc.sl ? [pc(zc.sc, zc.sl), '1º contato de uma pessoa: ' + zc.sc + ' de ' + zc.sl, 'tiveram 1º contato'] : null)
-    + card(quem ? 'Marquei no período' : 'Marcaram no período', okV ? _trfN(fez.length) : '…', '#f6a350', 'rgba(246,163,80,.14)', 'fezP', 'pelo dia em que marcou' + (fezFora ? ' · ' + _trfN(fezFora) + ' para outro mês' : ''))
-    + card('Marcadas', okV ? _trfN(zp.marc) : '…', '#f6a350', 'rgba(246,163,80,.14)', 'marcP', 'reuniões com data em ' + _trfE(P.rot) + (fut ? ' · 🔜 ' + _trfN(fut) + ' futuras' : ''))
-    + card('Realizadas', okV ? _trfN(zp.ja) : '…', '#ffd166', 'rgba(255,209,102,.14)', 'marcP', '↳ ' + pc(zp.ja, zp.marc) + ' das marcadas · inclui faltas')
-    + card('Lead apareceu', okV ? _trfN(zp.comp) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', 'compP', '↳ ' + pc(zp.comp, zp.ja) + ' das realizadas' + (zp.falt ? ' · ' + _trfN(zp.falt) + (zp.falt === 1 ? ' faltou' : ' faltaram') : ''))
-    + card('Pagou tudo', okV ? _trfN(zp.pag) : '…', '#3ddc97', 'rgba(61,220,151,.14)', 'pagP', zp.valor ? _trfRs(zp.valor) + ' vendidos' : 'status Vendido na planilha', zp.comp ? [pc(zp.pag, zp.comp), 'Pagou tudo ÷ lead apareceu: ' + zp.pag + ' de ' + zp.comp, 'de quem apareceu'] : null)
+  // 24/11/2026 (Bruno: "tem como criar desta forma visual aqui, com os dados mais importantes maiores?"): o MESMO desenho da Visão Geral —
+  // 3 cartões grandes (hero-row) com o que mais importa, e 5 menores com a comparação com o mês passado no mesmo ponto e as barrinhas.
+  var hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0); var amanha = hoje0.getTime() + 864e5, ehMes = P.id === 'mes';
+  var Pant = null; if (ehMes) { var hj = new Date(), ia = new Date(hj.getFullYear(), hj.getMonth() - 1, 1).getTime(); Pant = { ini: ia, fim: Math.min(new Date(hj.getFullYear(), hj.getMonth(), 1).getTime(), new Date(hj.getFullYear(), hj.getMonth() - 1, hj.getDate() + 1).getTime()), rot: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][new Date(ia).getMonth()] + '. no dia ' + hj.getDate() }; }
+  var zpH = _trfSdrPlan(nomes, { ini: P.ini, fim: Math.min(P.fim, amanha) }), zpA = Pant ? _trfSdrPlan(nomes, Pant) : null, fezA = Pant ? _trfSdrFez(nomes, Pant).length : null;
+  var LA = Pant && okC ? (CSD.rows || []).filter(function(x) { return /spark/i.test(x.funil || '') && x.cr >= Pant.ini && x.cr < Pant.fim && chaves.indexOf(_trfSdrChave(x.resp)) !== -1; }) : null, vA = {}, desdeC = Infinity; (okC ? CSD.rows : []).forEach(function(x) { if (/spark/i.test(x.funil || '') && x.cr && x.cr < desdeC) desdeC = x.cr; }); if (Pant && Pant.ini < desdeC - 864e5) LA = null;   // a base da Clint guarda ~35 dias: sem o mês anterior inteiro, não compara leads
+  if (LA) LA = LA.filter(function(x) { if (vA[x.id]) return false; vA[x.id] = 1; return true; });
+  var vs = function(a, b) { return b == null ? '' : '<div class="v2-mini-vs"><span class="v2-mini-t">' + Pant.rot + '</span><div class="v2-mini-v"><b>' + _trfN(b) + '</b>' + v2vs(a, b) + '</div></div>'; };
+  var dias6 = []; for (var di = 5; di >= 0; di--) dias6.push(hoje0.getTime() - di * 864e5);
+  var spark = function(fnT, tint) { var v = dias6.map(function(t0) { return fnT(t0, t0 + 864e5); }), mx = Math.max.apply(null, v) || 1; return '<div class="spark">' + v.map(function(x) { return '<i style="height:' + Math.max(Math.round(x / mx * 100), 8) + '%"></i>'; }).join('') + '</div>'; };
+  var nR = function(test) { return function(a, b) { return (zp.rows || []).filter(function(r) { var t = r.date ? r.date.getTime() : 0; return t >= a && t < b && test(r.sn || ''); }).length; }; };
+  var nL = function(test) { return function(a, b) { return (okC ? CSD.rows : []).filter(function(x) { return /spark/i.test(x.funil || '') && x.cr >= a && x.cr < b && chaves.indexOf(_trfSdrChave(x.resp)) !== -1 && test(x); }).length; }; };
+  var proj = null; if (ehMes && fez.length) { var uT = 0, uP = 0, hj2 = new Date(), tot = new Date(hj2.getFullYear(), hj2.getMonth() + 1, 0).getDate(); for (var d = 1; d <= tot; d++) { if (ehDiaUtil(new Date(hj2.getFullYear(), hj2.getMonth(), d))) { uT++; if (d <= hj2.getDate()) uP++; } } if (uP) proj = { v: Math.round(fez.length / uP * uT), restam: uT - uP, dia: fez.length / uP }; }
+  var stat = function(v, rot, cls) { return '<div class="g-stat hl ' + cls + '"><b>' + v + '</b><span>' + rot + '</span></div>'; };
+  var mqlP = mqlN ? mqlM / mqlN : null, compP = zp.ja ? zp.comp / zp.ja : null, nsP = zp.ja ? zp.falt / zp.ja : null;
+  // === HERO ===
+  h += '<div class="hero-row">';
+  h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(246,163,80,.2);--tint:#f6a350;" onclick="pvLista(\'fezP\')">'
+    + (proj ? '<div class="proj"><span class="proj-lbl">📈 Projeção do mês</span><span class="proj-val">' + _trfN(proj.v) + ' reuniões</span><span class="proj-sub">faltam ' + proj.restam + ' dias úteis · ' + (Math.round(proj.dia * 10) / 10).toString().replace('.', ',') + '/dia</span></div>' : '')
+    + '<div class="g-label">📅 ' + (quem ? 'Marquei' : 'Marcaram') + ' no período</div><div class="g-value money">' + (okV ? _trfN(fez.length) : '…') + '</div>'
+    + '<div class="g-sub"><b>' + _trfN(zp.marc) + ' reuniões</b> com data em ' + _trfE(P.rot) + (fut ? ' · 🔜 ' + _trfN(fut) + ' futuras' : '') + '</div>'
+    + (fezA != null ? '<div class="v2-cmp"><span class="v2-cmp-t">📅 ' + Pant.rot + '</span><div class="v2-cmp-v"><b>' + _trfN(fezA) + '</b><small>marcadas</small>' + v2vs(fez.length, fezA) + '</div></div>' : '')
+    + '<div class="g-stats">' + stat(mqlP == null ? '—' : Math.round(mqlP * 100) + '%', 'Marcação dos MQL · meta 30%', mqlP != null && mqlP >= 0.3 ? 'hl-green' : 'hl-red')
+    + stat(compP == null ? '—' : Math.round(compP * 100) + '%', 'Comparecimento · meta 85%', compP != null && compP >= 0.85 ? 'hl-green' : 'hl-orange')
+    + stat(nsP == null ? '—' : Math.round(nsP * 100) + '%', 'No-show · meta 15%', nsP != null && nsP <= 0.15 ? 'hl-green' : 'hl-red') + '</div></div>';
+  var fx = _trfSdrFaixa(zp.comp), prox = { P: 'M', M: 'G', G: 'GG' }[fx[0]];
+  h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(110,168,255,.18);--tint:#6ea8ff;" onclick="pvLista(\'compP\')">'
+    + '<div class="g-label">✅ Lead apareceu</div><div class="g-value money">' + (okV ? _trfN(zp.comp) : '…') + '</div>'
+    + '<div class="g-sub"><b>' + pc(zp.comp, zp.ja) + '</b> das ' + _trfN(zp.ja) + ' realizadas · ' + _trfN(zp.falt) + ' faltaram</div>'
+    + (zpA ? '<div class="v2-cmp"><span class="v2-cmp-t">📅 ' + Pant.rot + '</span><div class="v2-cmp-v"><b>' + _trfN(zpA.comp) + '</b><small>apareceram</small>' + v2vs(zpH.comp, zpA.comp) + '</div></div>' : '')
+    + (quem ? '<div class="g-rows"><div class="g-row"><span>🎯 Faixa ' + fx[0] + '</span><b>' + (prox ? 'faltam ' + fx[1] + ' para ' + prox : 'máxima') + '</b></div></div>' : '<div class="g-rows"><div class="g-row"><span>⏳ Sem resultado lançado</span><b>' + _trfN(zp.pend) + '</b></div></div>')
+    + '</div>';
+  h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(61,220,151,.18);--tint:#3ddc97;" onclick="pvLista(\'pagP\')">'
+    + '<div class="g-label">💰 Vendas ' + (quem ? 'das minhas reuniões' : 'das reuniões da pré-venda') + '</div><div class="g-value money">' + (okV ? _trfRs(zp.valor || 0) : '…') + '</div>'
+    + '<div class="g-sub"><b>' + _trfN(zp.pag) + ' vendas</b> · ' + pc(zp.pag, zp.comp) + ' de quem apareceu</div>'
+    + '<div class="g-rows"><div class="g-row"><span>⚡ Spark</span><b>' + _trfN(zp.spk || 0) + '</b></div><div class="g-row"><span>🚀 Growth</span><b>' + _trfN(zp.grw || 0) + '</b></div><div class="g-row"><span>📘 Legado</span><b>' + _trfN(zp.leg || 0) + '</b></div></div>'
+    + '</div>';
+  h += '</div>';
+  // === 5 MENORES ===
+  var mini = function(lbl, val, tint, halo, tipo, sub, a, b, fnT) { return '<div class="glass' + (tipo ? ' click' : '') + '" style="--halo:' + halo + ';--tint:' + tint + ';position:relative;"' + (tipo ? ' role="button" tabindex="0" onclick="pvLista(\'' + tipo + '\')"' : '') + '><div class="g-label">' + lbl + '</div><div class="g-value">' + val + '</div>'
+    + (sub ? '<div class="hint" style="margin:2px 0 6px;">' + sub + '</div>' : '') + vs(a, b) + spark(fnT, tint) + '</div>'; };
+  h += '<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'
+    + mini(quem ? 'Leads que recebi' : 'Leads recebidos', okC ? _trfN(zc.sl) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', '', 'negócios novos na Clint', zc.sl, LA ? LA.length : null, nL(function() { return true; }))
+    + mini('1º contato humano', okC ? pc(zc.sc, zc.sl) : '…', '#b98aff', 'rgba(185,138,255,.14)', '', _trfN(zc.sc) + ' de ' + _trfN(zc.sl) + ' · ' + (zc.med == null ? '' : 'metade em ' + _csdTempo(zc.med)), zc.sc, LA ? LA.filter(function(x) { return x.em > 0; }).length : null, nL(function(x) { return x.em > 0; }))
+    + mini('Marcadas', okV ? _trfN(zp.marc) : '…', '#f6a350', 'rgba(246,163,80,.14)', 'marcP', 'reuniões com data no período', zpH.marc, zpA ? zpA.marc : null, nR(function() { return true; }))
+    + mini('Realizadas', okV ? _trfN(zp.ja) : '…', '#ffd166', 'rgba(255,209,102,.14)', 'marcP', '↳ ' + pc(zp.ja, zp.marc) + ' das marcadas · inclui faltas', zpH.ja, zpA ? zpA.ja : null, nR(function(sn) { return isComp(sn) || sn === 'no show'; }))
+    + mini('Pagou tudo', okV ? _trfN(zp.pag) : '…', '#3ddc97', 'rgba(61,220,151,.14)', 'pagP', '↳ ' + pc(zp.pag, zp.comp) + ' de quem apareceu', zpH.pag, zpA ? zpA.pag : null, nR(function(sn) { return sn === 'vendido'; }))
     + '</div>';
   var hA = h; h = '';
   // 🔻 o funil do SDR, o mesmo desenho da Gestão de funis (24/11/2026, Bruno: "cadê o funil do SDR?"): Simples × Detalhado
@@ -44617,13 +44656,9 @@ function pvRender() {
     + '<div class="pl-chips" style="margin:2px 0 10px">' + vistaBt('simples', 'Simples') + vistaBt('detalhado', 'Detalhado') + '</div>'
     + '<div class="trf-fns">' + _trfFnBlocos(_trfSdrPassosFunil(), valF, 0, Df, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : ''; }) + '</div></div>';
   var hF = h; h = '';
-  // 2ª fileira: o que a pré-venda controla — rapidez, falta e o que ficou sem lançar
-  var nsAlto = zp.ja >= 5 && zp.falt / zp.ja > 0.15;
+  // 2ª fileira: o que precisa de ação agora
   h += '<div class="kpis">'
-    + card('Marcação dos MQL', okC ? pc(mqlM, mqlN) : '…', '#3ddc97', 'rgba(61,220,151,.14)', '', _trfN(mqlM) + ' de ' + _trfN(mqlN) + ' MQL do período marcaram reunião · meta 30%' + (mqlN >= 10 && mqlM / mqlN < 0.3 ? ' · ⚠️ abaixo' : ''))
-    + card('Tempo até a 1ª resposta', okC ? (zc.med == null ? '—' : _csdTempo(zc.med)) : '…', '#b98aff', 'rgba(185,138,255,.14)', '', 'metade dos leads do horário é chamada em até esse tempo')
     + card('Em até 5 minutos', okC ? pc(zc.m5, zc.hor) : '…', '#b98aff', 'rgba(185,138,255,.14)', '', _trfN(zc.m5) + ' de ' + _trfN(zc.hor) + ' que chegaram no horário')
-    + card('No-show', okV ? pc(zp.falt, zp.ja) : '…', '#ff6b6b', 'rgba(255,107,107,.14)', 'nsP', _trfN(zp.falt) + ' de ' + _trfN(zp.ja) + ' realizadas · meta até 15%' + (nsAlto ? ' · ⚠️ acima' : ''))
     + card('Faltaram e não remarcaram', okV ? _trfN(zp.nsr || 0) : '…', '#ff6b6b', 'rgba(255,107,107,.14)', 'nsrP', 'no-show sem nenhuma reunião depois · ligar e remarcar')
     + card('Sem resultado lançado', okV ? _trfN(zp.pend) : '…', '#ffd166', 'rgba(255,209,102,.14)', 'pendP', 'a data já passou e a planilha ainda diz agendada')
     + '</div>';
