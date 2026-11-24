@@ -44157,7 +44157,7 @@ function _trfSdrPer() {
 function trfSdrQuem(n) { TRF.sdr = TRF.sdr === n ? '' : n; renderTrafego(); }
 function trfSdrVista(v) { TRF.sdrVista = v; try { localStorage.setItem('trfSdrVista', v); } catch (e) {} renderTrafego(); }   // 23/11/2026: funil Detalhado × Simples
 function _trfSdrVista() { if (!TRF.sdrVista) { try { TRF.sdrVista = localStorage.getItem('trfSdrVista') || ''; } catch (e) {} } return TRF.sdrVista === 'simples' ? 'simples' : 'detalhado'; }
-function _trfSdrPassosFunil() { var s = _trfSdrVista() === 'simples'; return TRF_SDR_PS.filter(function(p) { return p[0] !== 'smql' && !(s && (p[0] === 'sc' || p[0] === 'sr')); }); }
+function _trfSdrPassosFunil() { var s = _trfSdrVista() === 'simples'; return TRF_SDR_PS.filter(function(p) { return p[0] !== 'smql' && !(s && (p[0] === 'sc' || p[0] === 'sr')) && !(TRF.sfun === 'ws' && /^s(l|c|r)$/.test(p[0])); }); }
 // 19/11/2026: MQL do SDR pela base do site (a mesma dos outros funis); a planilha de leads só quando o site não tem o lead
 function _trfSdrSite() { var S = TRF.site; if (!S || !S.leads) return {}; var g = TRF_R._sdrSite; if (g && g.S === S) return g.m; var m = {};
   S.leads.forEach(function(l) { if (!l.t8) return; var o = m[l.t8] || (m[l.t8] = { inv: '', comp: 0 }); if (l.inv) o.inv = l.inv; if (l.comp) o.comp = 1; }); TRF_R._sdrSite = { S: S, m: m }; return m; }
@@ -44352,7 +44352,7 @@ function _trfSdrPlan(nomes, P) {
   var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean);
   var z = { marc: 0, ja: 0, comp: 0, falt: 0, pag: 0, valor: 0, pend: 0, rows: [], L: { marcP: [], compP: [], nsP: [], pagP: [], pendP: [] } };
   if (!chaves.length) return z;
-  var dele = function(r) { var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
+  var dele = function(r) { if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false; var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
   var c = typeof rlCalc === 'function' ? rlCalc({ ini: P.ini, fim: P.fim }, dele) : null;
   if (c) { var t = c.t; z.marc = t.marc; z.comp = t.re; z.falt = t.ns; z.ja = t.re + t.ns; z.pag = t.vd; z.valor = t.vdV; z.pend = t.pend; z.rows = c.rows;
     z.L = { marcP: t.l.marc, compP: t.l.re, nsP: t.l.ns, pagP: t.l.vd, pendP: t.l.pend }; return _trfSdrProd(z); }
@@ -44376,6 +44376,7 @@ function _trfSdrFaixa(n) { return n >= 100 ? ['GG', 0] : n >= 80 ? ['G', 100 - n
 // 13/11/2026 (Bruno: "esse pode ser em outro lugar e mais claro"): a faixa da comissão em um bloco próprio, com barra até a próxima faixa.
 // Sempre o MÊS ATUAL (a faixa é mensal), só para quem é SDR (Selina, Ismael); a Sarah é Social Selling, com outra regra.
 function _trfSdrMetaHtml(nomes) {
+  var _sfun = TRF.sfun; TRF.sfun = '';   // a faixa da comissão conta todas as reuniões, sem o filtro de funil
   var h = new Date(), P = { ini: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth() + 1, 1).getTime() };
   var sdrs = nomes.filter(function(n) { return /selina|ismael|luana|jo[aã]o v/i.test(n) && (!TRF.sdr || TRF.sdr === n); });
   var zm = _trfSdrPlan(TRF.sdr ? [TRF.sdr] : nomes, P); if (window._trfSdrCtx) { window._trfSdrCtx.zm = zm; window._trfSdrCtx.Pm = { ini: P.ini, fim: P.fim, rot: RL_MES_NOME_C(h) }; }
@@ -44395,6 +44396,7 @@ function _trfSdrMetaHtml(nomes) {
       + '<div class="sdr-meta-bar"><i style="width:' + w + '%"></i>' + MARC.slice(1).map(function(m) { return '<em style="left:' + m[1] + '%"><span>' + m[0] + ' · ' + m[1] + '</span></em>'; }).join('') + '</div>'
       + '<div class="sdr-meta-nums">' + lk('compPM', n, '<b>' + _trfN(r) + '</b> realizadas') + lk('pagPM', n, '<b>' + _trfN(q.pag) + '</b> vendas') + lk('spkPM', n, '⚡ <b>' + _trfN(q.spk) + '</b> Spark') + lk('grwPM', n, '🚀 <b>' + _trfN(q.grw) + '</b> Growth') + '<span>' + _trfN(q.leg) + ' Legado</span><span class="sdr-meta-est">variável estimado até agora: <b>' + _trfRs(est) + '</b></span></div></div>';
   }).join('');
+  TRF.sfun = _sfun;
   return '<div class="sdr-meta"><div class="sdr-cmp-t">🎯 Meta do mês · ' + (TRF.sdr ? _trfE(String(TRF.sdr).split(' ')[0]) : 'time todo') + ' · ' + RL_MES_NOME_C(h) + ' <small>o que entra na remuneração · clique para ver as reuniões</small></div>' + cards + (lin ? '<div class="sdr-cmp-t" style="margin-top:4px">Faixa da comissão <small>reuniões realizadas no mês · P até 59 · M 60 · G 80 · GG 100 · workshop conta para a faixa</small></div>' + lin : '')
     + '<p class="sdr-cmp-n">Estimativa pela regra do plano do SDR (reunião realizada e venda × valor da faixa, + R$ 30 por Spark e R$ 90 por Growth; venda do workshop não entra). O valor oficial é o da planilha de comissões.</p></div>';
 }
@@ -44450,6 +44452,7 @@ function trfCloFunil(v) { TRF.cfun = v; TRF.cori = ''; renderTrafego(); }
 function trfCloOrigem(v) { TRF.cori = TRF.cori === v ? '' : v; renderTrafego(); }
 function _trfCloNome(r) { return String(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.closer) : r.closer || '').trim() || 'Sem closer'; }
 function _trfCloOriNome(o) { return TRF_CLO_ORI[o] || o; }
+function trfCloIrSS() { var it = document.querySelector('.nav-item[data-s="ss"]'); if (it) it.click(); }   // os passos da Clint abrem a tela Social Selling (o quadro das conversas)
 function trfCloLimpar() { TRF.clo = ''; TRF.cfun = ''; TRF.cori = ''; TRF.coriTodas = 0; renderTrafego(); }
 function _trfCloOrig(r) { return _trfOrigemLinha(r.origem); }
 function _trfCloZ(P, filtro) {
@@ -44476,19 +44479,25 @@ function _trfRenderCloser(el) {
   var fOri = function(r) { return !TRF.cori || _trfCloOrig(r) === TRF.cori; };
   var z = _trfCloZ(P, function(r) { return fFun(r) && fClo(r) && fOri(r); });
   var val = { marc: z.marc, real: z.ja, apar: z.comp, sim: z.sim, pag: z.pag }, topoSS = null;
-  if (ehSS && !fun && !TRF.clo && !TRF.cori) { try { csdCarregar(false); if (typeof CSD !== 'undefined' && CSD.carregado && !CSD.erro) { var vS = {}; topoSS = (CSD.rows || []).filter(function(x) { if (!/sarah/i.test(x.funil || '') || vS[x.id]) return false; vS[x.id] = 1; return x.cr >= P.ini && x.cr < P.fim; }).length; val.sl = topoSS; } else _trfVigiar('csd'); } catch (eCs) {} }
+  if (ehSS && !fun && !TRF.clo && !TRF.cori) { try { csdCarregar(false); if (typeof CSD !== 'undefined' && CSD.carregado && !CSD.erro) { var vS = {}, Lss = (CSD.rows || []).filter(function(x) { if (!/sarah/i.test(x.funil || '') || vS[x.id]) return false; vS[x.id] = 1; return x.cr >= P.ini && x.cr < P.fim; });
+      // 24/11/2026 (Bruno: "melhore o funil"): o começo do funil pela Clint — comentou › recebeu resposta › avançou na conversa (saiu da etapa Base, sem contar desqualificado)
+      topoSS = { n: Lss.length, resp: Lss.filter(function(x) { return x.ultEmp > 0; }).length, av: Lss.filter(function(x) { return !/^base$|desqualif/i.test(String(x.etapa || '').trim()); }).length, base: Lss.filter(function(x) { return /^base$/i.test(String(x.etapa || '').trim()); }).length };
+      val.sl = topoSS.n; val.sc = topoSS.resp; val.sr = topoSS.av; } else _trfVigiar('csd'); } catch (eCs) {} }
   var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; };
   var D = { z: z, P: P, ev: false, temMeta: true, temSite: true, naoBase: { sl: 1 }, aparte: {},
     pct: { real: [z.marc ? z.ja / z.marc * 100 : null, 'das marcadas · inclui faltas'],
       apar: [z.ja ? z.comp / z.ja * 100 : null, 'das realizadas · ' + _trfN(z.falt) + ' faltaram'],
       sim: [z.comp ? z.sim / z.comp * 100 : null, 'de quem apareceu'],
       pag: [z.comp ? z.pag / z.comp * 100 : null, 'de quem apareceu'] } };
+  if (topoSS && topoSS.n) { D.pct.sc = [topoSS.resp / topoSS.n * 100, 'de quem comentou']; D.pct.sr = [topoSS.av / topoSS.n * 100, 'de quem comentou · ' + _trfN(topoSS.base) + ' parados na etapa Base'];
+    D.pct.marc = [z.marc / topoSS.n * 100, 'de quem comentou no período · referência']; }
   window._trfCtx = null;
   window._trfSdrCtx = { L: [], esp: [], porTel: _trfIdxV2().porTel, P: P, quem: TRF.clo, zp: z, filtroTxt: (fun ? ' · ' + { diag: 'diagnóstico', ws: 'eventos' }[fun] : '') + (TRF.cori ? ' · ' + _trfCloOriNome(TRF.cori).replace(/^\S+\s/, '') : '') };
-  var simples = _trfSdrVista() === 'simples', passos = (topoSS != null ? [['sl', 'Pessoas no funil da Clint', 'entraram no funil "Sarah" da Clint no período (quem comentou no Instagram)']] : []).concat(TRF_CLO_PS.filter(function(p) { return !(simples && (p[0] === 'real' || p[0] === 'sim')); }));
+  var simples = _trfSdrVista() === 'simples', passos = (topoSS != null ? [['sl', 'Comentaram no Instagram', 'entraram no funil da Social Selling na Clint no período'], ['sc', 'Receberam resposta', 'a empresa respondeu na conversa (time ou IA)'], ['sr', 'Avançaram na conversa', 'saíram da etapa Base na Clint (conexão, foi para o WhatsApp…)']] : []).concat(TRF_CLO_PS.filter(function(p) { return !(simples && (p[0] === 'real' || p[0] === 'sim')); }));
   var chip = function(on, rot, ac) { return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="' + ac + '">' + rot + '</button>'; };
   var aspas = function(s) { return _trfE(s).replace(/\\/g, '').replace(/&#39;/g, ''); };
   var avisos = okV ? '' : '<div class="trf-aviso"><span class="mv-brilho-txt">Lendo a planilha de vendas…</span></div>';
+  if (topoSS && topoSS.n >= 10 && topoSS.base / topoSS.n > 0.7) avisos += '<div class="trf-aviso">⚠️ ' + _trfN(topoSS.base) + ' de ' + _trfN(topoSS.n) + ' pessoas que comentaram em ' + _trfE(P.rot) + ' ainda estão na etapa <b>Base</b> da Clint. Ou a conversa não andou, ou a etapa não está sendo atualizada na Clint — por isso as ' + _trfN(z.marc) + ' reuniões marcadas não se ligam a essas pessoas (a conversa é no Instagram, sem telefone).</div>';
   var conv = z.comp ? z.pag / z.comp : null, compP = z.ja ? z.comp / z.ja : null;
   var kb = function(tipo, rot, v, sub, cls) { return '<button type="button" class="trf-kpi l ' + (cls || '') + '" onclick="trfCloLista(\'' + tipo + '\')" title="Clique para ver as reuniões"><span>' + rot + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</button>'; };
   var linhas = nomes.map(function(n) { var q = _trfCloZ(P, function(r) { return fFun(r) && fOri(r) && _trfCloNome(r) === n; });
@@ -44523,7 +44532,7 @@ function _trfRenderCloser(el) {
     + kb('pendP', '⏳ Sem resultado lançado', _trfN(z.pend), 'a data já passou e a planilha ainda diz agendada', '') + '</div>'
     + '<div class="panel trf-bloco" id="trf-funil"><div class="trf-bt"><h3>🔻 Funil do ' + nomeF + (TRF.clo ? ' · ' + _trfE(TRF.clo) : ' · time todo') + (fun ? ' · ' + { diag: 'diagnóstico', ws: 'eventos' }[fun] : '') + (TRF.cori ? ' · ' + _trfE(_trfCloOriNome(TRF.cori)) : '') + '</h3><span class="trf-sub">reuniões da planilha de vendas com data em ' + _trfE(P.rot) + '</span></div>'
     +   '<div class="pl-chips" style="margin:2px 0 10px">' + chip(simples, 'Simples', 'trfSdrVista(\'simples\')') + chip(!simples, 'Detalhado', 'trfSdrVista(\'detalhado\')') + '</div>'
-    +   '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { return 'trfCloLista(\'' + ({ sl: 'marcP', marc: 'marcP', real: 'marcP', apar: 'compP', sim: 'simP', pag: 'pagP' }[k]) + '\')'; }) + '</div>'
+    +   '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { return /^s[lcr]$/.test(k) ? 'trfCloIrSS()' : 'trfCloLista(\'' + ({ marc: 'marcP', real: 'marcP', apar: 'compP', sim: 'simP', pag: 'pagP' }[k]) + '\')'; }) + '</div>'
     +   (simples ? '' : '<div class="trf-kpis" style="margin-top:10px">' + kb('legP', 'Legado', _trfN(z.leg), 'vendas de Legado Digital e Club', '') + kb('spkP', '⚡ Spark', _trfN(z.spk), 'vendas de Spark', '') + kb('grwP', '🚀 Growth', _trfN(z.grw), 'vendas de Growth', '') + '</div>')
     +   '<p class="trf-nota">Tudo vem da planilha de vendas, pelo dia da reunião, com a mesma conta da Visão Geral e do Relatório por função: os mesmos passos do funil da Visão Geral: realizadas = apareceu ou faltou; lead apareceu = vendido, não vendido, bloqueio, entrada ou estorno (remarcada não conta); conversão = vendas ÷ quem apareceu. O funil de cada reunião vem da coluna Origem da planilha: Eventos = workshop on-line e presencial (ILD); todo o resto é Diagnóstico (tráfego pago, orgânico, link na bio, pré/pós workshop, Social Selling, indicação e outras).' + (ehSS ? ' Aqui entram só as reuniões de Social Selling: origem de Social Selling ou marcadas pela Social Selling (a regra da comissão dela).' : '') + ' Alertas: comparecimento abaixo de 80% e conversão abaixo de 30%.' + (z.rem ? ' Remarcadas no período: ' + _trfN(z.rem) + ' (ficam fora de realizadas).' : '') + '</p></div>'
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>👥 Closer por closer</h3><span class="trf-sub">clique numa linha para ver o funil só dessa pessoa · segue os filtros de funil e origem</span></div>'
@@ -44538,7 +44547,7 @@ function _trfRenderCloser(el) {
 // =====================================================================================================
 var TRF_SEL_CSS = 'color-scheme:dark;appearance:none;-webkit-appearance:none;background-color:rgba(255,255,255,.06);color:inherit;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:9px 34px 9px 12px;font:inherit;font-size:13px;font-weight:700;width:100%;min-width:0;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 17px) 55%,calc(100% - 12px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat';
 function _trfSelRotulo(oc) {
-  if (/trfFiltro\('modo'/.test(oc)) return 'Contagem'; if (/trfFiltro\('wtipo'/.test(oc)) return 'Tipo de evento'; if (/trfFiltro\('wed'/.test(oc)) return 'Edição'; if (/trfFiltro\('tprod'/.test(oc)) return 'Funil';
+  if (/trfFiltro\('modo'/.test(oc)) return 'Contagem'; if (/trfFiltro\('wtipo'/.test(oc)) return 'Tipo de evento'; if (/trfFiltro\('wed'/.test(oc)) return 'Edição'; if (/trfFiltro\('tprod'/.test(oc)) return 'Funil'; if (/trfFiltro\('sfun'/.test(oc)) return 'Funil';
   if (/trfFiltro\('fam'/.test(oc)) return 'Público'; if (/trfSdrQuem/.test(oc)) return 'SDR'; if (/'tipoP'/.test(oc)) return 'Tipo de post'; if (/trfOrdem/.test(oc)) return 'Ordenar por'; return 'Filtro';
 }
 function _trfSeletores() {
@@ -44597,6 +44606,8 @@ function _trfRenderSdr(el) {
   if (okC && base.length && P.ini < desde - 864e5) avisos += '<div class="trf-aviso">⚠️ A base da Clint guarda os leads desde ' + new Date(desde).toLocaleDateString('pt-BR') + '. Este período começa antes: os leads mais antigos não aparecem aqui.</div>';
   var chips = '<div class="trf-filtros"><div class="pl-chips"><button type="button" class="pl-chip' + (!TRF.sdr ? ' on' : '') + '" onclick="trfSdrQuem(\'\')">Time todo</button>'
     + nomes.map(function(n) { return '<button type="button" class="pl-chip' + (TRF.sdr === n ? ' on' : '') + '" onclick="trfSdrQuem(\'' + _trfE(n).replace(/\\/g, '').replace(/&#39;/g, '') + '\')">' + pri(n) + ' · ' + _trfN(porSdr[n].length) + '</button>'; }).join('') + '</div></div>';
+  chips += '<div class="trf-filtros"><div class="pl-chips">' + [['', 'Todos os funis'], ['diag', '🩺 Diagnóstico'], ['ws', '🎟️ Eventos']].map(function(o) { return '<button type="button" class="pl-chip' + ((TRF.sfun || '') === o[0] ? ' on' : '') + '" onclick="trfFiltro(\'sfun\',\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div></div>'
+    + (TRF.sfun === 'ws' ? '<div class="trf-aviso">Em Eventos aparecem as reuniões e vendas da planilha com origem de workshop ou presencial. Os leads da Clint (1º contato, resposta) são do diagnóstico e ficam fora deste filtro.</div>' : '');
   var jaFoi = z.apar + z.falt, zp = _trfSdrPlan(TRF.sdr ? [TRF.sdr] : nomes, P); window._trfSdrCtx.zp = zp;
   val.marc = zp.marc; val.apar = zp.comp; val.pag = zp.pag;
   D.pct = { apar: [zp.ja ? zp.comp / zp.ja * 100 : null, 'das ' + _trfN(zp.ja) + ' reuniões que já aconteceram · ' + _trfN(zp.falt) + ' no-show'] };   // 23/11/2026: igual às outras telas
