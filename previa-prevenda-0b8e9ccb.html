@@ -44438,7 +44438,7 @@ function _trfSdrFez(nomes, P) {
   var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean); if (!chaves.length) return [];
   return (V2.rows || []).filter(function(r) { var t = +r.carimboT; if (!(t >= P.ini && t < P.fim) || /^remarcada/.test(r.sn || '')) return false;
     if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false;
-    if (TRF.sprod && typeof _vfProd === 'function' && _vfProd(r.produto) !== TRF.sprod) return false;
+    if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false;
     var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; });
 }
 function _trfSdrPlan(nomes, P) {
@@ -44448,7 +44448,7 @@ function _trfSdrPlan(nomes, P) {
   var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean);
   var z = { marc: 0, ja: 0, comp: 0, falt: 0, pag: 0, valor: 0, pend: 0, rows: [], L: { marcP: [], compP: [], nsP: [], pagP: [], pendP: [] } };
   if (!chaves.length) return z;
-  var dele = function(r) { if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false; if (TRF.sprod && typeof _vfProd === 'function' && _vfProd(r.produto) !== TRF.sprod) return false; var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
+  var dele = function(r) { if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false; if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
   var c = typeof rlCalc === 'function' ? rlCalc({ ini: P.ini, fim: P.fim }, dele) : null;
   if (c) { var t = c.t; z.marc = t.marc; z.comp = t.re; z.falt = t.ns; z.ja = t.re + t.ns; z.pag = t.vd; z.valor = t.vdV; z.pend = t.pend; z.rows = c.rows;
     z.L = { marcP: t.l.marc, compP: t.l.re, nsP: t.l.ns, pagP: t.l.vd, pendP: t.l.pend }; return _trfSdrProd(z); }
@@ -44585,6 +44585,10 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
     + '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : 'pvLista(\'L:' + k + '\')'; }) + '</div></div>';
 }
 function pvProd(k) { PV.prod = k; pvRender(); }
+// 24/11/2026 (Bruno: "HT foram leads que colocaram mais de 2 mil"): HT × Legado pelo INVESTIMENTO que o lead marcou no formulário,
+// nos leads e também nas reuniões e vendas (R$ 2 mil ou mais = HT · R$ 500 a R$ 1 mil = Legado · sem formulário ou "não tenho" fica fora dos dois)
+function pvProdRow(r) { var m = TRF_R._pvFi; if (!m || m.n !== (LD.rows || []).length) { m = { n: (LD.rows || []).length, f: {} }; (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = m.f[k]; if (!o || (l.date || 0) > (o.date || 0)) m.f[k] = l; }); TRF_R._pvFi = m; }
+  var fx = ''; try { fx = leadFaixa(_trfSdrInv(m.f[ldTel8(r.telefone)], r.telefone)); } catch (e) {} return fx === 'alta' ? 'ht' : fx === 'media' ? 'leg' : ''; }
 function pvFun(k) { PV.fun = k; pvRender(); }   // 24/11/2026 (Bruno: "filtro cursor HT, Legado e de Diagnóstico e Eventos")
 function pvSel(rot, fn, v, ops) { return '<label style="display:inline-flex;flex-direction:column;gap:5px;min-width:150px"><span style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;opacity:.55">' + rot + '</span><select style="' + TRF_SEL_CSS + '" onchange="' + fn + '(this.value)">' + ops.map(function(o) { return '<option value="' + o[0] + '"' + (v === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>'; }
 function pvPer(v) { TRF.sper = v; pvRender(); }
@@ -44663,7 +44667,7 @@ function pvRender() {
     + PV_SDRS.map(function(n) { return '<option value="' + _trfE(n) + '"' + (quem === n ? ' selected' : '') + '>' + _trfE(n) + '</option>'; }).join('') + '</select></label>';
   var h = '<div style="display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin-bottom:16px">' + selQuem
     + '<div class="pl-chips" style="margin:0">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'pvPer(\'' + o[0] + '\')'); }).join('') + '</div>'
-    + pvSel('Produto', 'pvProd', PV.prod || '', [['', 'Todos'], ['ht', '💎 HT'], ['leg', '📗 Legado']])
+    + pvSel('Produto', 'pvProd', PV.prod || '', [['', 'Todos'], ['ht', '💎 HT (R$ 2 mil ou mais)'], ['leg', '📗 Legado (R$ 500 a 1 mil)']])
     + pvSel('Funil', 'pvFun', PV.fun || '', [['', 'Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎟️ Eventos']])
     + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">' + (window._pvDash && !pvEhSdr() ? '<button type="button" class="btn" onclick="pvSairDash()" title="Voltar para o dash com todas as áreas">↗ Dash completo</button>' : '') + (!eu && !window._pvDash ? '<button type="button" class="btn" onclick="pvComo(\'' + _trfE(quem || 'Selina') + '\')" title="Mostra o dash exatamente como o SDR vê: menu só com a pré-venda">👁 Ver como o SDR vê</button>' : '') + '<a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
   var hCab = h; h = '';
