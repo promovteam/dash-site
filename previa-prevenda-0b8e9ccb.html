@@ -44549,7 +44549,7 @@ var PV_ORI = [
   { k: 'pp', rot: '🔁 Pós workshop e Call Meet', cl: null, pl: { pp: 1 } },
   { k: 'ind', rot: '🤝 Indicação', cl: null, pl: { ind: 1 } },
   { k: 'ss', rot: '💬 Social Selling', cl: null, pl: { ss: 1 } },
-  { k: 'out', rot: '🩹 Recuperação e sem origem', cl: 'resto', pl: { out: 1 } }
+  { k: 'out', rot: '🩹 Recuperação e sem origem', cl: null, pl: { out: 1 } }   // 24/11: os leads sem origem da Clint NÃO entram aqui (são de workshop, clientes e quem já conversava): ver o aviso
 ];
 // 24/11/2026 (Bruno: "link na bio"): Orgânico e Link na bio separados, como na Gestão de funis. A Clint escreve quase tudo como "Orgânico";
 // o que separa é a base do site: o lead que entrou pelo link da bio (src = bio) vai para Link na bio, o do ManyChat fica no Orgânico.
@@ -44586,7 +44586,7 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
     + kpi('', 'Vendas', _trfN(sel.pag), pc(sel.pag, sel.comp) + ' de quem apareceu', 'pagP')
     + kpi('vd', 'Vendido', sel.valor ? _trfRs(sel.valor) : '—', sel.pag ? 'ticket ' + _trfRs(sel.valor / sel.pag) : 'vendas fechadas', 'pagP') + '</div>';
   return nav + kp
-    + '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 Funil · ' + sel.o.rot + '</h3><span class="trf-sub">' + (sel.semLead ? (sel.o.k === 'ev' ? 'Eventos não têm lead no funil de diagnóstico da Clint' : 'A Clint não marca esta origem no lead') + ': o funil começa na reunião marcada' : 'clique num passo · em cima: leads da Clint com essa origem · embaixo: reuniões e vendas da planilha') + '</span></div>'
+    + '<div class="panel trf-bloco"><div class="trf-bt"><h3>🔻 Funil · ' + sel.o.rot + '</h3><span class="trf-sub">' + (sel.semLead ? (sel.o.k === 'ev' ? 'Eventos não têm lead no funil de diagnóstico da Clint' : sel.o.k === 'out' ? 'Os negócios da Clint sem origem ficam fora deste funil: a maioria é de gente do workshop, cliente ou quem já conversava, e as reuniões deles contam na origem da planilha' : 'A Clint não marca esta origem no lead') + ': o funil começa na reunião marcada' : 'clique num passo · em cima: leads da Clint com essa origem · embaixo: reuniões e vendas da planilha') + '</span></div>'
     + '<div class="trf-fns">' + _trfFnBlocos(passos, val, 0, D, function(k) { var m = { marc: 'marcP', apar: 'compP', pag: 'pagP' }[k]; return m ? 'pvLista(\'' + m + '\')' : 'pvLista(\'L:' + k + '\')'; }) + '</div></div>';
 }
 function pvProd(k) { PV.prod = k; pvRender(); }
@@ -44654,7 +44654,7 @@ function pvRender() {
   var fichasC = {}, mqlN = 0, mqlM = 0; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichasC[k]; if (!o || (l.date || 0) > (o.date || 0)) fichasC[k] = l; }); } catch (eFc) {}
   try { trfSiteCarregar(false); } catch (eSt) {}
   // lead HT = marcou investimento da faixa alta; lead Legado = faixa média (a mesma régua do Funil do Diagnóstico da Visão Geral)
-  var prodLead = function(x) { if (PV.ori2 && pvOriLead(x) !== PV.ori2) return false; if (!PV.prod) return true; var fx = ''; try { fx = leadFaixa(_trfSdrInv(fichasC[ldTel8(x.tel)], x.tel)); } catch (e) {} return PV.prod === 'ht' ? fx === 'alta' : fx === 'media'; };
+  var prodLead = function(x) { if (PV.ori2 && (/^(pp|ind|ss|out)$/.test(PV.ori2) || pvOriLead(x) !== PV.ori2)) return false; /* essas origens não têm lead marcado na Clint */ if (!PV.prod) return true; var fx = ''; try { fx = leadFaixa(_trfSdrInv(fichasC[ldTel8(x.tel)], x.tel)); } catch (e) {} return PV.prod === 'ht' ? fx === 'alta' : fx === 'media'; };
   if (PV.prod || PV.ori2) { L = L.filter(prodLead); zc = _trfSdrConta(L, porTel); }
   L.forEach(function(x) { if (!_trfSdrMql(fichasC[ldTel8(x.tel)], x.tel)) return; mqlN++; if (_trfSdrRs(x, porTel).length) mqlM++; });
   // 24/11/2026 (Bruno: "leads sem resposta" / "leads que chegaram hoje"): o que está esperando o SDR AGORA, sem depender do período —
