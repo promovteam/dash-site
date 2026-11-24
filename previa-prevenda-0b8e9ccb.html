@@ -44438,7 +44438,7 @@ function _trfSdrFez(nomes, P) {
   var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean); if (!chaves.length) return [];
   return (V2.rows || []).filter(function(r) { var t = +r.carimboT; if (!(t >= P.ini && t < P.fim) || /^remarcada/.test(r.sn || '')) return false;
     if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false;
-    if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; if (TRF.sori && _trfOrigemLinha(r.origem) !== TRF.sori) return false;
+    if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; if (TRF.sori && TRF.sori.split(',').indexOf(_trfOrigemLinha(r.origem)) === -1) return false;
     var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; });
 }
 function _trfSdrPlan(nomes, P) {
@@ -44448,7 +44448,7 @@ function _trfSdrPlan(nomes, P) {
   var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean);
   var z = { marc: 0, ja: 0, comp: 0, falt: 0, pag: 0, valor: 0, pend: 0, rows: [], L: { marcP: [], compP: [], nsP: [], pagP: [], pendP: [] } };
   if (!chaves.length) return z;
-  var dele = function(r) { if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false; if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; if (TRF.sori && _trfOrigemLinha(r.origem) !== TRF.sori) return false; var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
+  var dele = function(r) { if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false; if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; if (TRF.sori && TRF.sori.split(',').indexOf(_trfOrigemLinha(r.origem)) === -1) return false; var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
   var c = typeof rlCalc === 'function' ? rlCalc({ ini: P.ini, fim: P.fim }, dele) : null;
   if (c) { var t = c.t; z.marc = t.marc; z.comp = t.re; z.falt = t.ns; z.ja = t.re + t.ns; z.pag = t.vd; z.valor = t.vdV; z.pend = t.pend; z.rows = c.rows;
     z.L = { marcP: t.l.marc, compP: t.l.re, nsP: t.l.ns, pagP: t.l.vd, pendP: t.l.pend }; return _trfSdrProd(z); }
@@ -44589,6 +44589,7 @@ function pvProd(k) { PV.prod = k; pvRender(); }
 // nos leads e também nas reuniões e vendas (R$ 2 mil ou mais = HT · R$ 500 a R$ 1 mil = Legado · sem formulário ou "não tenho" fica fora dos dois)
 function pvProdRow(r) { var m = TRF_R._pvFi; if (!m || m.n !== (LD.rows || []).length) { m = { n: (LD.rows || []).length, f: {} }; (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = m.f[k]; if (!o || (l.date || 0) > (o.date || 0)) m.f[k] = l; }); TRF_R._pvFi = m; }
   var fx = ''; try { fx = leadFaixa(_trfSdrInv(m.f[ldTel8(r.telefone)], r.telefone)); } catch (e) {} return fx === 'alta' ? 'ht' : fx === 'media' ? 'leg' : ''; }
+function pvOri2(k) { PV.ori2 = k; pvRender(); }
 function pvFun(k) { PV.fun = k; pvRender(); }   // 24/11/2026 (Bruno: "filtro cursor HT, Legado e de Diagnóstico e Eventos")
 function pvSel(rot, fn, v, ops) { return '<label style="display:inline-flex;flex-direction:column;gap:5px;min-width:150px"><span style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;opacity:.55">' + rot + '</span><select style="' + TRF_SEL_CSS + '" onchange="' + fn + '(this.value)">' + ops.map(function(o) { return '<option value="' + o[0] + '"' + (v === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>'; }
 function pvPer(v) { TRF.sper = v; pvRender(); }
@@ -44639,7 +44640,7 @@ function pvRender() {
   var okV = !!(V2.carregado || (V2.rows || []).length), okC = typeof CSD !== 'undefined' && CSD.carregado;
   if (!okV || !okC) { clearTimeout(PV._t); PV._t = setTimeout(function() { var s = document.querySelector('.screen.active'); if (s && s.id === 's-prevenda') pvRender(); }, 1500); }
   var eu = pvEu(), quem = eu || PV.quem, nomes = quem ? [quem] : PV_SDRS, P = _trfSdrPer();
-  var sfun = TRF.sfun, sori0 = TRF.sori, evF = /^(ws|ild|wld)$/.test(PV.fun || ''); TRF.sfun = evF ? 'ws' : (PV.fun || ''); TRF.sori = PV.fun === 'ild' ? 'pres' : PV.fun === 'wld' ? 'ws' : '';   // 24/11: Eventos = ILD (presencial) + WLD (workshop on-line)   // Diagnóstico × Eventos pelo funil da origem da planilha (a mesma régua do principal)
+  var sfun = TRF.sfun, sori0 = TRF.sori, evF = /^(ws|ild|wld)$/.test(PV.fun || ''); TRF.sfun = evF ? 'ws' : (PV.fun || ''); TRF.sori = PV.fun === 'ild' ? 'pres' : PV.fun === 'wld' ? 'ws' : ''; if (PV.ori2) TRF.sori = { pago: 'pago', org: 'org', bio: 'bio', out: 'pp,ss,ind,out' }[PV.ori2];   // 24/11: filtro de origem (Bruno: "coloca um filtro de origem")   // 24/11: Eventos = ILD (presencial) + WLD (workshop on-line)   // Diagnóstico × Eventos pelo funil da origem da planilha (a mesma régua do principal)
   var sprod0 = TRF.sprod; TRF.sprod = PV.prod || '';   // 24/11/2026 (Bruno: "poderia ter um filtro HT e Legado")
   var zp = _trfSdrPlan(nomes, P), fez = _trfSdrFez(nomes, P), chaves = nomes.map(_trfSdrChave), porTel = _trfIdxV2().porTel, vistos = {};
   var L = (okC ? CSD.rows : []).filter(function(x) { if (!/spark/i.test(x.funil || '') || vistos[x.id]) return false; vistos[x.id] = 1; return x.cr >= P.ini && x.cr < P.fim && chaves.indexOf(_trfSdrChave(x.resp)) !== -1; });
@@ -44648,8 +44649,8 @@ function pvRender() {
   var fichasC = {}, mqlN = 0, mqlM = 0; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichasC[k]; if (!o || (l.date || 0) > (o.date || 0)) fichasC[k] = l; }); } catch (eFc) {}
   try { trfSiteCarregar(false); } catch (eSt) {}
   // lead HT = marcou investimento da faixa alta; lead Legado = faixa média (a mesma régua do Funil do Diagnóstico da Visão Geral)
-  var prodLead = function(x) { if (!PV.prod) return true; var fx = ''; try { fx = leadFaixa(_trfSdrInv(fichasC[ldTel8(x.tel)], x.tel)); } catch (e) {} return PV.prod === 'ht' ? fx === 'alta' : fx === 'media'; };
-  if (PV.prod) { L = L.filter(prodLead); zc = _trfSdrConta(L, porTel); }
+  var prodLead = function(x) { if (PV.ori2 && pvOriLead(x) !== PV.ori2) return false; if (!PV.prod) return true; var fx = ''; try { fx = leadFaixa(_trfSdrInv(fichasC[ldTel8(x.tel)], x.tel)); } catch (e) {} return PV.prod === 'ht' ? fx === 'alta' : fx === 'media'; };
+  if (PV.prod || PV.ori2) { L = L.filter(prodLead); zc = _trfSdrConta(L, porTel); }
   L.forEach(function(x) { if (!_trfSdrMql(fichasC[ldTel8(x.tel)], x.tel)) return; mqlN++; if (_trfSdrRs(x, porTel).length) mqlM++; });
   // 24/11/2026 (Bruno: "leads sem resposta" / "leads que chegaram hoje"): o que está esperando o SDR AGORA, sem depender do período —
   // esperando = o lead escreveu e ninguém respondeu ainda (coluna "Lead sem resposta desde" da Clint); hoje = leads criados hoje.
@@ -44668,6 +44669,7 @@ function pvRender() {
   var h = '<div style="display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin-bottom:16px">' + selQuem
     + '<div class="pl-chips" style="margin:0">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'pvPer(\'' + o[0] + '\')'); }).join('') + '</div>'
     + pvSel('Produto', 'pvProd', PV.prod || '', [['', 'Todos'], ['ht', '💎 HT (R$ 2 mil ou mais)'], ['leg', '📗 Legado (R$ 500 a 1 mil)']])
+    + pvSel('Origem', 'pvOri2', PV.ori2 || '', [['', 'Todas'], ['pago', '📣 Tráfego pago'], ['org', '🌱 Orgânico'], ['bio', '🔗 Link na bio'], ['out', 'Outras origens']])
     + pvSel('Funil', 'pvFun', PV.fun || '', [['', 'Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎟️ Eventos (ILD + WLD)'], ['ild', '　🏛️ ILD · presencial'], ['wld', '　💻 WLD · workshop on-line']])
     + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">' + (window._pvDash && !pvEhSdr() ? '<button type="button" class="btn" onclick="pvSairDash()" title="Voltar para o dash com todas as áreas">↗ Dash completo</button>' : '') + (!eu && !window._pvDash ? '<button type="button" class="btn" onclick="pvComo(\'' + _trfE(quem || 'Selina') + '\')" title="Mostra o dash exatamente como o SDR vê: menu só com a pré-venda">👁 Ver como o SDR vê</button>' : '') + '<a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
   var hCab = h; h = '';
@@ -44741,7 +44743,15 @@ function pvRender() {
   h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(61,220,151,.18);--tint:#3ddc97;" onclick="pvLista(\'pagP\')">'
     + '<div class="g-label">💰 Vendas ' + (quem ? 'das minhas reuniões' : 'das reuniões da pré-venda') + '</div><div class="g-value money">' + (okV ? _trfRs(zp.valor || 0) : '…') + '</div>'
     + '<div class="g-sub"><b>' + _trfN(zp.pag) + ' vendas</b> · ' + pc(zp.pag, zp.comp) + ' de quem apareceu</div>'
-    + '<div class="g-rows"><div class="g-row"><span>⚡ Spark</span><b>' + _trfN(zp.spk || 0) + '</b></div><div class="g-row"><span>🚀 Growth</span><b>' + _trfN(zp.grw || 0) + '</b></div><div class="g-row"><span>📘 Legado</span><b>' + _trfN(zp.leg || 0) + '</b></div></div>'
+    + (function() { // 24/11/2026 (Bruno: "cadê o restante do valor?"): quanto cada produto vendeu e, no time todo sem filtro, a conta que fecha com a Visão Geral
+        var vs = (zp.L.pagP || []), soma = function(re, nao) { var q = vs.filter(function(r) { var pr = String(r.produto || ''); return nao ? !/spark|growth/i.test(pr) : re.test(pr); }); return [q.length, q.reduce(function(t, r) { return t + (r.valor || 0); }, 0)]; };
+        var sp = soma(/spark/i), gr = soma(/growth/i), lg = soma(null, true), lin = function(ic, n, q) { return '<div class="g-row"><span>' + ic + ' ' + n + ' <small style="opacity:.6">' + _trfN(q[0]) + '</small></span><b>' + (q[1] ? _trfRs(q[1]) : '—') + '</b></div>'; };
+        var h2 = '<div class="g-rows">' + lin('⚡', 'Spark', sp) + lin('🚀', 'Growth', gr) + lin('📘', 'Legado', lg) + '</div>';
+        if (!quem && !PV.prod && !PV.fun && !PV.ori2) { try { var zg = _trfCloZ(P), ids = vs, fora = {}; (zg.L.pagP || []).forEach(function(r) { if (ids.indexOf(r) !== -1) return; var k = String(r.sdr || 'sem SDR').replace(/^(SS|SDR)\s+/i, ''); fora[k] = (fora[k] || 0) + (r.valor || 0); });
+          var fk = Object.keys(fora).filter(function(k) { return fora[k]; });
+          h2 += '<div style="margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);font-size:.72rem;line-height:1.5;color:var(--text2)">📊 <b>Visão Geral do mês: ' + _trfRs(zg.valor || 0) + '</b> (' + _trfN(zg.pag) + ' vendas)'
+            + (zg.valor - (zp.valor || 0) > 0 ? '<br>fora da pré-venda: <b>' + _trfRs(zg.valor - (zp.valor || 0)) + '</b>' + (fk.length ? ' · ' + fk.map(function(k) { return _trfE(k) + ' ' + _trfRs(fora[k]); }).join(' · ') : '') : '<br>✓ tudo da Visão Geral passou pela pré-venda') + '</div>'; } catch (eZg) {} }
+        return h2; })()
     + '</div>';
   h += '</div>';
   h += paceHtml;
