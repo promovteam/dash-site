@@ -44438,7 +44438,7 @@ function _trfSdrFez(nomes, P) {
   var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean); if (!chaves.length) return [];
   return (V2.rows || []).filter(function(r) { var t = +r.carimboT; if (!(t >= P.ini && t < P.fim) || /^remarcada/.test(r.sn || '')) return false;
     if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false;
-    if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false;
+    if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; if (TRF.sori && _trfOrigemLinha(r.origem) !== TRF.sori) return false;
     var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; });
 }
 function _trfSdrPlan(nomes, P) {
@@ -44448,7 +44448,7 @@ function _trfSdrPlan(nomes, P) {
   var chaves = nomes.filter(function(n) { return n && n !== 'Sem responsável'; }).map(_trfSdrChave).filter(Boolean);
   var z = { marc: 0, ja: 0, comp: 0, falt: 0, pag: 0, valor: 0, pend: 0, rows: [], L: { marcP: [], compP: [], nsP: [], pagP: [], pendP: [] } };
   if (!chaves.length) return z;
-  var dele = function(r) { if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false; if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
+  var dele = function(r) { if (TRF.sfun && typeof _trfCloFunDe === 'function' && _trfCloFunDe(r) !== TRF.sfun) return false; if (TRF.sprod && typeof pvProdRow === 'function' && pvProdRow(r) !== TRF.sprod) return false; if (TRF.sori && _trfOrigemLinha(r.origem) !== TRF.sori) return false; var p = _trfSdrChave(typeof rlPessoaNome === 'function' ? rlPessoaNome(r.sdr) : r.sdr); return !!p && chaves.indexOf(p) >= 0; };
   var c = typeof rlCalc === 'function' ? rlCalc({ ini: P.ini, fim: P.fim }, dele) : null;
   if (c) { var t = c.t; z.marc = t.marc; z.comp = t.re; z.falt = t.ns; z.ja = t.re + t.ns; z.pag = t.vd; z.valor = t.vdV; z.pend = t.pend; z.rows = c.rows;
     z.L = { marcP: t.l.marc, compP: t.l.re, nsP: t.l.ns, pagP: t.l.vd, pendP: t.l.pend }; return _trfSdrProd(z); }
@@ -44472,7 +44472,7 @@ function _trfSdrFaixa(n) { return n >= 100 ? ['GG', 0] : n >= 80 ? ['G', 100 - n
 // 13/11/2026 (Bruno: "esse pode ser em outro lugar e mais claro"): a faixa da comissão em um bloco próprio, com barra até a próxima faixa.
 // Sempre o MÊS ATUAL (a faixa é mensal), só para quem é SDR (Selina, Ismael); a Sarah é Social Selling, com outra regra.
 function _trfSdrMetaHtml(nomes) {
-  var _sfun = TRF.sfun, _sprod = TRF.sprod; TRF.sfun = ''; TRF.sprod = '';   // a faixa da comissão conta todas as reuniões, sem o filtro de funil
+  var _sfun = TRF.sfun, _sprod = TRF.sprod, _sori = TRF.sori; TRF.sfun = ''; TRF.sprod = ''; TRF.sori = '';   // a faixa da comissão conta todas as reuniões, sem o filtro de funil
   var h = new Date(), P = { ini: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), fim: new Date(h.getFullYear(), h.getMonth() + 1, 1).getTime() };
   var sdrs = nomes.filter(function(n) { return /selina|ismael|luana|jo[aã]o v/i.test(n) && (!TRF.sdr || TRF.sdr === n); });
   var zm = _trfSdrPlan(TRF.sdr ? [TRF.sdr] : nomes, P); if (window._trfSdrCtx) { window._trfSdrCtx.zm = zm; window._trfSdrCtx.Pm = { ini: P.ini, fim: P.fim, rot: RL_MES_NOME_C(h) }; }
@@ -44492,7 +44492,7 @@ function _trfSdrMetaHtml(nomes) {
       + '<div class="sdr-meta-bar"><i style="width:' + w + '%"></i>' + MARC.slice(1).map(function(m) { return '<em style="left:' + m[1] + '%"><span>' + m[0] + ' · ' + m[1] + '</span></em>'; }).join('') + '</div>'
       + '<div class="sdr-meta-nums">' + lk('compPM', n, '<b>' + _trfN(r) + '</b> realizadas') + lk('pagPM', n, '<b>' + _trfN(q.pag) + '</b> vendas') + lk('spkPM', n, '⚡ <b>' + _trfN(q.spk) + '</b> Spark') + lk('grwPM', n, '🚀 <b>' + _trfN(q.grw) + '</b> Growth') + '<span>' + _trfN(q.leg) + ' Legado</span></div></div>';
   }).join('');
-  TRF.sfun = _sfun; TRF.sprod = _sprod;
+  TRF.sfun = _sfun; TRF.sprod = _sprod; TRF.sori = _sori;
   return '<div class="sdr-meta"><div class="sdr-cmp-t">🎯 Meta do mês · ' + (TRF.sdr ? _trfE(String(TRF.sdr).split(' ')[0]) : 'time todo') + ' · ' + RL_MES_NOME_C(h) + ' <small>o que entra na remuneração · clique para ver as reuniões</small></div>' + cards + (lin ? '<div class="sdr-cmp-t" style="margin-top:4px">Faixa da comissão <small>reuniões realizadas no mês · P até 59 · M 60 · G 80 · GG 100 · workshop conta para a faixa</small></div>' + lin : '')
     + '<p class="sdr-cmp-n">A faixa sai das reuniões realizadas no mês. Os valores ficam na planilha de comissões.</p></div>';
 }
@@ -44639,7 +44639,7 @@ function pvRender() {
   var okV = !!(V2.carregado || (V2.rows || []).length), okC = typeof CSD !== 'undefined' && CSD.carregado;
   if (!okV || !okC) { clearTimeout(PV._t); PV._t = setTimeout(function() { var s = document.querySelector('.screen.active'); if (s && s.id === 's-prevenda') pvRender(); }, 1500); }
   var eu = pvEu(), quem = eu || PV.quem, nomes = quem ? [quem] : PV_SDRS, P = _trfSdrPer();
-  var sfun = TRF.sfun; TRF.sfun = PV.fun || '';   // Diagnóstico × Eventos pelo funil da origem da planilha (a mesma régua do principal)
+  var sfun = TRF.sfun, sori0 = TRF.sori, evF = /^(ws|ild|wld)$/.test(PV.fun || ''); TRF.sfun = evF ? 'ws' : (PV.fun || ''); TRF.sori = PV.fun === 'ild' ? 'pres' : PV.fun === 'wld' ? 'ws' : '';   // 24/11: Eventos = ILD (presencial) + WLD (workshop on-line)   // Diagnóstico × Eventos pelo funil da origem da planilha (a mesma régua do principal)
   var sprod0 = TRF.sprod; TRF.sprod = PV.prod || '';   // 24/11/2026 (Bruno: "poderia ter um filtro HT e Legado")
   var zp = _trfSdrPlan(nomes, P), fez = _trfSdrFez(nomes, P), chaves = nomes.map(_trfSdrChave), porTel = _trfIdxV2().porTel, vistos = {};
   var L = (okC ? CSD.rows : []).filter(function(x) { if (!/spark/i.test(x.funil || '') || vistos[x.id]) return false; vistos[x.id] = 1; return x.cr >= P.ini && x.cr < P.fim && chaves.indexOf(_trfSdrChave(x.resp)) !== -1; });
@@ -44668,7 +44668,7 @@ function pvRender() {
   var h = '<div style="display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin-bottom:16px">' + selQuem
     + '<div class="pl-chips" style="margin:0">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'pvPer(\'' + o[0] + '\')'); }).join('') + '</div>'
     + pvSel('Produto', 'pvProd', PV.prod || '', [['', 'Todos'], ['ht', '💎 HT (R$ 2 mil ou mais)'], ['leg', '📗 Legado (R$ 500 a 1 mil)']])
-    + pvSel('Funil', 'pvFun', PV.fun || '', [['', 'Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎟️ Eventos']])
+    + pvSel('Funil', 'pvFun', PV.fun || '', [['', 'Todos'], ['diag', '🩺 Diagnóstico'], ['ws', '🎟️ Eventos (ILD + WLD)'], ['ild', '　🏛️ ILD · presencial'], ['wld', '　💻 WLD · workshop on-line']])
     + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">' + (window._pvDash && !pvEhSdr() ? '<button type="button" class="btn" onclick="pvSairDash()" title="Voltar para o dash com todas as áreas">↗ Dash completo</button>' : '') + (!eu && !window._pvDash ? '<button type="button" class="btn" onclick="pvComo(\'' + _trfE(quem || 'Selina') + '\')" title="Mostra o dash exatamente como o SDR vê: menu só com a pré-venda">👁 Ver como o SDR vê</button>' : '') + '<a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
   var hCab = h; h = '';
   // 24/11/2026 (Bruno: "tem como criar desta forma visual aqui, com os dados mais importantes maiores?"): o MESMO desenho da Visão Geral —
@@ -44712,7 +44712,7 @@ function pvRender() {
       + '<i style="position:absolute;top:-3px;bottom:-3px;left:calc(' + m + '% - 1px);width:2px;border-radius:1px;background:#fff;opacity:.85" title="meta ' + m + '%"></i></span>'
       + '<span style="display:block;font-size:.62rem;letter-spacing:.2px;text-transform:none;color:var(--muted);white-space:nowrap">meta ' + (maiorMelhor ? '' : 'até ') + m + '%' + (suf || '') + '</span>'
       + '<b style="display:block;font-size:.68rem;color:' + cor + ';margin:0;white-space:nowrap">' + (ok ? '✓ na meta' : (maiorMelhor ? 'faltam ' : 'acima ') + dif + ' pontos') + '</b></div>'; };
-  var mqlP = mqlN ? mqlM / mqlN : null, compP = zp.ja ? zp.comp / zp.ja : null, nsP = zp.ja ? zp.falt / zp.ja : null;
+  var mqlP = mqlN && !evF ? mqlM / mqlN : null, compP = zp.ja ? zp.comp / zp.ja : null, nsP = zp.ja ? zp.falt / zp.ja : null;
   // === AGORA: esperando resposta + chegaram hoje ===
   var agora0 = Date.now(), esp24 = ESP.filter(function(x) { return agora0 - x.semResp > 864e5; }).length, espVelho = ESP.reduce(function(m, x) { return Math.max(m, agora0 - x.semResp); }, 0);
   var hSem = HOJE.filter(function(x) { return !(x.em > 0); }).length, hMql = HOJE.filter(function(x) { return _trfSdrMql(fichasC[ldTel8(x.tel)], x.tel); }).length;
@@ -44781,11 +44781,11 @@ function pvRender() {
   var hAbas = window._pvDash ? '' : '<div class="pl-chips" role="tablist" style="margin:0 0 16px;gap:8px">' + abaBt('resumo', '🏠 Resumo') + abaBt('funil', '🔻 Funil do SDR') + abaBt('origens', '🧲 Funil das origens') + '</div>';
   if (aba === 'fila') {   // a lista dos SDRs (e o Painel do time, para a gestão) dentro do dash: a mesma página, sem sair daqui
     if (!el.querySelector('#pv-fila')) el.innerHTML = '<iframe id="pv-fila" src="sem-contato.html" title="Lista dos SDRs" style="display:block;width:100%;height:calc(100vh - 120px);min-height:640px;border:0;border-radius:18px;background:#0c0e12"></iframe>';
-    TRF.sfun = sfun; TRF.sprod = sprod0; _pvNavAtivo(); return; }
+    TRF.sfun = sfun; TRF.sprod = sprod0; TRF.sori = sori0; _pvNavAtivo(); return; }
   var hClint = ''; if (aba === 'clint') { try { hClint = plMiaSecoes({}) || '<div class="panel">Lendo os atendimentos na Clint…</div>'; } catch (eCl) { hClint = '<div class="panel">Não consegui montar o atendimento agora.</div>'; } }
   h = (aba === 'clint' ? '' : hCab) + hAbas + (aba === 'funil' ? hF : aba === 'origens' ? _pvOrigensHtml(L, zp, porTel, P, quem) : aba === 'clint' ? hClint : hA + hB);
   h += '<p class="hint" style="margin-top:14px">Reuniões, comparecimento e vendas vêm da planilha de vendas, pela coluna SDR e pelo dia da reunião, com a mesma conta da Visão Geral (remarcada não conta como apareceu). Leads e tempo de resposta vêm da Clint. "Marquei no período" conta pelo dia em que a reunião foi marcada.</p>';
-  TRF.sfun = sfun; TRF.sprod = sprod0;
+  TRF.sfun = sfun; TRF.sprod = sprod0; TRF.sori = sori0;
   el.innerHTML = h; _pvNavAtivo();
 }
 // aplica o acesso da pré-venda assim que este código carrega (a checagem de acessos roda antes, quando ehPrevenda ainda não existe)
