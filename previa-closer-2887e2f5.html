@@ -43762,7 +43762,7 @@ function _trfAnimar(el, D) {
 function renderTrafego() {
   if (TRF_R.rT) { clearTimeout(TRF_R.rT); TRF_R.rT = 0; }
   TRF_R.vigQ = {}; TRF_R.n.render++;
-  try { _trfRender0(); } finally { _trfVigArmar(); try { _trfAquecerIg(); } catch (eA) {} try { _trfMobAjustar(); } catch (eM) {} }
+  try { _trfRender0(); } finally { _trfVigArmar(); try { _trfAquecerIg(); } catch (eA) {} try { _trfMobAjustar(); } catch (eM) {} try { _trfSeletores(); } catch (eSl) {} }
 }
 // 12/11/2026 (celular): nas linhas de botões que correm de lado, o botão ligado fica sempre à vista
 function _trfMobAjustar() {
@@ -44523,6 +44523,37 @@ function _trfRenderCloser(el) {
     + '<div class="panel trf-bloco" id="trf-cri"><div class="trf-bt"><h3>👥 Closer por closer</h3><span class="trf-sub">clique numa linha para ver o funil só dessa pessoa · segue os filtros de funil e origem</span></div>'
     +   (nomes.length ? '<div class="trf-tab-rol"><table class="trf-tab trf-tab-sdr"><thead><tr><th>Closer</th><th>Reuniões marcadas</th><th>Compareceram</th><th>No-show</th><th>Vendas</th><th>Conversão</th><th>Legado</th><th>Spark</th><th>Growth</th><th>Vendido</th></tr></thead><tbody>' + linhas + '</tbody></table></div>' : '<p class="trf-nota">' + (okV ? 'Nenhuma reunião neste período.' : 'Carregando…') + '</p>') + '</div>';
   _trfAnimar(el, D);
+}
+
+// =====================================================================================================
+// 🎛 FILTRO COM SELETOR EM TODAS AS ABAS da Gestão de funis (24/11/2026 · Bruno: "coloque esse funil em tudo" · "falo do funil com seletor").
+// Depois de cada desenho, cada grupo de botões de filtro (menos o período e o Simples/Detalhado) vira uma caixa de escolha com rótulo, no
+// mesmo formato da aba Closer. Os botões continuam na página, escondidos: escolher na caixa clica no botão — a regra de cada filtro não muda.
+// =====================================================================================================
+var TRF_SEL_CSS = 'color-scheme:dark;appearance:none;-webkit-appearance:none;background-color:rgba(255,255,255,.06);color:inherit;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:9px 34px 9px 12px;font:inherit;font-size:13px;font-weight:700;width:100%;min-width:0;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 17px) 55%,calc(100% - 12px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat';
+function _trfSelRotulo(oc) {
+  if (/trfFiltro\('modo'/.test(oc)) return 'Contagem'; if (/trfFiltro\('wtipo'/.test(oc)) return 'Tipo de evento'; if (/trfFiltro\('wed'/.test(oc)) return 'Edição'; if (/trfFiltro\('tprod'/.test(oc)) return 'Funil';
+  if (/trfFiltro\('fam'/.test(oc)) return 'Público'; if (/trfSdrQuem/.test(oc)) return 'SDR'; if (/'tipoP'/.test(oc)) return 'Tipo de post'; if (/trfOrdem/.test(oc)) return 'Ordenar por'; return 'Filtro';
+}
+function _trfSeletores() {
+  var raiz = document.getElementById('trf-corpo'); if (!raiz) return;
+  [].forEach.call(raiz.querySelectorAll('.pl-chips'), function(g) {
+    if (g.getAttribute('data-sel')) return;
+    var bs = [].filter.call(g.children, function(b) { return b.tagName === 'BUTTON'; }); if (bs.length < 2) return;
+    var ocs = bs.map(function(b) { return b.getAttribute('onclick') || ''; }), tudo = ocs.join(' ');
+    if (/trfFiltro\('per'|trfSdrPer|trfPeriodoAbrir|trfSdrDatas|trfSdrVista|trfCloLista|trfSdrLista|coriTodas|trfCloLimpar/.test(tudo)) return;   // período e Simples/Detalhado ficam em botões
+    if (g.closest('#vf-modal, .modal')) return;
+    g.setAttribute('data-sel', '1');
+    var cx = document.createElement('label'); cx.className = 'trf-selcx'; cx.style.cssText = 'display:inline-flex;flex-direction:column;gap:5px;min-width:190px;max-width:300px;vertical-align:bottom';
+    var temOn = bs.some(function(b) { return b.classList.contains('on'); }), i0 = 0;
+    var rot = document.createElement('span'); rot.textContent = _trfSelRotulo(ocs[0]); rot.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;opacity:.55';
+    var sel = document.createElement('select'); sel.style.cssText = TRF_SEL_CSS;
+    bs.forEach(function(b, i) { var o = document.createElement('option'); o.value = String(i); o.textContent = b.textContent.replace(/\s+/g, ' ').trim(); if (b.classList.contains('on') || b.getAttribute('aria-pressed') === 'true') { o.selected = true; i0 = i; } sel.appendChild(o); });
+    if (!temOn && !bs.some(function(b) { return b.getAttribute('aria-pressed') === 'true'; })) { var v = document.createElement('option'); v.value = ''; v.textContent = 'Escolher…'; v.selected = true; sel.insertBefore(v, sel.firstChild); }
+    sel.onchange = function() { var b = bs[+sel.value]; if (sel.value !== '' && b) b.click(); };
+    cx.appendChild(rot); cx.appendChild(sel);
+    g.style.display = 'none'; g.parentNode.insertBefore(cx, g.nextSibling);
+  });
 }
 function _trfRenderSdr(el) {
   try { csdCarregar(false); } catch (e) {}
