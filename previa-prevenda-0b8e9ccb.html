@@ -44571,7 +44571,7 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
 function pvProd(k) { PV.prod = k; pvRender(); }
 function pvPer(v) { TRF.sper = v; pvRender(); }
 function pvQuem(n) { PV.quem = n; pvRender(); }
-function pvLista(tipo) { var C = PV._ctx; if (!C) return; window._trfSdrCtx = C; trfCloLista(tipo); }
+function pvLista(tipo) { var C = PV._ctx; if (!C) return; window._trfSdrCtx = C; if (/^L:/.test(tipo)) { trfSdrLista(tipo.slice(2)); return; } trfCloLista(tipo); }   // L:… = lista de LEADS (1º contato, tempo…)
 function pvIr(s) { var it = document.querySelector('.nav-item[data-s="' + s + '"]'); if (it) it.click(); }
 function pvRender() {
   var el = document.getElementById('pv-corpo'); if (!el) return;
@@ -44619,7 +44619,20 @@ function pvRender() {
   var nR = function(test) { return function(a, b) { return (zp.rows || []).filter(function(r) { var t = r.date ? r.date.getTime() : 0; return t >= a && t < b && test(r.sn || ''); }).length; }; };
   var nL = function(test) { return function(a, b) { return (okC ? CSD.rows : []).filter(function(x) { return /spark/i.test(x.funil || '') && x.cr >= a && x.cr < b && chaves.indexOf(_trfSdrChave(x.resp)) !== -1 && prodLead(x) && test(x); }).length; }; };
   var proj = null; if (ehMes && fez.length) { var uT = 0, uP = 0, hj2 = new Date(), tot = new Date(hj2.getFullYear(), hj2.getMonth() + 1, 0).getDate(); for (var d = 1; d <= tot; d++) { if (ehDiaUtil(new Date(hj2.getFullYear(), hj2.getMonth(), d))) { uT++; if (d <= hj2.getDate()) uP++; } } if (uP) proj = { v: Math.round(fez.length / uP * uT), restam: uT - uP, dia: fez.length / uP }; }
-  var stat = function(v, rot, cls) { return '<div class="g-stat hl ' + cls + '"><b>' + v + '</b><span>' + rot + '</span></div>'; };
+  // 24/11/2026 (Bruno: "melhore essa parte visualmente"): cada objetivo com ícone, o número na cor do resultado, uma régua de 0 a 100% com a
+  // marca da meta, e embaixo quanto falta (ou "na meta") — o nome não quebra em duas linhas.
+  var stat = function(p, ico, rot, meta, maiorMelhor, suf) {
+    if (p == null) return '<div class="g-stat" style="text-align:left;padding:12px 14px"><span style="display:block">' + ico + ' ' + rot + '</span><b style="font-size:1.4rem">—</b></div>';
+    var v = Math.round(p * 100), m = Math.round(meta * 100), ok = maiorMelhor ? v >= m : v <= m, perto = maiorMelhor ? v >= m * 0.75 : v <= m * 1.5;
+    var cor = ok ? '#3ddc97' : perto ? '#f6a350' : '#ff6b6b', cls = ok ? 'hl-green' : perto ? 'hl-orange' : 'hl-red', dif = Math.abs(v - m);
+    return '<div class="g-stat hl ' + cls + '" style="text-align:left;padding:12px 14px 11px;display:flex;flex-direction:column;gap:6px;min-width:0">'
+      + '<span style="display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.6rem;letter-spacing:.7px;color:var(--text2)">' + ico + ' ' + rot + '</span>'
+      + '<b style="font-size:1.7rem;line-height:1;color:' + cor + ';margin:0">' + v + '%</b>'
+      + '<span style="position:relative;display:block;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:visible" aria-hidden="true">'
+      + '<i style="position:absolute;left:0;top:0;bottom:0;width:' + Math.min(100, v) + '%;border-radius:3px;background:' + cor + '"></i>'
+      + '<i style="position:absolute;top:-3px;bottom:-3px;left:calc(' + m + '% - 1px);width:2px;border-radius:1px;background:#fff;opacity:.85" title="meta ' + m + '%"></i></span>'
+      + '<span style="display:block;font-size:.62rem;letter-spacing:.2px;text-transform:none;color:var(--muted);white-space:nowrap">meta ' + (maiorMelhor ? '' : 'até ') + m + '%' + (suf || '') + '</span>'
+      + '<b style="display:block;font-size:.68rem;color:' + cor + ';margin:0;white-space:nowrap">' + (ok ? '✓ na meta' : (maiorMelhor ? 'faltam ' : 'acima ') + dif + ' pontos') + '</b></div>'; };
   var mqlP = mqlN ? mqlM / mqlN : null, compP = zp.ja ? zp.comp / zp.ja : null, nsP = zp.ja ? zp.falt / zp.ja : null;
   // === HERO ===
   h += '<div class="hero-row">';
@@ -44628,9 +44641,9 @@ function pvRender() {
     + '<div class="g-label">📅 ' + (quem ? 'Marquei' : 'Marcaram') + ' no período</div><div class="g-value money">' + (okV ? _trfN(fez.length) : '…') + '</div>'
     + '<div class="g-sub"><b>' + _trfN(zp.marc) + ' reuniões</b> com data em ' + _trfE(P.rot) + (fut ? ' · 🔜 ' + _trfN(fut) + ' futuras' : '') + '</div>'
     + (fezA != null ? '<div class="v2-cmp"><span class="v2-cmp-t">📅 ' + Pant.rot + '</span><div class="v2-cmp-v"><b>' + _trfN(fezA) + '</b><small>marcadas</small>' + v2vs(fez.length, fezA) + '</div></div>' : '')
-    + '<div class="g-stats">' + stat(mqlP == null ? '—' : Math.round(mqlP * 100) + '%', 'Marcação dos MQL · meta 30%', mqlP != null && mqlP >= 0.3 ? 'hl-green' : 'hl-red')
-    + stat(compP == null ? '—' : Math.round(compP * 100) + '%', 'Comparecimento · meta 85%', compP != null && compP >= 0.85 ? 'hl-green' : 'hl-orange')
-    + stat(nsP == null ? '—' : Math.round(nsP * 100) + '%', 'No-show · meta 15%', nsP != null && nsP <= 0.15 ? 'hl-green' : 'hl-red') + '</div></div>';
+    + '<div class="g-stats">' + stat(mqlP, '📅', 'Marcação', 0.30, true, ' dos MQL')
+    + stat(compP, '✅', 'Compareceu', 0.85, true)
+    + stat(nsP, '🚫', 'No-show', 0.15, false) + '</div></div>';
   var fx = _trfSdrFaixa(zp.comp), prox = { P: 'M', M: 'G', G: 'GG' }[fx[0]];
   h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(110,168,255,.18);--tint:#6ea8ff;" onclick="pvLista(\'compP\')">'
     + '<div class="g-label">✅ Lead apareceu</div><div class="g-value money">' + (okV ? _trfN(zp.comp) : '…') + '</div>'
@@ -44648,8 +44661,8 @@ function pvRender() {
   var mini = function(lbl, val, tint, halo, tipo, sub, a, b, fnT) { return '<div class="glass' + (tipo ? ' click' : '') + '" style="--halo:' + halo + ';--tint:' + tint + ';position:relative;"' + (tipo ? ' role="button" tabindex="0" onclick="pvLista(\'' + tipo + '\')"' : '') + '><div class="g-label">' + lbl + '</div><div class="g-value">' + val + '</div>'
     + (sub ? '<div class="hint" style="margin:2px 0 6px;">' + sub + '</div>' : '') + vs(a, b) + spark(fnT, tint) + '</div>'; };
   h += '<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'
-    + mini(quem ? 'Leads que recebi' : 'Leads recebidos', okC ? _trfN(zc.sl) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', '', 'negócios novos na Clint', zc.sl, LA ? LA.length : null, nL(function() { return true; }))
-    + mini('1º contato humano', okC ? pc(zc.sc, zc.sl) : '…', '#b98aff', 'rgba(185,138,255,.14)', '', _trfN(zc.sc) + ' de ' + _trfN(zc.sl) + ' · ' + (zc.med == null ? '' : 'metade em ' + _csdTempo(zc.med)), zc.sc, LA ? LA.filter(function(x) { return x.em > 0; }).length : null, nL(function(x) { return x.em > 0; }))
+    + mini(quem ? 'Leads que recebi' : 'Leads recebidos', okC ? _trfN(zc.sl) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', 'L:sl', 'negócios novos na Clint', zc.sl, LA ? LA.length : null, nL(function() { return true; }))
+    + mini('1º contato humano', okC ? pc(zc.sc, zc.sl) : '…', '#b98aff', 'rgba(185,138,255,.14)', 'L:sc', _trfN(zc.sc) + ' de ' + _trfN(zc.sl) + ' · ' + (zc.med == null ? '' : 'metade em ' + _csdTempo(zc.med)), zc.sc, LA ? LA.filter(function(x) { return x.em > 0; }).length : null, nL(function(x) { return x.em > 0; }))
     + mini('Marcadas', okV ? _trfN(zp.marc) : '…', '#f6a350', 'rgba(246,163,80,.14)', 'marcP', 'reuniões com data no período', zpH.marc, zpA ? zpA.marc : null, nR(function() { return true; }))
     + mini('Realizadas', okV ? _trfN(zp.ja) : '…', '#ffd166', 'rgba(255,209,102,.14)', 'marcP', '↳ ' + pc(zp.ja, zp.marc) + ' das marcadas · inclui faltas', zpH.ja, zpA ? zpA.ja : null, nR(function(sn) { return isComp(sn) || sn === 'no show'; }))
     + mini('Pagou tudo', okV ? _trfN(zp.pag) : '…', '#3ddc97', 'rgba(61,220,151,.14)', 'pagP', '↳ ' + pc(zp.pag, zp.comp) + ' de quem apareceu', zpH.pag, zpA ? zpA.pag : null, nR(function(sn) { return sn === 'vendido'; }))
@@ -44665,7 +44678,7 @@ function pvRender() {
   var hF = h; h = '';
   // 2ª fileira: o que precisa de ação agora
   h += '<div class="kpis">'
-    + card('Em até 5 minutos', okC ? pc(zc.m5, zc.hor) : '…', '#b98aff', 'rgba(185,138,255,.14)', '', _trfN(zc.m5) + ' de ' + _trfN(zc.hor) + ' que chegaram no horário')
+    + card('Em até 5 minutos', okC ? pc(zc.m5, zc.hor) : '…', '#b98aff', 'rgba(185,138,255,.14)', 'L:m5', _trfN(zc.m5) + ' de ' + _trfN(zc.hor) + ' que chegaram no horário')
     + card('Faltaram e não remarcaram', okV ? _trfN(zp.nsr || 0) : '…', '#ff6b6b', 'rgba(255,107,107,.14)', 'nsrP', 'no-show sem nenhuma reunião depois · ligar e remarcar')
     + card('Sem resultado lançado', okV ? _trfN(zp.pend) : '…', '#ffd166', 'rgba(255,209,102,.14)', 'pendP', 'a data já passou e a planilha ainda diz agendada')
     + '</div>';
