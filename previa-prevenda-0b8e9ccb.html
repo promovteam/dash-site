@@ -3480,6 +3480,7 @@ function soMeuIniciar() {
   SOMEU.nome = q ? q.nome : ''; SOMEU.primeiro = q ? q.primeiro : ''; SOMEU.closerKey = q ? q.closerKey : '';
   var pref = null; try { pref = localStorage.getItem('v2SoMeu_' + (q ? q.primeiro : '')); } catch (e) {}
   SOMEU.on = !!q && (pref === null ? !q.adm : pref === '1');
+  try { if (q && typeof ehPrevenda === 'function' && ehPrevenda() && !window._pvComo) SOMEU.on = true; } catch (ePv) {}   // 24/11/2026: SDR sempre no "Só o meu"
   soMeuMostrar();
 }
 // o nome da pessoa aparece na planilha de vários jeitos ("Tony Londe", "SS Sarah", "Selina"): vale se uma das palavras for o 1º nome
@@ -3525,6 +3526,7 @@ function soMeuMostrar() {
 }
 function soMeuAlternar() {
   if (!SOMEU.primeiro) return;
+  try { if (typeof ehPrevenda === 'function' && ehPrevenda() && !window._pvComo) return; } catch (ePv) {}
   SOMEU.on = !SOMEU.on;
   try { localStorage.setItem('v2SoMeu_' + SOMEU.primeiro, SOMEU.on ? '1' : '0'); } catch (e) {}
   soMeuMostrar();
@@ -22704,11 +22706,11 @@ var ACESSOS = [
   { nome: 'João',          adm: true, gestao: true, senhaRobo: true },   // 08/10/2026: idem (João Stecca)
   { nome: 'Suellen',       financeiro: true },   // Financeiro: vê o dash inteiro (05/10/2026: "libere tudo"; antes só Comissões); a senha é conferida no robô — não fica no código
   { nome: 'Executivo', pinRobo: true, contratos: true, executivo: true },   // Executiva (Customer Success, 28/09/2026): envia contratos, sem poderes de adm · 13/10/2026 (Bruno: "Juliane quero que se torne executivo"): o acesso mudou de nome, de "Juliane Promov" para "Executivo" (é do time executivo); o resto fica igual
-  { nome: 'Selina Promov', pinRobo: true },
+  { nome: 'Selina Promov', pinRobo: true, prevenda: true },
   { nome: 'Sarah Promov',  pinRobo: true },
-  { nome: 'Ismael',        pinRobo: true },
-  { nome: 'Luana',         senhaRobo: true, pessoa: true },   // 23/11/2026: SDR; cria a própria senha com o código que chega no WhatsApp dela (conferida no robô)
-  { nome: 'João Victor',   senhaRobo: true, pessoa: true },   // 23/11/2026: SDR; idem ("João" é o João Stecca)
+  { nome: 'Ismael',        pinRobo: true, prevenda: true },
+  { nome: 'Luana',         senhaRobo: true, pessoa: true, prevenda: true },   // 23/11/2026: SDR; cria a própria senha com o código que chega no WhatsApp dela (conferida no robô)
+  { nome: 'João Victor',   senhaRobo: true, pessoa: true, prevenda: true },   // 23/11/2026: SDR; idem ("João" é o João Stecca)
   { nome: 'Adm',           adm: true, gestao: true, pinRobo: true, semComissoes: true },   // 13/10/2026 (Bruno: "o admin que tire as comissões · deixe somente o closer score"): sem a aba Comissões; o resto e o Score continuam ·   // 09/10/2026 (Bruno: "preciso que ele tenha acesso total" · "não quero essa barreira no admin"): igual ao Gabriel — UMA senha na entrada (no lugar do PIN, que saiu do código público) e tudo abre direto; o código para criar a senha vai para o WhatsApp do Bruno     // acesso geral; não vira "Você" sozinho · 09/10/2026 (Bruno: "libera todas as abas no adm"): Comissões, Score e o alinhamento aparecem — os dados só abrem com a senha conferida no robô
   { nome: 'Produção de conteúdo', soOlha: true, conteudo: true, senhaTime: true },   // 10/10/2026 (Bruno: "crie um acesso para o time de Produção de conteúdo" · um acesso só do time): vê o 🏆 Ranking orgânico e os Criativos, não mexe em nada; a senha é criada com um código que vai para o WhatsApp do Bruno e conferida no robô — não fica no código
   { nome: 'Evento ILD', ild: true, senhaTime: true },   // 05/11/2026 (Bruno: "crie um acesso no dash evento ILD" · "senha única para todos"): abre só a tela 🎟️ Evento ILD; grava o 🗣️ Abordei e marca entrevista
@@ -26110,6 +26112,10 @@ html.conteudo #gm-toasts, html.conteudo #v2-pend-aviso, html.conteudo #vsf-btn {
 /* 05–06/11/2026: acesso Evento ILD — só as 5 abas do evento (no celular: Início · Leads · Agenda · Cases na barra e a Comparação no Mais) */
 html.ild .sidebar .nav-item[data-s]:not([data-s^="ild"]), html.ild .tb-tile[data-s]:not([data-s^="ild"]), html.ild .tb-it[data-s]:not([data-s="mais"]):not(.tb-ild),
 html.ild .screen:not([id^="s-ild"]), html.ild #gm-toasts, html.ild #v2-pend-aviso, html.ild #vsf-btn { display:none !important; }
+/* 24/11/2026: acesso pré-venda — o SDR vê só Pré-venda, Leads, Agenda, Comissões, Score e Treinamentos */
+html.prevenda .nav-item[data-s]:not([data-s="prevenda"]):not([data-s="agenda"]):not([data-s="leads"]):not([data-s="treinos"]):not([data-s="comissoes"]):not([data-s="score"]), html.prevenda .tb-tile[data-s]:not([data-s="prevenda"]):not([data-s="agenda"]):not([data-s="leads"]):not([data-s="treinos"]):not([data-s="comissoes"]):not([data-s="score"]), html.prevenda .tb-it[data-s]:not(.tb-pv):not([data-s="mais"]),
+html.prevenda .screen:not(#s-prevenda):not(#s-agenda):not(#s-leads):not(#s-treinos):not(#s-comissoes):not(#s-score), html.prevenda #btn-someu, html.prevenda #nav-apres-spark, html.prevenda #nav-acervo-cases, html.prevenda #nav-palco { display:none !important; }
+.tb-it.tb-pv { display:none; } html.prevenda .tb-it.tb-pv { display:flex; }
 /* 💬 › 📝 › 🏅 comentaram × formulário × MQL (16/10/2026) */
 .rko-conv { display:flex; align-items:stretch; justify-content:center; gap:4px; margin-top:10px; font-variant-numeric:tabular-nums; }
 .rko-conv span { display:flex; flex-direction:column; align-items:center; gap:1px; min-width:0; padding:6px 9px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); }
@@ -27664,7 +27670,7 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
   function rotuloDe(s) { var it = itemMenu(s), l = it && it.querySelector('.nav-label'); return l ? l.textContent.trim() : s; }
   var CURTO = { pesquisa: 'Pesquisar', anuncios: 'Criativos', pagamentos: 'Pagamentos' };
   var BARRA = [['visao', 'Início'], ['agenda', 'Agenda'], ['leads', 'Leads'], ['gravacoes', 'Vídeos']];
-  function naBarra(s) { if (root.classList.contains('ild')) return ['ild', 'ildleads', 'ildagenda', 'ildcases'].indexOf(s) !== -1; for (var i = 0; i < BARRA.length; i++) if (BARRA[i][0] === s) return true; return false; }   // 06/11/2026: + Evento ILD
+  function naBarra(s) { if (root.classList.contains('prevenda')) return ['prevenda', 'leads', 'agenda', 'comissoes'].indexOf(s) !== -1; if (root.classList.contains('ild')) return ['ild', 'ildleads', 'ildagenda', 'ildcases'].indexOf(s) !== -1; for (var i = 0; i < BARRA.length; i++) if (BARRA[i][0] === s) return true; return false; }   // 06/11/2026: + Evento ILD
   var ICO_MAIS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>';
 
   // ---------- barra de abas (celular) ----------
@@ -27674,6 +27680,8 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
     return '<button type="button" class="tb-it" data-s="' + b[0] + '"><span class="tb-ic">' + iconeDe(b[0]) + '</span><span class="tb-rot">' + b[1] + '</span><em class="tb-badge"></em></button>';
   }).join('') + [['ild', 'Início'], ['ildleads', 'Leads'], ['ildagenda', 'Agenda'], ['ildcases', 'Cases']].map(function (b) {   // 06/11/2026: abas do Evento ILD (só no acesso do evento)
     return '<button type="button" class="tb-it tb-ild" data-s="' + b[0] + '"><span class="tb-ic">' + iconeDe(b[0]) + '</span><span class="tb-rot">' + b[1] + '</span><em class="tb-badge"></em></button>';
+  }).join('') + [['prevenda', 'Início'], ['leads', 'Leads'], ['agenda', 'Agenda'], ['comissoes', 'Comissão']].map(function (b) {   // 24/11/2026: barra do acesso pré-venda
+    return '<button type="button" class="tb-it tb-pv" data-s="' + b[0] + '"><span class="tb-ic">' + iconeDe(b[0]) + '</span><span class="tb-rot">' + b[1] + '</span><em class="tb-badge"></em></button>';
   }).join('') + '<button type="button" class="tb-it" data-s="mais" aria-haspopup="dialog"><span class="tb-ic">' + ICO_MAIS + '</span><span class="tb-rot">Mais</span><em class="tb-badge"></em></button>';
   doc.body.appendChild(tb);
   var pill = tb.querySelector('.tb-pill');
@@ -28269,22 +28277,26 @@ html.visitante .tl-slot, html.visitante .sg-cell.vazio { cursor:default; }
   var TELAS_ILD = ['ild', 'ildleads', 'ildagenda', 'ildcases', 'ildcomp'];   // 05–06/11/2026: o acesso "Evento ILD" abre só as 5 abas do evento
   function ehIldX() { try { var lg = localStorage.getItem('v2Login'); return !!lg && ACESSOS.some(function(a) { return a.nome === lg && a.ild; }); } catch (e) { return false; } }
   function ehVisitante() { try { return localStorage.getItem('v2Login') === 'Visitante'; } catch (e) { return false; } }   // 13/10/2026: o conteúdo saiu daqui (vê a ficha do lead); as travas dele são CTD_LER e CTD_FECHA
-  function telaFechada(s) { return ehIldX() ? TELAS_ILD.indexOf(s) === -1 : ehCtd() ? TELAS_CONTEUDO.indexOf(s) === -1 : TELAS_FECHADAS.indexOf(s) !== -1; }
+  var TELAS_PREVENDA = ['prevenda', 'agenda', 'leads', 'treinos', 'comissoes', 'score'];   // 24/11/2026: o SDR vê só a pré-venda
+  function ehPvX() { try { return typeof ehPrevenda === 'function' && ehPrevenda(); } catch (e) { return false; } }
+  function telaFechada(s) { return ehIldX() ? TELAS_ILD.indexOf(s) === -1 : ehCtd() ? TELAS_CONTEUDO.indexOf(s) === -1 : ehPvX() ? TELAS_PREVENDA.indexOf(s) === -1 : TELAS_FECHADAS.indexOf(s) !== -1; }
   function aplicarRestricoes() {
-    var v = ehVisitante(), ctd = ehCtd(), il = ehIldX();
+    var v = ehVisitante(), ctd = ehCtd(), il = ehIldX(), pv = !v && !ctd && !il && ehPvX();
+    doc.documentElement.classList.toggle('prevenda', pv);
     doc.documentElement.classList.toggle('visitante', v);
     doc.documentElement.classList.toggle('conteudo', ctd);
     doc.documentElement.classList.toggle('ild', il);
-    if (!v && !ctd && !il) return;
+    if (!v && !ctd && !il && !pv) return;
     var at = doc.querySelector('.screen.active');
-    if (at && telaFechada(at.id.replace(/^s-/, ''))) { var ini = doc.querySelector('.nav-item[data-s="' + (il ? 'ild' : ctd ? 'rankorg' : 'visao') + '"]'); if (ini) ini.click(); }
+    if (at && telaFechada(at.id.replace(/^s-/, ''))) { var ini = doc.querySelector('.nav-item[data-s="' + (il ? 'ild' : ctd ? 'rankorg' : pv ? 'prevenda' : 'visao') + '"]'); if (ini) ini.click(); }
   }
+  window._aplicarRestricoes = aplicarRestricoes;
   doc.addEventListener('click', function (e) {
-    if (!ehVisitante() && !ehCtd() && !ehIldX()) return;
+    if (!ehVisitante() && !ehCtd() && !ehIldX() && !ehPvX()) return;
     var it = e.target && e.target.closest ? e.target.closest('.nav-item[data-s], .tb-tile[data-s], .tb-it[data-s]') : null;
     if (!it || it.getAttribute('data-s') === 'mais' || !telaFechada(it.getAttribute('data-s'))) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    try { avisoRapido(ehIldX() ? '🔒 Este acesso abre só o Evento ILD' : ehCtd() ? '🔒 Este acesso abre só Ranking, Criativos, Leads e Treinamentos' : '🔒 Acesso de visitante não abre esta tela'); } catch (x) {}
+    try { avisoRapido(ehIldX() ? '🔒 Este acesso abre só o Evento ILD' : ehCtd() ? '🔒 Este acesso abre só Ranking, Criativos, Leads e Treinamentos' : ehPvX() ? '🔒 Este acesso abre só a pré-venda' : '🔒 Acesso de visitante não abre esta tela'); } catch (x) {}
   }, true);
   // 🔒 PRODUÇÃO DE CONTEÚDO = SÓ LEITURA DE VERDADE (13/10/2026). Com os Leads liberados, não basta esconder botão: o pedido nem sai
   // para o robô se não for uma CONSULTA da lista abaixo (vale para o gasPedir, o fetch direto e o sendToGAS). Assim um clique errado
@@ -44497,7 +44509,17 @@ var PV = { quem: '' }, PV_SDRS = ['Selina', 'Ismael', 'Luana', 'João Victor'];
 function pvPode() { try { var lg = localStorage.getItem('v2Login'); if (lg === null) return true; if (lg === 'Visitante') return false; if (typeof ehIld === 'function' && ehIld()) return false; if (typeof ehConteudo === 'function' && ehConteudo()) return false; return true; } catch (e) { return false; } }
 function pvMostrarMenu() { var it = document.querySelector('.nav-item[data-s="prevenda"]'); if (it) it.style.display = pvPode() ? '' : 'none'; }
 // quem está logado é SDR? devolve o nome dele na lista (o SDR não troca de pessoa)
-function pvEu() { try { var lg = localStorage.getItem('v2Login') || '', k = _trfSdrChave(lg); for (var i = 0; i < PV_SDRS.length; i++) if (_trfSdrChave(PV_SDRS[i]) === k) return PV_SDRS[i]; } catch (e) {} return ''; }
+// 🔒 acesso "pré-venda" (24/11/2026 · Bruno: "deixa só o que for para o SDR" · "coisas só para SDR e pré-venda"): os SDRs entram e veem
+// só Pré-venda, Leads, Agenda, Comissões, Score e Treinamentos; abrem direto na Pré-venda; "Só o meu" fica sempre ligado.
+// A gestão pode "ver como o SDR vê" (window._pvComo), só para conferir: não muda o acesso de ninguém.
+function ehPrevenda() { try { if (window._pvComo) return true; var lg = localStorage.getItem('v2Login'); return !!lg && typeof ACESSOS !== 'undefined' && ACESSOS.some(function(a) { return a.nome === lg && a.prevenda; }); } catch (e) { return false; } }
+function pvComo(n) {
+  window._pvComo = n || ''; try { if (window._aplicarRestricoes) window._aplicarRestricoes(); } catch (e) {}
+  var p = document.getElementById('pv-como-pill'); if (!p) { p = document.createElement('button'); p.id = 'pv-como-pill'; p.type = 'button'; p.onclick = function() { pvComo(''); }; p.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:99999;padding:12px 18px;border-radius:999px;border:0;background:#f6a350;color:#1a1206;font:inherit;font-weight:800;font-size:.84rem;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.5)'; document.body.appendChild(p); }
+  p.style.display = n ? '' : 'none'; p.textContent = n ? '👁 Vendo como ' + n + ' vê · tocar para sair' : '';
+  var it = document.querySelector('.nav-item[data-s="prevenda"]'); if (it) it.click(); pvRender();
+}
+function pvEu() { if (window._pvComo) return window._pvComo; try { var lg = localStorage.getItem('v2Login') || '', k = _trfSdrChave(lg); for (var i = 0; i < PV_SDRS.length; i++) if (_trfSdrChave(PV_SDRS[i]) === k) return PV_SDRS[i]; } catch (e) {} return ''; }
 function pvAbrir() { try { csdCarregar(false); } catch (e) {} pvRender(); }
 function pvPer(v) { TRF.sper = v; pvRender(); }
 function pvQuem(n) { PV.quem = n; pvRender(); }
@@ -44513,6 +44535,10 @@ function pvRender() {
   var zp = _trfSdrPlan(nomes, P), fez = _trfSdrFez(nomes, P), chaves = nomes.map(_trfSdrChave), porTel = _trfIdxV2().porTel, vistos = {};
   var L = (okC ? CSD.rows : []).filter(function(x) { if (!/spark/i.test(x.funil || '') || vistos[x.id]) return false; vistos[x.id] = 1; return x.cr >= P.ini && x.cr < P.fim && chaves.indexOf(_trfSdrChave(x.resp)) !== -1; });
   var zc = _trfSdrConta(L, porTel); zp.L.fezP = fez;
+  // marcação dos MQL (a mesma conta da aba SDR): dos leads do período que marcaram algum investimento, quantos têm reunião
+  var fichasC = {}, mqlN = 0, mqlM = 0; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichasC[k]; if (!o || (l.date || 0) > (o.date || 0)) fichasC[k] = l; }); } catch (eFc) {}
+  try { trfSiteCarregar(false); } catch (eSt) {}
+  L.forEach(function(x) { if (!_trfSdrMql(fichasC[ldTel8(x.tel)], x.tel)) return; mqlN++; if (_trfSdrRs(x, porTel).length) mqlM++; });
   PV._ctx = { L: L, esp: [], porTel: porTel, P: P, quem: quem, zp: zp, filtroTxt: '', nome: 'pré-venda' };
   var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }, fut = Math.max(0, zp.marc - zp.ja - zp.pend), fezFora = fez.filter(function(r) { var t = r.date ? r.date.getTime() : 0; return t < P.ini || t >= P.fim; }).length;
   var card = function(lbl, val, tint, halo, tipo, sub, conv) {
@@ -44525,7 +44551,7 @@ function pvRender() {
     + PV_SDRS.map(function(n) { return '<option value="' + _trfE(n) + '"' + (quem === n ? ' selected' : '') + '>' + _trfE(n) + '</option>'; }).join('') + '</select></label>';
   var h = '<div style="display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin-bottom:16px">' + selQuem
     + '<div class="pl-chips" style="margin:0">' + TRF_SDR_PER.map(function(o) { return chip(P.id === o[0], o[1], 'pvPer(\'' + o[0] + '\')'); }).join('') + '</div>'
-    + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
+    + '<div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">' + (!eu ? '<button type="button" class="btn" onclick="pvComo(\'' + _trfE(quem || 'Selina') + '\')" title="Mostra o dash exatamente como o SDR vê: menu só com a pré-venda">👁 Ver como o SDR vê</button>' : '') + '<a class="btn" href="sem-contato.html" target="_blank" rel="noopener" style="text-decoration:none">📋 Minha lista</a><button type="button" class="btn" onclick="pvIr(\'agenda\')">📅 Marcar reunião</button><button type="button" class="btn" onclick="pvIr(\'leads\')">🙋 Leads</button></div></div>';
   // 1ª fileira: do lead até a venda, com os mesmos nomes do funil da Visão Geral
   h += '<div class="kpis">'
     + card(quem ? 'Leads que recebi' : 'Leads recebidos', okC ? _trfN(zc.sl) : '…', '#6ea8ff', 'rgba(110,168,255,.14)', '', 'negócios que entraram na Clint em ' + _trfE(P.rot), okC && zc.sl ? [pc(zc.sc, zc.sl), '1º contato de uma pessoa: ' + zc.sc + ' de ' + zc.sl, 'tiveram 1º contato'] : null)
@@ -44538,6 +44564,7 @@ function pvRender() {
   // 2ª fileira: o que a pré-venda controla — rapidez, falta e o que ficou sem lançar
   var nsAlto = zp.ja >= 5 && zp.falt / zp.ja > 0.15;
   h += '<div class="kpis">'
+    + card('Marcação dos MQL', okC ? pc(mqlM, mqlN) : '…', '#3ddc97', 'rgba(61,220,151,.14)', '', _trfN(mqlM) + ' de ' + _trfN(mqlN) + ' MQL do período marcaram reunião · meta 30%' + (mqlN >= 10 && mqlM / mqlN < 0.3 ? ' · ⚠️ abaixo' : ''))
     + card('Tempo até a 1ª resposta', okC ? (zc.med == null ? '—' : _csdTempo(zc.med)) : '…', '#b98aff', 'rgba(185,138,255,.14)', '', 'metade dos leads do horário é chamada em até esse tempo')
     + card('Em até 5 minutos', okC ? pc(zc.m5, zc.hor) : '…', '#b98aff', 'rgba(185,138,255,.14)', '', _trfN(zc.m5) + ' de ' + _trfN(zc.hor) + ' que chegaram no horário')
     + card('No-show', okV ? pc(zp.falt, zp.ja) : '…', '#ff6b6b', 'rgba(255,107,107,.14)', 'nsP', _trfN(zp.falt) + ' de ' + _trfN(zp.ja) + ' realizadas · meta até 15%' + (nsAlto ? ' · ⚠️ acima' : ''))
