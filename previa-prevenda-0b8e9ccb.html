@@ -44581,7 +44581,45 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
 function pvProd(k) { PV.prod = k; pvRender(); }
 function pvPer(v) { TRF.sper = v; pvRender(); }
 function pvQuem(n) { PV.quem = n; pvRender(); }
-function pvLista(tipo) { var C = PV._ctx; if (!C) return; window._trfSdrCtx = C; if (tipo === 'H:hoje') { window._trfSdrCtx = Object.assign({}, C, { L: C.hoje || [], P: Object.assign({}, C.P, { id: 'hoje', rot: 'hoje' }) }); trfSdrLista('sl'); return; } if (/^L:/.test(tipo)) { trfSdrLista(tipo.slice(2)); return; } trfCloLista(tipo); }   // L:… = lista de LEADS (1º contato, tempo…)
+function pvLista(tipo) { var C = PV._ctx; if (!C) return; window._trfSdrCtx = C; if (tipo === 'H:hoje' || /^L:/.test(tipo)) { pvLeadsLista(tipo, ''); return; } trfCloLista(tipo); }   // L:… = lista de LEADS
+// 24/11/2026 (Bruno: "tem que ser igual aos outros"): as listas de LEADS abrem na MESMA janela das listas de reuniões (modal-b da Visão Geral),
+// uma linha por lead (avatar, nome, detalhe, situação à direita) e, em cima, o filtro só pela situação do lead no funil.
+var PV_SIT = [['sem', 'Sem contato', '#ff6b6b'], ['esp', 'Esperando resposta', '#f6a350'], ['cham', 'Chamado', '#6ea8ff'], ['resp', 'Respondeu', '#a78bfa'], ['reu', 'Com reunião', '#f5c542'], ['vd', 'Vendeu', '#3ddc97']];
+function pvLeadsLista(tipo, sit) {
+  var C = PV._ctx, el = function(id) { return document.getElementById(id); }; if (!C || !el('modal-b') || !el('mb-lista')) return;
+  var hor = function(x) { return !x.ja && _csdNoHorario(x.cr) && !/sarah/i.test(x.funil || ''); };
+  var fichas = {}; try { (LD.rows || []).forEach(function(l) { var k = l.tel8 || ldTel8(l.tel); if (!k) return; var o = fichas[k]; if (!o || (l.date || 0) > (o.date || 0)) fichas[k] = l; }); } catch (e) {}
+  var k = tipo.replace(/^[LH]:/, ''), base = tipo === 'H:hoje' ? (C.hoje || []) : k === 'esp' ? (C.esp || []) : (C.L || []);
+  var F = { sl: function() { return true; }, hoje: function() { return true; }, esp: function() { return true; }, sc: function(x) { return x.em > 0; }, sr: function(x) { return x.respEm > 0; }, m5: hor, m30: hor, tempo: hor,
+    mqlM: function(x) { return _trfSdrMql(fichas[ldTel8(x.tel)], x.tel); } };
+  var TIT = { sl: ['🙋', 'Leads recebidos'], hoje: ['🆕', 'Leads que chegaram hoje'], esp: ['💬', 'Leads sem resposta agora'], sc: ['🤝', '1º contato humano'], sr: ['💬', 'Leads que responderam'], m5: ['⚡', 'Leads do horário comercial'], mqlM: ['🔥', 'MQL'] }[k] || ['🙋', 'Leads'];
+  var L = base.filter(F[k] || F.sl);
+  var sitDe = function(x) { var rs = _trfSdrRs(x, C.porTel); return rs.some(function(r) { return r.sn === 'vendido'; }) ? 'vd' : rs.length ? 'reu' : x.semResp > 0 ? 'esp' : x.respEm > 0 ? 'resp' : (x.em > 0 || x.ja) ? 'cham' : 'sem'; };
+  var cont = {}; L.forEach(function(x) { x._pvS = sitDe(x); cont[x._pvS] = (cont[x._pvS] || 0) + 1; }); if (sit && !cont[sit]) sit = '';
+  var rows = (sit ? L.filter(function(x) { return x._pvS === sit; }) : L.slice()).sort(function(a, b) { return k === 'esp' ? a.semResp - b.semResp : b.cr - a.cr; });
+  el('mb-titulo').textContent = TIT[1] + (sit ? ' · ' + PV_SIT.filter(function(q) { return q[0] === sit; })[0][1] : '') + ' — ' + rows.length + (rows.length === 1 ? ' lead' : ' leads');
+  el('mb-ico').textContent = TIT[0];
+  el('mb-sub').textContent = 'Pré-venda · ' + (C.quem ? 'só ' + C.quem : 'time todo') + (C.filtroTxt || '') + ' · ' + (tipo === 'H:hoje' ? 'hoje' : k === 'esp' ? 'agora (últimos 7 dias)' : C.P.rot) + ' · clique num lead para abrir a ficha';
+  var bt = function(q, t, n) { var on = (sit || '') === q; return '<button type="button" class="pl-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="pvLeadsLista(\'' + tipo + '\',\'' + q + '\')">' + _trfE(t) + ' <small style="opacity:.65">' + _trfN(n) + '</small></button>'; };
+  var ets = PV_SIT.filter(function(q) { return cont[q[0]]; });
+  var chips = ets.length > 1 ? '<div class="pl-chips" style="margin:0 0 10px;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;opacity:.6">Situação:</span>' + bt('', 'Todas', L.length) + ets.map(function(q) { return bt(q[0], q[1], cont[q[0]]); }).join('') + '</div>' : '';
+  var agora = Date.now(), quando = function(t) { var d = new Date(t); return d.toLocaleDateString('pt-BR').slice(0, 5) + ' ' + d.toTimeString().slice(0, 5); };
+  var linha = function(x) {
+    var f = fichas[ldTel8(x.tel)], nm = String(x.nome || '').replace(/\s*·\s*nota\s+[A-D]\s*$/i, '') || 'Sem nome', nn = /·\s*nota\s+([A-D])\s*$/i.exec(String(x.nome || '')), fx = (f && f.faixaNova) || (nn ? nn[1].toUpperCase() : ''), mql = _trfSdrMql(f, x.tel);
+    var q = PV_SIT.filter(function(s0) { return s0[0] === x._pvS; })[0], sub = q[1];
+    if (x._pvS === 'esp') sub = 'esperando há ' + _csdTempo((agora - x.semResp) / 60000);
+    else if (x._pvS === 'cham' && x.em > 0) sub = 'chamado em ' + _csdTempo(Math.max(0, (x.em - x.cr) / 60000));
+    var det = ['chegou ' + quando(x.cr), '👤 ' + _trfE(String(x.resp || 'sem responsável').split(' ')[0]), fx ? 'Nota ' + fx : '', mql ? '🔥 MQL' : '', x.ia > 0 ? '🤖 ' + x.ia + ' msg IA' : ''].filter(Boolean).join(' · ');
+    var tl = String(x.tel || '').replace(/\D/g, ''), qq = [nm, x.tel, x.resp, x.etapa].filter(Boolean).join(' ').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    return '<div class="cliente-row cr2" data-q="' + qq + '"' + (tl ? ' onclick="event.stopPropagation();trfSdrFicha(\'' + tl + '\')"' : '') + '>'
+      + '<div class="avatar" style="background:linear-gradient(135deg,' + v2grad(nm) + ');">' + v2ini(nm) + '</div>'
+      + '<div class="lead-info"><b class="nome-link">' + _trfE(nm) + '</b><span class="cr-meta">' + det + '</span></div>'
+      + '<div class="cr-fim"><div class="cr-val"><span class="pill" style="white-space:nowrap;background:' + q[2] + '22;color:' + q[2] + ';border:1px solid ' + q[2] + '55">' + _trfE(sub) + '</span></div>'
+      + '<div class="cr-acts">' + (tl ? '<a class="ld-wa cr-clint" href="#" onclick="event.stopPropagation();return abrirAtendimentoClintPor(event,\'' + tl + '\',' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')" title="abrir a conversa na Clint">🟣 Clint</a>' : '') + '</div></div></div>'; };
+  el('mb-lista').innerHTML = chips + (rows.slice(0, 400).map(linha).join('') || '<div style="color:var(--muted);font-size:.8rem;">Nenhum lead aqui.</div>') + (rows.length > 400 ? '<div class="hint">Mostrando os 400 primeiros.</div>' : '');
+  var bq = el('mb-busca'); if (bq) { bq.value = ''; bq.style.display = ''; }
+  el('modal-b').classList.add('open');
+}   // L:… = lista de LEADS (1º contato, tempo…)
 function pvIr(s) { var it = document.querySelector('.nav-item[data-s="' + s + '"]'); if (it) it.click(); }
 function pvRender() {
   var el = document.getElementById('pv-corpo'); if (!el) return;
