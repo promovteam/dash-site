@@ -44571,7 +44571,7 @@ function _pvOrigensHtml(L, zp, porTel, P, quem) {
 function pvProd(k) { PV.prod = k; pvRender(); }
 function pvPer(v) { TRF.sper = v; pvRender(); }
 function pvQuem(n) { PV.quem = n; pvRender(); }
-function pvLista(tipo) { var C = PV._ctx; if (!C) return; window._trfSdrCtx = C; if (/^L:/.test(tipo)) { trfSdrLista(tipo.slice(2)); return; } trfCloLista(tipo); }   // L:… = lista de LEADS (1º contato, tempo…)
+function pvLista(tipo) { var C = PV._ctx; if (!C) return; window._trfSdrCtx = C; if (tipo === 'H:hoje') { window._trfSdrCtx = Object.assign({}, C, { L: C.hoje || [], P: Object.assign({}, C.P, { id: 'hoje', rot: 'hoje' }) }); trfSdrLista('sl'); return; } if (/^L:/.test(tipo)) { trfSdrLista(tipo.slice(2)); return; } trfCloLista(tipo); }   // L:… = lista de LEADS (1º contato, tempo…)
 function pvIr(s) { var it = document.querySelector('.nav-item[data-s="' + s + '"]'); if (it) it.click(); }
 function pvRender() {
   var el = document.getElementById('pv-corpo'); if (!el) return;
@@ -44591,7 +44591,11 @@ function pvRender() {
   var prodLead = function(x) { if (!PV.prod) return true; var fx = ''; try { fx = leadFaixa(_trfSdrInv(fichasC[ldTel8(x.tel)], x.tel)); } catch (e) {} return PV.prod === 'ht' ? fx === 'alta' : fx === 'media'; };
   if (PV.prod) { L = L.filter(prodLead); zc = _trfSdrConta(L, porTel); }
   L.forEach(function(x) { if (!_trfSdrMql(fichasC[ldTel8(x.tel)], x.tel)) return; mqlN++; if (_trfSdrRs(x, porTel).length) mqlM++; });
-  PV._ctx = { L: L, esp: [], porTel: porTel, P: P, quem: quem, zp: zp, filtroTxt: PV.prod ? (PV.prod === 'ht' ? ' · HT' : ' · Legado') : '', nome: 'pré-venda' };
+  // 24/11/2026 (Bruno: "leads sem resposta" / "leads que chegaram hoje"): o que está esperando o SDR AGORA, sem depender do período —
+  // esperando = o lead escreveu e ninguém respondeu ainda (coluna "Lead sem resposta desde" da Clint); hoje = leads criados hoje.
+  var vE = {}, ESP = [], ESPv = 0, HOJE = [], h00 = new Date(); h00.setHours(0, 0, 0, 0);
+  (okC ? CSD.rows : []).forEach(function(x) { if (!/spark/i.test(x.funil || '') || vE[x.id] || chaves.indexOf(_trfSdrChave(x.resp)) === -1 || !prodLead(x)) return; vE[x.id] = 1; if (x.semResp > 0) { if (Date.now() - x.semResp <= 7 * 864e5) ESP.push(x); else ESPv++; } if (x.cr >= h00.getTime()) HOJE.push(x); });
+  PV._ctx = { L: L, esp: ESP, hoje: HOJE, porTel: porTel, P: P, quem: quem, zp: zp, filtroTxt: PV.prod ? (PV.prod === 'ht' ? ' · HT' : ' · Legado') : '', nome: 'pré-venda' };
   var pc = function(a, b) { return b ? Math.round(a / b * 100) + '%' : '—'; }, fut = Math.max(0, zp.marc - zp.ja - zp.pend), fezFora = fez.filter(function(r) { var t = r.date ? r.date.getTime() : 0; return t < P.ini || t >= P.fim; }).length;
   var card = function(lbl, val, tint, halo, tipo, sub, conv) {
     return '<div class="glass' + (tipo ? ' click' : '') + '" style="--halo:' + halo + ';--tint:' + tint + ';position:relative;"' + (tipo ? ' role="button" tabindex="0" onclick="pvLista(\'' + tipo + '\')"' : '') + '>'
@@ -44619,6 +44623,17 @@ function pvRender() {
   var nR = function(test) { return function(a, b) { return (zp.rows || []).filter(function(r) { var t = r.date ? r.date.getTime() : 0; return t >= a && t < b && test(r.sn || ''); }).length; }; };
   var nL = function(test) { return function(a, b) { return (okC ? CSD.rows : []).filter(function(x) { return /spark/i.test(x.funil || '') && x.cr >= a && x.cr < b && chaves.indexOf(_trfSdrChave(x.resp)) !== -1 && prodLead(x) && test(x); }).length; }; };
   var proj = null; if (ehMes && fez.length) { var uT = 0, uP = 0, hj2 = new Date(), tot = new Date(hj2.getFullYear(), hj2.getMonth() + 1, 0).getDate(); for (var d = 1; d <= tot; d++) { if (ehDiaUtil(new Date(hj2.getFullYear(), hj2.getMonth(), d))) { uT++; if (d <= hj2.getDate()) uP++; } } if (uP) proj = { v: Math.round(fez.length / uP * uT), restam: uT - uP, dia: fez.length / uP }; }
+  // 24/11/2026 (Bruno: "coloca o pace da pessoa o dia útil"): reuniões marcadas ÷ dias úteis já passados no período (hoje conta).
+  var uteis = function(a, b) { var n = 0, d = new Date(a); d.setHours(0, 0, 0, 0); while (d.getTime() < b) { if (ehDiaUtil(d)) n++; d.setDate(d.getDate() + 1); } return n; };
+  var duP = uteis(P.ini, Math.min(P.fim, amanha)), duA = Pant ? uteis(Pant.ini, Pant.fim) : 0;
+  var f1 = function(x) { return (Math.round(x * 10) / 10).toString().replace('.', ','); };
+  // quem começou no meio do período (SDR novo) é dividido só pelos dias úteis desde a 1ª reunião que marcou na vida
+  var duDe = function(ns) { var ini = Infinity; _trfSdrFez(ns, { ini: 0, fim: amanha }).forEach(function(r) { if (r.carimboT && r.carimboT < ini) ini = r.carimboT; }); return ini > P.ini && ini < amanha ? uteis(ini, Math.min(P.fim, amanha)) : duP; };
+  var rTxt = function(n, du) { du = du == null ? duP : du; return du ? f1(n / du) + '/dia' : '—'; };
+  var paceHtml = duP ? '<div class="g-rows">'
+    + '<div class="g-row"><span>⚡ Ritmo ' + (quem ? 'de ' + _trfE(quem) : 'do time') + '</span><b>' + rTxt(fez.length, quem ? duDe([quem]) : duP) + (fezA != null && duA ? ' <small style="color:var(--muted);font-weight:400">· ' + Pant.rot.split(' ')[0] + ' ' + f1(fezA / duA) + '</small>' : '') + '</b></div>'
+    + (quem ? '' : PV_SDRS.map(function(n) { var k = _trfSdrFez([n], P).length, du = duDe([n]); return '<div class="g-row"><span>' + _trfE(n) + '</span><b>' + rTxt(k, du) + ' <small style="color:var(--muted);font-weight:400">(' + _trfN(k) + (du !== duP ? ' em ' + du + ' dia' + (du > 1 ? 's' : '') : '') + ')</small></b></div>'; }).join(''))
+    + '<div class="g-row"><span style="color:var(--muted)">' + duP + ' dia' + (duP > 1 ? 's' : '') + (duP > 1 ? ' úteis' : ' útil') + ' no período</span><b></b></div></div>' : '';
   // 24/11/2026 (Bruno: "melhore essa parte visualmente"): cada objetivo com ícone, o número na cor do resultado, uma régua de 0 a 100% com a
   // marca da meta, e embaixo quanto falta (ou "na meta") — o nome não quebra em duas linhas.
   var stat = function(p, ico, rot, meta, maiorMelhor, suf) {
@@ -44634,6 +44649,14 @@ function pvRender() {
       + '<span style="display:block;font-size:.62rem;letter-spacing:.2px;text-transform:none;color:var(--muted);white-space:nowrap">meta ' + (maiorMelhor ? '' : 'até ') + m + '%' + (suf || '') + '</span>'
       + '<b style="display:block;font-size:.68rem;color:' + cor + ';margin:0;white-space:nowrap">' + (ok ? '✓ na meta' : (maiorMelhor ? 'faltam ' : 'acima ') + dif + ' pontos') + '</b></div>'; };
   var mqlP = mqlN ? mqlM / mqlN : null, compP = zp.ja ? zp.comp / zp.ja : null, nsP = zp.ja ? zp.falt / zp.ja : null;
+  // === AGORA: esperando resposta + chegaram hoje ===
+  var agora0 = Date.now(), esp24 = ESP.filter(function(x) { return agora0 - x.semResp > 864e5; }).length, espVelho = ESP.reduce(function(m, x) { return Math.max(m, agora0 - x.semResp); }, 0);
+  var hSem = HOJE.filter(function(x) { return !(x.em > 0); }).length, hMql = HOJE.filter(function(x) { return _trfSdrMql(fichasC[ldTel8(x.tel)], x.tel); }).length;
+  var cardAgora = function(tipo, tint, halo, lbl, val, sub, alerta) { return '<div class="glass click" role="button" tabindex="0" style="--halo:' + halo + ';--tint:' + tint + ';padding:14px 18px" onclick="pvLista(\'' + tipo + '\')"><div class="g-label">' + lbl + '</div><div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><div class="g-value" style="color:' + tint + '">' + (okC ? _trfN(val) : '…') + '</div><div class="hint" style="margin:0">' + sub + '</div></div>' + (alerta ? '<div style="margin-top:6px;font-size:.72rem;font-weight:700;color:' + tint + '">' + alerta + '</div>' : '') + '</div>'; };
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px">'
+    + cardAgora('L:esp', ESP.length ? '#ff6b6b' : '#3ddc97', ESP.length ? 'rgba(255,107,107,.2)' : 'rgba(61,220,151,.18)', '💬 Leads sem resposta agora', ESP.length, 'escreveram nos últimos 7 dias e ainda esperam o time responder', ESP.length ? (esp24 ? '⚠ ' + _trfN(esp24) + ' há mais de 24 h · ' : '') + 'o mais antigo espera há ' + _csdTempo(espVelho / 60000) + (ESPv ? ' · fora: ' + _trfN(ESPv) + ' parados há mais de 7 dias' : '') : '✓ ninguém esperando nos últimos 7 dias')
+    + cardAgora('H:hoje', '#6ea8ff', 'rgba(110,168,255,.18)', '🆕 Leads que chegaram hoje', HOJE.length, _trfN(HOJE.length - hSem) + ' já chamados · ' + _trfN(hMql) + ' MQL', hSem ? '⏳ ' + _trfN(hSem) + ' ainda sem contato' : (HOJE.length ? '✓ todos chamados' : ''))
+    + '</div>';
   // === HERO ===
   h += '<div class="hero-row">';
   h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(246,163,80,.2);--tint:#f6a350;" onclick="pvLista(\'fezP\')">'
@@ -44641,6 +44664,7 @@ function pvRender() {
     + '<div class="g-label">📅 ' + (quem ? 'Marquei' : 'Marcaram') + ' no período</div><div class="g-value money">' + (okV ? _trfN(fez.length) : '…') + '</div>'
     + '<div class="g-sub"><b>' + _trfN(zp.marc) + ' reuniões</b> com data em ' + _trfE(P.rot) + (fut ? ' · 🔜 ' + _trfN(fut) + ' futuras' : '') + '</div>'
     + (fezA != null ? '<div class="v2-cmp"><span class="v2-cmp-t">📅 ' + Pant.rot + '</span><div class="v2-cmp-v"><b>' + _trfN(fezA) + '</b><small>marcadas</small>' + v2vs(fez.length, fezA) + '</div></div>' : '')
+    + paceHtml
     + '<div class="g-stats">' + stat(mqlP, '📅', 'Marcação', 0.30, true, ' dos MQL')
     + stat(compP, '✅', 'Compareceu', 0.85, true)
     + stat(nsP, '🚫', 'No-show', 0.15, false) + '</div></div>';
