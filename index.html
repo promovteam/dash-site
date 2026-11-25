@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-2350';
+var VERSAO_DASH = '2026-11-26-0010';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -23596,7 +23596,7 @@ function plCalcular(p) {
   var S = {}, C = {}, tot = { marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, pend: 0, l: { marc: [], re: [], ns: [], vd: [], pend: [], semForm: [] } };
   PL_PAG_TEL = plPagPorTel();
   var vendasTel = {};   // não conta a mesma pessoa duas vezes (planilha + formulário)
-  var novo = function(n){ return { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, l: { marc: [], re: [], ns: [], vd: [], semForm: [] } }; };
+  var novo = function(n){ return { nome: n, marc: 0, re: 0, ns: 0, vd: 0, vdV: 0, est: 0, estV: 0, l: { marc: [], re: [], ns: [], vd: [], semForm: [], est: [] } }; };
   // closer (Bruno/Tony) NUNCA entra na coluna de SDRs, mesmo quando marca uma reuniao — a marcacao
   // conta no total do time, mas nao no ranking dos SDRs (Bruno 02/09/2026: "Bruno nao e SDR")
   var closersAtivos = plClosersAtivos();
@@ -23640,6 +23640,7 @@ function plCalcular(p) {
       tot.vd++; tot.vdV += val; tot.l.vd.push(r); if (s) { s.vd++; s.vdV += val; s.l.vd.push(r); } if (c) { c.vd++; c.vdV += val; c.l.vd.push(r); }
     }
     if (ehNs && no(nsT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
+    if (r.sn === 'estorno' && c && no(dT)) { c.est++; c.estV += r.valor || 0; c.l.est.push(r); }   // ⚠️ 25/11/2026 (Bruno): reembolsos do closer no placar (mesma conta da Visão Geral)
     if (faltouDeNovo && no(dT)) { tot.ns++; tot.l.ns.push(r); if (s) { s.ns++; s.l.ns.push(r); } if (c) { c.ns++; c.l.ns.push(r); } }
     // no-show que depois foi remarcado: fica a marca "No-show em dd/mm" na observacao
     var mNs = String(r.obs || '').match(/No-show em (\d{1,2})\/(\d{1,2})/g) || [];
@@ -23764,6 +23765,7 @@ function plMinis(x, tipo) {
     minis.push('<span class="ok"' + ver('re') + '>✅ ' + x.re + ' ' + (x.re === 1 ? 'compareceu' : 'compareceram') + '</span>');
     if (x.re) minis.push('<span>🎯 fecha ' + Math.round(x.vd / x.re * 100) + '%</span>');
     if (x.ns) minis.push('<span class="ruim"' + ver('ns') + '>🤦 ' + x.ns + ' no-show</span>');
+    if (x.est) minis.push('<span class="ruim pl-est"' + ver('est') + '>⚠️ ' + x.est + ' reembolso' + (x.est === 1 ? '' : 's') + ' / ' + v2mil(x.estV) + '</span>');
   }
   return '<div class="pl-mini">' + minis.join('') + '</div>';
 }
@@ -24179,7 +24181,7 @@ function plVer(tipo, chave, met, _denovo) {
   }
   var um = rows.length === 1;
   var rotPx = { direto: 'marcadas DIRETO (até 24 h após chegar)', resgate: 'marcadas por RESGATE (48 h ou mais)', meio: 'marcadas entre 1 e 2 dias', perNovas: 'reuniões NOVAS no período', perRet: 'RETORNOS no período', perRe: 'lead apareceu no período', perVd: 'fechamentos no período', perEnt: 'entradas/bloqueios no período', perNao: 'não vendidos no período', perNs: 'no-shows no período', perPend: 'reuniões sem resultado', fup: 'follow-ups que vencem no período', mgRecuperar: 'para RECUPERAR — no-show ou não vendido há 7+ dias, sem retorno depois', mgRecuperados: 'RECUPERADOS — voltaram a marcar ou compraram', mgFalhaMql: 'MQL que NÃO COMPARECERAM', mgFalhaNao: 'reuniões realizadas que NÃO FECHARAM', semForm: 'VENDIDOS SEM FORMULÁRIO DE PAGAMENTO — não contam no placar até preencherem' };
-  var rot = { marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', todas: um ? 'REUNIÃO no período' : 'REUNIÕES no período', pend: um ? 'reunião AINDA SEM RESULTADO' : 'reuniões AINDA SEM RESULTADO' }[met] || rotPx[met] || met;
+  var rot = { est: um ? 'REEMBOLSO (estorno)' : 'REEMBOLSOS (estorno)', marc: um ? 'reunião MARCADA' : 'reuniões MARCADAS', re: um ? 'pessoa que COMPARECEU' : 'pessoas que COMPARECERAM', ns: um ? 'NO-SHOW' : 'NO-SHOWS', vd: um ? 'VENDA' : 'VENDAS', todas: um ? 'REUNIÃO no período' : 'REUNIÕES no período', pend: um ? 'reunião AINDA SEM RESULTADO' : 'reuniões AINDA SEM RESULTADO' }[met] || rotPx[met] || met;
   var fmt = function(t){ return t ? new Date(t).toLocaleDateString('pt-BR') : '—'; };
   var h = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:1.3rem;">🔎</span><b style="flex:1;">' + lista.nome.replace(/</g, '&lt;') + ' — ' + rows.length + ' ' + rot + '</b>'
     + '<button class="close-x" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
@@ -27688,6 +27690,7 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
   .tb, .tb-pill, .tb-caixa, .tb-fundo, .tb-it .tb-ic svg, .gx-pill, .gv-abas button { transition:none !important; }
   .tl-wrap.um-dia.trocou > .tl-col { animation:none; }
 }
+.pl-mini .pl-est { border:1px solid rgba(255,107,107,.55) !important; font-weight:800; }
 .rk-est { display:inline-flex; align-items:center; gap:4px; margin-left:10px; padding:3px 10px; border-radius:999px; background:rgba(255,107,107,.16); border:1px solid rgba(255,107,107,.55); color:#ff8a8a; font-size:.7rem; font-weight:800; letter-spacing:.02em; text-transform:none; white-space:nowrap; vertical-align:middle; animation:rkEstPulse 2.4s ease-in-out infinite; }
 @keyframes rkEstPulse { 0%,100% { box-shadow:0 0 0 0 rgba(255,107,107,0); } 50% { box-shadow:0 0 12px 1px rgba(255,107,107,.35); } }
 @media (prefers-reduced-motion:reduce) { .rk-est { animation:none; } }
