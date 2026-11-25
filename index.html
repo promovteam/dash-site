@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-1300';
+var VERSAO_DASH = '2026-11-25-1420';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -36113,21 +36113,55 @@ function rkoProducaoHtml() {
 function rkoMesAtual() { var h = new Date(); return h.getFullYear() + '-' + ('0' + (h.getMonth() + 1)).slice(-2); }
 function rkoMesRot(ch) { return RKO_MESES[+ch.slice(5, 7) - 1] + ' de ' + ch.slice(0, 4); }
 function rkoMesAndar(ch, n) { var d = new Date(+ch.slice(0, 4), +ch.slice(5, 7) - 1 + n, 1); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); }
+// 💰 25/11/2026 (Bruno: "coloca junto dessas informações também o faturamento que esses posts geraram"): quem comentou e depois COMPROU.
+// A venda é a mesma lista da aba Criativos (planilha "Vendido" + formulário de pagamento, uma por pessoa) e é achada pelo @ do Instagram
+// do formulário de pagamento, pelo telefone do lead (achado pelo @) ou pelo próprio lead. Só conta venda feita no dia do comentário ou depois.
+var _rkoVdIdx = null;
+function rkoVendaIdx() {
+  var L = []; try { L = anVendasTodas() || []; } catch (e) { L = []; }
+  if (_rkoVdIdx && _rkoVdIdx.L === L) return _rkoVdIdx;
+  var I = { L: L, ig: {}, tel: {}, lead: [] }, pos = function(m, k, i) { if (k) (m[k] = m[k] || []).push(i); };
+  L.forEach(function(x, i) {
+    (x.tels || []).forEach(function(t8) { pos(I.tel, t8, i); });
+    try { pos(I.ig, idInsta(x.pg && x.pg.insta), i); } catch (e) {}
+    if (x.lead) { I.lead.push(i); try { pos(I.tel, x.lead.tel8, i); pos(I.ig, idInsta(x.lead.insta), i); } catch (e2) {} }
+  });
+  _rkoVdIdx = I; return I;
+}
+function rkoVendaDe(u, l, t) {   // devolve o índice da venda (ou -1)
+  var I = rkoVendaIdx(); if (!I.L.length) return -1;
+  var c = [].concat(I.ig[idInsta(u)] || [], l && l.tel8 ? (I.tel[l.tel8] || []) : []);
+  if (l) I.lead.forEach(function(i) { if (I.L[i].lead === l) c.push(i); });
+  var melhor = -1;
+  c.forEach(function(i) { var x = I.L[i]; if (!(x.valor > 0)) return; if (x.t && t && x.t < t - 864e5) return; if (melhor < 0 || (x.t || 0) < (I.L[melhor].t || 0)) melhor = i; });
+  return melhor;
+}
+function rkoProdVenda(x) {   // nome curto do produto vendido (planilha > formulário de pagamento)
+  var t = String((x.r && x.r.produto) || (x.pg && x.pg.programa) || ''), n = v2norm(t);
+  if (/spark/.test(n)) return /semestr/.test(n) ? 'Spark Semestral' : /anual/.test(n) ? 'Spark Anual' : 'Spark';
+  if (/growth/.test(n)) return 'Growth';
+  if (/club/.test(n)) return 'Legado Club';
+  if (/legado/.test(n)) return 'MLD';
+  return t.replace(/^(programa|mentoria)\s+/i, '').trim() || 'produto não informado';
+}
+function rkoProdsTxt(o) { return Object.keys(o || {}).sort(function(a, b) { return o[b] - o[a]; }).map(function(k) { return (o[k] > 1 ? o[k] + '× ' : '') + k; }).join(' · '); }
+function rkoR(v) { v = v || 0; return v >= 1e6 ? 'R$ ' + (v / 1e6).toFixed(2).replace('.', ',') + ' mi' : v >= 1e4 ? 'R$ ' + Math.round(v / 1e3) + ' mil' : v >= 1e3 ? 'R$ ' + (Math.round(v / 100) / 10).toString().replace('.', ',') + ' mil' : 'R$ ' + Math.round(v).toLocaleString('pt-BR'); }
 var _rkoMemo = {};
 function rkoDados(chave) {
   try { trfSiteCarregar(false); } catch (eSt) {}
-  var ref = chave + '|' + ((IGO.ped || []).length) + '|' + ((LD.rows || []).length) + '|' + new Date().getDate() + '|' + ((typeof TRF !== 'undefined' && TRF.site && TRF.site.leads || []).length);
+  var ref = chave + '|' + ((IGO.ped || []).length) + '|' + ((LD.rows || []).length) + '|' + new Date().getDate() + '|' + ((typeof TRF !== 'undefined' && TRF.site && TRF.site.leads || []).length) + '|' + ((typeof V2 !== 'undefined' && V2.rows || []).length) + '|' + ((typeof PAG !== 'undefined' && PAG.rows || []).length);
   if (_rkoMemo[ref]) return _rkoMemo[ref];
   var a = +chave.slice(0, 4), m = +chave.slice(5, 7), ini = new Date(a, m - 1, 1).getTime(), fim = new Date(a, m, 1).getTime(), nd = new Date(a, m, 0).getDate();
   var hj = new Date(), hoje0 = new Date(hj.getFullYear(), hj.getMonth(), hj.getDate()).getTime();
   var zeros = function() { var z = []; for (var i = 0; i < nd; i++) z.push(0); return z; };
   var D = { chave: chave, dias: nd, atual: chave === rkoMesAtual(), diaHoje: hj.getDate(), funis: {}, posts: {}, fora: 0, lidos: 0 };
   RKO_CFG.funis.forEach(function(f) {
-    var F = D.funis[f.k] = { n: 0, mql: 0, base: 0, hoje: 0, dia: zeros(), q: {} };
-    f.de.forEach(function(d) { F.q[d.q] = { n: 0, mql: 0, base: 0, hoje: 0, dia: zeros() }; });
+    var F = D.funis[f.k] = { n: 0, mql: 0, base: 0, hoje: 0, dia: zeros(), q: {}, vend: 0, fat: 0 };
+    f.de.forEach(function(d) { F.q[d.q] = { n: 0, mql: 0, base: 0, hoje: 0, dia: zeros(), vend: 0, fat: 0 }; });
   });
   var peds = (IGO.ped || []).filter(function(p) { return p.t != null && p.t >= ini && p.t < fim; }).sort(function(x, y) { return x.t - y.t; });
-  var visto = {};
+  var visto = {}, vdVista = {};   // a mesma venda conta uma vez no mês, no 1º post que a pessoa comentou
+  D.vend = 0; D.fat = 0;
   peds.forEach(function(p) {
     D.lidos++;
     var d = rkoDono(p.x, p.i); if (!d) { D.fora++; return; }
@@ -36145,6 +36179,13 @@ function rkoDados(chave) {
     P.n++; P.q[d.q] = (P.q[d.q] || 0) + 1; P.f[d.f] = (P.f[d.f] || 0) + 1;
     if (l) { P.base = (P.base || 0) + 1;   // 24/11/2026: formulário e MQL por post e por dia
       if (rkoEhMql(l)) { P.mql = (P.mql || 0) + 1; (F.diaM = F.diaM || zeros())[di]++; (Q.diaM = Q.diaM || zeros())[di]++; } }
+    var iv = -1; try { iv = rkoVendaDe(p.u, l, p.t); } catch (eV) {}
+    if (iv >= 0 && !vdVista[iv]) {
+      vdVista[iv] = 1; var vx = rkoVendaIdx().L[iv], val = vx.valor || 0;
+      P.vend = (P.vend || 0) + 1; P.fat = (P.fat || 0) + val; F.vend++; F.fat += val; Q.vend++; Q.fat += val; D.vend++; D.fat += val;
+      var pr = rkoProdVenda(vx); (P.prods = P.prods || {})[pr] = (P.prods[pr] || 0) + 1;
+      (P.quemVd = P.quemVd || []).push((vx.nome || '') + ' (' + pr + ', ' + rkoR(val) + ')');
+    }
   });
   if (Object.keys(_rkoMemo).length > 12) _rkoMemo = {};
   _rkoMemo[ref] = D; return D;
@@ -36196,7 +36237,7 @@ function rkoFunilHtml(D, f) {
       + '<div class="rko-pista-h"><span class="rko-pista-q"><b>' + dspEsc(p.nome) + '</b><em>' + dspEsc(x.d.palavra) + '</em></span>'
       + '<span class="rko-pista-n"><b>' + rkoN(x.r.n) + '</b><small>' + (tem ? ' de ' + rkoN(x.d.meta) : ' lead' + (x.r.n === 1 ? '' : 's')) + '</small></span></div>'
       + '<div class="rko-pista-t"><i class="rko-pista-f"></i><span class="rko-pista-av">' + rkoAvatar(x.d.q, 38) + '</span></div>'
-      + '<small class="rko-pista-p">' + (tem ? pc + '%' + (pc >= 100 ? ' ✓ meta batida' : ' · faltam ' + rkoN(x.d.meta - x.r.n)) : 'meta a definir') + (x.r.hoje ? ' · +' + x.r.hoje + ' hoje' : '') + ' · 📝 ' + rkoN(x.r.base) + ' preencheram' + (x.r.mql ? ' · ' + x.r.mql + ' MQL' : '') + '</small></div>';
+      + '<small class="rko-pista-p">' + (tem ? pc + '%' + (pc >= 100 ? ' ✓ meta batida' : ' · faltam ' + rkoN(x.d.meta - x.r.n)) : 'meta a definir') + (x.r.hoje ? ' · +' + x.r.hoje + ' hoje' : '') + ' · 📝 ' + rkoN(x.r.base) + ' preencheram' + (x.r.mql ? ' · ' + x.r.mql + ' MQL' : '') + (x.r.vend ? ' · 💰 ' + rkoR(x.r.fat) + ' (' + x.r.vend + ' venda' + (x.r.vend === 1 ? '' : 's') + ')' : '') + '</small></div>';
   }).join('') + '</div>';
   return h + '</section>';
 }
@@ -36264,15 +36305,17 @@ function rkoPostsHtml2(D) {
   var todos = Object.keys(D.posts).map(function(k) { var P = D.posts[k]; P.tipo = rkoTipoPost(P.lk); return P; }).sort(function(a, b) { return b.n - a.n; });
   if (!todos.length) return '';
   var ROT = { video: '🎬 Vídeos', carrossel: '🖼️ Carrosséis', foto: '📷 Fotos', story: '📱 Stories', outro: 'Outros' }, G = {};
-  todos.forEach(function(P) { var g = G[P.tipo] || (G[P.tipo] = { posts: 0, n: 0, base: 0, mql: 0 }); g.posts++; g.n += P.n; g.base += P.base || 0; g.mql += P.mql || 0; });
+  todos.forEach(function(P) { var g = G[P.tipo] || (G[P.tipo] = { posts: 0, n: 0, base: 0, mql: 0, vend: 0, fat: 0 }); g.posts++; g.n += P.n; g.base += P.base || 0; g.mql += P.mql || 0; g.vend += P.vend || 0; g.fat += P.fat || 0; g.prods = g.prods || {}; Object.keys(P.prods || {}).forEach(function(k) { g.prods[k] = (g.prods[k] || 0) + P.prods[k]; }); });
   var sel = RKO.tipoPost && G[RKO.tipoPost] ? RKO.tipoPost : '', ps = todos.filter(function(P) { return !sel || P.tipo === sel; }), lim = RKO.postsTodos ? 60 : 10;
   var um = function(v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); };
   var resumo = ['video', 'carrossel', 'foto', 'story'].filter(function(t) { return G[t]; }).map(function(t) { var g = G[t];
     return '<button type="button" class="rko-tipo' + (sel === t ? ' on' : '') + '" aria-pressed="' + (sel === t) + '" onclick="rkoTipoPostSel(\'' + (sel === t ? '' : t) + '\')" style="text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid ' + (sel === t ? '#f6a350' : 'rgba(255,255,255,.1)') + ';border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;gap:3px;min-width:0">'
       + '<b style="font-size:.86rem">' + ROT[t] + '</b><span style="font-size:1.25rem;font-weight:800">' + rkoN(g.n) + ' <small style="font-size:.68rem;font-weight:600;opacity:.7">leads</small></span>'
       + '<small style="font-size:.7rem;opacity:.8">' + rkoN(g.posts) + ' post' + (g.posts === 1 ? '' : 's') + ' · ' + um(g.n / g.posts) + ' leads por post</small>'
-      + '<small style="font-size:.7rem;opacity:.8">' + rkoN(g.base) + ' preencheram · <b style="color:#3ddc97">' + rkoN(g.mql) + ' MQL</b>' + (g.n ? ' (' + rkoPct(g.mql, g.n) + '%)' : '') + '</small></button>'; }).join('');
-  var h = '<div class="rko-sec"><h3>Leads e MQL por post</h3><span class="rko-meta">no mês · toque num tipo para filtrar · clique no post para abrir no Instagram</span></div>'
+      + '<small style="font-size:.7rem;opacity:.8">' + rkoN(g.base) + ' preencheram · <b style="color:#3ddc97">' + rkoN(g.mql) + ' MQL</b>' + (g.n ? ' (' + rkoPct(g.mql, g.n) + '%)' : '') + '</small>'
+      + '<small style="font-size:.7rem;opacity:.9">💰 <b style="color:#f6a350">' + rkoR(g.fat) + '</b> em ' + rkoN(g.vend) + ' venda' + (g.vend === 1 ? '' : 's') + (g.posts ? ' · ' + rkoR(g.fat / g.posts) + ' por post' : '') + '</small>'
+      + (g.vend ? '<small style="font-size:.68rem;opacity:.75">' + dspEsc(rkoProdsTxt(g.prods)) + '</small>' : '') + '</button>'; }).join('');
+  var h = '<div class="rko-sec"><h3>Leads, MQL e faturamento por post</h3><span class="rko-meta">no mês · 💰 = quem comentou e depois comprou · toque num tipo para filtrar · clique no post para abrir no Instagram</span></div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:10px">' + resumo + '</div><div class="panel rko-posts">';
   ps.slice(0, lim).forEach(function(P, i) {
     var info = (IGO.postDe || {})[P.lk] || {}, leg = String(info.legenda || '').replace(/\s+/g, ' ').trim(), dt = info.date ? ('0' + info.date.getDate()).slice(-2) + '/' + ('0' + (info.date.getMonth() + 1)).slice(-2) : '';
@@ -36281,7 +36324,7 @@ function rkoPostsHtml2(D) {
       + (story ? '<span class="rko-post-t"><b>📱 Respostas aos stories</b><small>no direct, com a palavra</small></span>'
         : '<span class="rko-post-t"><b>' + dspEsc(leg ? leg.slice(0, 90) + (leg.length > 90 ? '…' : '') : 'Post sem legenda') + '</b><small>' + [dt, { video: 'vídeo', carrossel: 'carrossel', foto: 'foto' }[P.tipo] || ''].filter(Boolean).join(' · ') + '</small></span>')
       + '<span class="rko-post-q">' + donos.map(function(q) { return '<span class="rko-chip" style="--cor:' + RKO_CFG.pessoas[q].cor + '">' + rkoAvatar(q, 20) + dspEsc(RKO_CFG.pessoas[q].nome.split(' ')[0]) + ' <b>' + P.q[q] + '</b></span>'; }).join('') + '</span>'
-      + '<span class="rko-conta" title="leads = comentaram a palavra · preencheram o formulário · MQL = marcou algum investimento"><b>' + rkoN(P.n) + '</b><small>lead' + (P.n === 1 ? '' : 's') + ' · ' + rkoN(P.base || 0) + ' form. · <b style="color:#3ddc97">' + rkoN(P.mql || 0) + ' MQL</b></small></span>' + (story ? '</div>' : '</a>');
+      + '<span class="rko-conta" title="leads = comentaram a palavra · preencheram o formulário · MQL = marcou algum investimento"><b>' + rkoN(P.n) + '</b><small>lead' + (P.n === 1 ? '' : 's') + ' · ' + rkoN(P.base || 0) + ' form. · <b style="color:#3ddc97">' + rkoN(P.mql || 0) + ' MQL</b>' + (P.vend ? ' · <b style="color:#f6a350" title="' + dspEsc('Compraram depois de comentar: ' + (P.quemVd || []).join(', ')) + '">💰 ' + rkoR(P.fat) + '</b> <span style="color:#f6a350;opacity:.85">' + dspEsc(rkoProdsTxt(P.prods)) + '</span>' : '') + '</small></span>' + (story ? '</div>' : '</a>');
   });
   h += '</div>';
   if (ps.length > 10) h += '<p style="margin:8px 0 0"><button type="button" class="pl-chip" onclick="rkoPostsTodos()">' + (RKO.postsTodos ? 'Mostrar só os 10 primeiros' : 'Ver os ' + rkoN(ps.length) + ' posts') + '</button></p>';
@@ -36341,6 +36384,7 @@ function rkoRegrasHtml() {
   h += '<tr class="rko-tab-m"><td>Meta do time</td>' + RKO_CFG.funis.map(function(f) { return '<td>P ' + rkoN(f.metas.P) + ' · M ' + rkoN(f.metas.M) + ' · G ' + rkoN(f.metas.G) + '</td>'; }).join('') + '<td></td></tr></tbody></table></div>'
     + '<div class="panel rko-lista"><p><b>Lead</b> é a pessoa que comentou a palavra no post. Cada pessoa conta <b>uma vez por funil no mês</b>, para a palavra que ela comentou primeiro.</p>'
     + '<p><b>MQL</b> é quem comentou, preencheu o formulário e <b>marcou algum investimento</b> (a mesma conta da Gestão de funis).</p>'
+    + '<p><b>💰 Faturamento</b> é o valor das vendas de quem comentou no post e <b>comprou no dia do comentário ou depois</b> (a mesma lista de vendas da aba Criativos). A venda é achada pelo @ do Instagram, pelo telefone ou pelo cadastro do lead, e conta uma vez no mês, no primeiro post que a pessoa comentou.</p>'
     + '<p>“Diagnóstico” e “Análise” valem em qualquer lugar do comentário. “Plano”, “Evento”, “Zoom”, “Workshop”, “Estratégia” e “Ingresso” valem em comentário curto (até 4 palavras).</p>'
     + '<p>A <b>Lilian</b> trabalha com <b>stories</b>: quem responde o story com “5001” (Diagnóstico) ou “4001” (Workshop) manda mensagem no direct, e o ManyChat avisa o robô na hora. Cada resposta com a palavra conta igual a um comentário.</p>'
     + '<p><b>Produção da semana</b> conta os posts publicados no perfil de segunda a domingo. O dono do post é quem tem a palavra que a legenda pede para comentar (“comenta PLANO” = Rafa).</p>'
@@ -36352,12 +36396,12 @@ function rkoHistoricoHtml() {
   var ch = rkoMesAtual(), linhas = [], tn = 0, tm = 0;
   for (var i = 1; i <= 3; i++) {
     var c = rkoMesAndar(ch, -i), D = rkoDados(c), F = D.funis.diag; if (!F.n) continue;
-    linhas.push('<tr><td>' + rkoMesRot(c) + '</td><td>' + rkoN(F.n) + '</td><td>' + rkoN(F.base) + '</td><td>' + rkoN(F.mql) + '</td><td>' + (F.n ? (F.mql / F.n * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</td></tr>'); tn += F.n; tm += F.mql;
+    linhas.push('<tr><td>' + rkoMesRot(c) + '</td><td>' + rkoN(F.n) + '</td><td>' + rkoN(F.base) + '</td><td>' + rkoN(F.mql) + '</td><td>' + (F.n ? (F.mql / F.n * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</td><td>' + rkoN(F.vend) + '</td><td>' + rkoR(F.fat) + '</td></tr>'); tn += F.n; tm += F.mql;
   }
   if (!linhas.length) return '';
   var taxa = tn ? tm / tn : 0, mt = RKO_CFG.funis[0].metas;
   return '<details class="panel rko-hist"><summary>🔒 Só você vê · conta para fechar a meta de MQL do Diagnóstico</summary>'
-    + '<table class="rko-tab"><thead><tr><th>Mês</th><th>Comentaram</th><th>Preencheram</th><th>MQL (marcou investimento)</th><th>% que vira MQL</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table>'
+    + '<table class="rko-tab"><thead><tr><th>Mês</th><th>Comentaram</th><th>Preencheram</th><th>MQL (marcou investimento)</th><th>% que vira MQL</th><th>Vendas</th><th>Faturamento</th></tr></thead><tbody>' + linhas.join('') + '</tbody></table>'
     + '<p class="rko-frase">Nos últimos meses, <b>' + (taxa * 100).toFixed(1).replace('.', ',') + '%</b> de quem comentou virou MQL. Mantendo essa taxa: meta P ≈ <b>' + Math.round(mt.P * taxa) + '</b> MQL · M ≈ <b>' + Math.round(mt.M * taxa) + '</b> · G ≈ <b>' + Math.round(mt.G * taxa) + '</b>. É só uma referência: você decide o número.</p></details>';
 }
 // ↻ Atualizar: pede ao robô para ler os comentários AGORA (ele lê sozinho 1 vez por dia, às 6h) e relê a planilha.
