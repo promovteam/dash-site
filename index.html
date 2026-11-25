@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-1930';
+var VERSAO_DASH = '2026-11-25-2015';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -36565,12 +36565,40 @@ function rkoEhMql(l) { if (!l) return false; try { if (typeof _trfSdrMql === 'fu
 function rkoTipoPost(lk) { if (lk === 'story') return 'story'; var t = ((IGO.postDe || {})[lk] || {}).tipo; return t === 'VIDEO' ? 'video' : t === 'CAROUSEL_ALBUM' ? 'carrossel' : t ? 'foto' : 'outro'; }
 function rkoTipoPostSel(t) { RKO.tipoPost = t; renderRankOrg(); }
 function rkoPostsTodos() { RKO.postsTodos = !RKO.postsTodos; renderRankOrg(); }
+// 🔀 25/11/2026 (Bruno: "ranquear por faturamento, por MQL, por lead, por criador"): ordem e filtro de criador da lista de posts
+var RKO_ORD_POST = [['n', '💬 Leads'], ['mql', '🏅 MQL'], ['fat', '💰 Faturamento'], ['base', '📝 Formulários'], ['bio', '🔗 Leads pela bio'], ['vw', '👁 Visualizações'], ['t', '🕒 Mais recentes']];
+function rkoOrdPost(k) { RKO.ordPost = k; renderRankOrg(); }
+function rkoCriadorPost(q) { RKO.criadorPost = RKO.criadorPost === q ? '' : q; renderRankOrg(); }
+function rkoDonoP(P) {   // dono do post: quem teve a palavra mais comentada nele; sem comentários, a palavra que a legenda pede
+  if (P._dono !== undefined) return P._dono;
+  var d = Object.keys(P.q || {}).sort(function(a, b) { return P.q[b] - P.q[a]; })[0] || '';
+  if (!d) { try { var info = (IGO.postDe || {})[P.lk] || {}, dn = rkoDonoDoPost({ legenda: info.legenda || '', link: P.lk }, {}); d = (dn && dn.q) || ''; } catch (e) {} }
+  return (P._dono = d);
+}
+function rkoValPost(P, k) {
+  if (k === 'fat') return (P.fat || 0) + (P.bioF || 0);
+  if (k === 'mql') return (P.mql || 0) + (P.bioM || 0);
+  if (k === 'base') return P.base || 0;
+  if (k === 'bio') return P.bioL || 0;
+  if (k === 'vw') { var o = IGM[rkoBioLink(P.lk)]; return o && o.vw || 0; }
+  if (k === 't') { var i = (IGO.postDe || {})[P.lk] || {}; return i.date ? i.date.getTime() : 0; }
+  return P.n || 0;
+}
 function rkoPostsHtml2(D) {
   var todos = Object.keys(D.posts).map(function(k) { var P = D.posts[k]; P.tipo = rkoTipoPost(P.lk); return P; }).sort(function(a, b) { return b.n - a.n; });
   if (!todos.length) return '';
   var ROT = { video: '🎬 Vídeos', carrossel: '🖼️ Carrosséis', foto: '📷 Fotos', story: '📱 Stories', outro: 'Outros' }, G = {};
   todos.forEach(function(P) { var g = G[P.tipo] || (G[P.tipo] = { posts: 0, n: 0, base: 0, mql: 0, vend: 0, fat: 0 }); g.posts++; g.n += P.n; g.base += P.base || 0; g.mql += P.mql || 0; g.vend += P.vend || 0; g.fat += P.fat || 0; g.prods = g.prods || {}; Object.keys(P.prods || {}).forEach(function(k) { g.prods[k] = (g.prods[k] || 0) + P.prods[k]; }); g.bioL = (g.bioL || 0) + (P.bioL || 0); g.bioF = (g.bioF || 0) + (P.bioF || 0); g.bioCli = (g.bioCli || 0) + (P.bioCli || 0); });
-  var sel = RKO.tipoPost && G[RKO.tipoPost] ? RKO.tipoPost : '', ps = todos.filter(function(P) { return !sel || P.tipo === sel; }), lim = RKO.postsTodos ? 60 : 10;
+  var ordK = RKO.ordPost || 'n', cri = RKO.criadorPost && RKO_CFG.pessoas[RKO.criadorPost] ? RKO.criadorPost : '';
+  todos.sort(function(a, b) { return rkoValPost(b, ordK) - rkoValPost(a, ordK) || (b.n || 0) - (a.n || 0); });
+  var sel = RKO.tipoPost && G[RKO.tipoPost] ? RKO.tipoPost : '', ps = todos.filter(function(P) { return (!sel || P.tipo === sel) && (!cri || rkoDonoP(P) === cri); }), lim = RKO.postsTodos ? 60 : 10;
+  var chip = function(on, txt, js, cor) { return '<button type="button" class="chart-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="' + js + '" style="cursor:pointer' + (cor && on ? ';background:' + cor + '33;border-color:' + cor + ';color:#fff' : '') + '">' + txt + '</button>'; };
+  var barra = '<div class="panel" style="display:flex;flex-direction:column;gap:8px;padding:10px 12px;margin-bottom:10px">'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);min-width:86px">Ordenar por</span>'
+    + RKO_ORD_POST.map(function(o) { return chip(ordK === o[0], o[1], "rkoOrdPost('" + o[0] + "')"); }).join('') + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);min-width:86px">Criador</span>'
+    + chip(!cri, 'Todos', "rkoCriadorPost('')") + Object.keys(RKO_CFG.pessoas).map(function(q) { var pp = RKO_CFG.pessoas[q], np = todos.filter(function(P) { return rkoDonoP(P) === q; }).length;
+      return chip(cri === q, '<span style="display:inline-flex;align-items:center;gap:5px">' + rkoAvatar(q, 18) + dspEsc(pp.nome.split(' ')[0]) + ' <small style="opacity:.6">' + np + '</small></span>', "rkoCriadorPost('" + q + "')", pp.cor); }).join('') + '</div></div>';
   var um = function(v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); };
   var resumo = ['video', 'carrossel', 'foto', 'story'].filter(function(t) { return G[t]; }).map(function(t) { var g = G[t];
     return '<button type="button" class="rko-tipo' + (sel === t ? ' on' : '') + '" aria-pressed="' + (sel === t) + '" onclick="rkoTipoPostSel(\'' + (sel === t ? '' : t) + '\')" style="text-align:left;cursor:pointer;font:inherit;color:inherit;border:1px solid ' + (sel === t ? '#f6a350' : 'rgba(255,255,255,.1)') + ';border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;gap:3px;min-width:0">'
@@ -36581,7 +36609,8 @@ function rkoPostsHtml2(D) {
       + (g.vend ? '<small style="font-size:.68rem;opacity:.75">' + dspEsc(rkoProdsTxt(g.prods)) + '</small>' : '')
       + (g.bioCli || g.bioL ? '<small style="font-size:.7rem;color:#6ea8ff">🔗 ' + rkoN(g.bioCli || 0) + (RKO_BIO.fonte === 'cliques' ? ' cliques na bio' : ' visitas ao perfil') + ' · ~' + rkoBioUm(g.bioL || 0) + ' leads' + (g.bioF ? ' · ~' + rkoR(g.bioF) : '') + '</small>' : '') + '</button>'; }).join('');
   var h = '<div class="rko-sec"><h3>Leads, MQL e faturamento por post</h3><span class="rko-meta">no mês · 💰 = quem comentou e depois comprou · 🔗 = link da bio (rateio) · toque num tipo para filtrar · clique no post para abrir no Instagram</span></div>'
-    + rkoBioResumoHtml(D) + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:10px">' + resumo + '</div><div class="panel rko-posts">';
+    + rkoBioResumoHtml(D) + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:10px">' + resumo + '</div>' + barra
+    + (ps.length ? '' : '<p class="rko-meta" style="margin:6px 0 10px">Nenhum post deste criador' + (sel ? ' neste tipo' : '') + ' no mês.</p>') + '<div class="panel rko-posts">';
   ps.slice(0, lim).forEach(function(P, i) {
     var info = (IGO.postDe || {})[P.lk] || {}, leg = String(info.legenda || '').replace(/\s+/g, ' ').trim(), dt = info.date ? ('0' + info.date.getDate()).slice(-2) + '/' + ('0' + (info.date.getMonth() + 1)).slice(-2) : '';
     var donos = Object.keys(P.q).sort(function(a, b) { return P.q[b] - P.q[a]; }), story = P.lk === 'story';
