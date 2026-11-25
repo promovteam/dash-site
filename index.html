@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-2320';
+var VERSAO_DASH = '2026-11-25-2350';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -3561,7 +3561,8 @@ function rankearPor(campo, rows) {
     var k = (r[campo] || '').trim();
     if (!k || ((campo === 'closer' || campo === 'sdr') && foraDoDash(k))) return;   // "tire matheus do dash" (27/09/2026)
     if (campo === 'sdr' && foraDoSdr(k)) return;   // "me tire de SDR" (Bruno 04/10/2026)
-    if (!m[k]) m[k] = { nome: k, vd: 0, vdV: 0, ps: 0, psV: 0, re: 0, ns: 0, feV: 0 };
+    if (!m[k]) m[k] = { nome: k, vd: 0, vdV: 0, ps: 0, psV: 0, re: 0, ns: 0, feV: 0, est: 0, estV: 0 };
+    if (r.sn === 'estorno') { m[k].est++; m[k].estV += r.valor || 0; }   // ⚠️ 25/11/2026 (Bruno): reembolsos de cada closer, no card
     if (r.sn === 'vendido') { m[k].vd++; m[k].vdV += r.valor; }
     if (r.sn === 'entrada' || r.sn.indexOf('bloqueio') !== -1) { m[k].ps++; m[k].psV += r.valor; }
     // "realizada" aqui é a MESMA conta do funil que abre no clique (o no-show fica
@@ -6157,7 +6158,7 @@ function renderV2() {
         + '<div class="rk-top">'
         + '<span class="rk-valor"><small>' + (tipo === 'closer' ? 'VENDIDO' : 'REUNIÕES') + '</small><b>' + num + '</b><i>' + rotulo + '</i></span>'
         + _rkAvatar(p.nome)
-        + '<span class="rk-nome">' + _rkNome(p.nome) + '</span>'
+        + '<span class="rk-nome">' + _rkNome(p.nome) + (tipo === 'closer' && p.est ? ' <span class="rk-est" title="Reembolsos (status Estorno) de vendas deste closer no período: ' + p.est + ' venda' + (p.est === 1 ? '' : 's') + ' · ' + v2mil(p.estV) + '">⚠️ ' + p.est + ' reembolso' + (p.est === 1 ? '' : 's') + ' / ' + v2mil(p.estV) + '</span>' : '') + '</span>'
         + '<span class="rk-right">' + linhas + '</span>'
         + '<span class="rk-pos">' + (medalhas[i] || '') + '</span>'
         + '</div>';
@@ -27687,6 +27688,9 @@ body:has(#vsf-btn) .main { padding-bottom:84px; }
   .tb, .tb-pill, .tb-caixa, .tb-fundo, .tb-it .tb-ic svg, .gx-pill, .gv-abas button { transition:none !important; }
   .tl-wrap.um-dia.trocou > .tl-col { animation:none; }
 }
+.rk-est { display:inline-flex; align-items:center; gap:4px; margin-left:10px; padding:3px 10px; border-radius:999px; background:rgba(255,107,107,.16); border:1px solid rgba(255,107,107,.55); color:#ff8a8a; font-size:.7rem; font-weight:800; letter-spacing:.02em; text-transform:none; white-space:nowrap; vertical-align:middle; animation:rkEstPulse 2.4s ease-in-out infinite; }
+@keyframes rkEstPulse { 0%,100% { box-shadow:0 0 0 0 rgba(255,107,107,0); } 50% { box-shadow:0 0 12px 1px rgba(255,107,107,.35); } }
+@media (prefers-reduced-motion:reduce) { .rk-est { animation:none; } }
 </style>
 
 <script>
