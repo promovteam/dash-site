@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-1600';
+var VERSAO_DASH = '2026-11-25-1730';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -4289,9 +4289,44 @@ function irParaCriativo(nome) {
   })();
   return false;
 }
+// 🔗 25/11/2026: sem comentário, o selo mostra o post PROVÁVEL de quem chegou pelo link da bio (rateio; ver conteudoDoLead)
+// 🎬 Visão Geral: os 5 conteúdos do mês com mais leads (💬 comentaram a palavra, certo + 🔗 link da bio, rateio) e o faturamento de cada um
+var _vgCtdTent = 0;
+function vgConteudosRender() {
+  var el = document.getElementById('v2-conteudos'); if (!el) return;
+  try { if (typeof MODO_CLINT !== 'undefined' && MODO_CLINT) return; } catch (e0) {}
+  try { carregarIGOrganico(); } catch (e) {}
+  if (typeof IGO === 'undefined' || !IGO.carregado) { if (_vgCtdTent++ < 40) setTimeout(vgConteudosRender, 3000); return; }
+  var D = null; try { D = rkoDados(rkoMesAtual()); } catch (e2) { return; }
+  if (!RKO_BIO.snaps && _vgCtdTent++ < 40) setTimeout(vgConteudosRender, 3000);
+  var L = Object.keys(D.posts).map(function(k) { var P = D.posts[k]; return { P: P, leads: (P.n || 0) + (P.bioL || 0), fat: (P.fat || 0) + (P.bioF || 0) }; })
+    .filter(function(x) { return x.P.lk !== 'story' && x.leads > 0; }).sort(function(a, b) { return b.fat - a.fat || b.leads - a.leads; }).slice(0, 5);
+  if (!L.length) { el.innerHTML = ''; return; }
+  var tot = { n: 0, b: 0, f: 0 }; Object.keys(D.posts).forEach(function(k) { var P = D.posts[k]; tot.n += P.n || 0; tot.b += P.bioL || 0; tot.f += (P.fat || 0) + (P.bioF || 0); });
+  el.innerHTML = '<div class="panel" style="margin-top:16px;padding:16px 18px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h3 style="margin:0;font-size:.95rem">🎬 Conteúdos que mais trouxeram resultado · ' + rkoMesRot(D.chave) + '</h3>'
+    + '<span class="hint">' + rkoN(tot.n) + ' leads por comentário · ~' + rkoBioUm(tot.b) + ' pela bio · ' + rkoR(tot.f) + ' em vendas · <a href="#" onclick="event.preventDefault();var it=document.querySelector(\'.nav-item[data-s=rankorg]\');if(it)it.click();" style="color:#6ea8ff">ver o ranking</a></span></div>'
+    + L.map(function(x, i) { var P = x.P, info = (IGO.postDe || {})[P.lk] || {}, leg = String(info.legenda || '').replace(/\s+/g, ' ').trim();
+      var dt = info.date ? ('0' + info.date.getDate()).slice(-2) + '/' + ('0' + (info.date.getMonth() + 1)).slice(-2) : '', tp = info.tipo === 'VIDEO' ? '🎬' : info.tipo === 'CAROUSEL_ALBUM' ? '🖼️' : '📷';
+      var prods = {}; Object.keys(P.prods || {}).forEach(function(k) { prods[k] = (prods[k] || 0) + P.prods[k]; }); Object.keys(P.bioProds || {}).forEach(function(k) { prods[k] = (prods[k] || 0) + P.bioProds[k]; });
+      return '<a href="' + dspEsc(P.lk) + '" target="_blank" rel="noopener" style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:' + (i ? '1px solid var(--border)' : '0') + ';color:inherit;text-decoration:none">'
+        + '<b style="width:22px;color:var(--text2)">' + (i + 1) + 'º</b><span style="flex:1;min-width:0"><b style="display:block;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tp + ' ' + dspEsc(leg ? leg.slice(0, 90) : 'post') + '</b>'
+        + '<small style="color:var(--text2);font-size:.7rem">' + [dt, P.n ? '💬 ' + rkoN(P.n) + ' comentaram' + (P.mql ? ' · ' + P.mql + ' MQL' : '') : '', P.bioL ? '🔗 ~' + rkoBioUm(P.bioL) + ' pela bio' : ''].filter(Boolean).join(' · ') + '</small></span>'
+        + '<span style="text-align:right;white-space:nowrap"><b style="color:' + (x.fat ? '#f6a350' : 'var(--text2)') + ';font-size:.9rem">' + (x.fat ? rkoR(x.fat) : '—') + '</b>' + (x.fat ? '<small style="display:block;font-size:.66rem;color:var(--text2)">' + dspEsc(rkoBioProdsTxt(prods)) + '</small>' : '') + '</span></a>';
+    }).join('') + '<p class="hint" style="margin:8px 0 0;font-size:.68rem">💬 = comentou a palavra no post (certo). 🔗 = chegou pelo link da bio, dividido entre os posts ' + (RKO_BIO.fonte === 'cliques' ? 'pelos cliques na bio' : 'pelas visitas ao perfil') + ' daquela hora (estimativa).</p></div>';
+}
+function _igSeloBio(l, mini) {
+  if (!l) return '';
+  try {
+    var d = l.date instanceof Date ? l.date.getTime() : (l.t || null);
+    var o = conteudoDoLead({ l: l.tel8 || l.invest !== undefined ? l : null, tel: l.telefone || l.tel || l.celular || '', insta: l.insta, t: d });
+    if (!o || o.como !== 'bio') return '';
+    return conteudoDoLeadHtml({ l: l.tel8 || l.invest !== undefined ? l : null, tel: l.telefone || l.tel || l.celular || '', insta: l.insta, t: d }, 'chip');
+  } catch (e) { return ''; }
+}
 function igSeloLead(l, mini) {
   var p = igPedidoDoLead(l);
-  if (!p) return '';
+  if (!p) return _igSeloBio(l, mini);
   var qd = p.quando ? new Date(p.quando) : null;
   var dia = (qd && !isNaN(qd)) ? qd.toLocaleDateString('pt-BR').slice(0, 5) : '';
   // 26/09/2026 (Bruno: "mostre os criativos orgânicos na lista do lead"): o selo diz QUAL post trouxe (apelido do post
@@ -6204,7 +6239,9 @@ function renderV2() {
   h += blocoRanking('Resultados — Closers', '🏆', rankearPor('closer', mesRows), 'closer');
   h += blocoRanking('Resultados — SDRs', '📞', _rkSdrs, 'sdr');
 
+  h += '<div id="v2-conteudos"></div>';   // 🎬 25/11/2026: os conteúdos do mês que mais trouxeram leads e venda (comentário + link da bio)
   document.getElementById('v2-visao').innerHTML = h;
+  setTimeout(vgConteudosRender, 50);
   var lo = document.getElementById('v2-loading');
   if (lo) lo.style.display = 'none';
 
@@ -10202,7 +10239,7 @@ function anVendasPainel(per) {
             + '<td style="padding:7px 8px;white-space:nowrap;color:var(--text2);">' + (v.t ? new Date(v.t).toLocaleDateString('pt-BR') : '—') + '</td>'
             + '<td style="padding:7px 8px;"><b>' + esc(v.nome) + '</b>' + (!v.r ? ' <span class="hint" title="só no formulário de pagamento">· só formulário</span>' : '') + '</td>'
             + '<td style="padding:7px 8px;text-align:right;white-space:nowrap;">' + (v.valor ? 'R$ ' + Math.round(v.valor).toLocaleString('pt-BR') : '—') + '</td>'
-            + '<td style="padding:7px 8px;"><span style="color:' + R.c + ';font-weight:700;">' + R.i + '</span> ' + esc(onde) + '</td>'
+            + '<td style="padding:7px 8px;"><span style="color:' + R.c + ';font-weight:700;">' + R.i + '</span> ' + esc(onde) + (k !== 'pago' ? (function() { var c = conteudoDoLeadHtml({ l: v.lead, tels: v.tels, t8: v.tels && v.tels[0], insta: (v.pg && v.pg.insta) || (v.lead && v.lead.insta), t: v.t }, 'chip'); return c ? '<br>' + c : ''; })() : '') + '</td>'
             + '<td style="padding:7px 8px;color:var(--muted);">' + (v.como || '—') + '</td></tr>';
         }).join('')
       + '</table></div>';
@@ -14588,6 +14625,7 @@ function abrirFichaLead(i) {
     ['✉️', 'E-mail', l.email],
     ['👥', 'Seguidores', _segTxt(l)],
     ['🔗', 'Link na bio', _bioLinkHtml(l), 'html'],
+    ['🎬', 'Conteúdo de origem', conteudoDoLeadHtml({ l: l, t: l.date instanceof Date ? l.date.getTime() : null }), 'html'],
     ['💰', 'Quanto pode investir', l.invest],
     ['💼', 'Fonte de renda hoje', l.renda],
     ['🎯', 'Objetivos', l.obj],
@@ -19000,7 +19038,7 @@ function gvQuemDesenhar() {
     var outroNome = l.nome && v2norm(l.nome).split(' ')[0] !== v2norm(p.nome || '').split(' ')[0];
     h += '<div class="gq-sec"><h5>🧑 Quem é (formulário)</h5>'
       + linha('Nota', nota, true) + linha('Seguidores', _segTxt(l)) + linha('Pode investir', l.invest) + linha('Renda hoje', l.renda)
-      + linha('Objetivos', l.obj) + linha('Chegou em', chegou) + linha('Origem', origem) + linha('Anúncio', l.anuncio)
+      + linha('Objetivos', l.obj) + linha('Chegou em', chegou) + linha('Origem', origem) + linha('Conteúdo', conteudoDoLeadHtml({ l: l, t: l.date instanceof Date ? l.date.getTime() : null }), true) + linha('Anúncio', l.anuncio)
       + (a.como && a.como !== 'telefone' ? '<div class="gq-aviso">achado na base pelo ' + e(a.como) + '</div>' : '')
       + (outroNome ? '<div class="gq-aviso">⚠️ na base de leads este contato está como <b>' + e(l.nome) + '</b></div>' : '')
       + '</div>';
@@ -22320,6 +22358,7 @@ function agMostrarOrigem(l) {
     +   '<span style="cursor:pointer;opacity:.6;font-size:.9rem;" onclick="agLimparLead()" title="não é este lead">✕</span>'
     + '</div>'
     + linha('origem', l.origem || l.fonte)
+    + linha('conteúdo', conteudoDoLeadHtml({ l: l, t: l.date instanceof Date ? l.date.getTime() : null }))
     + linha('anúncio', l.anuncio)
     + linha('campanha', l.campanha)
     + linha('investe', l.invest)
@@ -36128,7 +36167,9 @@ var RKO_BIO = { snaps: null, fonte: '', ped: false, erro: '' };
 function rkoBioCarregar() {
   if (RKO_BIO.snaps || RKO_BIO.ped) return; RKO_BIO.ped = true;
   var fim = function(sn, fonte) { RKO_BIO.ped = false; RKO_BIO.snaps = sn || []; RKO_BIO.fonte = fonte || ''; _rkoMemo = {};
-    try { if (typeof telaVisivel !== 'function' || telaVisivel('s-rankorg')) renderRankOrg(); } catch (e) {} };
+    _rkoBioRatMemo = {}; _ctdIdx = null;
+    try { if (typeof telaVisivel !== 'function' || telaVisivel('s-rankorg')) renderRankOrg(); } catch (e) {}
+    try { if (typeof telaVisivel === 'function' && telaVisivel('s-trafego') && typeof renderTrafego === 'function') renderTrafego(); } catch (e2) {} };
   var montar = function(T, cT, cL, cV, hora) {   // agrupa as linhas por foto (momento) → { t, m: { link: acumulado } }
     var porT = {};
     T.rows.forEach(function(r) {
@@ -36171,31 +36212,100 @@ function rkoBioPesos(t) {
   Object.keys(b.m).forEach(function(lk) { var d = b.m[lk] - (a.m[lk] || 0); if (d > 0) { w[lk] = d; tot += d; } });
   return tot ? { w: w, tot: tot } : null;
 }
-// aplica o rateio aos posts do mês (D.posts) e guarda o resumo em D.bio
-function rkoBioAplicar(D, ini, fim) {
-  var B = D.bio = { fonte: RKO_BIO.fonte, leads: 0, semPost: 0, mql: 0, vend: 0, fat: 0, cli: 0 };
-  if (!RKO_BIO.snaps || !RKO_BIO.snaps.length) return;
-  var porLk = {}; Object.keys(D.posts).forEach(function(k) { var c = rkoBioLink(k); if (c) porLk[c] = D.posts[k]; });
-  var post = function(c) { if (porLk[c]) return porLk[c]; var lk = 'https://www.instagram.com/p/' + c + '/'; (IGO.posts || []).some(function(q) { if (q.link && rkoBioLink(q.link) === c) { lk = q.link; return true; } return false; }); return porLk[c] = D.posts[lk] = D.posts[lk] || { lk: lk, n: 0, q: {}, f: {}, soBio: 1 }; };
-  // cliques (ou visitas) que cada post ganhou nas janelas que começam no mês
+// o rateio de um período qualquer (o mês do Ranking, o período da Gestão de funis…): por código de post
+// { c: { cli, l, m, v, f, prods } } e os totais. Guardado enquanto as fotos, os leads e as vendas forem os mesmos.
+var _rkoBioRatMemo = {};
+function rkoBioRateio(ini, fim) {
+  var R = { c: {}, leads: 0, semPost: 0, mql: 0, vend: 0, fat: 0, cli: 0, fonte: RKO_BIO.fonte };
+  if (!RKO_BIO.snaps || !RKO_BIO.snaps.length) return R;
+  var LB = rkoBioLeads(), I = rkoVendaIdx(), ref = ini + '|' + fim + '|' + RKO_BIO.snaps.length + '|' + LB.length + '|' + I.L.length;
+  if (_rkoBioRatMemo[ref]) return _rkoBioRatMemo[ref];
+  var po = function(c) { return R.c[c] || (R.c[c] = { cli: 0, l: 0, m: 0, v: 0, f: 0, prods: {} }); };
   var sn = RKO_BIO.snaps;
   for (var k = 0; k + 1 < sn.length; k++) { if (sn[k].t < ini || sn[k].t >= fim) continue;
-    Object.keys(sn[k + 1].m).forEach(function(c) { var d = sn[k + 1].m[c] - (sn[k].m[c] || 0); if (d > 0) { var P = post(c); P.bioCli = (P.bioCli || 0) + d; B.cli += d; } }); }
-  var vistos = {}, vdVista = {}, I = rkoVendaIdx();
-  rkoBioLeads().forEach(function(x) {
+    Object.keys(sn[k + 1].m).forEach(function(c) { var d = sn[k + 1].m[c] - (sn[k].m[c] || 0); if (d > 0) { po(c).cli += d; R.cli += d; } }); }
+  var vistos = {}, vdVista = {};
+  LB.forEach(function(x) {
     if (x.t < ini || x.t >= fim) return;
-    var ch = x.t8 || ('n:' + x.nome); if (vistos[ch]) return; vistos[ch] = 1;   // a pessoa conta uma vez no mês
-    B.leads++; if (x.mql) B.mql++;
-    var pw = rkoBioPesos(x.t);
+    var ch = x.t8 || ('n:' + x.nome); if (vistos[ch]) return; vistos[ch] = 1;   // a pessoa conta uma vez no período
+    R.leads++; if (x.mql) R.mql++;
     var iv = -1; (x.t8 ? (I.tel[x.t8] || []) : []).forEach(function(i) { var v = I.L[i]; if (v.valor > 0 && (!v.t || v.t >= x.t - 864e5) && !vdVista[i] && (iv < 0 || (v.t || 0) < (I.L[iv].t || 0))) iv = i; });
-    var vx = iv >= 0 ? I.L[iv] : null; if (vx) { vdVista[iv] = 1; B.vend++; B.fat += vx.valor || 0; }
-    if (!pw) { B.semPost++; return; }
+    var vx = iv >= 0 ? I.L[iv] : null; if (vx) { vdVista[iv] = 1; R.vend++; R.fat += vx.valor || 0; }
+    var pw = rkoBioPesos(x.t); if (!pw) { R.semPost++; return; }
     Object.keys(pw.w).forEach(function(c) {
-      var f = pw.w[c] / pw.tot, P = post(c);
-      P.bioL = (P.bioL || 0) + f; if (x.mql) P.bioM = (P.bioM || 0) + f;
-      if (vx) { P.bioV = (P.bioV || 0) + f; P.bioF = (P.bioF || 0) + f * (vx.valor || 0); var pr = rkoProdVenda(vx); (P.bioProds = P.bioProds || {})[pr] = (P.bioProds[pr] || 0) + f; }
+      var f = pw.w[c] / pw.tot, P = po(c); P.l += f; if (x.mql) P.m += f;
+      if (vx) { P.v += f; P.f += f * (vx.valor || 0); var pr = rkoProdVenda(vx); P.prods[pr] = (P.prods[pr] || 0) + f; }
     });
   });
+  if (Object.keys(_rkoBioRatMemo).length > 20) _rkoBioRatMemo = {};
+  return (_rkoBioRatMemo[ref] = R);
+}
+function rkoBioAplicar(D, ini, fim) {
+  var R = rkoBioRateio(ini, fim);
+  D.bio = { fonte: R.fonte, leads: R.leads, semPost: R.semPost, mql: R.mql, vend: R.vend, fat: R.fat, cli: R.cli };
+  var porLk = {}; Object.keys(D.posts).forEach(function(k) { var c = rkoBioLink(k); if (c) porLk[c] = D.posts[k]; });
+  Object.keys(R.c).forEach(function(c) {
+    var x = R.c[c], P = porLk[c];
+    if (!P) { var lk = rkoBioLkDe(c); P = porLk[c] = D.posts[lk] = D.posts[lk] || { lk: lk, n: 0, q: {}, f: {}, soBio: 1 }; }
+    P.bioCli = x.cli; P.bioL = x.l; P.bioM = x.m; P.bioV = x.v; P.bioF = x.f; P.bioProds = x.prods;
+  });
+}
+function rkoBioLkDe(c) { var lk = 'https://www.instagram.com/p/' + c + '/'; (IGO.posts || []).some(function(q) { if (q.link && rkoBioLink(q.link) === c) { lk = q.link; return true; } return false; }); return lk; }
+function rkoBioPostInfo(c) { var lk = rkoBioLkDe(c), p = (IGO.postDe || {})[lk] || {}; return { lk: lk, leg: String(p.legenda || '').replace(/\s+/g, ' ').trim(), date: p.date || null, tipo: p.tipo || '' }; }
+
+// =====================================================================================================
+// 🎬 CONTEÚDO DE ORIGEM DO LEAD (25/11/2026 · Bruno: "plugue esse dado estrategicamente em todas as partes pertinentes do dashboard:
+// gestão de funis, ranking orgânico, cards de venda, visão geral, reuniões"). Para uma pessoa (lead, reunião ou venda):
+//   💬 comentou a palavra num post → o post é CERTO (IG Pedidos, achado pelo @ do Instagram);
+//   🔗 chegou pelo link da bio → o post é PROVÁVEL (o rateio daquela hora: os posts que mais ganharam cliques/visitas).
+// =====================================================================================================
+var _ctdIdx = null;
+function ctdIdx() {
+  var S = (typeof TRF !== 'undefined') ? TRF.site : null, nS = S && S.leads ? S.leads.length : 0, nL = (LD.rows || []).length, nP = (IGO.ped || []).length;
+  if (_ctdIdx && _ctdIdx.k === nS + '|' + nL + '|' + nP) return _ctdIdx;
+  try { if (!S) trfSiteCarregar(false); } catch (eS) {} try { rkoBioCarregar(); } catch (eB) {}
+  var X = { k: nS + '|' + nL + '|' + nP, bio: {}, ped: {} };
+  rkoBioLeads().forEach(function(x) { if (x.t8) (X.bio[x.t8] = X.bio[x.t8] || []).push(x.t); });
+  (IGO.ped || []).forEach(function(p) { if (!p.u || !p.lk || p.lk === 'story' || !p.t) return; var u = idInsta(p.u); if (u) (X.ped[u] = X.ped[u] || []).push(p); });
+  return (_ctdIdx = X);
+}
+// pessoa: { tel, insta, t (quando chegou/marcou/comprou — para pegar a origem de antes), l (lead da planilha, opcional) }
+function conteudoDoLead(pe) {
+  try {
+    var l = pe.l || null, t8 = pe.t8 || ldTel8(pe.tel || (l && l.tel) || ''), ig = idInsta(pe.insta || (l && l.insta) || ''), ate = pe.t || Date.now(), X = ctdIdx();
+    if (!t8 && l) t8 = l.tel8 || '';
+    // 💬 comentou: o comentário mais recente antes da data (ou o primeiro, se todos depois)
+    var cs = ig ? (X.ped[ig] || []) : [], cm = null;
+    cs.forEach(function(p) { if (p.t <= ate + 864e5 && (!cm || p.t > cm.t)) cm = p; });
+    if (!cm && cs.length) cm = cs[0];
+    if (cm) { var c0 = rkoBioLink(cm.lk), inf = rkoBioPostInfo(c0); inf.lk = cm.lk; return { como: 'comentou', quando: cm.t, posts: [{ c: c0, pct: 100, info: inf }] }; }
+    // 🔗 pela bio: o formulário com a etiqueta bio mais recente antes da data
+    var ts = (t8 && X.bio[t8]) || [], tb = 0;
+    ts.forEach(function(t) { if (t <= ate + 864e5 && t > tb) tb = t; });
+    if (!tb && ts.length) tb = ts[0];
+    if (!tb && l && /\bbio\b/i.test(String(l.origemMan || l.origem || '')) && l.date instanceof Date) tb = l.date.getTime();
+    if (!tb) return null;
+    var pw = rkoBioPesos(tb);
+    if (!pw) return { como: 'bio', quando: tb, posts: [] };
+    var ps = Object.keys(pw.w).map(function(c) { return { c: c, pct: Math.round(pw.w[c] / pw.tot * 100), info: rkoBioPostInfo(c) }; }).filter(function(x) { return x.pct >= 1; }).sort(function(a, b) { return b.pct - a.pct; });
+    return { como: 'bio', quando: tb, posts: ps.slice(0, 3) };
+  } catch (e) { return null; }
+}
+function _ctdLeg(inf, n) { var s = inf.leg ? inf.leg.slice(0, n) + (inf.leg.length > n ? '…' : '') : 'post'; return s; }
+function _ctdData(inf) { var d = inf.date; return d ? ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) : ''; }
+// HTML curto para fichas, reuniões e vendas. modo 'linha' = uma linha; 'chip' = etiqueta pequena
+function conteudoDoLeadHtml(pe, modo) {
+  var o = conteudoDoLead(pe); if (!o) return '';
+  var tpo = function(inf) { return inf.tipo === 'VIDEO' ? '🎬' : inf.tipo === 'CAROUSEL_ALBUM' ? '🖼️' : '📷'; };
+  var link = function(x, n) { return '<a href="' + dspEsc(x.info.lk) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,.25)" title="' + dspEsc(x.info.leg || 'abrir o post') + '">' + tpo(x.info) + ' ' + dspEsc(_ctdLeg(x.info, n)) + (_ctdData(x.info) ? ' <span style="opacity:.6">' + _ctdData(x.info) + '</span>' : '') + '</a>'; };
+  if (modo === 'chip') {
+    if (o.como === 'comentou') return '<span class="ld-tag" style="background:rgba(61,220,151,.12);color:#3ddc97" title="Comentou a palavra neste post: ' + dspEsc(o.posts[0].info.leg) + '">💬 ' + dspEsc(_ctdLeg(o.posts[0].info, 28)) + '</span>';
+    if (!o.posts.length) return '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:#6ea8ff" title="Veio pelo link da bio, antes das primeiras medições dos posts">🔗 bio</span>';
+    return '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:#6ea8ff" title="Veio pelo link da bio. Post provável (rateio dos ' + (RKO_BIO.fonte === 'cliques' ? 'cliques na bio' : 'visitas ao perfil') + ' daquela hora): ' + dspEsc(o.posts.map(function(x) { return x.pct + '% ' + _ctdLeg(x.info, 40); }).join(' · ')) + '">🔗 ~' + dspEsc(_ctdLeg(o.posts[0].info, 24)) + ' ' + o.posts[0].pct + '%</span>';
+  }
+  if (o.como === 'comentou') return '<span style="color:#3ddc97">💬 comentou no post</span> ' + link(o.posts[0], 60);
+  if (!o.posts.length) return '<span style="color:#6ea8ff">🔗 link da bio</span> <span class="hint">(antes das primeiras medições dos posts)</span>';
+  return '<span style="color:#6ea8ff">🔗 link da bio · provável:</span> ' + o.posts.map(function(x, i) { return link(x, i ? 30 : 50) + ' <b>' + x.pct + '%</b>'; }).join(' · ');
 }
 function rkoBioUm(v) { return v >= 10 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toString().replace('.', ','); }
 function rkoBioProdsTxt(o) { return Object.keys(o || {}).sort(function(a, b) { return o[b] - o[a]; }).join(' · '); }
@@ -43250,7 +43360,7 @@ function trfCriJanela(k) {
 function trfPassoCri(k, passo) { if (!window._trfCtx) return; TRF.lst = { k: passo, f: '', cri: k }; _trfListaDesenhar(); }
 function trfPagina(pg) { TRF.pg = TRF.pg === pg ? '' : pg; try { vfFechar(); } catch (e) {} renderTrafego(); try { document.getElementById('trf-funil').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e2) {} }
 var TRF_ORD_P = [['vd', '💰 Vendas'], ['fat', 'Faturamento'], ['marc', '📅 Reuniões'], ['mql', '🔥 MQL'], ['ld', 'Leads'], ['com', 'Comentaram a palavra'], ['vw', 'Visualizações'], ['cur', 'Curtidas'], ['cm', 'Comentários'], ['t', 'Mais recentes']];
-var TRF_ORD_B = [['pf', 'Foram ao perfil'], ['taxa', '% de quem viu'], ['vw', 'Visualizações'], ['cur', 'Curtidas'], ['cm', 'Comentários'], ['t', 'Mais recentes']];
+var TRF_ORD_B = [['bioL', 'Leads pela bio'], ['bioF', 'Faturamento pela bio'], ['pf', 'Foram ao perfil'], ['taxa', '% de quem viu'], ['vw', 'Visualizações'], ['cur', 'Curtidas'], ['cm', 'Comentários'], ['t', 'Mais recentes']];
 var TRF_ORD_W = [['gasto', 'Gasto'], ['imp', 'Impressões'], ['cli', 'Cliques'], ['ctr', '% que clicam'], ['cpc', 'Menor custo por clique'], ['res', 'Resultados da Meta']];
 var TRF_TIPO_P = [['', 'Todos'], ['VIDEO', '🎬 Vídeos'], ['CAROUSEL_ALBUM', '🖼️ Carrosséis'], ['IMAGE', '📷 Fotos']];
 function trfOrdemDe(campo, v, id) { TRF[campo] = v; TRF.todos = false; renderTrafego(); try { document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
@@ -43820,7 +43930,10 @@ function _trfPosts(D) {
 }
 // 🔗 aba Link na bio: não dá para ligar a pessoa a um post (ela não comenta), mas o Instagram diz quantas idas ao perfil cada post gerou
 function _trfPostsBio(D) {
-  var oB = TRF.ordB || 'pf', tudo = (D.z.posts || []).filter(function(o) { return o.pf > 0; }), tP = TRF.tipoP || '', vB = function(o) { return oB === 'taxa' ? (o.vw ? o.pf / o.vw : 0) : (o[oB] || 0); };
+  // 🔗 25/11/2026: o rateio dos leads da bio (mesma conta do Ranking orgânico) entra em cada post do período
+  var RB = null; try { rkoBioCarregar(); var PB = _trfPer(); RB = rkoBioRateio(PB.ini, PB.fim); } catch (eRb) {}
+  (D.z.posts || []).forEach(function(o) { var x = RB && RB.c[rkoBioLink(o.lk)]; o.bioL = x ? x.l : 0; o.bioM = x ? x.m : 0; o.bioF = x ? x.f : 0; o.bioV = x ? x.v : 0; o.bioProds = x ? x.prods : null; o.bioCli = x ? x.cli : 0; });
+  var oB = TRF.ordB || 'pf', tudo = (D.z.posts || []).filter(function(o) { return o.pf > 0 || o.bioL > 0; }), tP = TRF.tipoP || '', vB = function(o) { return oB === 'taxa' ? (o.vw ? o.pf / o.vw : 0) : (o[oB] || 0); };
   var L = tudo.filter(function(o) { return !tP || o.tipo === tP; }).sort(function(a, b) { return vB(b) - vB(a) || b.pf - a.pf; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
   var tp = { VIDEO: '🎬 vídeo', CAROUSEL_ALBUM: '🖼️ carrossel', IMAGE: '📷 foto' }, falta = 0; window._trfPostsOrd = L;
   var caixa = function(v, r, cor, fundo) { return '<div style="flex:1;text-align:center;padding:6px 3px;border-radius:9px;background:' + fundo + ';"><b style="color:' + cor + ';font-size:.95rem;display:block;">' + v + '</b><span style="font-size:.55rem;color:var(--text2);font-weight:700;">' + r + '</span></div>'; };
@@ -43834,13 +43947,15 @@ function _trfPostsBio(D) {
       + '<div class="an-cc" style="padding:11px 12px;flex:1;display:flex;flex-direction:column;"><b style="font-size:.74rem;line-height:1.3;">' + _trfE(leg ? leg.slice(0, 80) + (leg.length > 80 ? '…' : '') : 'Post sem legenda') + '</b>'
       +   '<span class="ld-tag" style="align-self:flex-start;margin-top:5px;background:rgba(34,211,238,.13);color:#22d3ee;">🔗 ' + (tp[o.tipo] || 'post') + ' · ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '</span>'
       +   '<div class="an-nums" style="display:flex;gap:5px;margin-top:9px;">' + caixa(_trfK(o.vw), 'VISUALIZAÇÕES', '#6ea8ff', 'rgba(110,168,255,.1)') + caixa(_trfN(o.pf), 'FORAM AO PERFIL', '#22d3ee', 'rgba(34,211,238,.1)') + caixa(o.vw ? (o.pf / o.vw * 100).toFixed(2).replace('.', ',') + '%' : '—', 'DE QUEM VIU', '#ffd166', 'rgba(255,209,102,.1)') + '</div>'
+      +   '<div class="an-nums" style="display:flex;gap:5px;margin-top:5px;" title="Rateio: os leads que chegaram pelo link da bio divididos entre os posts conforme os ' + (RKO_BIO.fonte === 'cliques' ? 'cliques na bio' : 'visitas ao perfil') + ' de cada um naquela hora">' + caixa('~' + rkoBioUm(o.bioL || 0), 'LEADS BIO', '#6ea8ff', 'rgba(110,168,255,.1)') + caixa('~' + rkoBioUm(o.bioM || 0), 'MQL', '#3ddc97', 'rgba(61,220,151,.1)') + caixa(o.bioF ? '~' + rkoR(o.bioF) : '—', 'FATURAMENTO', '#f6a350', 'rgba(246,163,80,.1)') + '</div>'
+      +   (o.bioF ? '<small style="display:block;margin-top:4px;font-size:.62rem;color:#f6a350;opacity:.85">' + _trfE(rkoBioProdsTxt(o.bioProds)) + '</small>' : '')
       +   '<div class="trf-anc-ver">🔎 ver o post por dentro</div></div></div>'; }).join('');
   if (falta) { try { pedirCapasIG(); } catch (e) {} }
   return '<div class="panel trf-bloco" id="trf-posts"><div class="trf-bt"><h3>🎬 Posts que mais levaram gente ao perfil</h3><span class="trf-sub">os criativos do link na bio · em ordem de</span><div class="pl-chips">' + _trfChipsDe(TRF_ORD_B, 'ordB', oB, 'trf-posts') + '</div></div>' + _trfTiposDe(tudo, 'trf-posts')
     + ''
     + (h ? '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;">' + h + '</div>' : '<p class="trf-nota">' + (D.semVw ? 'Lendo os posts do Instagram…' : tP ? 'Nenhum post deste tipo com idas ao perfil medidas.' : 'Nenhum post do período com idas ao perfil medidas.') + '</p>')
     + (tot > 12 ? '<button type="button" class="btn trf-mais" onclick="TRF.todos=!TRF.todos;renderTrafego()">' + (TRF.todos ? 'Mostrar só os 12 primeiros' : 'Ver os ' + tot + ' posts') + '</button>' : '')
-    + '<p class="trf-nota">Quem vem pela bio não comenta, então não dá para dizer de qual post veio cada lead. O que o Instagram informa é quantas idas ao perfil cada post gerou (medido no 7º dia; nem todo post traz esse número). O clique no link da bio ainda não é medido.</p></div>';
+    + '<p class="trf-nota">Quem vem pela bio não comenta, então o Instagram não diz de qual post veio cada lead. <b>Leads, MQL e faturamento da bio são um rateio</b>: cada lead que chegou pela bio é dividido entre os posts conforme os ' + (RKO_BIO.fonte === 'cliques' ? 'cliques no link da bio' : 'visitas ao perfil (até o robô começar a gravar os cliques na bio)') + ' que cada post ganhou naquela hora — a mesma conta do Ranking orgânico. Na ficha de cada lead aparece o post provável.</p></div>';
 }
 // janela do criativo de evento ou do MCP: o anúncio tocando (mesmo player da aba Criativos) e, ao lado, o funil dele
 function trfWsCriJanela(i) {
