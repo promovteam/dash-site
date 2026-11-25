@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-2245';
+var VERSAO_DASH = '2026-11-25-2320';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -36421,10 +36421,12 @@ function rkoDados(chave) {
   var ref = chave + '|' + ((IGO.ped || []).length) + '|' + ((LD.rows || []).length) + '|' + new Date().getDate() + '|' + ((typeof TRF !== 'undefined' && TRF.site && TRF.site.leads || []).length) + '|' + ((typeof V2 !== 'undefined' && V2.rows || []).length) + '|' + ((typeof PAG !== 'undefined' && PAG.rows || []).length) + '|' + ((RKO_BIO.snaps || []).length);
   try { rkoBioCarregar(); } catch (eBc) {}
   if (_rkoMemo[ref]) return _rkoMemo[ref];
-  var a = +chave.slice(0, 4), m = +chave.slice(5, 7), ini = new Date(a, m - 1, 1).getTime(), fim = new Date(a, m, 1).getTime(), nd = new Date(a, m, 0).getDate();
-  var hj = new Date(), hoje0 = new Date(hj.getFullYear(), hj.getMonth(), hj.getDate()).getTime();
+  var hj = new Date(), hoje0 = new Date(hj.getFullYear(), hj.getMonth(), hj.getDate()).getTime(), ini, fim, nd, custom = chave.charAt(0) === 'P';
+  if (custom) {   // 25/11/2026: período livre "P:ini:fim" (mês atual, 30/90/180 dias, personalizado)
+    var pp = chave.split(':'); ini = +pp[1]; fim = +pp[2]; nd = Math.max(1, Math.round((fim - ini) / 864e5));
+  } else { var a = +chave.slice(0, 4), m = +chave.slice(5, 7); ini = new Date(a, m - 1, 1).getTime(); fim = new Date(a, m, 1).getTime(); nd = new Date(a, m, 0).getDate(); }
   var zeros = function() { var z = []; for (var i = 0; i < nd; i++) z.push(0); return z; };
-  var D = { chave: chave, dias: nd, atual: chave === rkoMesAtual(), diaHoje: hj.getDate(), funis: {}, posts: {}, fora: 0, lidos: 0 };
+  var D = { chave: chave, ini: ini, fim: fim, custom: custom, rot: custom ? rkoPerRot(ini, fim) : rkoMesRot(chave), dias: nd, atual: custom ? false : chave === rkoMesAtual(), diaHoje: custom ? Math.min(nd, Math.floor((hoje0 - ini) / 864e5) + 1) : hj.getDate(), funis: {}, posts: {}, fora: 0, lidos: 0 };
   RKO_CFG.funis.forEach(function(f) {
     var F = D.funis[f.k] = { n: 0, mql: 0, base: 0, hoje: 0, dia: zeros(), q: {}, vend: 0, fat: 0 };
     f.de.forEach(function(d) { F.q[d.q] = { n: 0, mql: 0, base: 0, hoje: 0, dia: zeros(), vend: 0, fat: 0 }; });
@@ -36436,7 +36438,7 @@ function rkoDados(chave) {
     D.lidos++;
     var d = rkoDono(p.x, p.i); if (!d) { D.fora++; return; }
     var k = d.f + '|' + p.u; if (visto[k]) return; visto[k] = 1;   // a pessoa conta uma vez por funil no mês, para a 1ª palavra
-    var F = D.funis[d.f], Q = F.q[d.q], di = new Date(p.t).getDate() - 1;
+    var F = D.funis[d.f], Q = F.q[d.q], di = custom ? Math.min(nd - 1, Math.floor((p.t - ini) / 864e5)) : new Date(p.t).getDate() - 1;
     F.n++; Q.n++; F.dia[di]++; Q.dia[di]++;
     if (p.t >= hoje0) { F.hoje++; Q.hoje++; }
     var l = null; try { l = igLeadPorInsta(p.u); } catch (e) {}
@@ -36477,6 +36479,7 @@ function rkoRegua(n, metas) {
   return h + '</div>';
 }
 function rkoBarrasDia(D, F, f) {   // um palito por dia do mês, empilhado por pessoa
+  if (D.dias > 62) return '';   // 90/180 dias: palitos demais para ler
   var max = Math.max.apply(null, F.dia.concat([1])), h = '<div class="rko-dias" role="img" aria-label="Leads por dia no mês">';
   for (var i = 0; i < D.dias; i++) {
     var fut = D.atual && i + 1 > D.diaHoje, hoje = D.atual && i + 1 === D.diaHoje;
@@ -36530,7 +36533,7 @@ function rkoGeralHtml(D) {
   var totBase = lista.reduce(function(a, x) { return a + (x.base || 0); }, 0);
   var zerado = !lista.some(function(x) { return x.n; }), total = lista.reduce(function(a, x) { return a + x.n; }, 0), lider = RKO_CFG.pessoas[lista[0].q];
   var h = '<section class="rko-palco' + (zerado ? ' zerado' : '') + '" style="--lider:' + (zerado ? '#f6a350' : lider.cor) + '">'
-    + '<header class="rko-palco-h"><div><span class="rko-eyebrow">Ranking do mês</span><h3>' + (zerado ? 'A corrida ainda não começou' : dspEsc(lider.nome.split(' ')[0]) + ' está na frente') + '</h3></div>'
+    + '<header class="rko-palco-h"><div><span class="rko-eyebrow">' + (D.custom ? 'Ranking do período' : 'Ranking do mês') + '</span><h3>' + (zerado ? 'A corrida ainda não começou' : dspEsc(lider.nome.split(' ')[0]) + ' está na frente') + '</h3></div>'
     + '<span class="rko-chips" role="tablist" aria-label="Ordenar o ranking">'
     + '<button type="button" class="chart-chip' + (RKO.ordem === 'pct' ? ' on' : '') + '" onclick="RKO.ordem=\'pct\';renderRankOrg()">por % da meta</button>'
     + '<button type="button" class="chart-chip' + (RKO.ordem === 'leads' ? ' on' : '') + '" onclick="RKO.ordem=\'leads\';renderRankOrg()">por nº de leads</button></span></header>'
@@ -36834,7 +36837,7 @@ function rkoFatPorPessoa(D) {
 }
 function rkoFatPessoasHtml(D) {
   if (!D || !rkoVeFat()) return '';
-  var FP = rkoFatPorPessoa(D), tt = { fat: 0, vend: 0, prods: {}, bioF: 0, bioL: 0 }, mes = RKO_MESES[+D.chave.slice(5, 7) - 1];
+  var FP = rkoFatPorPessoa(D), tt = { fat: 0, vend: 0, prods: {}, bioF: 0, bioL: 0 }, mes = D.custom ? D.rot : RKO_MESES[+D.chave.slice(5, 7) - 1];
   var lista = Object.keys(FP).map(function(q) { var x = FP[q]; tt.fat += x.fat; tt.vend += x.vend; tt.bioF += x.bioF; tt.bioL += x.bioL; Object.keys(x.prods).forEach(function(k) { tt.prods[k] = (tt.prods[k] || 0) + x.prods[k]; }); return { q: q, x: x, tot: x.fat + x.bioF }; })
     .sort(function(a, b) { return b.tot - a.tot; });
   var card = function(av, nome, cor, x, tot) {
@@ -36905,7 +36908,25 @@ function rkoAtualizar() {
     reler();
   }, 150000);
 }
-function rkoMudarMes(n) { RKO.mes = rkoMesAndar(RKO.mes || rkoMesAtual(), n); renderRankOrg(); }
+function rkoMudarMes(n) { RKO.per = 'mes'; RKO.mes = rkoMesAndar(RKO.mes || rkoMesAtual(), n); renderRankOrg(); }
+// 📅 25/11/2026 (Bruno: "filtrar por mês corrente, últimos 30D, 90D, 180D e personalizar"): o período do Ranking
+function rkoPerRot(ini, fim) { var f = function(t) { return new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }); }; return f(ini) + ' a ' + f(fim - 1); }
+function rkoChave() {
+  var h = new Date(), h0 = new Date(h.getFullYear(), h.getMonth(), h.getDate()).getTime(), dia = 864e5, per = RKO.per || 'mes';
+  if (per === '30' || per === '90' || per === '180') return 'P:' + (h0 - (+per - 1) * dia) + ':' + (h0 + dia);
+  if (per === 'custom' && RKO.de && RKO.ate) { var a = new Date(RKO.de + 'T00:00:00').getTime(), b = new Date(RKO.ate + 'T00:00:00').getTime() + dia; if (b > a) return 'P:' + a + ':' + b; }
+  return RKO.mes || rkoMesAtual();
+}
+function rkoPer(per) { RKO.per = per; if (per === 'mesatual') { RKO.per = 'mes'; RKO.mes = rkoMesAtual(); } renderRankOrg(); }
+function rkoPerCustom() { var a = document.getElementById('rko-de'), b = document.getElementById('rko-ate'); if (!a || !b || !a.value || !b.value) return; RKO.de = a.value <= b.value ? a.value : b.value; RKO.ate = a.value <= b.value ? b.value : a.value; RKO.per = 'custom'; renderRankOrg(); }
+// nos períodos livres as metas (que são do mês) ficam proporcionais aos dias: 90 dias = 3× a meta do mês
+function rkoCfgProporcional(f) {
+  var c = { pessoas: RKO_CFG.pessoas, funis: RKO_CFG.funis.map(function(F) { var o = {}; for (var k in F) o[k] = F[k];
+    o.metas = { P: Math.round(F.metas.P * f), M: Math.round(F.metas.M * f), G: Math.round(F.metas.G * f) }; if (F.mql) o.mql = Math.round(F.mql * f);
+    o.de = F.de.map(function(d) { var x = {}; for (var j in d) x[j] = d[j]; if (d.meta) x.meta = Math.round(d.meta * f); return x; }); return o; }) };
+  for (var k2 in RKO_CFG) if (!(k2 in c)) c[k2] = RKO_CFG[k2];
+  return c;
+}
 function renderRankOrg() {
   var el = document.getElementById('rko-corpo'); if (!el) return;
   if (!RKO.mes) RKO.mes = rkoMesAtual();
@@ -36917,23 +36938,34 @@ function renderRankOrg() {
     return;
   }
   RKO.espera = 0;
-  var D = rkoDados(RKO.mes), atual = rkoMesAtual(), adm = false; try { adm = ehAdm(); } catch (e2) {}
+  var chaveP = rkoChave(), D = rkoDados(chaveP), atual = rkoMesAtual(), adm = false; try { adm = ehAdm(); } catch (e2) {}
+  var cfg0 = RKO_CFG; if (D.custom) RKO_CFG = rkoCfgProporcional(D.dias / 30);   // metas proporcionais enquanto desenha
+  try {
   var ult = 0; (IGO.ped || []).forEach(function(p) { if (p.t && p.t > ult) ult = p.t; });
   var ultTxt = ult ? new Date(ult).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   var h = rkoAbasHtml() + '<div class="rko-topo"><div><span class="rko-eyebrow">Produção de conteúdo · ManyChat orgânico</span><h2>Ranking de leads orgânicos</h2>'
     + '<p>Quem comentou a palavra de cada um nos posts' + (ultTxt ? ' · último comentário lido em ' + ultTxt : '') + '</p></div>'
-    + '<div class="rko-acoes"><span class="rko-mes"><button type="button" onclick="rkoMudarMes(-1)" aria-label="Mês anterior">‹</button><b>' + rkoMesRot(RKO.mes) + '</b>'
+    + '<div class="rko-acoes"><span class="rko-mes"' + (D.custom ? ' style="opacity:.55"' : '') + '><button type="button" onclick="rkoMudarMes(-1)" aria-label="Mês anterior">‹</button><b>' + rkoMesRot(RKO.mes) + '</b>'
     + '<button type="button" onclick="rkoMudarMes(1)" aria-label="Próximo mês"' + (RKO.mes >= atual ? ' disabled' : '') + '>›</button></span>'
     + '<button type="button" class="btn" onclick="rkoAtualizar()"' + (RKO.lendo ? ' disabled' : '') + ' title="Lê os comentários dos posts agora">' + (RKO.lendo ? '⏳ Lendo os comentários…' : '↻ Atualizar') + '</button></div></div>';
-  if (RKO.mes < RKO_INICIO) h += '<div class="rko-aviso">O ranking começou em ' + rkoMesRot(RKO_INICIO) + '. Antes disso as palavras ainda não eram de cada pessoa, e “Plano”, “Zoom” e “Evento” não eram lidas: este mês serve só de referência.</div>';
+  var perB = function(on, txt, js) { return '<button type="button" class="chart-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="' + js + '">' + txt + '</button>'; }, pAt = RKO.per || 'mes';
+  h += '<div class="panel" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 12px;margin:0 0 12px"><span style="font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-right:4px">Período</span>'
+    + perB(pAt === 'mes' && RKO.mes === atual, 'Mês atual', "rkoPer('mesatual')") + (RKO.mes !== atual ? perB(pAt === 'mes', rkoMesRot(RKO.mes), "rkoPer('mes')") : '')
+    + perB(pAt === '30', '30 dias', "rkoPer('30')") + perB(pAt === '90', '90 dias', "rkoPer('90')") + perB(pAt === '180', '180 dias', "rkoPer('180')")
+    + '<span style="display:inline-flex;gap:6px;align-items:center;margin-left:6px;padding:3px 6px 3px 10px;border-radius:999px;border:1px solid ' + (pAt === 'custom' ? '#f6a350' : 'var(--border)') + '"><small style="color:var(--text2)">Personalizar</small>'
+    + '<input type="date" id="rko-de" value="' + (RKO.de || '') + '" style="background:transparent;color:var(--text);border:0;font:inherit;font-size:.74rem;color-scheme:dark"><small style="color:var(--text2)">até</small>'
+    + '<input type="date" id="rko-ate" value="' + (RKO.ate || '') + '" style="background:transparent;color:var(--text);border:0;font:inherit;font-size:.74rem;color-scheme:dark"><button type="button" class="chart-chip" onclick="rkoPerCustom()">Aplicar</button></span>'
+    + (D.custom ? '<small style="color:var(--text2);margin-left:auto">' + D.rot + ' · ' + D.dias + ' dias · metas proporcionais (' + (Math.round(D.dias / 30 * 10) / 10).toString().replace('.', ',') + '× a do mês)</small>' : '') + '</div>';
+  if (D.custom ? D.ini < EVO_INI_T : RKO.mes < RKO_INICIO) h += '<div class="rko-aviso">' + (D.custom ? 'Este período começa antes de ' + rkoMesRot(RKO_INICIO) + ', quando o ranking começou: até lá as palavras ainda não eram de cada pessoa, e “Plano”, “Zoom” e “Evento” não eram lidas. Use como referência.</div>' : 'O ranking começou em ' + rkoMesRot(RKO_INICIO) + '. Antes disso as palavras ainda não eram de cada pessoa, e “Plano”, “Zoom” e “Evento” não eram lidas: este mês serve só de referência.</div>');
   h += rkoGeralHtml(D);
-  if (RKO.mes === atual) { try { h += rkoProducaoHtml(); } catch (eP) {} }
+  if (!D.custom && RKO.mes === atual) { try { h += rkoProducaoHtml(); } catch (eP) {} }
   h += '<div class="rko-sec"><h3>Meta do time por funil</h3><span class="rko-meta">a régua enche até a meta G</span></div><div class="rko-funis">' + RKO_CFG.funis.map(function(f) { return rkoFunilHtml(D, f); }).join('') + '</div>';
-  try { h += rkoRitmoHtml(D); } catch (eRt) {}
+  if (!D.custom) { try { h += rkoRitmoHtml(D); } catch (eRt) {} }
   try { h += rkoPostsHtml2(D); } catch (ePs) { h += rkoPostsHtml(D); }
   h += rkoRegrasHtml(D);
   if (adm) { try { h += rkoHistoricoHtml(); } catch (e3) {} }
   h += '<div id="rko-evo"></div>';   // 📈 25/11/2026: desempenho ao longo do tempo (no fim da página)
+  } finally { RKO_CFG = cfg0; }
   el.innerHTML = h;
   try { rkoEvoRender(); } catch (eEv) { try { console.warn('rkoEvoRender', eEv); } catch (eC) {} }
   if (!window._evoRs) { window._evoRs = 1; var _evoT; window.addEventListener('resize', function() { clearTimeout(_evoT); _evoT = setTimeout(function() { try { if (telaVisivel('s-rankorg')) rkoEvoRender(); } catch (e) {} }, 150); }); }
