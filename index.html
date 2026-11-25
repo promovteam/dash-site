@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-2230';
+var VERSAO_DASH = '2026-11-25-2245';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -4298,21 +4298,23 @@ function vgConteudosRender() {
   try { carregarIGOrganico(); } catch (e) {}
   if (typeof IGO === 'undefined' || !IGO.carregado) { if (_vgCtdTent++ < 40) setTimeout(vgConteudosRender, 3000); return; }
   var D = null; try { D = rkoDados(rkoMesAtual()); } catch (e2) { return; }
+  var VF = typeof rkoVeFat === 'function' && rkoVeFat();   // 🔒 o faturamento do orgânico só para quem pode ver (a mesma lista do Ranking)
   if (!RKO_BIO.snaps && _vgCtdTent++ < 40) setTimeout(vgConteudosRender, 3000);
   var L = Object.keys(D.posts).map(function(k) { var P = D.posts[k]; return { P: P, leads: (P.n || 0) + (P.bioL || 0), fat: (P.fat || 0) + (P.bioF || 0) }; })
-    .filter(function(x) { return x.P.lk !== 'story' && x.leads > 0; }).sort(function(a, b) { return b.fat - a.fat || b.leads - a.leads; }).slice(0, 5);
+    .filter(function(x) { return x.P.lk !== 'story' && x.leads > 0; }).sort(function(a, b) { return (VF ? b.fat - a.fat : 0) || b.leads - a.leads; }).slice(0, 5);
   if (!L.length) { el.innerHTML = ''; return; }
   var tot = { n: 0, b: 0, f: 0 }; Object.keys(D.posts).forEach(function(k) { var P = D.posts[k]; tot.n += P.n || 0; tot.b += P.bioL || 0; tot.f += (P.fat || 0) + (P.bioF || 0); });
   el.innerHTML = '<div class="panel" style="margin-top:16px;padding:16px 18px">'
     + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h3 style="margin:0;font-size:.95rem">🎬 Conteúdos que mais trouxeram resultado · ' + rkoMesRot(D.chave) + '</h3>'
-    + '<span class="hint">' + rkoN(tot.n) + ' leads por comentário · ~' + rkoBioUm(tot.b) + ' pela bio · ' + rkoR(tot.f) + ' em vendas · <a href="#" onclick="event.preventDefault();var it=document.querySelector(\'.nav-item[data-s=rankorg]\');if(it)it.click();" style="color:#6ea8ff">ver o ranking</a></span></div>'
+    + '<span class="hint">' + rkoN(tot.n) + ' leads por comentário · ~' + rkoBioUm(tot.b) + ' pela bio' + (VF ? ' · ' + rkoR(tot.f) + ' em vendas' : '') + ' · <a href="#" onclick="event.preventDefault();var it=document.querySelector(\'.nav-item[data-s=rankorg]\');if(it)it.click();" style="color:#6ea8ff">ver o ranking</a></span></div>'
     + L.map(function(x, i) { var P = x.P, info = (IGO.postDe || {})[P.lk] || {}, leg = String(info.legenda || '').replace(/\s+/g, ' ').trim();
       var dt = info.date ? ('0' + info.date.getDate()).slice(-2) + '/' + ('0' + (info.date.getMonth() + 1)).slice(-2) : '', tp = info.tipo === 'VIDEO' ? '🎬' : info.tipo === 'CAROUSEL_ALBUM' ? '🖼️' : '📷';
       var prods = {}; Object.keys(P.prods || {}).forEach(function(k) { prods[k] = (prods[k] || 0) + P.prods[k]; }); Object.keys(P.bioProds || {}).forEach(function(k) { prods[k] = (prods[k] || 0) + P.bioProds[k]; });
       return '<a href="' + dspEsc(P.lk) + '" target="_blank" rel="noopener" style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:' + (i ? '1px solid var(--border)' : '0') + ';color:inherit;text-decoration:none">'
         + '<b style="width:22px;color:var(--text2)">' + (i + 1) + 'º</b><span style="flex:1;min-width:0"><b style="display:block;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tp + ' ' + dspEsc(leg ? leg.slice(0, 90) : 'post') + '</b>'
         + '<small style="color:var(--text2);font-size:.7rem">' + [dt, P.n ? '💬 ' + rkoN(P.n) + ' comentaram' + (P.mql ? ' · ' + P.mql + ' MQL' : '') : '', P.bioL >= .05 ? '🔗 ~' + rkoBioUm(P.bioL) + ' pela bio' : ''].filter(Boolean).join(' · ') + '</small>' + igmHtml(P.lk, true) + '</span>'
-        + '<span style="text-align:right;white-space:nowrap"><b style="color:' + (x.fat ? '#f6a350' : 'var(--text2)') + ';font-size:.9rem">' + (x.fat ? rkoR(x.fat) : '—') + '</b>' + (x.fat ? '<small style="display:block;font-size:.66rem;color:var(--text2)">' + dspEsc(rkoBioProdsTxt(prods)) + '</small>' : '') + '</span></a>';
+        + (VF ? '<span style="text-align:right;white-space:nowrap"><b style="color:' + (x.fat ? '#f6a350' : 'var(--text2)') + ';font-size:.9rem">' + (x.fat ? rkoR(x.fat) : '—') + '</b>' + (x.fat ? '<small style="display:block;font-size:.66rem;color:var(--text2)">' + dspEsc(rkoBioProdsTxt(prods)) + '</small>' : '') + '</span>'
+          : '<span style="text-align:right;white-space:nowrap"><b style="font-size:.9rem">' + rkoBioUm(x.leads) + '</b><small style="display:block;font-size:.66rem;color:var(--text2)">leads</small></span>') + '</a>';
     }).join('') + '<p class="hint" style="margin:8px 0 0;font-size:.68rem">💬 = comentou a palavra no post (certo). 🔗 = chegou pelo link da bio, dividido entre os posts ' + (RKO_BIO.fonte === 'cliques' ? 'pelos cliques na bio' : 'pelas visitas ao perfil') + ' daquela hora (estimativa).</p></div>';
 }
 function _igSeloBio(l, mini) {
@@ -36408,7 +36410,7 @@ function rkoProdVenda(x) {   // nome curto do produto vendido (planilha > formul
 }
 function rkoProdsTxt(o) { return Object.keys(o || {}).sort(function(a, b) { return o[b] - o[a]; }).map(function(k) { return (o[k] > 1 ? o[k] + '× ' : '') + k; }).join(' · '); }
 // 🔒 25/11/2026 (Bruno: "restrinja todos os números de faturamento na aba de ranking orgânico para PV, João, Rebeca, Bruno, Larissa Moya e Gabriel")
-var RKO_FAT_QUEM = ['PV', 'João', 'Bruno Pardim', 'Gabriel', 'Rebeca Zerpa', 'Rebeca', 'Larissa Moya', 'Larissa'];
+var RKO_FAT_QUEM = ['Adm', 'PV', 'João', 'Bruno Pardim', 'Gabriel', 'Rebeca Zerpa', 'Rebeca', 'Larissa Moya', 'Larissa'];   // 25/11/2026: + Admin (acesso "Adm")
 function rkoVeFat() {
   try { var lg = localStorage.getItem('v2Login'); if (lg === null) return typeof loginPrecisa === 'function' ? !loginPrecisa() : false; return RKO_FAT_QUEM.indexOf(lg) !== -1; } catch (e) { return false; }
 }
