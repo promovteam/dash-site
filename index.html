@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-1815';
+var VERSAO_DASH = '2026-11-25-1930';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -4311,7 +4311,7 @@ function vgConteudosRender() {
       var prods = {}; Object.keys(P.prods || {}).forEach(function(k) { prods[k] = (prods[k] || 0) + P.prods[k]; }); Object.keys(P.bioProds || {}).forEach(function(k) { prods[k] = (prods[k] || 0) + P.bioProds[k]; });
       return '<a href="' + dspEsc(P.lk) + '" target="_blank" rel="noopener" style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:' + (i ? '1px solid var(--border)' : '0') + ';color:inherit;text-decoration:none">'
         + '<b style="width:22px;color:var(--text2)">' + (i + 1) + 'º</b><span style="flex:1;min-width:0"><b style="display:block;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + tp + ' ' + dspEsc(leg ? leg.slice(0, 90) : 'post') + '</b>'
-        + '<small style="color:var(--text2);font-size:.7rem">' + [dt, P.n ? '💬 ' + rkoN(P.n) + ' comentaram' + (P.mql ? ' · ' + P.mql + ' MQL' : '') : '', P.bioL ? '🔗 ~' + rkoBioUm(P.bioL) + ' pela bio' : ''].filter(Boolean).join(' · ') + '</small></span>'
+        + '<small style="color:var(--text2);font-size:.7rem">' + [dt, P.n ? '💬 ' + rkoN(P.n) + ' comentaram' + (P.mql ? ' · ' + P.mql + ' MQL' : '') : '', P.bioL >= .05 ? '🔗 ~' + rkoBioUm(P.bioL) + ' pela bio' : ''].filter(Boolean).join(' · ') + '</small>' + igmHtml(P.lk, true) + '</span>'
         + '<span style="text-align:right;white-space:nowrap"><b style="color:' + (x.fat ? '#f6a350' : 'var(--text2)') + ';font-size:.9rem">' + (x.fat ? rkoR(x.fat) : '—') + '</b>' + (x.fat ? '<small style="display:block;font-size:.66rem;color:var(--text2)">' + dspEsc(rkoBioProdsTxt(prods)) + '</small>' : '') + '</span></a>';
     }).join('') + '<p class="hint" style="margin:8px 0 0;font-size:.68rem">💬 = comentou a palavra no post (certo). 🔗 = chegou pelo link da bio, dividido entre os posts ' + (RKO_BIO.fonte === 'cliques' ? 'pelos cliques na bio' : 'pelas visitas ao perfil') + ' daquela hora (estimativa).</p></div>';
 }
@@ -36164,36 +36164,73 @@ function rkoMesAndar(ch, n) { var d = new Date(+ch.slice(0, 4), +ch.slice(5, 7) 
 // Um lead pela bio entre a foto k e a k+1: peso do post = acumulado(k+1) − acumulado(k). Depois da última foto: usa a última janela.
 // =====================================================================================================
 var RKO_BIO = { snaps: null, fonte: '', ped: false, erro: '' };
+// 📊 IGM: os números de cada post no Instagram (a leitura mais recente) — código do post → { vw, al, cu, cm, sv, sh, pf, bio, tm, tipo, em }
+var IGM = {};
 function rkoBioCarregar() {
   if (RKO_BIO.snaps || RKO_BIO.ped) return; RKO_BIO.ped = true;
   var fim = function(sn, fonte) { RKO_BIO.ped = false; RKO_BIO.snaps = sn || []; RKO_BIO.fonte = fonte || ''; _rkoMemo = {};
     _rkoBioRatMemo = {}; _ctdIdx = null;
     try { if (typeof telaVisivel !== 'function' || telaVisivel('s-rankorg')) renderRankOrg(); } catch (e) {}
-    try { if (typeof telaVisivel === 'function' && telaVisivel('s-trafego') && typeof renderTrafego === 'function') renderTrafego(); } catch (e2) {} };
-  var montar = function(T, cT, cL, cV, hora) {   // agrupa as linhas por foto (momento) → { t, m: { link: acumulado } }
+    try { if (typeof telaVisivel === 'function' && telaVisivel('s-trafego') && typeof renderTrafego === 'function') renderTrafego(); } catch (e2) {}
+    try { vgConteudosRender(); } catch (e3) {} };
+  var vazio = function(x) { return x === null || x === undefined || x === ''; };
+  var data = function(d, hora) {
+    if (!(d instanceof Date)) { var m = String(d || '').match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/) || String(d || '').match(/(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?/);
+      if (!m) return null; d = m[1].length === 4 ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)); }
+    var t = d.getTime(); if (hora && !d.getHours() && !d.getMinutes()) t += hora * 3600e3; return t;
+  };
+  // agrupa as linhas por foto → { t, m: { código: peso medido | null (Reel: o Instagram não informa) }, v: { código: visualizações } }
+  var montar = function(T, cT, cL, cP, cV, hora) {
     var porT = {};
     T.rows.forEach(function(r) {
-      var d = r[cT]; if (!(d instanceof Date)) { var m = String(d || '').match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/) || String(d || '').match(/(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?/);
-        if (!m) return; d = m[1].length === 4 ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)); }
-      var t = d.getTime(); if (hora && !d.getHours() && !d.getMinutes()) t += hora * 3600e3;
-      var lk = rkoBioLink(r[cL]), v = +r[cV]; if (!lk || isNaN(v)) return;
-      var s = porT[t] || (porT[t] = { t: t, m: {} }); s.m[lk] = v;
+      var t = data(r[cT], hora), c = rkoBioLink(r[cL]); if (!t || !c) return;
+      var s = porT[t] || (porT[t] = { t: t, m: {}, v: {} });
+      s.m[c] = vazio(r[cP]) ? null : (+r[cP] || 0);
+      if (cV >= 0 && !vazio(r[cV])) s.v[c] = +r[cV] || 0;
     });
     return Object.keys(porT).map(function(k) { return porT[k]; }).sort(function(a, b) { return a.t - b.t; });
   };
+  var guardarNumeros = function(T, ix, hora) {   // a linha mais recente de cada post vira o número do post
+    var col = function(re) { return _ildIx(T, re); }, C = { t: col(ix.t), l: col(/^link$/), tipo: col(/^tipo$/), vw: col(/^visualiza/), al: col(/^alcance/), cu: col(/^curtidas/), cm: col(/^comentarios/),
+      sv: col(/^salvamentos/), sh: col(/^compartilhamentos/), pf: col(/^visitas ao perfil/), bio: col(/^cliques na bio/), tm: col(/^tempo medio/) };
+    if (C.l < 0) return;
+    T.rows.forEach(function(r) {
+      var c = rkoBioLink(r[C.l]); if (!c) return; var t = C.t >= 0 ? data(r[C.t], hora) || 0 : 0;
+      var o = IGM[c]; if (o && o.em > t) return;
+      o = IGM[c] = { em: t };
+      ['tipo', 'vw', 'al', 'cu', 'cm', 'sv', 'sh', 'pf', 'bio', 'tm'].forEach(function(k) { if (C[k] >= 0 && !vazio(r[C[k]])) o[k] = k === 'tipo' ? String(r[C[k]]) : +r[C[k]] || 0; });
+    });
+  };
   try {
-    _ildGv('sheet=' + encodeURIComponent('Bio por dia'), '', function(r) {
-      var T = null; try { T = _ildTab(r); } catch (e) {}
-      var cT = T ? _ildIx(T, /^quando$/) : -1, cL = T ? _ildIx(T, /^link$/) : -1, cB = T ? _ildIx(T, /^cliques na bio/) : -1;
-      if (T && cT >= 0 && cL >= 0 && cB >= 0) { var sn = montar(T, cT, cL, cB, 0); if (sn.length >= 2) { fim(sn, 'cliques'); return; } }
-      _ildGv('sheet=' + encodeURIComponent('Conteudo por dia'), '', function(r2) {
-        var T2 = null; try { T2 = _ildTab(r2); } catch (e2) {}
-        var c2T = T2 ? _ildIx(T2, /^data$/) : -1, c2L = T2 ? _ildIx(T2, /^link$/) : -1, c2V = T2 ? _ildIx(T2, /^visitas ao perfil/) : -1;
-        if (!T2 || c2T < 0 || c2L < 0 || c2V < 0) { RKO_BIO.erro = 'sem as abas "Bio por dia" e "Conteudo por dia"'; fim([], ''); return; }
-        fim(montar(T2, c2T, c2L, c2V, 7), 'visitas');
+    _ildGv('sheet=' + encodeURIComponent('Conteudo hoje'), '', function(rH) {   // os 40 posts mais recentes, 1 leitura por dia (fica por baixo da "Bio por dia")
+      try { var TH = _ildTab(rH); if (TH && _ildIx(TH, /^link$/) >= 0) guardarNumeros(TH, { t: /^conferido em/ }, 0); } catch (eH) {}
+      _ildGv('sheet=' + encodeURIComponent('Bio por dia'), '', function(r) {
+        var T = null; try { T = _ildTab(r); } catch (e) {}
+        var cT = T ? _ildIx(T, /^quando$/) : -1, cL = T ? _ildIx(T, /^link$/) : -1, cB = T ? _ildIx(T, /^cliques na bio/) : -1, cV = T ? _ildIx(T, /^visualiza/) : -1;
+        if (T && cL >= 0) { try { guardarNumeros(T, { t: /^quando$/ }, 0); } catch (eG) {} }
+        if (T && cT >= 0 && cL >= 0 && cB >= 0) { var sn = montar(T, cT, cL, cB, cV, 0); if (sn.length >= 2) { fim(sn, 'cliques'); return; } }
+        _ildGv('sheet=' + encodeURIComponent('Conteudo por dia'), '', function(r2) {
+          var T2 = null; try { T2 = _ildTab(r2); } catch (e2) {}
+          var c2T = T2 ? _ildIx(T2, /^data$/) : -1, c2L = T2 ? _ildIx(T2, /^link$/) : -1, c2P = T2 ? _ildIx(T2, /^visitas ao perfil/) : -1, c2V = T2 ? _ildIx(T2, /^visualiza/) : -1;
+          if (!T2 || c2T < 0 || c2L < 0 || c2P < 0) { RKO_BIO.erro = 'sem as abas "Bio por dia" e "Conteudo por dia"'; fim([], ''); return; }
+          fim(montar(T2, c2T, c2L, c2P, c2V, 7), 'visitas');
+        });
       });
     });
   } catch (e) { RKO_BIO.erro = String(e); fim([], ''); }
+}
+// 📊 a linha de números do Instagram de um post (a leitura mais recente: aba "Bio por dia", a cada 2h, ou "Conteudo hoje", 1x por dia)
+function igmNum(v) { v = +v || 0; return v >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mi' : v >= 1e4 ? Math.round(v / 1e3) + ' mil' : v >= 1e3 ? (v / 1e3).toFixed(1).replace('.', ',') + ' mil' : String(Math.round(v)); }
+function igmHtml(lk, curto) {
+  var o = IGM[rkoBioLink(lk)]; if (!o) return '';
+  var it = [], add = function(ic, v, rot) { if (v != null) it.push('<span title="' + rot + '">' + ic + ' ' + igmNum(v) + '</span>'); };
+  add('👁', o.vw, 'visualizações'); if (!curto) add('📣', o.al, 'alcance (contas diferentes)');
+  add('❤️', o.cu, 'curtidas'); add('💬', o.cm, 'comentários'); add('🔖', o.sv, 'salvamentos'); add('↗️', o.sh, 'compartilhamentos');
+  if (o.pf != null) add('👤', o.pf, 'visitas ao perfil'); if (o.bio != null && o.tipo !== 'VIDEO') add('🔗', o.bio, 'cliques no link da bio (medido pelo Instagram)');
+  if (o.tm) it.push('<span title="tempo médio assistido do Reel">⏱ ' + String(o.tm).replace('.', ',') + 's</span>');
+  if (!it.length) return '';
+  var quando = o.em ? new Date(o.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  return '<small class="igm" style="display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:2px;font-size:.68rem;color:var(--text2)" title="Números do Instagram' + (quando ? ' · lidos em ' + quando : '') + '">' + it.join('') + '</small>';
 }
 function rkoBioLink(v) { var m = String(v || '').match(/instagram\.com\/(?:[^\/]+\/)?(p|reel|tv)\/([A-Za-z0-9_-]+)/); return m ? m[2] : ''; }   // a chave é o código do post (p/ ou reel/ dão no mesmo)
 // os leads que chegaram pelo link da bio (orgânico, etiqueta "bio"): a base do site primeiro, a planilha de leads quando o site não respondeu
@@ -36204,13 +36241,26 @@ function rkoBioLeads() {
     .map(function(l) { return { t: l.date.getTime(), t8: l.tel8 || ldTel8(l.tel || ''), nome: l.nome, mql: rkoEhMql(l) }; });
 }
 // pesos de cada post para um momento t (null = sem foto que cubra)
+// pesos de cada post para um momento t (null = sem foto que cubra). Medido = o que o post ganhou de cliques (ou visitas) entre as
+// duas fotos. Reel (o Instagram não informa cliques nem visitas): ESTIMADO = visualizações que ganhou × a taxa dos posts medidos
+// naquela mesma janela (cliques por visualização). est[código] = true marca os estimados.
 function rkoBioPesos(t) {
   var sn = RKO_BIO.snaps || []; if (sn.length < 2 || t < sn[0].t) return null;
   var k = 0; while (k + 1 < sn.length && sn[k + 1].t <= t) k++;
   var a = k + 1 < sn.length ? sn[k] : sn[k - 1], b = k + 1 < sn.length ? sn[k + 1] : sn[k];   // depois da última foto: a última janela
-  var w = {}, tot = 0;
-  Object.keys(b.m).forEach(function(lk) { var d = b.m[lk] - (a.m[lk] || 0); if (d > 0) { w[lk] = d; tot += d; } });
-  return tot ? { w: w, tot: tot } : null;
+  return rkoBioJanela(a, b);
+}
+function rkoBioJanela(a, b) {
+  var w = {}, est = {}, tot = 0, sC = 0, sV = 0, reels = [], aTemV = Object.keys(a.v || {}).length > 0;   // a foto anterior sem visualizações (formato antigo): não estima
+  Object.keys(b.m).forEach(function(c) {
+    var dv = Math.max(0, (b.v[c] || 0) - ((a.v || {})[c] || 0));
+    if (b.m[c] === null) { if (dv > 0 && aTemV) reels.push([c, dv]); return; }
+    var d = b.m[c] - (a.m[c] || 0); if (d > 0) { w[c] = d; tot += d; sC += d; }
+    if (b.v[c] != null && (a.v || {})[c] != null) sV += dv;
+  });
+  var taxa = sV ? sC / sV : 0;
+  reels.forEach(function(x) { var e = x[1] * taxa; if (e > 0) { w[x[0]] = e; est[x[0]] = true; tot += e; } });
+  return tot ? { w: w, tot: tot, est: est, taxa: taxa } : null;
 }
 // o rateio de um período qualquer (o mês do Ranking, o período da Gestão de funis…): por código de post
 // { c: { cli, l, m, v, f, prods } } e os totais. Guardado enquanto as fotos, os leads e as vendas forem os mesmos.
@@ -36223,7 +36273,8 @@ function rkoBioRateio(ini, fim) {
   var po = function(c) { return R.c[c] || (R.c[c] = { cli: 0, l: 0, m: 0, v: 0, f: 0, prods: {} }); };
   var sn = RKO_BIO.snaps;
   for (var k = 0; k + 1 < sn.length; k++) { if (sn[k].t < ini || sn[k].t >= fim) continue;
-    Object.keys(sn[k + 1].m).forEach(function(c) { var d = sn[k + 1].m[c] - (sn[k].m[c] || 0); if (d > 0) { po(c).cli += d; R.cli += d; } }); }
+    var J = rkoBioJanela(sn[k], sn[k + 1]); if (!J) continue;
+    Object.keys(J.w).forEach(function(c) { var P = po(c); P.cli += J.w[c]; R.cli += J.w[c]; if (J.est[c]) { P.est = true; R.cliEst = (R.cliEst || 0) + J.w[c]; } }); }
   var vistos = {}, vdVista = {};
   LB.forEach(function(x) {
     if (x.t < ini || x.t >= fim) return;
@@ -36247,7 +36298,7 @@ function rkoBioAplicar(D, ini, fim) {
   Object.keys(R.c).forEach(function(c) {
     var x = R.c[c], P = porLk[c];
     if (!P) { var lk = rkoBioLkDe(c); P = porLk[c] = D.posts[lk] = D.posts[lk] || { lk: lk, n: 0, q: {}, f: {}, soBio: 1 }; }
-    P.bioCli = x.cli; P.bioL = x.l; P.bioM = x.m; P.bioV = x.v; P.bioF = x.f; P.bioProds = x.prods;
+    P.bioCli = x.cli; P.bioL = x.l; P.bioM = x.m; P.bioV = x.v; P.bioF = x.f; P.bioProds = x.prods; P.bioEst = !!x.est;
   });
 }
 function rkoBioLkDe(c) { var lk = 'https://www.instagram.com/p/' + c + '/'; (IGO.posts || []).some(function(q) { if (q.link && rkoBioLink(q.link) === c) { lk = q.link; return true; } return false; }); return lk; }
@@ -36303,9 +36354,9 @@ function conteudoDoLeadHtml(pe, modo) {
     if (!o.posts.length) return '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:#6ea8ff" title="Veio pelo link da bio, antes das primeiras medições dos posts">🔗 bio</span>';
     return '<span class="ld-tag" style="background:rgba(110,168,255,.12);color:#6ea8ff" title="Veio pelo link da bio. Post provável (rateio dos ' + (RKO_BIO.fonte === 'cliques' ? 'cliques na bio' : 'visitas ao perfil') + ' daquela hora): ' + dspEsc(o.posts.map(function(x) { return x.pct + '% ' + _ctdLeg(x.info, 40); }).join(' · ')) + '">🔗 ~' + dspEsc(_ctdLeg(o.posts[0].info, 24)) + ' ' + o.posts[0].pct + '%</span>';
   }
-  if (o.como === 'comentou') return '<span style="color:#3ddc97">💬 comentou no post</span> ' + link(o.posts[0], 60);
+  if (o.como === 'comentou') return '<span style="color:#3ddc97">💬 comentou no post</span> ' + link(o.posts[0], 60) + igmHtml(o.posts[0].info.lk, true);
   if (!o.posts.length) return '<span style="color:#6ea8ff">🔗 link da bio</span> <span class="hint">(antes das primeiras medições dos posts)</span>';
-  return '<span style="color:#6ea8ff">🔗 link da bio · provável:</span> ' + o.posts.map(function(x, i) { return link(x, i ? 30 : 50) + ' <b>' + x.pct + '%</b>'; }).join(' · ');
+  return '<span style="color:#6ea8ff">🔗 link da bio · provável:</span> ' + o.posts.map(function(x, i) { return link(x, i ? 30 : 50) + ' <b>' + x.pct + '%</b>'; }).join(' · ') + igmHtml(o.posts[0].info.lk, true);
 }
 function rkoBioUm(v) { return v >= 10 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toString().replace('.', ','); }
 function rkoBioProdsTxt(o) { return Object.keys(o || {}).sort(function(a, b) { return o[b] - o[a]; }).join(' · '); }
@@ -36319,12 +36370,12 @@ function rkoBioResumoHtml(D) {
     + (B.semPost ? '<span style="opacity:.75">' + rkoN(B.semPost) + ' lead' + (B.semPost === 1 ? '' : 's') + ' sem post para ratear (antes das primeiras medições)</span>' : '') + '</div>'
     + '<small style="display:block;margin-top:6px;font-size:.7rem;opacity:.75">O Instagram diz quantos clicaram a partir de cada post, mas não quem. Cada lead que chegou pela bio é dividido entre os posts conforme os ' + rot + ' que cada um ganhou naquela hora; por isso os números por post têm vírgula.'
     + (B.fonte === 'visitas' ? ' <b>Por enquanto o peso são as visitas ao perfil (1 medição por dia)</b>; com 2 fotos na aba “Bio por dia” (o robô tira uma a cada 2 horas), o rateio passa a usar os cliques na bio.' : '')
-    + ' <b>Reels ficam fora do rateio:</b> o Instagram não informa cliques na bio nem visitas ao perfil de vídeos, só de carrosséis e fotos. Para medir um Reel, peça para comentar a palavra (ManyChat).</small></div>';
+    + ' <b>Reels:</b> o Instagram não informa cliques na bio nem visitas ao perfil de vídeos. Eles entram com cliques <b>estimados pelas visualizações</b> que ganharam × a taxa de cliques dos carrosséis na mesma hora (marcados como estimados). Para medir um Reel com certeza, peça para comentar a palavra (ManyChat).</small></div>';
 }
 function rkoBioPostHtml(P) {
   if (!P.bioCli && !P.bioL) return '';
-  return '<small style="display:block;color:#6ea8ff;margin-top:2px" title="Rateio estimado dos leads que chegaram pelo link da bio">🔗 ' + rkoN(P.bioCli || 0) + (RKO_BIO.fonte === 'cliques' ? ' cliques na bio' : ' visitas ao perfil')
-    + (P.bioL ? ' · ~' + rkoBioUm(P.bioL) + ' lead' + (P.bioL >= 1.05 ? 's' : '') + (P.bioM ? ' · ~' + rkoBioUm(P.bioM) + ' MQL' : '') : '')
+  return '<small style="display:block;color:#6ea8ff;margin-top:2px" title="Rateio dos leads que chegaram pelo link da bio' + (P.bioEst ? '. Reel: o Instagram não informa cliques na bio de vídeo, então os cliques são estimados pelas visualizações que ele ganhou × a taxa de cliques dos carrosséis na mesma hora' : '') + '">🔗 ' + (P.bioEst ? '~' : '') + rkoN(Math.round(P.bioCli || 0)) + (RKO_BIO.fonte === 'cliques' ? ' cliques na bio' : ' visitas ao perfil') + (P.bioEst ? ' (estimado pelas visualizações)' : '')
+    + (P.bioL >= .05 ? ' · ~' + rkoBioUm(P.bioL) + ' lead' + (P.bioL >= 1.05 ? 's' : '') + (P.bioM >= .05 ? ' · ~' + rkoBioUm(P.bioM) + ' MQL' : '') : '')
     + (P.bioF ? ' · <b style="color:#f6a350">~' + rkoR(P.bioF) + '</b> ' + dspEsc(rkoBioProdsTxt(P.bioProds)) : '') + '</small>';
 }
 var _rkoVdIdx = null;
@@ -36536,7 +36587,7 @@ function rkoPostsHtml2(D) {
     var donos = Object.keys(P.q).sort(function(a, b) { return P.q[b] - P.q[a]; }), story = P.lk === 'story';
     h += (story ? '<div class="rko-post">' : '<a class="rko-post" href="' + dspEsc(P.lk) + '" target="_blank" rel="noopener">') + '<span class="rko-pos">' + (i + 1) + 'º</span>'
       + (story ? '<span class="rko-post-t"><b>📱 Respostas aos stories</b><small>no direct, com a palavra</small></span>'
-        : '<span class="rko-post-t"><b>' + dspEsc(leg ? leg.slice(0, 90) + (leg.length > 90 ? '…' : '') : 'Post sem legenda') + '</b><small>' + [dt, { video: 'vídeo', carrossel: 'carrossel', foto: 'foto' }[P.tipo] || ''].filter(Boolean).join(' · ') + '</small>' + rkoBioPostHtml(P) + '</span>')
+        : '<span class="rko-post-t"><b>' + dspEsc(leg ? leg.slice(0, 90) + (leg.length > 90 ? '…' : '') : 'Post sem legenda') + '</b><small>' + [dt, { video: 'vídeo', carrossel: 'carrossel', foto: 'foto' }[P.tipo] || ''].filter(Boolean).join(' · ') + '</small>' + igmHtml(P.lk) + rkoBioPostHtml(P) + '</span>')
       + '<span class="rko-post-q">' + donos.map(function(q) { return '<span class="rko-chip" style="--cor:' + RKO_CFG.pessoas[q].cor + '">' + rkoAvatar(q, 20) + dspEsc(RKO_CFG.pessoas[q].nome.split(' ')[0]) + ' <b>' + P.q[q] + '</b></span>'; }).join('') + '</span>'
       + '<span class="rko-conta" title="leads = comentaram a palavra · preencheram o formulário · MQL = marcou algum investimento"><b>' + rkoN(P.n) + '</b><small>lead' + (P.n === 1 ? '' : 's') + ' · ' + rkoN(P.base || 0) + ' form. · <b style="color:#3ddc97">' + rkoN(P.mql || 0) + ' MQL</b>' + (P.vend ? ' · <b style="color:#f6a350" title="' + dspEsc('Compraram depois de comentar: ' + (P.quemVd || []).join(', ')) + '">💰 ' + rkoR(P.fat) + '</b> <span style="color:#f6a350;opacity:.85">' + dspEsc(rkoProdsTxt(P.prods)) + '</span>' : '') + '</small></span>' + (story ? '</div>' : '</a>');
   });
@@ -43933,7 +43984,7 @@ function _trfPosts(D) {
 function _trfPostsBio(D) {
   // 🔗 25/11/2026: o rateio dos leads da bio (mesma conta do Ranking orgânico) entra em cada post do período
   var RB = null; try { rkoBioCarregar(); var PB = _trfPer(); RB = rkoBioRateio(PB.ini, PB.fim); } catch (eRb) {}
-  (D.z.posts || []).forEach(function(o) { var x = RB && RB.c[rkoBioLink(o.lk)]; o.bioL = x ? x.l : 0; o.bioM = x ? x.m : 0; o.bioF = x ? x.f : 0; o.bioV = x ? x.v : 0; o.bioProds = x ? x.prods : null; o.bioCli = x ? x.cli : 0; });
+  (D.z.posts || []).forEach(function(o) { var x = RB && RB.c[rkoBioLink(o.lk)]; o.bioEst = !!(x && x.est); o.bioL = x ? x.l : 0; o.bioM = x ? x.m : 0; o.bioF = x ? x.f : 0; o.bioV = x ? x.v : 0; o.bioProds = x ? x.prods : null; o.bioCli = x ? x.cli : 0; });
   var oB = TRF.ordB || 'pf', tudo = (D.z.posts || []).filter(function(o) { return o.pf > 0 || o.bioL > 0; }), tP = TRF.tipoP || '', vB = function(o) { return oB === 'taxa' ? (o.vw ? o.pf / o.vw : 0) : (o[oB] || 0); };
   var L = tudo.filter(function(o) { return !tP || o.tipo === tP; }).sort(function(a, b) { return vB(b) - vB(a) || b.pf - a.pf; }), tot = L.length; if (!TRF.todos) L = L.slice(0, 12);
   var tp = { VIDEO: '🎬 vídeo', CAROUSEL_ALBUM: '🖼️ carrossel', IMAGE: '📷 foto' }, falta = 0; window._trfPostsOrd = L;
@@ -43956,7 +44007,7 @@ function _trfPostsBio(D) {
     + ''
     + (h ? '<div class="an-grade" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;">' + h + '</div>' : '<p class="trf-nota">' + (D.semVw ? 'Lendo os posts do Instagram…' : tP ? 'Nenhum post deste tipo com idas ao perfil medidas.' : 'Nenhum post do período com idas ao perfil medidas.') + '</p>')
     + (tot > 12 ? '<button type="button" class="btn trf-mais" onclick="TRF.todos=!TRF.todos;renderTrafego()">' + (TRF.todos ? 'Mostrar só os 12 primeiros' : 'Ver os ' + tot + ' posts') + '</button>' : '')
-    + '<p class="trf-nota">Quem vem pela bio não comenta, então o Instagram não diz de qual post veio cada lead. <b>Leads, MQL e faturamento da bio são um rateio</b>: cada lead que chegou pela bio é dividido entre os posts conforme os ' + (RKO_BIO.fonte === 'cliques' ? 'cliques no link da bio' : 'visitas ao perfil (até o robô começar a gravar os cliques na bio)') + ' que cada post ganhou naquela hora — a mesma conta do Ranking orgânico. Reels não entram: o Instagram não informa cliques na bio nem visitas ao perfil de vídeos. Na ficha de cada lead aparece o post provável.</p></div>';
+    + '<p class="trf-nota">Quem vem pela bio não comenta, então o Instagram não diz de qual post veio cada lead. <b>Leads, MQL e faturamento da bio são um rateio</b>: cada lead que chegou pela bio é dividido entre os posts conforme os ' + (RKO_BIO.fonte === 'cliques' ? 'cliques no link da bio' : 'visitas ao perfil (até o robô começar a gravar os cliques na bio)') + ' que cada post ganhou naquela hora — a mesma conta do Ranking orgânico. Reels: o Instagram não informa cliques na bio nem visitas ao perfil de vídeos, então os cliques deles são estimados pelas visualizações (× a taxa dos carrosséis na mesma hora). Na ficha de cada lead aparece o post provável.</p></div>';
 }
 // janela do criativo de evento ou do MCP: o anúncio tocando (mesmo player da aba Criativos) e, ao lado, o funil dele
 function trfWsCriJanela(i) {
