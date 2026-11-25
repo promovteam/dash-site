@@ -44745,17 +44745,20 @@ function pvRender() {
     + (zpA ? '<div class="v2-cmp"><span class="v2-cmp-t">📅 ' + Pant.rot + '</span><div class="v2-cmp-v"><b>' + _trfN(zpA.comp) + '</b><small>apareceram</small>' + v2vs(zpH.comp, zpA.comp) + '</div></div>' : '')
     + (quem && quem !== 'De fechamento' && quem !== 'Sarah' ? '<div class="g-rows"><div class="g-row"><span>🎯 Faixa ' + fx[0] + '</span><b>' + (prox ? 'faltam ' + fx[1] + ' para ' + prox : 'máxima') + '</b></div></div>' : '<div class="g-rows"><div class="g-row"><span>⏳ Sem resultado lançado</span><b>' + _trfN(zp.pend) + '</b></div></div>')
     + '</div>';
+  // 25/11/2026 (Bruno: "o valor por que está diferente?" → "do dash oficial"): no time todo, sem filtro, o valor é o da Visão Geral (dash oficial)
+  var zOf = null; if (!quem && !PV.prod && !PV.fun && !PV.ori2) { try { zOf = _trfCloZ(P); } catch (eOf) { zOf = null; } }
+  var zV = zOf ? { valor: zOf.valor || 0, pag: zOf.pag || 0, L: zOf.L } : zp;
   h += '<div class="glass click" role="button" tabindex="0" style="--halo:rgba(61,220,151,.18);--tint:#3ddc97;" onclick="pvLista(\'pagP\')">'
-    + '<div class="g-label">💰 Vendas ' + (quem ? 'das minhas reuniões' : 'das reuniões da pré-venda') + '</div><div class="g-value money">' + (okV ? _trfRs(zp.valor || 0) : '…') + '</div>'
-    + '<div class="g-sub"><b>' + _trfN(zp.pag) + ' vendas</b> · ' + pc(zp.pag, zp.comp) + ' de quem apareceu</div>'
+    + '<div class="g-label">💰 Vendas ' + (quem ? 'das minhas reuniões' : zOf ? 'do mês (igual à Visão Geral)' : 'das reuniões da pré-venda') + '</div><div class="g-value money">' + (okV ? _trfRs(zV.valor || 0) : '…') + '</div>'
+    + '<div class="g-sub"><b>' + _trfN(zV.pag) + ' vendas</b> · ' + pc(zV.pag, zp.comp) + ' de quem apareceu</div>'
     + (function() { // 24/11/2026 (Bruno: "cadê o restante do valor?"): quanto cada produto vendeu e, no time todo sem filtro, a conta que fecha com a Visão Geral
-        var vs = (zp.L.pagP || []), soma = function(re, nao) { var q = vs.filter(function(r) { var pr = String(r.produto || ''); return nao ? !/spark|growth/i.test(pr) : re.test(pr); }); return [q.length, q.reduce(function(t, r) { return t + (r.valor || 0); }, 0)]; };
+        var vs = (zV.L.pagP || []), soma = function(re, nao) { var q = vs.filter(function(r) { var pr = String(r.produto || ''); return nao ? !/spark|growth/i.test(pr) : re.test(pr); }); return [q.length, q.reduce(function(t, r) { return t + (r.valor || 0); }, 0)]; };
         var sp = soma(/spark/i), gr = soma(/growth/i), lg = soma(null, true), lin = function(ic, n, q) { return '<div class="g-row"><span>' + ic + ' ' + n + ' <small style="opacity:.6">' + _trfN(q[0]) + '</small></span><b>' + (q[1] ? _trfRs(q[1]) : '—') + '</b></div>'; };
         var h2 = '<div class="g-rows">' + lin('⚡', 'Spark', sp) + lin('🚀', 'Growth', gr) + lin('📘', 'Legado', lg) + '</div>';
-        if (!quem && !PV.prod && !PV.fun && !PV.ori2) { try { var zg = _trfCloZ(P), ids = vs, fora = {}; (zg.L.pagP || []).forEach(function(r) { if (ids.indexOf(r) !== -1) return; var k = String(r.sdr || 'sem SDR').replace(/^(SS|SDR)\s+/i, ''); fora[k] = (fora[k] || 0) + (r.valor || 0); });
+        if (zOf) { try { var zg = zOf, ids = (zp.L.pagP || []), fora = {}; (zg.L.pagP || []).forEach(function(r) { if (ids.indexOf(r) !== -1) return; var k = String(r.sdr || 'sem SDR').replace(/^(SS|SDR)\s+/i, ''); fora[k] = (fora[k] || 0) + (r.valor || 0); });
           var fk = Object.keys(fora).filter(function(k) { return fora[k]; });
-          h2 += '<div style="margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);font-size:.72rem;line-height:1.5;color:var(--text2)">📊 <b>Visão Geral do mês: ' + _trfRs(zg.valor || 0) + '</b> (' + _trfN(zg.pag) + ' vendas)'
-            + (zg.valor - (zp.valor || 0) > 0 ? '<br>fora da pré-venda: <b>' + _trfRs(zg.valor - (zp.valor || 0)) + '</b>' + (fk.length ? ' · ' + fk.map(function(k) { return _trfE(k) + ' ' + _trfRs(fora[k]); }).join(' · ') : '') : '<br>✓ tudo da Visão Geral passou pela pré-venda') + '</div>'; } catch (eZg) {} }
+          h2 += '<div style="margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);font-size:.72rem;line-height:1.5;color:var(--text2)">👥 <b>Dos SDRs: ' + _trfRs(zp.valor || 0) + '</b> (' + _trfN(zp.pag) + ' vendas)'
+            + (zg.valor - (zp.valor || 0) > 0 ? '<br>sem SDR da lista na planilha: <b>' + _trfRs(zg.valor - (zp.valor || 0)) + '</b>' + (fk.length ? ' · ' + fk.map(function(k) { return _trfE(k) + ' ' + _trfRs(fora[k]); }).join(' · ') : '') : '<br>✓ tudo da Visão Geral passou pela pré-venda') + '</div>'; } catch (eZg) {} }
         return h2; })()
     + '</div>';
   h += '</div>';
