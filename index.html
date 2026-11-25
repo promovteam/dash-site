@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-25-2015';
+var VERSAO_DASH = '2026-11-25-2130';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -36667,6 +36667,149 @@ function rkoPostsHtml(D) {
   });
   return h + '</div>';
 }
+// =====================================================================================================
+// 📈 DESEMPENHO AO LONGO DO TEMPO (25/11/2026 · Bruno: "MQL só de carrossel e só de vídeo, leads A e B, faturamento por tipo,
+// por criador e por palavra-chave, ao longo do ano · padrão o ano todo · mês corrente, 30, 90, 180 dias e mês avulso").
+// Uma métrica por vez (mesma escala) e as linhas quebradas por tipo de post, criador ou palavra. Base: quem comentou a palavra
+// (IG Pedidos) — cada pessoa conta uma vez por funil em cada pedaço do gráfico (dia, semana ou mês). Venda = a mesma do Ranking
+// (comprou no dia do comentário ou depois), uma vez no período. Com "＋ bio", entra o rateio do link da bio por tipo e criador.
+// =====================================================================================================
+var EVO_INI_T = new Date(+RKO_INICIO.slice(0, 4), +RKO_INICIO.slice(5, 7) - 1, 1).getTime();   // quando as palavras passaram a ser de cada criador
+var EVO = { per: 'ano', mes: '', met: 'fat', dim: 'tipo', bio: true, X: {} };
+var EVO_MET = [['n', '💬 Leads'], ['mql', '🏅 MQL'], ['ab', '⭐ Leads A e B'], ['vd', '🛒 Vendas'], ['fat', '💰 Faturamento']];
+var EVO_DIM = [['tipo', 'Tipo de post'], ['q', 'Criador'], ['pal', 'Palavra-chave'], ['tot', 'Total']];
+var EVO_COR_TIPO = { carrossel: '#6ea8ff', video: '#e2647a', foto: '#ffd166', story: '#b98aff', outro: '#9aa3b2' };
+var EVO_ROT_TIPO = { carrossel: '🖼️ Carrossel', video: '🎬 Vídeo', foto: '📷 Foto', story: '📱 Story', outro: 'Outros' };
+function evoPeriodo() {
+  var h = new Date(), h0 = new Date(h.getFullYear(), h.getMonth(), h.getDate()).getTime(), dia = 864e5, fim = h0 + dia;
+  if (EVO.per === 'mesatual') return { ini: new Date(h.getFullYear(), h.getMonth(), 1).getTime(), fim: fim, pedaco: 'dia', rot: 'o mês atual' };
+  if (EVO.per === '30') return { ini: h0 - 29 * dia, fim: fim, pedaco: 'dia', rot: 'os últimos 30 dias' };
+  if (EVO.per === '90') return { ini: h0 - 89 * dia, fim: fim, pedaco: 'semana', rot: 'os últimos 90 dias' };
+  if (EVO.per === '180') return { ini: h0 - 179 * dia, fim: fim, pedaco: 'semana', rot: 'os últimos 180 dias' };
+  if (EVO.per === 'mes' && EVO.mes) { var a = +EVO.mes.slice(0, 4), m = +EVO.mes.slice(5, 7); return { ini: new Date(a, m - 1, 1).getTime(), fim: Math.min(new Date(a, m, 1).getTime(), fim), pedaco: 'dia', rot: rkoMesRot(EVO.mes) }; }
+  return { ini: new Date(h.getFullYear(), 0, 1).getTime(), fim: fim, pedaco: 'mes', rot: 'o ano de ' + h.getFullYear() };
+}
+// os pedaços (eixo x) do período
+function evoPedacos(P) {
+  var L = [], d = new Date(P.ini), M = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  var dm = function(x) { return ('0' + x.getDate()).slice(-2) + '/' + ('0' + (x.getMonth() + 1)).slice(-2); };
+  while (d.getTime() < P.fim) {
+    var prox = P.pedaco === 'mes' ? new Date(d.getFullYear(), d.getMonth() + 1, 1) : new Date(d.getFullYear(), d.getMonth(), d.getDate() + (P.pedaco === 'semana' ? 7 : 1));
+    L.push({ ini: d.getTime(), fim: Math.min(prox.getTime(), P.fim), rot: P.pedaco === 'mes' ? M[d.getMonth()] : dm(d) });
+    d = prox;
+  }
+  return L;
+}
+function evoPalavra(f, q) { var F = RKO_CFG.funis.filter(function(x) { return x.k === f; })[0]; var d = F && F.de.filter(function(x) { return x.q === q; })[0]; return d ? d.palavra : (F ? F.nome : f); }
+// a conta: dados[chave da linha][pedaço] = { n, mql, ab, vd, fat } + totais por linha
+function evoDados(P, PD) {
+  var ref = P.ini + '|' + P.fim + '|' + P.pedaco + '|' + (IGO.ped || []).length + '|' + (LD.rows || []).length + '|' + rkoVendaIdx().L.length + '|' + EVO.bio + '|' + ((RKO_BIO.snaps || []).length);
+  if (EVO._ref === ref) return EVO._dados;
+  var Z = function() { return { n: 0, mql: 0, ab: 0, vd: 0, fat: 0, prods: {} }; };
+  var R = { tipo: {}, q: {}, pal: {}, tot: {} }, T = { tipo: {}, q: {}, pal: {}, tot: {} }, nP = PD.length;
+  var cel = function(dim, k, i) { var a = R[dim][k] || (R[dim][k] = []); while (a.length < nP) a.push(Z()); if (!T[dim][k]) T[dim][k] = Z(); return [a[i], T[dim][k]]; };
+  var idxDe = function(t) { for (var i = 0; i < nP; i++) if (t >= PD[i].ini && t < PD[i].fim) return i; return -1; };
+  var visto = {}, vdVista = {}, I = rkoVendaIdx();
+  (IGO.ped || []).forEach(function(p) {
+    if (p.t == null || p.t < P.ini || p.t >= P.fim) return;
+    var d = rkoDono(p.x, p.i); if (!d) return;
+    var i = idxDe(p.t); if (i < 0) return;
+    var k = i + '|' + d.f + '|' + p.u; if (visto[k]) return; visto[k] = 1;   // a pessoa conta uma vez por funil em cada pedaço
+    var l = null; try { l = igLeadPorInsta(p.u); } catch (e) {}
+    var mql = l ? rkoEhMql(l) : false, ab = false; try { var c = l && classeDoLead(l); ab = !!(c && (c.classe === 'A' || c.classe === 'B')); } catch (e2) {}
+    var iv = -1; try { iv = rkoVendaDe(p.u, l, p.t); } catch (e3) {}
+    var vx = iv >= 0 && !vdVista[iv] ? I.L[iv] : null; if (vx) vdVista[iv] = 1;
+    var tipo = rkoTipoPost(p.lk), chaves = [['tipo', tipo], ['q', p.t < EVO_INI_T ? 'antes' : d.q], ['pal', evoPalavra(d.f, d.q)], ['tot', 'Total']];   // antes do ranking a palavra não era de ninguém
+    chaves.forEach(function(ch) { cel(ch[0], ch[1], i).forEach(function(z) { z.n++; if (mql) z.mql++; if (ab) z.ab++; if (vx) { z.vd++; z.fat += vx.valor || 0; var pr = rkoProdVenda(vx); z.prods[pr] = (z.prods[pr] || 0) + 1; } }); });
+  });
+  // ＋ bio: o rateio do link da bio entra por tipo de post, criador e total (não tem palavra-chave: quem vem pela bio não comenta)
+  if (EVO.bio && RKO_BIO.snaps && RKO_BIO.snaps.length) {
+    PD.forEach(function(pd, i) {
+      var RB = rkoBioRateio(pd.ini, pd.fim);
+      Object.keys(RB.c).forEach(function(c) {
+        var x = RB.c[c], lk = rkoBioLkDe(c), P2 = { lk: lk, q: {} }, tipo = rkoTipoPost(lk), dono = pd.ini < EVO_INI_T ? 'antes' : rkoDonoP(P2);
+        [['tipo', tipo], ['q', dono], ['tot', 'Total']].forEach(function(ch) { if (!ch[1]) return; cel(ch[0], ch[1], i).forEach(function(z) { z.n += x.l; z.mql += x.m; z.vd += x.v; z.fat += x.f; z.bio = (z.bio || 0) + x.l; }); });
+      });
+    });
+  }
+  EVO._ref = ref; EVO._dados = { R: R, T: T };
+  return EVO._dados;
+}
+function evoLinhas(D) {
+  var dim = EVO.dim, ks = Object.keys(D.R[dim]);
+  if (dim === 'q') ks = Object.keys(RKO_CFG.pessoas).filter(function(q) { return D.R.q[q]; }).concat(D.R.q.antes ? ['antes'] : []);
+  if (dim === 'pal') { var ordem = []; RKO_CFG.funis.forEach(function(f) { f.de.forEach(function(d) { if (ordem.indexOf(d.palavra) < 0) ordem.push(d.palavra); }); }); ks = ordem.filter(function(p) { return D.R.pal[p]; }).concat(ks.filter(function(p) { return ordem.indexOf(p) < 0; })); }
+  if (dim === 'tipo') ks = ['carrossel', 'video', 'foto', 'story', 'outro'].filter(function(t) { return D.R.tipo[t]; });
+  var PAL_COR = ['#e2647a', '#6ea8ff', '#3ddc97', '#ffd166', '#b98aff', '#22d3ee', '#f6a350', '#a3e635', '#f9a8d4', '#cbd5e1'];
+  return ks.map(function(k, j) {
+    var cor = dim === 'tipo' ? EVO_COR_TIPO[k] : k === 'antes' ? '#7c8596' : dim === 'q' ? RKO_CFG.pessoas[k].cor : dim === 'tot' ? '#f6a350' : PAL_COR[j % PAL_COR.length];
+    var rot = dim === 'tipo' ? EVO_ROT_TIPO[k] : k === 'antes' ? 'Antes do ranking (sem dono)' : dim === 'q' ? RKO_CFG.pessoas[k].nome : k;
+    return { k: dim + ':' + k, rot: rot, cor: cor, d: D.R[dim][k], t: D.T[dim][k] };
+  });
+}
+function evoFmt(v) { return EVO.met === 'fat' ? rkoR(v) : (Math.round(v * 10) / 10).toLocaleString('pt-BR'); }
+function evoSet(k, v) { EVO[k] = v; if (k === 'per' && v !== 'mes') EVO.mes = ''; rkoEvoRender(); }
+function evoMes(v) { EVO.per = 'mes'; EVO.mes = v; rkoEvoRender(); }
+function evoTog(k) { if (EVO.X[k]) delete EVO.X[k]; else EVO.X[k] = 1; rkoEvoRender(); }
+function rkoEvoRender() {
+  var el = document.getElementById('rko-evo'); if (!el) return;
+  if (!IGO.carregado) { el.innerHTML = ''; return; }
+  var P = evoPeriodo(), PD = evoPedacos(P), D = evoDados(P, PD), L = evoLinhas(D), V = L.filter(function(z) { return !EVO.X[z.k]; });
+  var chip = function(on, txt, js) { return '<button type="button" class="chart-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" onclick="' + js + '">' + txt + '</button>'; };
+  var rotL = function(t) { return '<span style="font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);min-width:92px">' + t + '</span>'; };
+  var meses = []; for (var dm = new Date(2026, 6, 1); dm <= new Date(); dm = new Date(dm.getFullYear(), dm.getMonth() + 1, 1)) meses.push(dm.getFullYear() + '-' + ('0' + (dm.getMonth() + 1)).slice(-2));
+  var h = '<div class="rko-sec"><h3>📈 Desempenho ao longo do tempo</h3><span class="rko-meta">' + P.rot + ' · por ' + ({ mes: 'mês', semana: 'semana', dia: 'dia' })[P.pedaco] + ' · clique numa linha da legenda para esconder ou mostrar</span></div>'
+    + '<div class="panel" style="padding:14px 16px">'
+    + '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' + rotL('Período') + [['ano', 'Ano todo'], ['mesatual', 'Mês atual'], ['30', '30 dias'], ['90', '90 dias'], ['180', '180 dias']].map(function(o) { return chip(EVO.per === o[0], o[1], "evoSet('per','" + o[0] + "')"); }).join('')
+    + '<select onchange="if(this.value)evoMes(this.value)" style="background:var(--panel2);color:var(--text);border:1px solid ' + (EVO.per === 'mes' ? '#f6a350' : 'var(--border)') + ';border-radius:999px;padding:6px 10px;font:inherit;font-size:.74rem"><option value="">Mês avulso…</option>'
+    + meses.reverse().map(function(m) { return '<option value="' + m + '"' + (EVO.mes === m ? ' selected' : '') + '>' + rkoMesRot(m) + '</option>'; }).join('') + '</select></div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' + rotL('Métrica') + EVO_MET.map(function(o) { return chip(EVO.met === o[0], o[1], "evoSet('met','" + o[0] + "')"); }).join('') + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' + rotL('Linhas por') + EVO_DIM.map(function(o) { return chip(EVO.dim === o[0], o[1], "evoSet('dim','" + o[0] + "')"); }).join('')
+    + (EVO.dim !== 'pal' ? chip(EVO.bio, '＋ link da bio (rateio)', "evoSet('bio'," + !EVO.bio + ")") : '<small style="color:var(--text2);font-size:.7rem">palavra-chave = só quem comentou (a bio não tem palavra)</small>') + '</div></div>';
+  // legenda
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.78rem;margin:4px 0 6px">' + L.map(function(z) {
+    return '<button type="button" onclick="evoTog(\'' + z.k.replace(/'/g, "\\'") + '\')" aria-pressed="' + !EVO.X[z.k] + '" style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;' + (EVO.X[z.k] ? 'opacity:.38;text-decoration:line-through' : '') + '"><i style="width:10px;height:10px;border-radius:50%;background:' + z.cor + ';display:inline-block"></i>' + dspEsc(z.rot) + ' <b style="color:var(--text2);font-weight:600">' + evoFmt(z.t[EVO.met] || 0) + '</b></button>';
+  }).join('') + '</div><div id="rko-evo-g" style="position:relative;touch-action:pan-y"></div>';
+  // tabela de cruzamento
+  var tot = D.T.tot.Total || { n: 0, mql: 0, ab: 0, vd: 0, fat: 0 };
+  h += '<div style="overflow-x:auto;margin-top:12px"><table class="rko-tab" style="width:100%;font-variant-numeric:tabular-nums"><thead><tr><th style="text-align:left">' + (EVO_DIM.filter(function(o) { return o[0] === EVO.dim; })[0][1]) + '</th><th>Leads</th><th>MQL</th><th>% MQL</th><th>A e B</th><th>Vendas</th><th>Faturamento</th><th>% do faturamento</th><th>R$ por lead</th><th>R$ por MQL</th><th>Lead → venda</th><th>Ticket médio</th><th>Produtos</th></tr></thead><tbody>'
+    + L.map(function(z) { var t = z.t;
+      return '<tr><td style="text-align:left"><i style="width:9px;height:9px;border-radius:50%;background:' + z.cor + ';display:inline-block;margin-right:6px"></i>' + dspEsc(z.rot) + '</td><td>' + rkoBioUm(t.n) + '</td><td>' + rkoBioUm(t.mql) + '</td><td>' + (t.n ? Math.round(t.mql / t.n * 100) + '%' : '–') + '</td><td>' + rkoN(t.ab) + '</td><td>' + rkoBioUm(t.vd) + '</td>'
+        + '<td><b style="color:#f6a350">' + rkoR(t.fat) + '</b></td><td>' + (tot.fat ? Math.round(t.fat / tot.fat * 100) + '%' : '–') + '</td><td>' + (t.n ? rkoR(t.fat / t.n) : '–') + '</td><td>' + (t.mql ? rkoR(t.fat / t.mql) : '–') + '</td>'
+        + '<td>' + (t.n ? (Math.round(t.vd / t.n * 1000) / 10).toString().replace('.', ',') + '%' : '–') + '</td><td>' + (t.vd ? rkoR(t.fat / t.vd) : '–') + '</td><td style="text-align:left;font-size:.7rem;color:var(--text2)">' + dspEsc(rkoProdsTxt(t.prods)) + '</td></tr>'; }).join('')
+    + '</tbody></table></div>'
+    + '<p class="rko-meta" style="margin:8px 0 0">Leads = pessoas que comentaram a palavra (uma vez por funil em cada ' + ({ mes: 'mês', semana: 'semana', dia: 'dia' })[P.pedaco] + '). A e B = nota do lead. Venda = comprou no dia do comentário ou depois (uma vez no período)'
+    + (EVO.bio && EVO.dim !== 'pal' ? '; com “＋ link da bio”, entra o rateio dos leads que chegaram pela bio (estimativa, com vírgula)' : '') + '. Os comentários são lidos desde ' + (function() { var m = Infinity; (IGO.ped || []).forEach(function(p) { if (p.t && p.t > 1577836800000 && p.t < m) m = p.t; }); return m < Infinity ? new Date(m).toLocaleDateString('pt-BR') : '—'; })() + '; antes disso o gráfico fica em zero.' + (EVO.dim === 'q' ? ' Por criador: as palavras passaram a ser de cada pessoa em ' + rkoMesRot(RKO_INICIO) + '; o que veio antes aparece como “Antes do ranking (sem dono)”.' : '') + '</p></div>';
+  el.innerHTML = h;
+  evoGrafico(PD, V);
+}
+function evoGrafico(PD, V) {
+  var el = document.getElementById('rko-evo-g'); if (!el) return;
+  var W = el.clientWidth || 700, tel = W < 560, H = tel ? 260 : 320, l = 66, r = 16, t = 14, b = 26, n = PD.length, met = EVO.met;
+  var max = 0; V.forEach(function(z) { z.d.forEach(function(c) { if ((c[met] || 0) > max) max = c[met]; }); });
+  var passo = function(v) { var p = Math.pow(10, Math.floor(Math.log10(v || 1))), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
+  var top = max ? passo(max / 4) * 4 : 4, x = function(i) { return n > 1 ? l + i * (W - l - r) / (n - 1) : (l + W - r) / 2; }, y = function(v) { return t + (H - t - b) * (1 - v / top); };
+  var s = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Evolução da métrica escolhida">';
+  for (var g = 0; g <= 4; g++) { var gv = top / 4 * g, gy = y(gv); s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + gy + '" y2="' + gy + '" stroke="rgba(255,255,255,.08)"/><text x="' + (l - 8) + '" y="' + (gy + 4) + '" text-anchor="end" style="font-size:11px;fill:var(--text2)">' + (met === 'fat' ? (gv >= 1000 ? Math.round(gv / 1000) + 'k' : gv) : Math.round(gv)) + '</text>'; }
+  var cada = Math.max(1, Math.ceil(n / (tel ? 6 : 12)));
+  PD.forEach(function(p, i) { if (i % cada === 0 || i === n - 1) s += '<text x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="middle" style="font-size:11px;fill:var(--text2)">' + p.rot + '</text>'; });
+  V.forEach(function(z) {
+    s += '<polyline fill="none" stroke="' + z.cor + '" stroke-width="2" stroke-linejoin="round" points="' + z.d.map(function(c, i) { return x(i) + ',' + y(c[met] || 0); }).join(' ') + '"/>';
+    if (n <= 40) s += z.d.map(function(c, i) { return '<circle cx="' + x(i) + '" cy="' + y(c[met] || 0) + '" r="2.8" fill="' + z.cor + '"/>'; }).join('');
+  });
+  el.innerHTML = s + '<line class="g" y1="' + t + '" y2="' + (H - b) + '" stroke="rgba(255,255,255,.35)" stroke-dasharray="3 3" visibility="hidden"/></svg><div class="evo-tip" hidden style="position:absolute;top:4px;background:var(--panel2);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;font-size:.76rem;pointer-events:none;white-space:nowrap;z-index:3;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>';
+  var gl = el.querySelector('.g'), tip = el.querySelector('.evo-tip');
+  el.onpointermove = function(e) {
+    var i = n > 1 ? Math.max(0, Math.min(n - 1, Math.round((e.clientX - el.getBoundingClientRect().left - l) / ((W - l - r) / (n - 1))))) : 0;
+    gl.setAttribute('x1', x(i)); gl.setAttribute('x2', x(i)); gl.setAttribute('visibility', 'visible'); tip.hidden = false;
+    tip.innerHTML = '<b>' + PD[i].rot + '</b>' + V.slice().sort(function(a, b2) { return (b2.d[i][met] || 0) - (a.d[i][met] || 0); }).map(function(z) { var c = z.d[i];
+      return '<div style="display:flex;gap:8px;align-items:center;margin-top:3px"><i style="width:9px;height:9px;border-radius:50%;background:' + z.cor + ';display:inline-block"></i>' + dspEsc(z.rot) + ' <b style="margin-left:auto;padding-left:10px">' + evoFmt(c[met] || 0) + '</b>'
+        + (met === 'fat' && c.vd ? ' <small style="color:var(--text2)">' + rkoBioUm(c.vd) + ' venda' + (c.vd >= 1.05 ? 's' : '') + '</small>' : met !== 'n' && c.n ? ' <small style="color:var(--text2)">de ' + rkoBioUm(c.n) + ' leads</small>' : '') + '</div>'; }).join('');
+    var w = tip.offsetWidth; tip.style.left = Math.max(0, x(i) + 10 + w > W ? x(i) - 10 - w : x(i) + 10) + 'px';
+  };
+  el.onpointerleave = function() { gl.setAttribute('visibility', 'hidden'); tip.hidden = true; };
+}
 // 💰 25/11/2026 (Bruno: "o faturamento por cada um desses criadores de conteúdo do nosso time"): comentários (venda de quem comentou a palavra
 // da pessoa) + o rateio do link da bio nos posts dela (dono do post = quem mais teve a palavra comentada nele; sem comentários, a palavra da legenda)
 function rkoFatPorPessoa(D) {
@@ -36781,7 +36924,10 @@ function renderRankOrg() {
   try { h += rkoPostsHtml2(D); } catch (ePs) { h += rkoPostsHtml(D); }
   h += rkoRegrasHtml(D);
   if (adm) { try { h += rkoHistoricoHtml(); } catch (e3) {} }
+  h += '<div id="rko-evo"></div>';   // 📈 25/11/2026: desempenho ao longo do tempo (no fim da página)
   el.innerHTML = h;
+  try { rkoEvoRender(); } catch (eEv) { try { console.warn('rkoEvoRender', eEv); } catch (eC) {} }
+  if (!window._evoRs) { window._evoRs = 1; var _evoT; window.addEventListener('resize', function() { clearTimeout(_evoT); _evoT = setTimeout(function() { try { if (telaVisivel('s-rankorg')) rkoEvoRender(); } catch (e) {} }, 150); }); }
 }
 // ===== 📈 SEGUIDORES (16/10/2026 · Bruno: "painel de crescimento de seguidores diários na aba orgânica, por dia, comparado com
 // outros meses e quem sabe outros dias com filtros, e o pacing de quanto vai ganhar no mês se continuar nesse ritmo" · "quero ver
