@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-26-1100';
+var VERSAO_DASH = '2026-11-26-1130';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46187,7 +46187,7 @@ try { viMostrarMenu(); } catch (eViM2) {}
 
 <!-- 📈 desempenho-anual:inicio (25/11/2026 · Bruno: "nova aba Desempenho Anual, com o gráfico do desempenho anual de vendas, filtro por mês, ligar e desligar as linhas e as métricas do período") -->
 <style>
-#s-anual{--a0:#60a5fa;--a1:#fbbf24;--a2:#34d399;--a3:#c084fc;--a4:#fb7185;--a5:#cbd5e1;--a6:#22d3ee;--a7:#e0a876;--a8:#a3e635;--a9:#e879f9;--a10:#fca5a5;--a11:#93c5fd;--a12:#ffffff;--a13:#5eead4;--a14:#f9a8d4;--a15:#fde047;--a16:#fb923c;--a17:#38bdf8;--a18:#a78bfa;--a19:#f472b6;--a20:#ef4444;--a21:#c084fc;--a22:#2dd4bf}
+#s-anual{--a0:#60a5fa;--a1:#fbbf24;--a2:#34d399;--a3:#c084fc;--a4:#fb7185;--a5:#cbd5e1;--a6:#22d3ee;--a7:#e0a876;--a8:#a3e635;--a9:#e879f9;--a10:#fca5a5;--a11:#93c5fd;--a12:#ffffff;--a13:#5eead4;--a14:#f9a8d4;--a15:#fde047;--a16:#fb923c;--a17:#38bdf8;--a18:#a78bfa;--a19:#f472b6;--a20:#ef4444;--a21:#c084fc;--a22:#2dd4bf;--a23:#86efac}
 #s-anual .anu{display:flex;flex-direction:column;gap:14px}
 #s-anual .anu-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 18px;min-width:0}
 #s-anual .anu-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -46280,7 +46280,8 @@ var ANU = {
     // 26/11/2026 (Bruno): gasto no Meta por mês, pelo nome da campanha (metaTipoCampanha) — ao vivo pelo robô
     { id:'TDG', n:'Tráfego · funil diagnóstico', c:C(20), d:ANU.TDG, top:600000, f:'r', da:'3 2', g:'d' },
     { id:'TWS', n:'Tráfego · workshop', c:C(21), d:ANU.TWS, top:600000, f:'r', da:'3 2', g:'d' },
-    { id:'TIM', n:'Impulsionamento de posts (distribuição)', c:C(22), d:ANU.TIM, top:600000, f:'r', da:'3 2', g:'d' }
+    { id:'TIM', n:'Impulsionamento de posts (distribuição)', c:C(22), d:ANU.TIM, top:600000, f:'r', da:'3 2', g:'d' },
+    { id:'PFC', n:'% de leads com formulário completo', c:C(23), d:ANU.L.map(function(v, i){ return v ? Math.round(ANU.LC[i] / v * 1000) / 10 : null; }), top:60, f:'p', da:'2 2 6 2', g:'v' }
   ]);
   ANU.sum = sum;
 })();
@@ -46432,14 +46433,17 @@ function anuGrafico(){
   var wMax = 0; V.forEach(function(z){ if (z.g === 'w') I.forEach(function(i){ var v = z.d[i]; if (v != null && v > wMax) wMax = v; }); });
   var wTop = wMax <= 150 ? 150 : wMax <= 300 ? 300 : wMax <= 600 ? 600 : 900;
   ANU.S.forEach(function(z){ if (z.g === 'w') z.top = wTop; });
+  var vMax = 0; V.forEach(function(z){ if (z.g === 'v') I.forEach(function(i){ var v = z.d[i]; if (v != null && v > vMax) vMax = v; }); });
+  var vTop = vMax <= 60 ? 60 : 120;   // com o % do formulário (70–80%) visível, o eixo de vendas e % vai até 120
+  ANU.S.forEach(function(z){ if (z.g === 'v') z.top = vTop; });
   var dMax = 0; V.forEach(function(z){ if (z.g === 'd') I.forEach(function(i){ var v = z.d[i]; if (v != null && v > dMax) dMax = v; }); });
   var dTop = dMax <= 60000 ? 60000 : dMax <= 150000 ? 150000 : dMax <= 300000 ? 300000 : 600000;
   ANU.S.forEach(function(z){ if (z.g === 'd') z.top = dTop; });
-  var s = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Gráfico mensal de vendas, leads e faturamento"><text x="0" y="12"><tspan style="fill:var(--a8)">Ingressos e reuniões</tspan> · Vendas · <tspan style="fill:var(--a17)">Conversão %</tspan></text><text x="' + W + '" y="12" text-anchor="end"><tspan style="fill:var(--a5)">Leads</tspan> · <tspan style="fill:var(--a14)">Fat. e tráfego (R$)</tspan> · <tspan style="fill:var(--a7)">Ticket</tspan></text>';
+  var s = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Gráfico mensal de vendas, leads e faturamento"><text x="0" y="12"><tspan style="fill:var(--a8)">Ingressos e reuniões</tspan> · Vendas · <tspan style="fill:var(--a17)">%</tspan></text><text x="' + W + '" y="12" text-anchor="end"><tspan style="fill:var(--a5)">Leads</tspan> · <tspan style="fill:var(--a14)">Fat. e tráfego (R$)</tspan> · <tspan style="fill:var(--a7)">Ticket</tspan></text>';
   for (var g = 0; g < 4; g++) {
     var gy = y(g, 3);
     s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + gy + '" y2="' + gy + '" stroke="rgba(255,255,255,.08)"/>' +
-      '<text x="0" y="' + (gy + 4) + '" style="fill:var(--a8)">' + g * wTop / 3 + '</text><text x="' + (l - 6) + '" y="' + (gy + 4) + '" text-anchor="end">' + g * 20 + '</text>' +
+      '<text x="0" y="' + (gy + 4) + '" style="fill:var(--a8)">' + g * wTop / 3 + '</text><text x="' + (l - 6) + '" y="' + (gy + 4) + '" text-anchor="end">' + g * vTop / 3 + '</text>' +
       '<text x="' + (W - r + 8) + '" y="' + (gy + 4) + '" style="fill:var(--a5)">' + (g * 600).toLocaleString('pt-BR') + '</text>' +
       '<text x="' + (W - 30) + '" y="' + (gy + 4) + '" text-anchor="end" style="fill:var(--a14)">' + Math.round(g * dTop / 3000) + 'k</text>' +
       '<text x="' + W + '" y="' + (gy + 4) + '" text-anchor="end" style="fill:var(--a7)">' + g * 10 + 'k</text>';
@@ -46526,6 +46530,7 @@ function anuMetricas(){
   h += '<div class="anu-sec">Leads</div><div class="anu-kpis">' +
     kp('Leads reais', nn(o.L), (med(o.L, nn) + dl(o.L, ant && ant.L)).replace(/^ · /, '')) +
     kp('Formulário completo', nn(o.LC), (o.L ? anuN(Math.round(o.LC / o.L * 100)) + '% dos leads' : '') + dl(o.LC, ant && ant.LC)) +
+    kp('% com formulário completo', o.L ? anuN(Math.round(o.LC / o.L * 1000) / 10) + '%' : '–', dl(o.L ? o.LC / o.L : null, ant && ant.L ? ant.LC / ant.L : null).replace(/^ · /, '')) +
     kp('Leads MQL', nn(o.MQ), (o.mqlPct == null ? '' : anuN(Math.round(o.mqlPct)) + '% dos leads') + dl(o.MQ, ant && ant.MQ)) +
     kp('Leads HT (R$ 2 mil+)', nn(o.HT), (o.L ? anuN(Math.round(o.HT / o.L * 1000) / 10) + '% dos leads' : '') + dl(o.HT, ant && ant.HT)) +
     kp('MQL score (A e B)', o.MS ? nn(o.MS.v) : '–', o.MS ? parc(o.MS, 'out').trim() : 'lead score a partir de outubro') +
@@ -46547,11 +46552,11 @@ function anuTabela(){
   var td = function(v){ return '<td>' + v + '</td>'; };
   for (var i = a; i <= b; i++) {
     rows += '<tr><td>' + ANU.M[i] + (i === ANU.parcial ? '*' : '') + '</td>' + ANU.Q[i].map(td).join('') + td('<b>' + ANU.T[i] + '</b>') + td(anuR(ANU.TR[i])) + td(anuR(ANU.TM[i])) + td(anuR(ANU.FR[i])) + td(ANU.RE[i]) + td(anuR(ANU.FD[i])) + td(ANU.RDG[i] == null ? '–' : ANU.RDG[i]) + td(ANU.RWS[i] == null ? '–' : ANU.RWS[i]) + td(anuR(ANU.FRD[i])) + td(ANU.CVD[i] == null ? '–' : anuN(ANU.CVD[i]) + '%') + td(anuR(ANU.FWS[i])) + td(anuR(ANU.TDG[i])) + td(anuR(ANU.TWS[i])) + td(anuR(ANU.TIM[i])) +
-      td(anuN(ANU.L[i])) + td(anuN(ANU.LC[i])) + td(anuN(ANU.MQ[i])) + td(anuN(ANU.HT[i])) + td(anuN(ANU.MS[i])) + td(anuN(ANU.WK[i])) + '</tr>';
+      td(anuN(ANU.L[i])) + td(anuN(ANU.LC[i])) + td(ANU.L[i] ? anuN(Math.round(ANU.LC[i] / ANU.L[i] * 1000) / 10) + '%' : '–') + td(anuN(ANU.MQ[i])) + td(anuN(ANU.HT[i])) + td(anuN(ANU.MS[i])) + td(anuN(ANU.WK[i])) + '</tr>';
   }
-  document.getElementById('anu-tb').innerHTML = '<thead><tr><th>Mês</th><th>Spark Sem.</th><th>Spark Anual</th><th>Growth</th><th>Mentoria LD</th><th>Legado Club</th><th>Total</th><th>Faturamento</th><th>Ticket médio</th><th>Fat./reunião</th><th>Reuniões</th><th>Fat. diagnóstico</th><th>Reuniões diag.</th><th>Reuniões workshop</th><th>Fat./reunião diag.</th><th>Conversão diag.</th><th>Fat. workshop</th><th>Tráfego diag.</th><th>Tráfego workshop</th><th>Impulsionamento</th><th>Leads reais</th><th>Completos</th><th>MQL</th><th>HT</th><th>MQL score</th><th>Ingressos</th></tr></thead><tbody>' + rows +
+  document.getElementById('anu-tb').innerHTML = '<thead><tr><th>Mês</th><th>Spark Sem.</th><th>Spark Anual</th><th>Growth</th><th>Mentoria LD</th><th>Legado Club</th><th>Total</th><th>Faturamento</th><th>Ticket médio</th><th>Fat./reunião</th><th>Reuniões</th><th>Fat. diagnóstico</th><th>Reuniões diag.</th><th>Reuniões workshop</th><th>Fat./reunião diag.</th><th>Conversão diag.</th><th>Fat. workshop</th><th>Tráfego diag.</th><th>Tráfego workshop</th><th>Impulsionamento</th><th>Leads reais</th><th>Completos</th><th>% completo</th><th>MQL</th><th>HT</th><th>MQL score</th><th>Ingressos</th></tr></thead><tbody>' + rows +
     '</tbody><tfoot><tr><td>Total</td>' + o.prod.map(function(p){ return td(p.q); }).join('') + td(o.vend) + td(anuR(o.fat)) + td(anuR(o.tm)) + td(anuR(o.fr)) + td(o.re) + td(o.FD ? anuR(o.FD.v) : '–') + td(o.rdg ? o.rdg.v : '–') + td(o.rws ? o.rws.v : '–') + td(o.fdg && o.rdg && o.rdg.v ? anuR(o.fdg.v / o.rdg.v) : '–') + td(o.vdg && o.rdg && o.rdg.v ? anuN(Math.round(o.vdg.v / o.rdg.v * 1000) / 10) + '%' : '–') + td(o.fws ? anuR(o.fws.v) : '–') + td(o.tdg ? anuR(o.tdg.v) : '–') + td(o.tws ? anuR(o.tws.v) : '–') + td(o.tim ? anuR(o.tim.v) : '–') +
-    td(anuN(o.L)) + td(anuN(o.LC)) + td(anuN(o.MQ)) + td(anuN(o.HT)) + td(o.MS ? anuN(o.MS.v) : '–') + td(o.WK ? anuN(o.WK.v) : '–') + '</tr></tfoot>';
+    td(anuN(o.L)) + td(anuN(o.LC)) + td(o.L ? anuN(Math.round(o.LC / o.L * 1000) / 10) + '%' : '–') + td(anuN(o.MQ)) + td(anuN(o.HT)) + td(o.MS ? anuN(o.MS.v) : '–') + td(o.WK ? anuN(o.WK.v) : '–') + '</tr></tfoot>';
 }
 </script>
 <!-- desempenho-anual:fim -->
