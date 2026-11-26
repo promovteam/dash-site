@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<!-- 🎯 OPERAÇÃO HT (26/11/2026 · Bruno: "preciso que o trabalho seja feito por aqui, para que a gente possa acompanhar" · "naquele mesmo design"). A lista vem do robô (rota opHt, só POST) e abre com o mesmo link pessoal da página Leads sem contato ou com a sessão do dash. Nenhum dado de lead fica neste arquivo. -->
+<!-- 🎯 OPERAÇÃO HT (26/11/2026 · Bruno: "preciso que o trabalho seja feito por aqui, para que a gente possa acompanhar" · "tudo como estava o outro": painel do time no alto, lista embaixo, Abordei / Já tinha abordado, abrir no Lead Center, ver respostas, abordagem sugerida). A lista vem do robô (rota opHt, só POST) e abre com o mesmo link pessoal da página Leads sem contato ou com a sessão do dash. Nenhum dado de lead fica neste arquivo. -->
 <style>
   :root { --bg:#0c0e12; --panel:#14171d; --panel2:#1a1e26; --borda:rgba(255,255,255,.08); --text:#fff; --text2:#9aa3b2; --muted:#6b7380;
     --accent:#f6a350; --green:#3ddc97; --red:#ff6b6b; --yellow:#ffd166; --blue:#6ea8ff; color-scheme:dark; }
@@ -117,15 +117,17 @@
 </main>
 <script>
   var ROBO = 'https://script.google.com/macros/s/AKfycbxj7EtQMHIB7VSZFh8Fea3uhp10dI2ubIlTy9MEJakGNtfhYilg3v4hyPEJAPi7ydku/exec';
-  var CLINT = 'https://app.clint.digital/contacts/';
-  var D = null, EST = { de: '', f: 'nao', busca: '', ver: 50, plano: false }, AB = {};
+  var CLINT = 'https://app.clint.digital/contacts/', LEADC = 'https://leads.legado.club/ir/contacts/';
+  var D = null, EST = { de: '', aba: 'g1', busca: '', ver: 50, f: '', rot: false }, ABERTAS = {}, ROTA = {}, PASSO = {};
   var esc = function(t) { return String(t == null ? '' : t).replace(/[<>&"]/g, function(c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); };
   function tok() { try { var m = /[#&]k=([^&]+)/.exec(location.hash); if (m) { localStorage.setItem('sdrlLink', decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname); }
     return localStorage.getItem('sdrlLink') || localStorage.getItem('comPainelTok') || localStorage.getItem('scoreTok') || ''; } catch (e) { return ''; } }
   function robo(corpo, ok, falha) { fetch(ROBO, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(corpo) }).then(function(r) { return r.json(); }).then(ok).catch(function(e) { falha(e && e.message || String(e)); }); }
   function semAcento(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
-  function real(n) { return 'R$ ' + Math.round(n || 0).toLocaleString('pt-BR'); }
-  function dia(t) { return new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); }
+  function rs(n) { return 'R$ ' + Math.round(n || 0).toLocaleString('pt-BR'); }
+  function hora(t) { var d = new Date(t); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+  function pnome(n) { var w = String(n || '').trim().split(/\s+/)[0] || ''; return /^[A-Za-zÀ-ÿ]{2,}$/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ''; }
+  function sair() { try { localStorage.removeItem('sdrlLink'); } catch (e) {} location.href = location.pathname; }
   function carregar() {
     var t = tok(), c = document.getElementById('corpo');
     if (!t) { c.innerHTML = '<div class="card aviso"><b>Abra pelo seu link pessoal</b>Esta lista abre pelo link que a gestão te mandou, ou para quem já entrou no dash neste navegador.<br><br><a class="b ab" href="./">Abrir o dash e entrar</a></div>'; return; }
@@ -133,98 +135,134 @@
     robo({ action: 'opHt', tok: t }, function(d) {
       bt.disabled = false; bt.textContent = '↻ Atualizar';
       if (!d || !d.success) { c.innerHTML = '<div class="card aviso"><b>' + esc((d && d.error) || 'O robô não respondeu') + '</b>' + (d && d.sair ? '<br><a class="b ab" href="./">Abrir o dash e entrar de novo</a>' : 'Tente de novo em instantes.') + '</div>'; return; }
-      D = d; if (!EST.de) EST.de = d.gestor ? 'painel' : d.eu; desenhar();
+      D = d; D.porLink = /^lk:/.test(t); if (!EST.de || !d.pessoas[EST.de]) EST.de = d.gestor ? primeiro() : d.eu; desenhar();
     }, function(e) { bt.disabled = false; bt.textContent = '↻ Atualizar'; if (D) return; c.innerHTML = '<div class="card aviso"><b>Não consegui falar com o robô</b>' + esc(e) + '</div>'; });
   }
-  function feito(p) { return !!(p.marc && p.marc.ok) || !!p.res; }
-  function marcou(p) { return !!p.res || (p.marc && p.marc.res === 'Marcou reunião'); }
-  function conta(k) { var o = { t: 0, f: 0, m: 0, v: 0, val: 0 }; D.itens.forEach(function(p) { if (p.dono !== k) return; o.t++; if (feito(p)) o.f++; if (marcou(p)) o.m++; if (p.res && p.res.vend) { o.v++; o.val += p.res.valor || 0; } }); return o; }
-  function plano() {
-    return '<div class="card"><h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer" onclick="EST.plano=!EST.plano;desenhar()">O plano em 1 minuto <span class="nota">' + (EST.plano ? 'fechar ▴' : 'abrir ▾') + '</span></h2>' + (EST.plano ?
-      '<ol class="ordem">' +
-      '<li><b>Quem escreveu e está sem resposta</b>A pessoa falou com a gente e ninguém respondeu. É a primeira ligação do dia.</li>' +
-      '<li><b>Ligar primeiro, mensagem depois</b>A mensagem pronta está em cada lead. Ouro e quente de cima para baixo.</li>' +
-      '<li><b>Marcar para o dia seguinte</b>No máximo 2 dias. Para o mesmo dia, de cada 100 só 13 faltam; com 5 dias, faltam 34.</li>' +
-      '<li><b>HT vai para Tony e Wesllene</b>Bruno atende na segunda (30/11), só os mais quentes. Segunda com agenda até mais tarde.</li>' +
-      '<li><b>Achou caro?</b>Spark Semestral antes de descer para o Legado. Escada: 12x no cartão → 2 ou 3 cartões → entrada + cartão → entrada + recorrente → boleto.</li>' +
-      '<li><b>Sem cartão ou limite</b>Selo verde "oferecer boleto": entrada + parcelas no boleto, sem depender de limite.</li>' +
-      '</ol><p class="nota" style="margin:10px 0 0">A conta: de cada 100 reuniões de HT marcadas, 61 acontecem; de cada 100 que acontecem, 35 viram venda. Uma venda = 5 reuniões marcadas. Sem condição especial: a urgência é a agenda, que fecha na segunda.</p>' : '') + '</div>';
-  }
-  function painel() {
-    var h = '<div class="pg">';
-    Object.keys(D.pessoas).forEach(function(k) { var c = conta(k), P = (D.placar || {})[k] || {}, mt = (D.metas || {})[k] || {}, meta = mt.dia ? mt.dia * 3 : 0, pc = c.t ? Math.round(c.f / c.t * 100) : 0;
-      if (!c.t) return;
-      var st = P.hoje >= 30 ? ['ok', 'no ritmo'] : P.hoje > 0 ? ['meio', 'começou'] : ['nao', 'parado hoje'];
-      h += '<div class="pp" style="cursor:pointer" onclick="de(\'' + k + '\')"><div class="pp-top"><div><b>' + esc(D.pessoas[k]) + '</b><small>' + esc(mt.txt || '') + '</small></div><span class="st ' + st[0] + '">' + st[1] + '</span></div>' +
+  function primeiro() { var ks = Object.keys(D.pessoas).filter(function(k) { return D.itens.some(function(p) { return p.dono === k; }); }); return ks[0] || D.eu; }
+  // em qual aba o lead fica: reunião marcada · abordado · pelo João · chamar hoje · até sábado · se sobrar tempo
+  function calor(p) { var c = String(p.cls || '').toUpperCase(); return /A\+|OURO|QUENTE/.test(c) ? 1 : /^A$|PRATA|MORNO/.test(c) ? 2 : 3; }
+  function grupo(p) { if (p.res || (p.marc && p.marc.res === 'Marcou reunião')) return 'reu'; if (p.marc && p.marc.ok) return 'feitos'; if (p.joao) return 'joao'; return 'g' + calor(p); }
+  function conta(k) { var o = { t: 0, pend: 0, f: 0, hoje: 0, m: 0, v: 0, val: 0, urg: 0 }, h0 = new Date(); h0.setHours(0, 0, 0, 0);
+    D.itens.forEach(function(p) { if (p.dono !== k) return; o.t++; var g = grupo(p); if (g === 'reu') o.m++; if (g === 'reu' || g === 'feitos') { o.f++; if (p.marc && p.marc.em >= h0.getTime()) o.hoje++; } else { o.pend++; if (p.urg) o.urg++; } if (p.res && p.res.vend) { o.v++; o.val += p.res.valor || 0; } }); return o; }
+  // painel do time, sempre no alto para a gestão (igual ao da página Leads sem contato)
+  function painelGestor() {
+    var h = '<div class="card"><h2>Painel do time · quem está trabalhando a lista</h2><div class="pg">';
+    Object.keys(D.pessoas).forEach(function(k) { var c = conta(k); if (!c.t) return; var mt = (D.metas || {})[k] || {}, meta = mt.dia ? mt.dia * 3 : 0, pc = c.t ? Math.round(c.f / c.t * 100) : 0;
+      var st = c.hoje >= 25 ? ['ok', 'no ritmo'] : c.hoje > 0 ? ['meio', 'começou'] : ['nao', 'parado hoje'];
+      h += '<div class="pp" style="cursor:pointer' + (EST.de === k ? ';border-color:rgba(246,163,80,.55)' : '') + '" onclick="de(\'' + k + '\')"><div class="pp-top"><div><b>' + esc(D.pessoas[k]) + '</b><small>' + esc(mt.txt || '') + '</small></div><span class="st ' + st[0] + '">' + st[1] + '</span></div>' +
         '<div class="barra"><i style="width:' + pc + '%"></i></div>' +
-        '<div class="pp-n"><div><small>Abordados</small><b>' + c.f + '</b></div><div><small>Hoje</small><b>' + (P.hoje || 0) + '</b></div><div><small>Reuniões</small><b style="color:var(--green)">' + c.m + (meta ? '<span style="font-size:.7rem;color:var(--muted)"> /' + meta + '</span>' : '') + '</b></div></div>' +
-        '<div class="pp-f">' + c.f + ' de ' + c.t + ' leads' + (c.v ? ' · <b>' + c.v + ' venda' + (c.v > 1 ? 's' : '') + ' · ' + real(c.val) + '</b>' : '') + '</div>' +
-        '<div class="pp-pe"><span>ver os leads →</span><button type="button" class="b" style="padding:5px 9px;font-size:.7rem" onclick="event.stopPropagation();gerarLink(\'' + k + '\')">gerar link</button></div></div>'; });
-    return h + '</div><p class="nota" id="lk">Selina, Luana e João Victor entram pelo mesmo link da página Leads sem contato. "Gerar link" cria um link novo para a pessoa e o link antigo dela para de valer.</p>';
+        '<div class="pp-n"><div><small>Para chamar</small><b>' + c.pend + '</b></div><div><small>Hoje</small><b>' + c.hoje + '</b></div><div><small>Reuniões</small><b style="color:var(--green)">' + c.m + (meta ? '<span style="font-size:.7rem;color:var(--muted)"> /' + meta + '</span>' : '') + '</b></div></div>' +
+        '<div class="pp-f">' + c.f + ' de ' + c.t + ' trabalhados' + (c.urg ? ' · <b style="color:#ffb4b4">' + c.urg + ' esperando resposta</b>' : '') + (c.v ? ' · <b>' + c.v + ' venda' + (c.v > 1 ? 's' : '') + ' · ' + rs(c.val) + '</b>' : '') + '</div>' +
+        '<div class="pp-pe"><span>' + (EST.de === k ? 'lista aberta abaixo ↓' : 'ver a lista ↓') + '</span><button type="button" class="b" style="padding:5px 9px;font-size:.7rem" onclick="event.stopPropagation();gerarLink(\'' + k + '\')">gerar link</button></div></div>'; });
+    return h + '</div><p class="nota" id="lk" style="margin:10px 0 0">Selina, Luana e João Victor entram com o mesmo link da página Leads sem contato. "Gerar link" cria um link novo para a pessoa e o antigo dela para de valer.</p></div>';
   }
   function gerarLink(k) { if (!confirm('Gerar um link novo para ' + D.pessoas[k] + '? Se ela já tem um link, o antigo para de funcionar.')) return;
     robo({ action: 'opHtLink', tok: tok(), quem: k }, function(d) { var e = document.getElementById('lk'); if (!d || !d.success) { e.textContent = (d && d.error) || 'Não consegui gerar.'; return; }
       e.innerHTML = 'Link de <b>' + esc(d.nome) + '</b> (mande só para a pessoa): <input type="search" readonly style="width:100%;margin-top:6px" value="' + esc(d.link) + '" onfocus="this.select()">'; }, function(e2) { document.getElementById('lk').textContent = 'Não consegui gerar: ' + e2; }); }
+  function tipoDe(k) { var p = D.itens.filter(function(x) { return x.dono === k; })[0]; return p ? p.tipo : 'sdr'; }
+  // "Quem chamar primeiro" e o processo, por função
+  function ordemHtml(tp) {
+    var li = tp === 'clo' ? ['<b>Bloqueio de oferta e entrada</b>Já disse sim. Falta pagar: ligar hoje e mandar o link na chamada.', '<b>Esperando resposta nossa</b>O lead escreveu e ficou sem retorno. Responder antes de qualquer outra coisa.', '<b>Data prometida vencida</b>Disse "dia tal" ou "mês que vem" e a data já passou.', '<b>Travou no cartão ou no limite</b>Oferecer o boleto agora (entrada + parcelas). Esperar o cartão virar não recupera.', '<b>Achou caro e tem perfil</b>Depois da escada do pagamento, o Spark Semestral como degrau.', '<b>Mornos e frios bons</b>Só depois de zerar os de cima.']
+      : tp === 'ss' ? ['<b>Chamar hoje</b>Perfil forte que comentou há pouco. A mensagem já está pronta em cada um.', '<b>Até sábado</b>Mesmo critério, um pouco menos quente.', '<b>Pelo João</b>Perfis muito fortes ou antigos: a mensagem é na voz dele e só sai com ele aprovando.', '<b>Quem responder</b>Duas perguntas, convite e pedir o WhatsApp para mandar o link. Não precisa preencher formulário.']
+      : ['<b>Esperando resposta nossa</b>A pessoa escreveu e ninguém respondeu. Primeira tarefa do dia.', '<b>Passou por evento (ILD ou workshop)</b>Já conhece o João. É quem mais compra.', '<b>Chamar hoje (A+)</b>Marcou R$ 2 a 4 mil e deu 2 sinais ou mais em poucos dias.', '<b>Até sábado (A)</b>Perfil certo, um pouco menos quente.', '<b>No-show</b>"A gente não conseguiu se falar": oferecer outro horário.', '<b>Regra de ouro</b>Ligar primeiro, mensagem em seguida. Marcar para hoje ou amanhã, nunca depois de segunda.'];
+    return '<ol class="ordem">' + li.map(function(x) { return '<li>' + x + '</li>'; }).join('') + '</ol>';
+  }
+  function processoHtml(tp) {
+    var b = function(t, x) { return '<li><b>' + t + '</b><div class="balao"><p>' + x + '</p></div></li>'; };
+    if (tp === 'clo') return '<ol class="rot">' + b('1 · Abertura', '[Nome], é o [closer], da Promov. Fiquei pensando no seu caso depois da nossa conversa. Tem 5 minutos?') + b('2 · Pergunta que reabre', 'Você me disse que queria [objetivo]. De lá pra cá, andou? O que te segurou naquele dia: foi o programa ou foi a forma de pagar?') + b('3 · Escada do pagamento (sem mexer no valor)', 'Cartão em 12x → 2 ou 3 cartões → entrada + cartão → entrada + recorrente → boleto, por último.') + b('4 · Degrau do Semestral (só depois da escada)', 'Se o anual pesa, tem o Spark Semestral: mesmo método, 6 meses, valor menor. Prefere começar por ele?') + b('5 · Fechamento com data', 'Então fica [forma]. Te mando o contrato agora e fico na linha enquanto você paga? Se não der: qual dia e hora você resolve? Sábado às 10h eu te ligo e fechamos.') + '</ol>';
+    var obj = '<p class="dic" style="margin-top:10px"><b>Se falar de Black Friday ou dinheiro:</b> "Por isso mesmo vale conversar antes. A reunião é gratuita e não te obriga a nada. Você sai sabendo o que faz seu Instagram dar retorno, e aí decide onde põe seu dinheiro."<br><b>"Me manda por mensagem":</b> "Mando, sim. Só que por mensagem vai o genérico, e o seu caso não é genérico. Em 1h30 o especialista olha o SEU perfil."<br><b>"Não tenho tempo":</b> "Quanto tempo por semana você já gasta postando sem vender? É 1h30 pra parar de gastar esse tempo errado."<br><b>"Quanto custa?":</b> "Depende do acompanhamento que fizer sentido, e é isso que o diagnóstico mostra. O especialista te passa tudo na reunião, e a decisão é sua."<br><b>"Vou pensar":</b> "Claro. Pensar em quê, pra eu te ajudar: no horário ou se vale a pena? A reunião é justamente pra você pensar com informação."</p>';
+    var cad = '<p class="dic"><b>Até 6 toques por pessoa em 2 dias</b> (para quando ela responder ou disser não): 1 ligação (10h–12h) · 2 mensagem 1 minuto depois · 3 áudio de 20 a 30 segundos (18h30–20h) · 4 mensagem com 2 horários (8h30–10h do dia seguinte, a melhor hora) · 5 ligação no almoço · 6 encerramento: "a agenda extra fecha hoje".</p>';
+    if (tp === 'ss') return cad + '<ol class="rot">' + b('1 · Primeira mensagem', 'Já está pronta em cada perfil: cita a palavra que a pessoa comentou e algo verdadeiro do perfil.') + b('2 · Respondeu', 'Que bom! Só para eu separar o especialista certo: você já vende pelo Instagram ou está começando? E o que mais te trava hoje?') + b('3 · Convite', 'Pelo que você falou, faz sentido passar pelo diagnóstico. É cerca de 1h30 com um especialista nosso: ele olha seu perfil, mostra onde você está perdendo venda e te diz o que fazer primeiro. É gratuito. Tenho amanhã às __ ou sábado às __. Qual fica melhor?') + b('4 · Marcar', 'Não precisa preencher nada, eu marco por aqui. Qual seu WhatsApp pra te mandar o link?') + '</ol>' + obj;
+    return cad + '<ol class="rot">' + b('1 · Ligação (30 segundos)', 'Oi, [nome]? Aqui é [seu nome], da Promov, equipe do João. Você pediu o diagnóstico do seu Instagram. Te peguei em má hora? São 2 minutinhos.') + b('2 · Não atendeu: mensagem na hora', 'A mensagem pronta está em cada lead. Mandou, fica 10 minutos no chat.') + b('3 · Duas perguntas, não mais', 'O que mais te trava hoje pra [objetivo que ela marcou]? … E por que resolver isso agora, e não ano que vem? (Se couber: você decide sozinha ou com mais alguém?)') + b('4 · Convite: vender a reunião', 'Pelo que você falou, faz sentido você passar pelo diagnóstico. É cerca de 1h30 com um especialista nosso. Ele olha seu perfil, mostra onde você está perdendo venda e te diz o que fazer primeiro. É gratuito. Se fizer sentido, ele te mostra como a gente acompanha; se não, você sai com o plano do mesmo jeito. Abrimos horários extras só até segunda.') + b('5 · Dois horários', 'Tenho hoje às 15h ou amanhã às 10h. Qual fica melhor? (Nunca "quando você pode?". Nada depois de segunda.)') + b('6 · Confirmação na hora', 'Fechado: [dia], [hora], com o [closer]. Dura cerca de 1h30: separa um lugar calmo e, se alguém decide com você, chama junto. Me responde CONFIRMADO? E me manda em 2 ou 3 linhas como está seu Instagram hoje e o que você quer vender.') + b('7 · Antifalta', 'Véspera às 19h: "[nome], amanhã às __ é seu diagnóstico com o [closer]. Ele já olhou seu perfil. Tudo certo?" · 1 hora antes: "Daqui a 1 hora! O [closer] já te espera." · Sem CONFIRMADO até 2 horas antes: ligar.') + '</ol>' + obj;
+  }
   function visiveis() { var b = semAcento(EST.busca.trim());
-    return D.itens.filter(function(p) { if (p.dono !== EST.de) return false;
-      if (EST.f === 'nao' && feito(p)) return false; if (EST.f === 'sim' && !feito(p)) return false; if (EST.f === 'reu' && !marcou(p)) return false;
-      if (EST.f === 'top' && !(/OURO|QUENTE/.test(p.cls || '') || p.urg)) return false; if (EST.f === 'bol' && !p.bol) return false;
-      if (b && semAcento(p.nome + ' ' + (p.insta || '')).indexOf(b) === -1) return false; return true; })
-      .sort(function(a, b2) { return (b2.urg ? 1 : 0) - (a.urg ? 1 : 0) || b2.pri - a.pri; });
+    return D.itens.filter(function(p) { if (p.dono !== EST.de) return false; if (EST.f === 'urg' && !p.urg) return false; if (EST.f === 'bol' && !p.bol) return false; if (EST.f === 'ev' && !p.ev) return false;
+      if (b && semAcento(p.nome + ' ' + (p.insta || '')).indexOf(b) === -1) return false; return true; });
   }
   function fichaHtml(p) {
     var h = '<div class="ficha">';
-    (p.form || []).forEach(function(x) { h += '<div><small>' + esc(x[0]) + '</small><span>' + esc(x[1]) + '</span></div>'; });
-    if (!(p.form || []).length) h += '<p>Não preencheu o formulário.</p>';
-    (p.reu || []).forEach(function(x) { h += '<div style="grid-column:1 / -1"><small>Reunião ' + esc(x[0]) + ' · ' + esc(x[1]) + '</small><span><b>' + esc(x[3]) + '</b> · ' + esc(x[2]) + (x[4] ? ' · ' + real(x[4]) : '') + (x[5] ? '<br><span style="color:var(--text2)">Anotação do closer: ' + esc(x[5]) + '</span>' : '') + '</span></div>'; });
-    if (p.tipo !== 'ss' && !(p.reu || []).length) h += '<p>Nunca teve reunião.</p>';
+    (p.form || []).forEach(function(x) { h += '<div' + (String(x[1]).length > 60 ? ' style="grid-column:1 / -1"' : '') + '><small>' + esc(x[0]) + '</small><span>' + esc(x[1]) + '</span></div>'; });
+    if (p.tipo !== 'ss' && !(p.form || []).length) h += '<p>Não preencheu o formulário.</p>';
     if (p.bio) h += '<div style="grid-column:1 / -1"><small>Bio do Instagram</small><span>' + esc(p.bio) + '</span></div>';
+    (p.reu || []).forEach(function(x) { h += '<div style="grid-column:1 / -1"><small>Reunião ' + esc(x[0]) + ' · ' + esc(x[1]) + '</small><span><b>' + esc(x[3]) + '</b> · ' + esc(x[2]) + (x[4] ? ' · ' + rs(x[4]) : '') + (x[5] ? '<br><span style="color:var(--text2)">Anotação do closer: ' + esc(x[5]) + '</span>' : '') + '</span></div>'; });
+    if (p.tipo !== 'ss' && !(p.reu || []).length) h += '<p>Nunca teve reunião.</p>';
     return h + '</div>';
   }
+  function abordagemHtml(p) {
+    var id = esc(p.id), ab = ROTA[p.id];
+    if (!ab) return '<div class="abd fechado"><button type="button" class="b sug" onclick="verRot(\'' + id + '\')"><span>💬 Abordagem sugerida para ' + esc(pnome(p.nome) || 'este lead') + '</span><span>ver ▾</span></button></div>';
+    var passos = [];
+    if (p.tipo === 'clo') { passos.push(['O que travou', p.travou, 0]); passos.push(['O que fazer agora', p.fazer, 0]); passos.push(['Abertura da ligação', (pnome(p.nome) || 'Oi') + ', é ' + esc(D.nome) + ', da Promov. Fiquei pensando no seu caso depois da nossa conversa. Tem 5 minutos?', 1]); if (p.bol) passos.push(['Boleto', 'Na nossa conversa o que travou foi o cartão. Hoje consigo te colocar pelo boleto: uma entrada e as parcelas no boleto, sem depender de limite. Ainda faz sentido para você?', 1]); }
+    else { if (p.msg) passos.push([p.joao ? 'Mensagem na voz do João (só com ele aprovando)' : p.tipo === 'ss' ? 'Primeira mensagem (direct)' : 'Mensagem (se não atender a ligação)', String(p.msg).replace(/\[SEU NOME\]/g, D.nome), 1]); if (p.msg2) passos.push(['Depois que responder', p.msg2, 1]); }
+    var h = '<div class="abd"><div class="abd-t"><small>💬 Abordagem sugerida</small><button type="button" class="b" style="padding:5px 10px;font-size:.72rem" onclick="verRot(\'' + id + '\')">fechar ▴</button></div>';
+    passos.forEach(function(x, i) { if (!x[1]) return; h += '<small style="color:var(--text2)">' + esc(x[0]) + '</small>' + (x[2] ? '<div class="balao"><p>' + esc(x[1]) + '</p><button type="button" class="b" onclick="copiarTxt(this,\'' + id + '\',' + i + ')">Copiar</button></div>' : '<p>' + esc(x[1]) + '</p>'); });
+    PASSO[p.id] = passos; return h + '</div>';
+  }
   function cartao(p) {
-    var f = feito(p), tg = '', cls = (p.cls || '').toUpperCase(), t = cls === 'OURO' || cls === 'QUENTE' ? 't1' : cls === 'MORNO' ? 't2' : cls === 'PRATA' ? 't3' : 't4';
-    if (cls) tg += '<span class="tag ' + (cls === 'OURO' || cls === 'QUENTE' ? 'alto' : cls === 'MORNO' ? 'inv' : '') + '">' + esc(cls) + '</span>';
-    if (p.urg) tg += '<span class="tag alto">escreveu e está sem resposta · ' + esc(p.urg) + '</span>';
-    if (p.bol) tg += '<span class="tag ok">sem cartão → oferecer boleto</span>';
-    if (p.exc) tg += '<span class="tag nota">exceção: perfil forte</span>';
-    if (p.inv) tg += '<span class="tag inv">' + esc(p.inv) + '</span>';
-    if (p.seg) tg += '<span class="tag nota">' + Number(p.seg).toLocaleString('pt-BR') + ' seguidores</span>';
-    var linha = [];
-    if (p.tipo === 'clo') { linha.push(esc(p.sit)); if (p.prod) linha.push(esc(p.prod) + (p.valor ? ' · ' + real(p.valor) : '')); if (p.ult) linha.push('última reunião ' + esc(p.ult)); }
-    else if (p.tipo === 'ss') { linha.push(esc(p.insta)); linha.push('comentou "' + esc(p.pal) + '" em ' + esc(p.ult)); }
-    else { linha.push(esc(p.sit)); if (p.insta) linha.push(esc(p.insta)); }
-    if (p.res) linha.push('<b style="color:var(--green)">reunião ' + dia(p.res.em) + ' com ' + esc(p.res.closer || '—') + ' · ' + esc(p.res.st || '') + (p.res.vend ? ' · ' + real(p.res.valor) : '') + '</b>');
-    else if (p.marc && p.marc.ok) linha.push('<span style="color:var(--green)">' + esc(p.marc.res || 'abordado') + ' · ' + esc(p.marc.quem) + ' · ' + dia(p.marc.em) + '</span>');
-    var meio = '';
-    if (p.tipo === 'clo') meio = '<div class="abd"><small>O que travou</small><p>' + esc(p.travou) + '</p><small>O que fazer</small><p>' + esc(p.fazer) + '</p></div>';
-    else meio = (p.pq ? '<div class="lead-f" style="grid-column:1 / -1">' + esc(p.pq) + '</div>' : '') + (p.msg ? '<div class="abd"><div class="abd-t"><small>Mensagem pronta</small><button type="button" class="b" onclick="copiar(this,\'' + p.id + '\',\'msg\')">Copiar</button></div><p>' + esc(p.msg) + '</p>' + (p.msg2 ? '<small>Depois que responder</small><p>' + esc(p.msg2) + '</p>' : '') + '</div>' : '');
-    var sel = '<select class="' + (p.marc && p.marc.res ? 'on' : '') + '" onchange="marcar(\'' + p.id + '\',true,this.value)" aria-label="Resultado">' + (D.resultados || ['']).map(function(x) { return '<option value="' + esc(x) + '"' + (p.marc && p.marc.res === x ? ' selected' : '') + '>' + (x || 'Resultado…') + '</option>'; }).join('') + '</select>';
-    var bts = (p.fone ? '<button type="button" class="b cl" onclick="copiar(this,\'' + p.id + '\',\'fone\')">' + esc(p.fone.replace(/^55(\d\d)(\d{5})(\d{4})$/, '($1) $2-$3')) + '</button>' : '') +
-      (p.link ? '<a class="b cl" href="' + esc(p.link) + '" target="_blank" rel="noopener">Abrir Instagram</a>' : '') +
-      (f && !p.res ? '<button type="button" class="b des" onclick="marcar(\'' + p.id + '\',false,\'\')">desfazer</button>' : (!f ? '<button type="button" class="b ab" onclick="marcar(\'' + p.id + '\',true,\'\')">Abordei</button>' : '')) + sel;
-    return '<div class="lead ' + t + (f ? ' feito' : '') + '" id="l-' + p.id + '"><div class="lead-n" onclick="abre(\'' + p.id + '\')"><b>' + esc(p.nome || '(sem nome)') + '</b>' + tg + '<span class="ver">' + (AB[p.id] ? 'fechar ficha ▴' : 'ver ficha ▾') + '</span></div><div class="lead-f">' + linha.join(' · ') + '</div><div class="lead-a">' + bts + '</div>' + meio + (AB[p.id] ? fichaHtml(p) : '') + '</div>';
+    var m = p.marc, r = p.res, id = esc(p.id), feito = !!((m && m.ok) || r), c = calor(p);
+    var tags = (p.cls ? '<span class="tag ' + (c === 1 ? 'alto' : c === 2 ? 'inv' : '') + '">' + (c === 1 ? '🔥 ' : '') + esc(p.cls) + '</span>' : '') + (p.urg ? '<span class="tag alto">⏰ esperando resposta nossa' + (p.urg === true || p.urg === 1 ? '' : ' · ' + esc(p.urg)) + '</span>' : '') + (p.ev ? '<span class="tag alto">🎓 ' + esc(p.ev) + '</span>' : '')
+      + (p.inv ? '<span class="tag inv">💰 ' + esc(p.inv) + '</span>' : '') + (p.seg ? '<span class="tag nota">' + Number(p.seg).toLocaleString('pt-BR') + ' seguidores</span>' : '') + (p.bol ? '<span class="tag ok">🧾 oferecer boleto</span>' : '') + (p.exc ? '<span class="tag nota">exceção: perfil forte</span>' : '')
+      + (p.marcas || []).map(function(x) { return '<span class="tag">' + esc(x) + '</span>'; }).join('')
+      + (r ? '<span class="tag ' + (r.vend ? 'ok' : 'inv') + '">' + (r.vend ? '💰 comprou · ' + rs(r.valor) : /no.?show/i.test(r.st) ? '🚫 faltou à reunião' : '📅 reunião · ' + esc(r.st || 'marcada')) + '</span>' : '')
+      + (m && m.ok ? '<span class="tag ok">' + (m.res === 'Já tinha abordado' ? '🔎 já tinha abordado' : '✅ ' + esc(m.res || 'abordado')) + ' · ' + esc(m.quem) + '</span>' : '');
+    var links = (p.cid ? (/^cm/.test(p.cid) ? '' : '<a class="b cl" href="' + CLINT + encodeURIComponent(p.cid) + '" target="_blank" rel="noopener">Clint ↗</a>') + '<a class="b cl" href="' + LEADC + encodeURIComponent(p.cid) + '" target="_blank" rel="noopener">Lead Center ↗</a>' : '')
+      + (p.link ? '<a class="b cl" href="' + esc(p.link) + '" target="_blank" rel="noopener">Instagram ↗</a>' : '')
+      + (p.fone ? '<button type="button" class="b cl" onclick="copiarFone(this,\'' + id + '\')" title="Copiar o WhatsApp">📱 ' + esc(String(p.fone).replace(/^55(\d\d)(\d{5})(\d{4})$/, '($1) $2-$3')) + '</button>' : '');
+    var sel = '<select class="' + (m && m.res && m.res !== 'Já tinha abordado' ? 'on' : '') + '" onchange="marcar(\'' + id + '\',true,this.value)" aria-label="Como foi">' + ['', 'Sem resposta', 'Respondeu', 'Marcou reunião', 'Sem interesse', 'Número errado'].map(function(x) { return '<option value="' + x + '"' + (m && m.res === x ? ' selected' : '') + '>' + (x || 'Como foi?') + '</option>'; }).join('') + '</select>';
+    var acao = r ? '' : (m && m.ok) ? sel + '<button type="button" class="b des" onclick="marcar(\'' + id + '\',false,\'\')">Desfazer</button>' : '<button type="button" class="b ab" onclick="marcar(\'' + id + '\',true,\'\')">✅ Abordei</button><button type="button" class="b" onclick="marcar(\'' + id + '\',true,\'Já tinha abordado\')" title="Você já tinha falado com o lead">🔎 Já tinha abordado</button>';
+    var linha = '<span>👤 ' + esc((D.pessoas || {})[p.dono] || p.dono) + '</span>' + (p.etapa ? '<span>📍 ' + esc(p.etapa) + '</span>' : '') + (p.sit ? '<span>📝 ' + esc(p.sit) + '</span>' : '')
+      + (p.tipo === 'clo' ? (p.prod ? '<span>📦 ' + esc(p.prod) + (p.valor ? ' · ' + rs(p.valor) : '') + '</span>' : '') + (p.ult ? '<span>🗓 última reunião ' + esc(p.ult) + '</span>' : '') : '')
+      + (p.tipo === 'ss' ? (p.insta ? '<span>' + esc(p.insta) + '</span>' : '') + (p.pal ? '<span>💬 comentou "' + esc(p.pal) + '"' + (p.ult ? ' em ' + esc(p.ult) : '') + '</span>' : '') : (p.insta && p.tipo === 'sdr' ? '<span>' + esc(p.insta) + '</span>' : ''))
+      + (r ? '<span>🗓 reunião ' + new Date(r.em).toLocaleDateString('pt-BR') + (r.closer ? ' · ' + esc(r.closer) : '') + '</span>' : '') + (m && m.em ? '<span>marcado em ' + hora(m.em) + '</span>' : '');
+    var mot = p.pq || (p.sinais || []).join(' · ');
+    return '<div class="lead ' + (feito ? 'feito' : 't' + c) + '"><div class="lead-n" role="button" tabindex="0" onclick="ficha(\'' + id + '\')" onkeydown="if(event.key===\'Enter\')ficha(\'' + id + '\')" title="Clique para ver a ficha"><b>' + esc(p.nome || 'Contato sem nome') + '</b>' + tags + '<span class="ver">' + (ABERTAS[p.id] ? '▴ fechar' : '▾ ver respostas') + '</span></div><div class="lead-a">' + links + acao + '</div>'
+      + '<div class="lead-f">' + linha + '</div>' + (mot ? '<div class="lead-f" style="color:var(--text)">💡 ' + esc(mot) + '</div>' : '')
+      + ((p.sinais || []).length && p.pq ? '<div class="lead-f">' + p.sinais.map(function(x) { return '<span>• ' + esc(x) + '</span>'; }).join('') + '</div>' : '')
+      + (!r ? abordagemHtml(p) : '') + (ABERTAS[p.id] ? fichaHtml(p) : '') + '</div>';
   }
   function desenhar() {
-    var c = document.getElementById('corpo'), h = plano();
-    if (D.gestor) { h += '<div class="abas" role="tablist"><button type="button" class="aba" role="tab" aria-selected="' + (EST.de === 'painel') + '" onclick="de(\'painel\')">Painel do time</button>';
-      Object.keys(D.pessoas).forEach(function(k) { var n = conta(k); if (n.t) h += '<button type="button" class="aba" role="tab" aria-selected="' + (EST.de === k) + '" onclick="de(\'' + k + '\')">' + esc(D.pessoas[k]) + '<small>' + n.f + '/' + n.t + '</small></button>'; }); h += '</div>'; }
-    if (EST.de === 'painel') { c.innerHTML = h + painel(); return; }
-    var n = conta(EST.de), mt = (D.metas || {})[EST.de] || {}, meta = mt.dia ? mt.dia * 3 : 0, P = (D.placar || {})[EST.de] || {};
-    h += '<div class="kpis"><div class="kpi q"><small>Para abordar</small><b>' + (n.t - n.f) + '</b><span>de ' + n.t + ' na sua lista</span></div><div class="kpi"><small>Abordados hoje</small><b>' + (P.hoje || 0) + '</b><span>' + n.f + ' no total</span></div><div class="kpi v"><small>Reuniões marcadas</small><b>' + n.m + (meta ? ' <span style="display:inline;font-size:.9rem;color:var(--muted)">de ' + meta + '</span>' : '') + '</b><span>' + esc(mt.txt || '') + '</span></div><div class="kpi v"><small>Vendas</small><b>' + n.v + '</b><span>' + (n.val ? real(n.val) : 'da planilha de vendas') + '</span></div></div>';
-    var ch = [['nao', 'Para abordar'], ['top', 'Ouro, quentes e urgentes'], ['sim', 'Já abordados'], ['reu', 'Reunião marcada'], ['todos', 'Todos']]; if (D.itens.some(function(p) { return p.dono === EST.de && p.bol; })) ch.splice(2, 0, ['bol', 'Sem cartão → boleto']);
-    h += '<div class="filtros"><input type="search" id="bs" placeholder="Buscar pelo nome ou @" value="' + esc(EST.busca) + '" oninput="busca(this.value)">' + ch.map(function(x) { return '<button type="button" class="chip' + (EST.f === x[0] ? ' on' : '') + '" onclick="filtro(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>';
-    var L = visiveis();
-    h += '<div class="lista">' + L.slice(0, EST.ver).map(cartao).join('') + '</div>' + (!L.length ? '<div class="card aviso"><b>Ninguém neste filtro</b>Troque o filtro acima.</div>' : '') + (L.length > EST.ver ? '<button type="button" class="b" style="align-self:center;margin-top:12px" onclick="EST.ver+=60;desenhar()">Mostrar mais (' + (L.length - EST.ver) + ')</button>' : '');
+    var c = document.getElementById('corpo'), tp = tipoDe(EST.de), L = visiveis(), G = { g1: [], g2: [], g3: [], joao: [], reu: [], feitos: [] };
+    L.forEach(function(p) { G[grupo(p)].push(p); });
+    ['g1', 'g2', 'g3', 'joao'].forEach(function(k) { G[k].sort(function(a, b) { return (b.urg ? 1 : 0) - (a.urg ? 1 : 0) || (b.pri || 0) - (a.pri || 0); }); });
+    var quando = function(p) { return (p.marc && p.marc.em) || (p.res && p.res.em) || 0; }; G.feitos.sort(function(a, b) { return quando(b) - quando(a); }); G.reu.sort(function(a, b) { return quando(b) - quando(a); });
+    var n = conta(EST.de), mt = (D.metas || {})[EST.de] || {}, meta = mt.dia ? mt.dia * 3 : 0;
+    document.getElementById('sub').textContent = 'Olá, ' + D.nome + '. ' + (D.gestor ? 'Você vê o time inteiro: clique numa pessoa no painel para abrir a lista dela.' : 'Esta é a sua lista: só gente com perfil de high ticket. Marque cada pessoa que você abordar.');
+    var h = '';
+    if (D.gestor) h += painelGestor();
+    else if (D.porLink) h += '<p class="nota" style="margin:0">Você entrou pelo seu link pessoal. Não encaminhe este link: ele abre a sua lista. <a href="#" onclick="sair();return false" style="color:var(--accent)">Sair deste acesso</a></p>';
+    if (D.gestor) h += '<div class="abas">' + Object.keys(D.pessoas).filter(function(k) { return conta(k).t; }).map(function(k) { var x = conta(k); return '<button type="button" class="aba" aria-selected="' + (EST.de === k) + '" onclick="de(\'' + k + '\')">' + esc(D.pessoas[k]) + ' <small>' + x.pend + '</small></button>'; }).join('') + '</div>';
+    h += '<div class="kpis"><div class="kpi q"><small>Para chamar</small><b>' + n.pend + '</b><span>' + (n.urg ? n.urg + ' esperando resposta nossa' : 'de ' + n.t + ' na lista') + '</span></div>'
+      + '<div class="kpi"><small>🔥 Chamar hoje</small><b>' + G.g1.length + '</b><span>os mais quentes</span></div>'
+      + '<div class="kpi v"><small>Trabalhados hoje</small><b>' + n.hoje + '</b><span>' + n.f + ' no total</span></div>'
+      + '<div class="kpi"><small>📅 Reuniões marcadas</small><b>' + n.m + (meta ? ' <span style="display:inline;font-size:.9rem;color:var(--muted)">de ' + meta + '</span>' : '') + '</b><span>' + esc(mt.txt || 'meta até segunda') + '</span></div>'
+      + '<div class="kpi v"><small>💰 Vendas</small><b>' + n.v + '</b><span>' + (n.v ? rs(n.val) : 'saídas desta lista') + '</span></div></div>';
+    h += '<div class="card"><h2>Quem chamar primeiro</h2>' + ordemHtml(tp) + '<p class="nota" style="margin:12px 0 0">A lista já vem nesta ordem. A cor da borda mostra o calor: vermelho = hoje, laranja = até sábado.</p>'
+      + '<div style="margin-top:12px"><button type="button" class="b sug" onclick="EST.rot=!EST.rot;desenhar()"><span>📖 ' + (tp === 'clo' ? 'Roteiro da ligação de recuperação' : 'O processo passo a passo, com as falas e as objeções') + '</span><span>' + (EST.rot ? 'fechar ▴' : 'ver ▾') + '</span></button>' + (EST.rot ? '<div style="margin-top:10px">' + processoHtml(tp) + '</div>' : '') + '</div></div>';
+    var abas = [['g1', '🔥 Chamar hoje'], ['g2', '🟠 Até sábado'], ['g3', '🔵 Se sobrar tempo']]; if (G.joao.length || tp === 'ss') abas.push(['joao', '👤 Pelo João']); abas = abas.filter(function(a) { return G[a[0]].length || a[0] === 'g1'; }).concat([['reu', '📅 Com reunião'], ['feitos', '✅ Abordados']]);
+    if (!abas.some(function(a) { return a[0] === EST.aba; })) EST.aba = abas[0][0];
+    h += '<div class="abas" role="tablist">' + abas.map(function(a) { return '<button type="button" class="aba" role="tab" aria-selected="' + (EST.aba === a[0]) + '" onclick="aba(\'' + a[0] + '\')">' + a[1] + ' <small>' + G[a[0]].length + '</small></button>'; }).join('') + '</div>';
+    var doDono = D.itens.filter(function(p) { return p.dono === EST.de; }), ch = [['', 'Todos']]; if (doDono.some(function(p) { return p.urg; })) ch.push(['urg', '⏰ Esperando resposta']); if (doDono.some(function(p) { return p.ev; })) ch.push(['ev', '🎓 Passou por evento']); if (doDono.some(function(p) { return p.bol; })) ch.push(['bol', '🧾 Oferecer boleto']);
+    h += '<div class="filtros">' + (ch.length > 1 ? ch.map(function(x) { return '<button type="button" class="chip' + (EST.f === x[0] ? ' on' : '') + '" onclick="filtro(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') : '') + '<input type="search" id="bs" placeholder="Procurar pelo nome ou @…" value="' + esc(EST.busca) + '" oninput="busca(this.value)" aria-label="Procurar"></div>';
+    var lst = G[EST.aba], vazio = { feitos: 'Ninguém abordado ainda', reu: 'Nenhuma reunião marcada ainda a partir desta lista' }[EST.aba] || 'Ninguém aqui 🎉';
+    h += lst.length ? '<div class="lista" id="lst">' + lst.slice(0, EST.ver).map(cartao).join('') + '</div>' + (lst.length > EST.ver ? '<div style="text-align:center"><button type="button" class="b" onclick="mais()">Mostrar mais ' + Math.min(50, lst.length - EST.ver) + ' (faltam ' + (lst.length - EST.ver) + ')</button></div>' : '') : '<div class="card aviso"><b>' + vazio + '</b>' + (EST.busca || EST.f ? 'Nada com esse filtro.' : '') + '</div>';
+    h += '<p class="nota" style="text-align:center">Clicou em "Abordei", o lead vai para "Abordados" e você escolhe como foi. Quando a reunião entra na planilha de vendas, ele vai sozinho para "Com reunião". Sem condição especial: a urgência é a agenda, que fecha na segunda.</p>';
     c.innerHTML = h;
   }
-  function de(k) { EST.de = k; EST.ver = 50; EST.busca = ''; EST.f = 'nao'; desenhar(); scrollTo(0, 0); }
+  function de(k) { EST.de = k; EST.aba = 'g1'; EST.ver = 50; EST.busca = ''; EST.f = ''; desenhar(); var a = document.querySelector('.kpis'); if (a && D.gestor) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  function aba(k) { EST.aba = k; EST.ver = 50; desenhar(); }
   function filtro(k) { EST.f = k; EST.ver = 50; desenhar(); }
-  function busca(v) { EST.busca = v; EST.ver = 50; desenhar(); var i = document.getElementById('bs'); i.focus(); i.setSelectionRange(v.length, v.length); }
-  function abre(id) { AB[id] = !AB[id]; desenhar(); }
+  function mais() { EST.ver += 50; desenhar(); }
+  function busca(v) { EST.busca = v; EST.ver = 50; desenhar(); var i = document.getElementById('bs'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } }
+  function ficha(id) { ABERTAS[id] = !ABERTAS[id]; desenhar(); }
+  function verRot(id) { ROTA[id] = !ROTA[id]; desenhar(); }
   function item(id) { return D.itens.filter(function(p) { return p.id === id; })[0]; }
-  function copiar(b, id, campo) { var p = item(id), t = campo === 'fone' ? p.fone : p.msg; navigator.clipboard.writeText(t).then(function() { var o = b.textContent; b.textContent = 'Copiado'; setTimeout(function() { b.textContent = o; }, 1300); }); }
-  function marcar(id, ok, res) { var p = item(id), antes = p.marc; p.marc = ok || res ? { ok: true, res: res, quem: D.nome, em: Date.now() } : null; desenhar();
-    robo({ action: 'opHtMarcar', tok: tok(), id: id, ok: ok, res: res }, function(d) { if (!d || !d.success) { p.marc = antes; desenhar(); alert((d && d.error) || 'Não consegui gravar. Tente de novo.'); } }, function() { p.marc = antes; desenhar(); alert('Sem conexão com o robô. Tente de novo.'); }); }
+  function pisca(b) { var o = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(function() { b.textContent = o; }, 1300); }
+  function copiarFone(b, id) { navigator.clipboard.writeText(item(id).fone).then(function() { pisca(b); }); }
+  function copiarTxt(b, id, i) { var x = (PASSO[id] || [])[i]; if (x) navigator.clipboard.writeText(x[1]).then(function() { pisca(b); }); }
+  function marcar(id, ok, res) { var p = item(id), antes = p.marc; p.marc = ok ? { ok: true, res: res, quem: D.nome, em: Date.now() } : null; desenhar();
+    var falhou = function(msg) { p.marc = antes; desenhar(); alert(msg || 'Não consegui gravar. Tente de novo.'); };
+    var manda = function(r2, segunda) { robo({ action: 'opHtMarcar', tok: tok(), id: id, ok: ok, res: r2 }, function(d) { if (d && d.success) return; if (!segunda && r2 === 'Já tinha abordado') return manda('', true); falhou(d && d.error); }, function() { falhou('Sem conexão com o robô. Tente de novo.'); }); };
+    manda(res, false); }
   carregar();
 </script>
 </body>
