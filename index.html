@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-26-0930';
+var VERSAO_DASH = '2026-11-26-1015';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46187,7 +46187,7 @@ try { viMostrarMenu(); } catch (eViM2) {}
 
 <!-- 📈 desempenho-anual:inicio (25/11/2026 · Bruno: "nova aba Desempenho Anual, com o gráfico do desempenho anual de vendas, filtro por mês, ligar e desligar as linhas e as métricas do período") -->
 <style>
-#s-anual{--a0:#60a5fa;--a1:#fbbf24;--a2:#34d399;--a3:#c084fc;--a4:#fb7185;--a5:#cbd5e1;--a6:#22d3ee;--a7:#e0a876;--a8:#a3e635;--a9:#e879f9;--a10:#fca5a5;--a11:#93c5fd;--a12:#ffffff;--a13:#5eead4;--a14:#f9a8d4;--a15:#fde047;--a16:#fb923c;--a17:#38bdf8}
+#s-anual{--a0:#60a5fa;--a1:#fbbf24;--a2:#34d399;--a3:#c084fc;--a4:#fb7185;--a5:#cbd5e1;--a6:#22d3ee;--a7:#e0a876;--a8:#a3e635;--a9:#e879f9;--a10:#fca5a5;--a11:#93c5fd;--a12:#ffffff;--a13:#5eead4;--a14:#f9a8d4;--a15:#fde047;--a16:#fb923c;--a17:#38bdf8;--a18:#a78bfa;--a19:#f472b6}
 #s-anual .anu{display:flex;flex-direction:column;gap:14px}
 #s-anual .anu-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 18px;min-width:0}
 #s-anual .anu-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -46250,7 +46250,7 @@ var ANU = {
   WK: [null,null,null,null,null,null,374,503,661,648,191],
   RE: [71,36,69,73,57,46,109,113,193,178,106],
   FD: [null,null,null,227814,135023,227273,48356,148753,382087,263763,193067],
-  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [],   // preenchidas por anuVivo()
+  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [], RWS: [],   // preenchidas por anuVivo()
   de: 0, ate_i: 10, X: null
 };
 (function(){
@@ -46274,7 +46274,9 @@ var ANU = {
     // 26/11/2026 (Bruno): calculadas ao vivo da planilha de vendas (anuVivo) — funil do diagnóstico SEM as reuniões do workshop
     { id:'FRD', n:'Fat. por reunião · diagnóstico (sem workshop)', c:C(15), d:ANU.FRD, top:30000, f:'r', da:'6 2 2 2', g:'t' },
     { id:'CVD', n:'Conversão das reuniões · diagnóstico (%)', c:C(17), d:ANU.CVD, top:60, f:'p', da:'1 2', g:'v' },
-    { id:'FWS', n:'Faturamento das reuniões do workshop', c:C(16), d:ANU.FWS, top:600000, f:'r', da:'10 3 2 3', g:'d' }
+    { id:'FWS', n:'Faturamento das reuniões do workshop', c:C(16), d:ANU.FWS, top:600000, f:'r', da:'10 3 2 3', g:'d' },
+    { id:'RDG', n:'Reuniões do diagnóstico (sem workshop)', c:C(18), d:ANU.RDG, top:900, f:'n', da:'4 3', g:'w' },
+    { id:'RWS', n:'Reuniões do workshop (realizadas)', c:C(19), d:ANU.RWS, top:900, f:'n', da:'4 3 1 3', g:'w' }
   ]);
   ANU.sum = sum;
 })();
@@ -46287,10 +46289,10 @@ function anuF(z, v){ return v == null ? '–' : z.f === 'r' ? anuR(v) : z.f === 
 function anuEhWs(r){ return /workshop/.test(v2norm(r.origem || '')); }
 function anuVivo(){
   var rows = (typeof V2 !== 'undefined' && V2.rows) || [], n = ANU.M.length, z = function(){ var a = []; for (var i = 0; i < n; i++) a.push(0); return a; };
-  var fdg = z(), rdg = z(), vdg = z(), fws = z(), vws = z();
+  var fdg = z(), rdg = z(), vdg = z(), fws = z(), vws = z(), rws = z();
   rows.forEach(function(r){
     var ws = anuEhWs(r);
-    if (r.date && r.date.getFullYear() === 2026 && typeof _fsRealizada === 'function' && _fsRealizada(r.sn) && !ws) rdg[r.date.getMonth()]++;
+    if (r.date && r.date.getFullYear() === 2026 && r.date.getMonth() < n && typeof _fsRealizada === 'function' && _fsRealizada(r.sn)) { if (ws) rws[r.date.getMonth()]++; else rdg[r.date.getMonth()]++; }
     if (r.sn !== 'vendido') return;
     var t = typeof plDataVenda === 'function' ? plDataVenda(r) : (r.date ? r.date.getTime() : null); if (!t) return;
     var d = new Date(t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
@@ -46298,7 +46300,7 @@ function anuVivo(){
   });
   var ok = rows.length > 0;
   for (var i = 0; i < n; i++) {
-    ANU.FDG[i] = ok ? fdg[i] : null; ANU.RDG[i] = ok ? rdg[i] : null; ANU.VDG[i] = ok ? vdg[i] : null; ANU.FWS[i] = ok ? Math.round(fws[i]) : null; ANU.VWS[i] = ok ? vws[i] : null;
+    ANU.FDG[i] = ok ? fdg[i] : null; ANU.RDG[i] = ok ? rdg[i] : null; ANU.VDG[i] = ok ? vdg[i] : null; ANU.FWS[i] = ok ? Math.round(fws[i]) : null; ANU.VWS[i] = ok ? vws[i] : null; ANU.RWS[i] = ok ? rws[i] : null;
     ANU.FRD[i] = ok && rdg[i] ? Math.round(fdg[i] / rdg[i]) : null;
     ANU.CVD[i] = ok && rdg[i] ? Math.round(vdg[i] / rdg[i] * 1000) / 10 : null;
   }
@@ -46332,7 +46334,7 @@ function anuRender(){
       '</div>' +
       '<div class="anu-card" id="anu-met"></div>' +
       '<div class="anu-card"><h3>Mês a mês no período</h3><div class="anu-tw"><table class="anu-tb" id="anu-tb"></table></div>' +
-        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. Faturamento do diagnóstico = vendas de leads com origem diagnóstico (orgânico + anúncios), a partir de abril. <b>Ao vivo da planilha:</b> “diagnóstico (sem workshop)” = todas as reuniões menos as de origem Workshop, Pré workshop e Pós workshop (entram orgânico, anúncios, ManyChat, social selling, indicação, recuperação, ILD e sem origem); fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
+        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. Faturamento do diagnóstico = vendas de leads com origem diagnóstico (orgânico + anúncios), a partir de abril. <b>Ao vivo da planilha:</b> “diagnóstico (sem workshop)” = todas as reuniões menos as de origem Workshop, Pré workshop e Pós workshop (entram orgânico, anúncios, ManyChat, social selling, indicação, recuperação, ILD e sem origem); fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; reuniões do diagnóstico e do workshop = reuniões realizadas no mês (sem no-show), separadas pela origem; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
       '</div>';
     el.setAttribute('data-ok', '1');
     var ultimo = null;
@@ -46395,11 +46397,15 @@ function anuGrafico(){
   var n = I.length, passo = n > 1 ? (W - l - r) / (n - 1) : 0;
   var x = function(j){ return n > 1 ? l + j * passo : (l + W - r) / 2; }, y = function(v, top){ return t + (H - t - b) * (1 - Math.min(v, top * 1.05) / top); };
   var V = ANU.S.filter(function(z){ return !ANU.X[z.id]; });
+  // 26/11/2026: o eixo de ingressos e reuniões se ajusta ao que está visível (sem os ingressos, as reuniões cabem em 150 ou 300)
+  var wMax = 0; V.forEach(function(z){ if (z.g === 'w') I.forEach(function(i){ var v = z.d[i]; if (v != null && v > wMax) wMax = v; }); });
+  var wTop = wMax <= 150 ? 150 : wMax <= 300 ? 300 : wMax <= 600 ? 600 : 900;
+  ANU.S.forEach(function(z){ if (z.g === 'w') z.top = wTop; });
   var s = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Gráfico mensal de vendas, leads e faturamento"><text x="0" y="12"><tspan style="fill:var(--a8)">Ingressos e reuniões</tspan> · Vendas · <tspan style="fill:var(--a17)">Conversão %</tspan></text><text x="' + W + '" y="12" text-anchor="end"><tspan style="fill:var(--a5)">Leads</tspan> · <tspan style="fill:var(--a14)">Fat. diag.</tspan> · <tspan style="fill:var(--a7)">Ticket</tspan></text>';
   for (var g = 0; g < 4; g++) {
     var gy = y(g, 3);
     s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + gy + '" y2="' + gy + '" stroke="rgba(255,255,255,.08)"/>' +
-      '<text x="0" y="' + (gy + 4) + '" style="fill:var(--a8)">' + g * 300 + '</text><text x="' + (l - 6) + '" y="' + (gy + 4) + '" text-anchor="end">' + g * 20 + '</text>' +
+      '<text x="0" y="' + (gy + 4) + '" style="fill:var(--a8)">' + g * wTop / 3 + '</text><text x="' + (l - 6) + '" y="' + (gy + 4) + '" text-anchor="end">' + g * 20 + '</text>' +
       '<text x="' + (W - r + 8) + '" y="' + (gy + 4) + '" style="fill:var(--a5)">' + (g * 600).toLocaleString('pt-BR') + '</text>' +
       '<text x="' + (W - 30) + '" y="' + (gy + 4) + '" text-anchor="end" style="fill:var(--a14)">' + g * 200 + 'k</text>' +
       '<text x="' + W + '" y="' + (gy + 4) + '" text-anchor="end" style="fill:var(--a7)">' + g * 10 + 'k</text>';
@@ -46438,7 +46444,7 @@ function anuPer(a, b){
   var L = sm(ANU.L).v, HT = sm(ANU.HT).v, o = {
     meses: b - a + 1, vend: vend, fat: fat, tm: vend ? fat / vend : null, sp: sp, spf: spf, re: re, fr: re ? fat / re : null, conv: re ? vend / re * 100 : null,
     L: L, LC: sm(ANU.LC).v, MQ: sm(ANU.MQ).v, HT: HT, MS: sm(ANU.MS), WK: sm(ANU.WK), FD: sm(ANU.FD),
-    spHT: HT ? sp / HT * 100 : null, fdg: sm(ANU.FDG), rdg: sm(ANU.RDG), vdg: sm(ANU.VDG), fws: sm(ANU.FWS), vws: sm(ANU.VWS), v1000: L ? vend / L * 1000 : null, mqlPct: L ? sm(ANU.MQ).v / L * 100 : null,
+    spHT: HT ? sp / HT * 100 : null, fdg: sm(ANU.FDG), rdg: sm(ANU.RDG), vdg: sm(ANU.VDG), fws: sm(ANU.FWS), vws: sm(ANU.VWS), rws: sm(ANU.RWS), v1000: L ? vend / L * 1000 : null, mqlPct: L ? sm(ANU.MQ).v / L * 100 : null,
     prod: ANU.P.map(function(_, p){ var q = 0, r = 0; for (var i = a; i <= b; i++) { q += ANU.Q[i][p]; r += ANU.RV[i][p]; } return { q: q, r: r }; })
   };
   return o;
@@ -46473,6 +46479,7 @@ function anuMetricas(){
     kp('Vendas a cada 100 reuniões', o.conv == null ? '–' : anuN(Math.round(o.conv * 10) / 10), dl(o.conv, ant && ant.conv).replace(/^ · /, '')) +
     kp('Fat. por reunião · diagnóstico', o.fdg && o.rdg && o.rdg.v ? anuR(o.fdg.v / o.rdg.v) : '–', o.rdg ? rkoN0(o.rdg.v) + ' reuniões sem workshop' + dl(o.rdg && o.rdg.v ? o.fdg.v / o.rdg.v : null, ant && ant.rdg && ant.rdg.v ? ant.fdg.v / ant.rdg.v : null) : '', 1) +
     kp('Conversão · diagnóstico', o.vdg && o.rdg && o.rdg.v ? anuN(Math.round(o.vdg.v / o.rdg.v * 1000) / 10) + '%' : '–', o.vdg ? rkoN0(o.vdg.v) + ' vendas' + dl(o.rdg && o.rdg.v ? o.vdg.v / o.rdg.v : null, ant && ant.rdg && ant.rdg.v ? ant.vdg.v / ant.rdg.v : null) : '') +
+    kp('Reuniões do workshop', o.rws ? rkoN0(o.rws.v) : '–', o.rws && o.vws ? rkoN0(o.vws.v) + ' vendas · conversão ' + anuN(Math.round(o.vws.v / o.rws.v * 1000) / 10) + '%' + dl(o.rws.v, ant && ant.rws && ant.rws.v) : '') +
     kp('Faturamento do workshop', o.fws ? anuRc(o.fws.v) : '–', o.vws ? rkoN0(o.vws.v) + ' venda' + (o.vws.v === 1 ? '' : 's') + (o.fat ? ' · ' + anuN(Math.round(o.fws.v / o.fat * 100)) + '% do total' : '') + dl(o.fws && o.fws.v, ant && ant.fws && ant.fws.v) : '') +
     kp('Spark a cada 100 leads HT', o.spHT == null ? '–' : anuN(Math.round(o.spHT * 10) / 10), dl(o.spHT, ant && ant.spHT).replace(/^ · /, '')) +
     '</div>';
@@ -46499,11 +46506,11 @@ function anuTabela(){
   var a = ANU.de, b = ANU.ate_i, o = anuPer(a, b), rows = '';
   var td = function(v){ return '<td>' + v + '</td>'; };
   for (var i = a; i <= b; i++) {
-    rows += '<tr><td>' + ANU.M[i] + (i === ANU.parcial ? '*' : '') + '</td>' + ANU.Q[i].map(td).join('') + td('<b>' + ANU.T[i] + '</b>') + td(anuR(ANU.TR[i])) + td(anuR(ANU.TM[i])) + td(anuR(ANU.FR[i])) + td(ANU.RE[i]) + td(anuR(ANU.FD[i])) + td(anuR(ANU.FRD[i])) + td(ANU.CVD[i] == null ? '–' : anuN(ANU.CVD[i]) + '%') + td(anuR(ANU.FWS[i])) +
+    rows += '<tr><td>' + ANU.M[i] + (i === ANU.parcial ? '*' : '') + '</td>' + ANU.Q[i].map(td).join('') + td('<b>' + ANU.T[i] + '</b>') + td(anuR(ANU.TR[i])) + td(anuR(ANU.TM[i])) + td(anuR(ANU.FR[i])) + td(ANU.RE[i]) + td(anuR(ANU.FD[i])) + td(ANU.RDG[i] == null ? '–' : ANU.RDG[i]) + td(ANU.RWS[i] == null ? '–' : ANU.RWS[i]) + td(anuR(ANU.FRD[i])) + td(ANU.CVD[i] == null ? '–' : anuN(ANU.CVD[i]) + '%') + td(anuR(ANU.FWS[i])) +
       td(anuN(ANU.L[i])) + td(anuN(ANU.LC[i])) + td(anuN(ANU.MQ[i])) + td(anuN(ANU.HT[i])) + td(anuN(ANU.MS[i])) + td(anuN(ANU.WK[i])) + '</tr>';
   }
-  document.getElementById('anu-tb').innerHTML = '<thead><tr><th>Mês</th><th>Spark Sem.</th><th>Spark Anual</th><th>Growth</th><th>Mentoria LD</th><th>Legado Club</th><th>Total</th><th>Faturamento</th><th>Ticket médio</th><th>Fat./reunião</th><th>Reuniões</th><th>Fat. diagnóstico</th><th>Fat./reunião diag.</th><th>Conversão diag.</th><th>Fat. workshop</th><th>Leads reais</th><th>Completos</th><th>MQL</th><th>HT</th><th>MQL score</th><th>Ingressos</th></tr></thead><tbody>' + rows +
-    '</tbody><tfoot><tr><td>Total</td>' + o.prod.map(function(p){ return td(p.q); }).join('') + td(o.vend) + td(anuR(o.fat)) + td(anuR(o.tm)) + td(anuR(o.fr)) + td(o.re) + td(o.FD ? anuR(o.FD.v) : '–') + td(o.fdg && o.rdg && o.rdg.v ? anuR(o.fdg.v / o.rdg.v) : '–') + td(o.vdg && o.rdg && o.rdg.v ? anuN(Math.round(o.vdg.v / o.rdg.v * 1000) / 10) + '%' : '–') + td(o.fws ? anuR(o.fws.v) : '–') +
+  document.getElementById('anu-tb').innerHTML = '<thead><tr><th>Mês</th><th>Spark Sem.</th><th>Spark Anual</th><th>Growth</th><th>Mentoria LD</th><th>Legado Club</th><th>Total</th><th>Faturamento</th><th>Ticket médio</th><th>Fat./reunião</th><th>Reuniões</th><th>Fat. diagnóstico</th><th>Reuniões diag.</th><th>Reuniões workshop</th><th>Fat./reunião diag.</th><th>Conversão diag.</th><th>Fat. workshop</th><th>Leads reais</th><th>Completos</th><th>MQL</th><th>HT</th><th>MQL score</th><th>Ingressos</th></tr></thead><tbody>' + rows +
+    '</tbody><tfoot><tr><td>Total</td>' + o.prod.map(function(p){ return td(p.q); }).join('') + td(o.vend) + td(anuR(o.fat)) + td(anuR(o.tm)) + td(anuR(o.fr)) + td(o.re) + td(o.FD ? anuR(o.FD.v) : '–') + td(o.rdg ? o.rdg.v : '–') + td(o.rws ? o.rws.v : '–') + td(o.fdg && o.rdg && o.rdg.v ? anuR(o.fdg.v / o.rdg.v) : '–') + td(o.vdg && o.rdg && o.rdg.v ? anuN(Math.round(o.vdg.v / o.rdg.v * 1000) / 10) + '%' : '–') + td(o.fws ? anuR(o.fws.v) : '–') +
     td(anuN(o.L)) + td(anuN(o.LC)) + td(anuN(o.MQ)) + td(anuN(o.HT)) + td(o.MS ? anuN(o.MS.v) : '–') + td(o.WK ? anuN(o.WK.v) : '–') + '</tr></tfoot>';
 }
 </script>
