@@ -118,7 +118,7 @@
 <script>
   var ROBO = 'https://script.google.com/macros/s/AKfycbxj7EtQMHIB7VSZFh8Fea3uhp10dI2ubIlTy9MEJakGNtfhYilg3v4hyPEJAPi7ydku/exec';
   var CLINT = 'https://app.clint.digital/contacts/', LEADC = 'https://leads.legado.club/ir/contacts/';
-  var D = null, EST = { de: '', aba: 'g1', busca: '', ver: 50, f: '', rot: false }, ABERTAS = {}, ROTA = {}, PASSO = {};
+  var D = null, EST = { de: '', aba: 'pend', busca: '', ver: 50, f: '', rot: false }, ABERTAS = {}, ROTA = {}, PASSO = {};
   var esc = function(t) { return String(t == null ? '' : t).replace(/[<>&"]/g, function(c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); };
   function tok() { try { var m = /[#&]k=([^&]+)/.exec(location.hash); if (m) { localStorage.setItem('sdrlLink', decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname); }
     return localStorage.getItem('sdrlLink') || localStorage.getItem('comPainelTok') || localStorage.getItem('scoreTok') || ''; } catch (e) { return ''; } }
@@ -141,7 +141,7 @@
   function primeiro() { var ks = Object.keys(D.pessoas).filter(function(k) { return D.itens.some(function(p) { return p.dono === k; }); }); return ks[0] || D.eu; }
   // em qual aba o lead fica: reunião marcada · abordado · pelo João · chamar hoje · até sábado · se sobrar tempo
   function calor(p) { var c = String(p.cls || '').toUpperCase(); return /A\+|OURO|QUENTE/.test(c) ? 1 : /^A$|PRATA|MORNO/.test(c) ? 2 : 3; }
-  function grupo(p) { if (p.res || (p.marc && p.marc.res === 'Marcou reunião')) return 'reu'; if (p.marc && p.marc.ok) return 'feitos'; if (p.joao) return 'joao'; return 'g' + calor(p); }
+  function grupo(p) { if (p.res || (p.marc && p.marc.res === 'Marcou reunião')) return 'reu'; if (p.marc && p.marc.ok) return 'feitos'; if (p.joao) return 'joao'; return 'pend'; }   // 26/11 (Bruno: "coloca uma lista só para eles decidirem"): sem separar hoje / sábado
   function conta(k) { var o = { t: 0, pend: 0, f: 0, hoje: 0, m: 0, v: 0, val: 0, urg: 0 }, h0 = new Date(); h0.setHours(0, 0, 0, 0);
     D.itens.forEach(function(p) { if (p.dono !== k) return; o.t++; var g = grupo(p); if (g === 'reu') o.m++; if (g === 'reu' || g === 'feitos') { o.f++; if (p.marc && p.marc.em >= h0.getTime()) o.hoje++; } else { o.pend++; if (p.urg) o.urg++; } if (p.res && p.res.vend) { o.v++; o.val += p.res.valor || 0; } }); return o; }
   // painel do time, sempre no alto para a gestão (igual ao da página Leads sem contato)
@@ -163,8 +163,8 @@
   // "Quem chamar primeiro" e o processo, por função
   function ordemHtml(tp) {
     var li = tp === 'clo' ? ['<b>Bloqueio de oferta e entrada</b>Já disse sim. Falta pagar: ligar hoje e mandar o link na chamada.', '<b>Esperando resposta nossa</b>O lead escreveu e ficou sem retorno. Responder antes de qualquer outra coisa.', '<b>Data prometida vencida</b>Disse "dia tal" ou "mês que vem" e a data já passou.', '<b>Travou no cartão ou no limite</b>Oferecer o boleto agora (entrada + parcelas). Esperar o cartão virar não recupera.', '<b>Achou caro e tem perfil</b>Depois da escada do pagamento, o Spark Semestral como degrau.', '<b>Mornos e frios bons</b>Só depois de zerar os de cima.']
-      : tp === 'ss' ? ['<b>Chamar hoje</b>Perfil forte que comentou há pouco. A mensagem já está pronta em cada um.', '<b>Até sábado</b>Mesmo critério, um pouco menos quente.', '<b>Pelo João</b>Perfis muito fortes ou antigos: a mensagem é na voz dele e só sai com ele aprovando.', '<b>Quem responder</b>Duas perguntas, convite e pedir o WhatsApp para mandar o link. Não precisa preencher formulário.']
-      : ['<b>Esperando resposta nossa</b>A pessoa escreveu e ninguém respondeu. Primeira tarefa do dia.', '<b>Passou por evento (ILD ou workshop)</b>Já conhece o João. É quem mais compra.', '<b>Chamar hoje (A+)</b>Marcou R$ 2 a 4 mil e deu 2 sinais ou mais em poucos dias.', '<b>Até sábado (A)</b>Perfil certo, um pouco menos quente.', '<b>No-show</b>"A gente não conseguiu se falar": oferecer outro horário.', '<b>Regra de ouro</b>Ligar primeiro, mensagem em seguida. Marcar para hoje ou amanhã, nunca depois de segunda.'];
+      : tp === 'ss' ? ['<b>Os mais quentes (A+)</b>Perfil forte que comentou há pouco. A mensagem já está pronta em cada um.', '<b>Depois os A</b>Mesmo critério, um pouco menos quente.', '<b>Pelo João</b>Perfis muito fortes ou antigos: a mensagem é na voz dele e só sai com ele aprovando.', '<b>Quem responder</b>Duas perguntas, convite e pedir o WhatsApp para mandar o link. Não precisa preencher formulário.']
+      : ['<b>Esperando resposta nossa</b>A pessoa escreveu e ninguém respondeu. Primeira tarefa do dia.', '<b>Passou por evento (ILD ou workshop)</b>Já conhece o João. É quem mais compra.', '<b>Os mais quentes (A+)</b>Marcou R$ 2 a 4 mil e deu 2 sinais ou mais em poucos dias.', '<b>Depois os A e os B</b>Perfil certo, um pouco menos quente. B é a segunda camada: R$ 2 a 4 mil sem outro sinal.', '<b>No-show</b>"A gente não conseguiu se falar": oferecer outro horário.', '<b>Regra de ouro</b>Ligar primeiro, mensagem em seguida. Marcar para hoje ou amanhã, nunca depois de segunda.'];
     return '<ol class="ordem">' + li.map(function(x) { return '<li>' + x + '</li>'; }).join('') + '</ol>';
   }
   function processoHtml(tp) {
@@ -221,9 +221,9 @@
       + (!r ? abordagemHtml(p) : '') + (ABERTAS[p.id] ? fichaHtml(p) : '') + '</div>';
   }
   function desenhar() {
-    var c = document.getElementById('corpo'), tp = tipoDe(EST.de), L = visiveis(), G = { g1: [], g2: [], g3: [], joao: [], reu: [], feitos: [] };
+    var c = document.getElementById('corpo'), tp = tipoDe(EST.de), L = visiveis(), G = { pend: [], joao: [], reu: [], feitos: [] };
     L.forEach(function(p) { G[grupo(p)].push(p); });
-    ['g1', 'g2', 'g3', 'joao'].forEach(function(k) { G[k].sort(function(a, b) { return (b.urg ? 1 : 0) - (a.urg ? 1 : 0) || (b.pri || 0) - (a.pri || 0); }); });
+    ['pend', 'joao'].forEach(function(k) { G[k].sort(function(a, b) { return (b.urg ? 1 : 0) - (a.urg ? 1 : 0) || (b.pri || 0) - (a.pri || 0); }); });
     var quando = function(p) { return (p.marc && p.marc.em) || (p.res && p.res.em) || 0; }; G.feitos.sort(function(a, b) { return quando(b) - quando(a); }); G.reu.sort(function(a, b) { return quando(b) - quando(a); });
     var n = conta(EST.de), mt = (D.metas || {})[EST.de] || {}, meta = mt.dia ? mt.dia * 3 : 0;
     document.getElementById('sub').textContent = 'Olá, ' + D.nome + '. ' + (D.gestor ? 'Você vê o time inteiro: clique numa pessoa no painel para abrir a lista dela.' : 'Esta é a sua lista: só gente com perfil de high ticket. Marque cada pessoa que você abordar.');
@@ -232,13 +232,13 @@
     else if (D.porLink) h += '<p class="nota" style="margin:0">Você entrou pelo seu link pessoal. Não encaminhe este link: ele abre a sua lista. <a href="#" onclick="sair();return false" style="color:var(--accent)">Sair deste acesso</a></p>';
     if (D.gestor) h += '<div class="abas">' + Object.keys(D.pessoas).filter(function(k) { return conta(k).t; }).map(function(k) { var x = conta(k); return '<button type="button" class="aba" aria-selected="' + (EST.de === k) + '" onclick="de(\'' + k + '\')">' + esc(D.pessoas[k]) + ' <small>' + x.pend + '</small></button>'; }).join('') + '</div>';
     h += '<div class="kpis"><div class="kpi q"><small>Para chamar</small><b>' + n.pend + '</b><span>' + (n.urg ? n.urg + ' esperando resposta nossa' : 'de ' + n.t + ' na lista') + '</span></div>'
-      + '<div class="kpi"><small>🔥 Chamar hoje</small><b>' + G.g1.length + '</b><span>os mais quentes</span></div>'
+      + '<div class="kpi"><small>🔥 Mais quentes</small><b>' + G.pend.filter(function(p) { return calor(p) === 1; }).length + '</b><span>borda vermelha na lista</span></div>'
       + '<div class="kpi v"><small>Trabalhados hoje</small><b>' + n.hoje + '</b><span>' + n.f + ' no total</span></div>'
       + '<div class="kpi"><small>📅 Reuniões marcadas</small><b>' + n.m + (meta ? ' <span style="display:inline;font-size:.9rem;color:var(--muted)">de ' + meta + '</span>' : '') + '</b><span>' + esc(mt.txt || 'meta até segunda') + '</span></div>'
       + '<div class="kpi v"><small>💰 Vendas</small><b>' + n.v + '</b><span>' + (n.v ? rs(n.val) : 'saídas desta lista') + '</span></div></div>';
-    h += '<div class="card"><h2>Quem chamar primeiro</h2>' + ordemHtml(tp) + '<p class="nota" style="margin:12px 0 0">A lista já vem nesta ordem. A cor da borda mostra o calor: vermelho = hoje, laranja = até sábado.</p>'
+    h += '<div class="card"><h2>Quem chamar primeiro</h2>' + ordemHtml(tp) + '<p class="nota" style="margin:12px 0 0">A lista é uma só e já vem do mais quente para o menos quente: você decide o ritmo. A cor da borda mostra o calor (vermelho = mais quente, laranja = quente, azul = segunda camada).</p>'
       + '<div style="margin-top:12px"><button type="button" class="b sug" onclick="EST.rot=!EST.rot;desenhar()"><span>📖 ' + (tp === 'clo' ? 'Roteiro da ligação de recuperação' : 'O processo passo a passo, com as falas e as objeções') + '</span><span>' + (EST.rot ? 'fechar ▴' : 'ver ▾') + '</span></button>' + (EST.rot ? '<div style="margin-top:10px">' + processoHtml(tp) + '</div>' : '') + '</div></div>';
-    var abas = [['g1', '🔥 Chamar hoje'], ['g2', '🟠 Até sábado'], ['g3', '🔵 Se sobrar tempo']]; if (G.joao.length || tp === 'ss') abas.push(['joao', '👤 Pelo João']); abas = abas.filter(function(a) { return G[a[0]].length || a[0] === 'g1'; }).concat([['reu', '📅 Com reunião'], ['feitos', '✅ Abordados']]);
+    var abas = [['pend', '📋 Para chamar']]; if (G.joao.length || tp === 'ss') abas.push(['joao', '👤 Pelo João']); abas = abas.concat([['reu', '📅 Com reunião'], ['feitos', '✅ Abordados']]);
     if (!abas.some(function(a) { return a[0] === EST.aba; })) EST.aba = abas[0][0];
     h += '<div class="abas" role="tablist">' + abas.map(function(a) { return '<button type="button" class="aba" role="tab" aria-selected="' + (EST.aba === a[0]) + '" onclick="aba(\'' + a[0] + '\')">' + a[1] + ' <small>' + G[a[0]].length + '</small></button>'; }).join('') + '</div>';
     var doDono = D.itens.filter(function(p) { return p.dono === EST.de; }), ch = [['', 'Todos']]; if (doDono.some(function(p) { return p.urg; })) ch.push(['urg', '⏰ Esperando resposta']); if (doDono.some(function(p) { return p.ev; })) ch.push(['ev', '🎓 Passou por evento']); if (doDono.some(function(p) { return p.bol; })) ch.push(['bol', '🧾 Oferecer boleto']);
@@ -248,7 +248,7 @@
     h += '<p class="nota" style="text-align:center">Clicou em "Abordei", o lead vai para "Abordados" e você escolhe como foi. Quando a reunião entra na planilha de vendas, ele vai sozinho para "Com reunião". Sem condição especial: a urgência é a agenda, que fecha na segunda.</p>';
     c.innerHTML = h;
   }
-  function de(k) { EST.de = k; EST.aba = 'g1'; EST.ver = 50; EST.busca = ''; EST.f = ''; desenhar(); var a = document.querySelector('.kpis'); if (a && D.gestor) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  function de(k) { EST.de = k; EST.aba = 'pend'; EST.ver = 50; EST.busca = ''; EST.f = ''; desenhar(); var a = document.querySelector('.kpis'); if (a && D.gestor) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   function aba(k) { EST.aba = k; EST.ver = 50; desenhar(); }
   function filtro(k) { EST.f = k; EST.ver = 50; desenhar(); }
   function mais() { EST.ver += 50; desenhar(); }
