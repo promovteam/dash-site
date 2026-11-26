@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-26-1130';
+var VERSAO_DASH = '2026-11-26-1200';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46272,10 +46272,10 @@ var ANU = {
     { id:'RE', n:'Reuniões realizadas', c:C(13), d:ANU.RE, top:900, f:'n', da:'1 3', g:'w' },
     { id:'FD', n:'Faturamento do diagnóstico', c:C(14), d:ANU.FD, top:600000, f:'r', da:'10 3', g:'d' },
     // 26/11/2026 (Bruno): calculadas ao vivo da planilha de vendas (anuVivo) — funil do diagnóstico SEM as reuniões do workshop
-    { id:'FRD', n:'Fat. por reunião · diagnóstico (sem workshop)', c:C(15), d:ANU.FRD, top:30000, f:'r', da:'6 2 2 2', g:'t' },
+    { id:'FRD', n:'Fat. por reunião · diagnóstico', c:C(15), d:ANU.FRD, top:30000, f:'r', da:'6 2 2 2', g:'t' },
     { id:'CVD', n:'Conversão das reuniões · diagnóstico (%)', c:C(17), d:ANU.CVD, top:60, f:'p', da:'1 2', g:'v' },
     { id:'FWS', n:'Faturamento das reuniões do workshop', c:C(16), d:ANU.FWS, top:600000, f:'r', da:'10 3 2 3', g:'d' },
-    { id:'RDG', n:'Reuniões do diagnóstico (sem workshop)', c:C(18), d:ANU.RDG, top:900, f:'n', da:'4 3', g:'w' },
+    { id:'RDG', n:'Reuniões do diagnóstico (sem workshop e ILD)', c:C(18), d:ANU.RDG, top:900, f:'n', da:'4 3', g:'w' },
     { id:'RWS', n:'Reuniões do workshop (realizadas)', c:C(19), d:ANU.RWS, top:900, f:'n', da:'4 3 1 3', g:'w' },
     // 26/11/2026 (Bruno): gasto no Meta por mês, pelo nome da campanha (metaTipoCampanha) — ao vivo pelo robô
     { id:'TDG', n:'Tráfego · funil diagnóstico', c:C(20), d:ANU.TDG, top:600000, f:'r', da:'3 2', g:'d' },
@@ -46292,6 +46292,11 @@ function anuN(v, c){ return v == null ? '–' : v.toLocaleString('pt-BR', { maxi
 function anuF(z, v){ return v == null ? '–' : z.f === 'r' ? anuR(v) : z.f === 'p' ? anuN(v) + '%' : anuN(v); }
 // 🔴 ao vivo: reuniões e vendas de 2026 da planilha (V2.rows). Workshop = origem "Workshop", "Pré workshop" ou "Pós workshop".
 function anuEhWs(r){ return /workshop/.test(v2norm(r.origem || '')); }
+// 26/11/2026 (Bruno: "só o funil do diagnóstico, orgânico e pago · sem workshop e sem ILD"): origem com a etiqueta [Diag]
+// ([Org][Diag], [Ads][Diag], [Org][Diag][Mchat]) ou social selling. Fora: workshop, ILD/imersão, PV, indicação, recuperação, sem origem.
+function anuEhIld(r){ return /(^|[^a-z])ild([^a-z]|$)|imersao|goiania/.test(v2norm(r.origem || '')); }
+function anuEhDiag(r){ var og = v2norm(r.origem || ''); if (!og || anuEhWs(r) || anuEhIld(r)) return false; return /diag/.test(og) || /social/.test(og); }
+var ANU_DIAG_DESDE = 3;   // abril: antes disso a origem não era preenchida na planilha
 // 🎟️ ingressos do workshop ao vivo: aba "Workshop (Lovable)", programa WLD, pelo mês do ingresso (a mesma conta do número fixo)
 function anuIngressosVivo(){
   if (typeof WSL === 'undefined') return;
@@ -46323,18 +46328,21 @@ function anuVivo(){
   var fdg = z(), rdg = z(), vdg = z(), fws = z(), vws = z(), rws = z();
   rows.forEach(function(r){
     var ws = anuEhWs(r);
-    if (r.date && r.date.getFullYear() === 2026 && r.date.getMonth() < n && typeof _fsRealizada === 'function' && _fsRealizada(r.sn)) { if (ws) rws[r.date.getMonth()]++; else rdg[r.date.getMonth()]++; }
+    if (r.date && r.date.getFullYear() === 2026 && r.date.getMonth() < n && typeof _fsRealizada === 'function' && _fsRealizada(r.sn)) { if (ws) rws[r.date.getMonth()]++; else if (anuEhDiag(r)) rdg[r.date.getMonth()]++; }
     if (r.sn !== 'vendido') return;
     var t = typeof plDataVenda === 'function' ? plDataVenda(r) : (r.date ? r.date.getTime() : null); if (!t) return;
     var d = new Date(t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
-    if (ws) { fws[d.getMonth()] += r.valor || 0; vws[d.getMonth()]++; } else { fdg[d.getMonth()] += r.valor || 0; vdg[d.getMonth()]++; }
+    if (ws) { fws[d.getMonth()] += r.valor || 0; vws[d.getMonth()]++; } else if (anuEhDiag(r)) { fdg[d.getMonth()] += r.valor || 0; vdg[d.getMonth()]++; }
   });
   var ok = rows.length > 0;
   for (var i = 0; i < n; i++) {
-    ANU.FDG[i] = ok ? fdg[i] : null; ANU.RDG[i] = ok ? rdg[i] : null; ANU.VDG[i] = ok ? vdg[i] : null; ANU.FWS[i] = ok ? Math.round(fws[i]) : null; ANU.VWS[i] = ok ? vws[i] : null; ANU.RWS[i] = ok ? rws[i] : null;
+    var dg = ok && i >= ANU_DIAG_DESDE;
+    ANU.FDG[i] = dg ? fdg[i] : null; ANU.RDG[i] = dg ? rdg[i] : null; ANU.VDG[i] = dg ? vdg[i] : null;
+    ANU.FD[i] = dg ? Math.round(fdg[i]) : (ok ? null : ANU.FD[i]);   /* "Faturamento do diagnóstico" ao vivo, com a mesma regra */
+    ANU.FWS[i] = ok ? Math.round(fws[i]) : null; ANU.VWS[i] = ok ? vws[i] : null; ANU.RWS[i] = ok ? rws[i] : null;
     if (!ANU.metaOk[i]) { ANU.TDG[i] = null; ANU.TWS[i] = null; ANU.TIM[i] = null; }
-    ANU.FRD[i] = ok && rdg[i] ? Math.round(fdg[i] / rdg[i]) : null;
-    ANU.CVD[i] = ok && rdg[i] ? Math.round(vdg[i] / rdg[i] * 1000) / 10 : null;
+    ANU.FRD[i] = dg && rdg[i] ? Math.round(fdg[i] / rdg[i]) : null;
+    ANU.CVD[i] = dg && rdg[i] ? Math.round(vdg[i] / rdg[i] * 1000) / 10 : null;
   }
 }
 function anuLerX(){
@@ -46366,7 +46374,7 @@ function anuRender(){
       '</div>' +
       '<div class="anu-card" id="anu-met"></div>' +
       '<div class="anu-card"><h3>Mês a mês no período</h3><div class="anu-tw"><table class="anu-tb" id="anu-tb"></table></div>' +
-        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. Faturamento do diagnóstico = vendas de leads com origem diagnóstico (orgânico + anúncios), a partir de abril. <b>Ao vivo da planilha:</b> “diagnóstico (sem workshop)” = todas as reuniões menos as de origem Workshop, Pré workshop e Pós workshop (entram orgânico, anúncios, ManyChat, social selling, indicação, recuperação, ILD e sem origem); fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; reuniões do diagnóstico e do workshop = reuniões realizadas no mês (sem no-show), separadas pela origem; ingressos = ingressos do Workshop Legado Digital (programa WLD) pelo mês da compra, ao vivo da aba “Workshop (Lovable)” (a base não guarda o valor do ingresso); tráfego = gasto no Meta pelo nome da campanha, a mesma regra da Gestão de funis: WLD/workshop = workshop; distribuição, engajamento e posts turbinados = impulsionamento; o resto (DIAGNOSTICO, MCP…) = funil diagnóstico; campanhas da imersão (ILD) ficam de fora; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
+        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. <b>Ao vivo da planilha:</b> “diagnóstico” (faturamento, reuniões, fat. por reunião e conversão) = só o funil do diagnóstico: origem [Org][Diag], [Ads][Diag], [Org][Diag][Mchat] ou social selling. Ficam de fora workshop (Workshop, Pré e Pós workshop), ILD/imersão, PV, indicação, recuperação e reuniões sem origem; começa em abril, quando a origem passou a ser preenchida; fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; reuniões do diagnóstico e do workshop = reuniões realizadas no mês (sem no-show), separadas pela origem; ingressos = ingressos do Workshop Legado Digital (programa WLD) pelo mês da compra, ao vivo da aba “Workshop (Lovable)” (a base não guarda o valor do ingresso); tráfego = gasto no Meta pelo nome da campanha, a mesma regra da Gestão de funis: WLD/workshop = workshop; distribuição, engajamento e posts turbinados = impulsionamento; o resto (DIAGNOSTICO, MCP…) = funil diagnóstico; campanhas da imersão (ILD) ficam de fora; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
       '</div>';
     el.setAttribute('data-ok', '1');
     var ultimo = null;
@@ -46515,7 +46523,7 @@ function anuMetricas(){
     kp('Reuniões realizadas', nn(o.re), (med(o.re, nn) + dl(o.re, ant && ant.re)).replace(/^ · /, '')) +
     kp('Faturamento por reunião', anuR(o.fr), dl(o.fr, ant && ant.fr).replace(/^ · /, ''), 1) +
     kp('Vendas a cada 100 reuniões', o.conv == null ? '–' : anuN(Math.round(o.conv * 10) / 10), dl(o.conv, ant && ant.conv).replace(/^ · /, '')) +
-    kp('Fat. por reunião · diagnóstico', o.fdg && o.rdg && o.rdg.v ? anuR(o.fdg.v / o.rdg.v) : '–', o.rdg ? rkoN0(o.rdg.v) + ' reuniões sem workshop' + dl(o.rdg && o.rdg.v ? o.fdg.v / o.rdg.v : null, ant && ant.rdg && ant.rdg.v ? ant.fdg.v / ant.rdg.v : null) : '', 1) +
+    kp('Fat. por reunião · diagnóstico', o.fdg && o.rdg && o.rdg.v ? anuR(o.fdg.v / o.rdg.v) : '–', o.rdg ? rkoN0(o.rdg.v) + ' reuniões do diagnóstico' + dl(o.rdg && o.rdg.v ? o.fdg.v / o.rdg.v : null, ant && ant.rdg && ant.rdg.v ? ant.fdg.v / ant.rdg.v : null) : '', 1) +
     kp('Conversão · diagnóstico', o.vdg && o.rdg && o.rdg.v ? anuN(Math.round(o.vdg.v / o.rdg.v * 1000) / 10) + '%' : '–', o.vdg ? rkoN0(o.vdg.v) + ' vendas' + dl(o.rdg && o.rdg.v ? o.vdg.v / o.rdg.v : null, ant && ant.rdg && ant.rdg.v ? ant.vdg.v / ant.rdg.v : null) : '') +
     kp('Reuniões do workshop', o.rws ? rkoN0(o.rws.v) : '–', o.rws && o.vws ? rkoN0(o.vws.v) + ' vendas · conversão ' + anuN(Math.round(o.vws.v / o.rws.v * 1000) / 10) + '%' + dl(o.rws.v, ant && ant.rws && ant.rws.v) : '') +
     kp('Faturamento do workshop', o.fws ? anuRc(o.fws.v) : '–', o.vws ? rkoN0(o.vws.v) + ' venda' + (o.vws.v === 1 ? '' : 's') + (o.fat ? ' · ' + anuN(Math.round(o.fws.v / o.fat * 100)) + '% do total' : '') + dl(o.fws && o.fws.v, ant && ant.fws && ant.fws.v) : '') +
