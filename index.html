@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-26-1200';
+var VERSAO_DASH = '2026-11-26-1300';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46187,7 +46187,7 @@ try { viMostrarMenu(); } catch (eViM2) {}
 
 <!-- 📈 desempenho-anual:inicio (25/11/2026 · Bruno: "nova aba Desempenho Anual, com o gráfico do desempenho anual de vendas, filtro por mês, ligar e desligar as linhas e as métricas do período") -->
 <style>
-#s-anual{--a0:#60a5fa;--a1:#fbbf24;--a2:#34d399;--a3:#c084fc;--a4:#fb7185;--a5:#cbd5e1;--a6:#22d3ee;--a7:#e0a876;--a8:#a3e635;--a9:#e879f9;--a10:#fca5a5;--a11:#93c5fd;--a12:#ffffff;--a13:#5eead4;--a14:#f9a8d4;--a15:#fde047;--a16:#fb923c;--a17:#38bdf8;--a18:#a78bfa;--a19:#f472b6;--a20:#ef4444;--a21:#c084fc;--a22:#2dd4bf;--a23:#86efac}
+#s-anual{--a0:#60a5fa;--a1:#fbbf24;--a2:#34d399;--a3:#c084fc;--a4:#fb7185;--a5:#cbd5e1;--a6:#22d3ee;--a7:#e0a876;--a8:#a3e635;--a9:#e879f9;--a10:#fca5a5;--a11:#93c5fd;--a12:#ffffff;--a13:#5eead4;--a14:#f9a8d4;--a15:#fde047;--a16:#fb923c;--a17:#38bdf8;--a18:#a78bfa;--a19:#f472b6;--a20:#ef4444;--a21:#c084fc;--a22:#2dd4bf;--a23:#86efac;--a24:#22c55e;--a25:#f43f5e}
 #s-anual .anu{display:flex;flex-direction:column;gap:14px}
 #s-anual .anu-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 18px;min-width:0}
 #s-anual .anu-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -46250,7 +46250,7 @@ var ANU = {
   WK: [null,null,null,null,null,null,374,503,661,648,191],
   RE: [71,36,69,73,57,46,109,113,193,178,106],
   FD: [null,null,null,227814,135023,227273,48356,148753,382087,263763,193067],
-  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [], RWS: [], TDG: [], TWS: [], TIM: [], metaOk: {},   // preenchidas por anuVivo()
+  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [], RWS: [], TDG: [], TWS: [], TIM: [], metaOk: {}, LO: [], LP: [],   // preenchidas por anuVivo()
   de: 0, ate_i: 10, X: null
 };
 (function(){
@@ -46281,6 +46281,9 @@ var ANU = {
     { id:'TDG', n:'Tráfego · funil diagnóstico', c:C(20), d:ANU.TDG, top:600000, f:'r', da:'3 2', g:'d' },
     { id:'TWS', n:'Tráfego · workshop', c:C(21), d:ANU.TWS, top:600000, f:'r', da:'3 2', g:'d' },
     { id:'TIM', n:'Impulsionamento de posts (distribuição)', c:C(22), d:ANU.TIM, top:600000, f:'r', da:'3 2', g:'d' },
+    // 26/11/2026 (Bruno): leads separados por canal — a mesma base da Gestão de funis (site + planilha antiga), 1ª vez da pessoa no ano
+    { id:'LO', n:'Leads do orgânico', c:C(24), d:ANU.LO, top:1800, f:'n', da:'6 2', g:'l' },
+    { id:'LP', n:'Leads do tráfego pago', c:C(25), d:ANU.LP, top:1800, f:'n', da:'6 2', g:'l' },
     { id:'PFC', n:'% de leads com formulário completo', c:C(23), d:ANU.L.map(function(v, i){ return v ? Math.round(ANU.LC[i] / v * 1000) / 10 : null; }), top:60, f:'p', da:'2 2 6 2', g:'v' }
   ]);
   ANU.sum = sum;
@@ -46321,8 +46324,28 @@ function anuMetaCarregar(){
     _metaPedacoBuscar(p, function(d){ if (d && d.success !== false) anuMetaSomar(i, d); else ANU.metaErro = true; redesenhar(); });
   });
 }
+// 🌱💸 leads por canal: cada pessoa (telefone) conta uma vez no ano, no mês e no canal do 1º formulário. Pago = link de anúncio ou VSL
+// do MCP (que também vem de anúncio); orgânico = etiqueta [Org] (bio, ManyChat, link orgânico).
+function anuLeadsCanal(){
+  var S = (typeof TRF !== 'undefined') ? TRF.site : null, n = ANU.M.length;
+  if (!S || !S.leads || !S.leads.length) {
+    try { trfSiteCarregar(false); } catch (e) {}
+    if ((ANU.canalTent = (ANU.canalTent || 0) + 1) < 40) setTimeout(function(){ try { if (document.getElementById('s-anual').classList.contains('active')) anuAtualizar(); } catch (e2) {} }, 4000);
+    for (var k = 0; k < n; k++) { ANU.LO[k] = null; ANU.LP[k] = null; }
+    return;
+  }
+  try { _trfJuntarLD(S); } catch (e3) {}
+  var lo = [], lp = [], visto = {}; for (var j = 0; j < n; j++) { lo.push(0); lp.push(0); }
+  S.leads.forEach(function(x){
+    if (!x.t) return; var d = new Date(x.t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
+    var ch = x.t8 || ('n:' + v2norm(x.nome || '')); if (visto[ch]) return; visto[ch] = 1;
+    if (x.o === 'o') lo[d.getMonth()]++; else lp[d.getMonth()]++;
+  });
+  for (var i = 0; i < n; i++) { ANU.LO[i] = lo[i]; ANU.LP[i] = lp[i]; }
+}
 function anuVivo(){
   try { anuIngressosVivo(); } catch (eI) {}
+  try { anuLeadsCanal(); } catch (eC) {}
   try { anuMetaCarregar(); } catch (eM) {}
   var rows = (typeof V2 !== 'undefined' && V2.rows) || [], n = ANU.M.length, z = function(){ var a = []; for (var i = 0; i < n; i++) a.push(0); return a; };
   var fdg = z(), rdg = z(), vdg = z(), fws = z(), vws = z(), rws = z();
@@ -46374,7 +46397,7 @@ function anuRender(){
       '</div>' +
       '<div class="anu-card" id="anu-met"></div>' +
       '<div class="anu-card"><h3>Mês a mês no período</h3><div class="anu-tw"><table class="anu-tb" id="anu-tb"></table></div>' +
-        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. <b>Ao vivo da planilha:</b> “diagnóstico” (faturamento, reuniões, fat. por reunião e conversão) = só o funil do diagnóstico: origem [Org][Diag], [Ads][Diag], [Org][Diag][Mchat] ou social selling. Ficam de fora workshop (Workshop, Pré e Pós workshop), ILD/imersão, PV, indicação, recuperação e reuniões sem origem; começa em abril, quando a origem passou a ser preenchida; fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; reuniões do diagnóstico e do workshop = reuniões realizadas no mês (sem no-show), separadas pela origem; ingressos = ingressos do Workshop Legado Digital (programa WLD) pelo mês da compra, ao vivo da aba “Workshop (Lovable)” (a base não guarda o valor do ingresso); tráfego = gasto no Meta pelo nome da campanha, a mesma regra da Gestão de funis: WLD/workshop = workshop; distribuição, engajamento e posts turbinados = impulsionamento; o resto (DIAGNOSTICO, MCP…) = funil diagnóstico; campanhas da imersão (ILD) ficam de fora; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
+        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. <b>Ao vivo da planilha:</b> “diagnóstico” (faturamento, reuniões, fat. por reunião e conversão) = só o funil do diagnóstico: origem [Org][Diag], [Ads][Diag], [Org][Diag][Mchat] ou social selling. Ficam de fora workshop (Workshop, Pré e Pós workshop), ILD/imersão, PV, indicação, recuperação e reuniões sem origem; começa em abril, quando a origem passou a ser preenchida; fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; reuniões do diagnóstico e do workshop = reuniões realizadas no mês (sem no-show), separadas pela origem; leads do orgânico × do tráfego pago = base do formulário (site + planilha antiga, a mesma da Gestão de funis), cada telefone uma vez no ano, no mês e no canal do 1º formulário; pago = link de anúncio ou VSL do MCP, orgânico = etiqueta [Org] (bio, ManyChat, link orgânico); ingressos = ingressos do Workshop Legado Digital (programa WLD) pelo mês da compra, ao vivo da aba “Workshop (Lovable)” (a base não guarda o valor do ingresso); tráfego = gasto no Meta pelo nome da campanha, a mesma regra da Gestão de funis: WLD/workshop = workshop; distribuição, engajamento e posts turbinados = impulsionamento; o resto (DIAGNOSTICO, MCP…) = funil diagnóstico; campanhas da imersão (ILD) ficam de fora; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
       '</div>';
     el.setAttribute('data-ok', '1');
     var ultimo = null;
@@ -46490,7 +46513,7 @@ function anuPer(a, b){
   var L = sm(ANU.L).v, HT = sm(ANU.HT).v, o = {
     meses: b - a + 1, vend: vend, fat: fat, tm: vend ? fat / vend : null, sp: sp, spf: spf, re: re, fr: re ? fat / re : null, conv: re ? vend / re * 100 : null,
     L: L, LC: sm(ANU.LC).v, MQ: sm(ANU.MQ).v, HT: HT, MS: sm(ANU.MS), WK: sm(ANU.WK), FD: sm(ANU.FD),
-    spHT: HT ? sp / HT * 100 : null, fdg: sm(ANU.FDG), rdg: sm(ANU.RDG), vdg: sm(ANU.VDG), fws: sm(ANU.FWS), vws: sm(ANU.VWS), rws: sm(ANU.RWS), tdg: sm(ANU.TDG), tws: sm(ANU.TWS), tim: sm(ANU.TIM), wkv: sm(ANU.WK), v1000: L ? vend / L * 1000 : null, mqlPct: L ? sm(ANU.MQ).v / L * 100 : null,
+    spHT: HT ? sp / HT * 100 : null, fdg: sm(ANU.FDG), rdg: sm(ANU.RDG), vdg: sm(ANU.VDG), fws: sm(ANU.FWS), vws: sm(ANU.VWS), rws: sm(ANU.RWS), lo: sm(ANU.LO), lp: sm(ANU.LP), tdg: sm(ANU.TDG), tws: sm(ANU.TWS), tim: sm(ANU.TIM), wkv: sm(ANU.WK), v1000: L ? vend / L * 1000 : null, mqlPct: L ? sm(ANU.MQ).v / L * 100 : null,
     prod: ANU.P.map(function(_, p){ var q = 0, r = 0; for (var i = a; i <= b; i++) { q += ANU.Q[i][p]; r += ANU.RV[i][p]; } return { q: q, r: r }; })
   };
   return o;
@@ -46538,6 +46561,8 @@ function anuMetricas(){
   h += '<div class="anu-sec">Leads</div><div class="anu-kpis">' +
     kp('Leads reais', nn(o.L), (med(o.L, nn) + dl(o.L, ant && ant.L)).replace(/^ · /, '')) +
     kp('Formulário completo', nn(o.LC), (o.L ? anuN(Math.round(o.LC / o.L * 100)) + '% dos leads' : '') + dl(o.LC, ant && ant.LC)) +
+    kp('Leads do orgânico', o.lo ? rkoN0(o.lo.v) : 'carregando…', o.lo && o.lp && (o.lo.v + o.lp.v) ? anuN(Math.round(o.lo.v / (o.lo.v + o.lp.v) * 100)) + '% dos leads' + dl(o.lo.v, ant && ant.lo && ant.lo.v) : '') +
+    kp('Leads do tráfego pago', o.lp ? rkoN0(o.lp.v) : 'carregando…', o.lp && o.lo && (o.lo.v + o.lp.v) ? anuN(Math.round(o.lp.v / (o.lo.v + o.lp.v) * 100)) + '% dos leads' + (o.tdg && o.lp.v ? ' · ' + anuR(o.tdg.v / o.lp.v) + ' por lead' : '') + dl(o.lp.v, ant && ant.lp && ant.lp.v) : '') +
     kp('% com formulário completo', o.L ? anuN(Math.round(o.LC / o.L * 1000) / 10) + '%' : '–', dl(o.L ? o.LC / o.L : null, ant && ant.L ? ant.LC / ant.L : null).replace(/^ · /, '')) +
     kp('Leads MQL', nn(o.MQ), (o.mqlPct == null ? '' : anuN(Math.round(o.mqlPct)) + '% dos leads') + dl(o.MQ, ant && ant.MQ)) +
     kp('Leads HT (R$ 2 mil+)', nn(o.HT), (o.L ? anuN(Math.round(o.HT / o.L * 1000) / 10) + '% dos leads' : '') + dl(o.HT, ant && ant.HT)) +
@@ -46560,11 +46585,11 @@ function anuTabela(){
   var td = function(v){ return '<td>' + v + '</td>'; };
   for (var i = a; i <= b; i++) {
     rows += '<tr><td>' + ANU.M[i] + (i === ANU.parcial ? '*' : '') + '</td>' + ANU.Q[i].map(td).join('') + td('<b>' + ANU.T[i] + '</b>') + td(anuR(ANU.TR[i])) + td(anuR(ANU.TM[i])) + td(anuR(ANU.FR[i])) + td(ANU.RE[i]) + td(anuR(ANU.FD[i])) + td(ANU.RDG[i] == null ? '–' : ANU.RDG[i]) + td(ANU.RWS[i] == null ? '–' : ANU.RWS[i]) + td(anuR(ANU.FRD[i])) + td(ANU.CVD[i] == null ? '–' : anuN(ANU.CVD[i]) + '%') + td(anuR(ANU.FWS[i])) + td(anuR(ANU.TDG[i])) + td(anuR(ANU.TWS[i])) + td(anuR(ANU.TIM[i])) +
-      td(anuN(ANU.L[i])) + td(anuN(ANU.LC[i])) + td(ANU.L[i] ? anuN(Math.round(ANU.LC[i] / ANU.L[i] * 1000) / 10) + '%' : '–') + td(anuN(ANU.MQ[i])) + td(anuN(ANU.HT[i])) + td(anuN(ANU.MS[i])) + td(anuN(ANU.WK[i])) + '</tr>';
+      td(anuN(ANU.L[i])) + td(ANU.LO[i] == null ? '–' : anuN(ANU.LO[i])) + td(ANU.LP[i] == null ? '–' : anuN(ANU.LP[i])) + td(anuN(ANU.LC[i])) + td(ANU.L[i] ? anuN(Math.round(ANU.LC[i] / ANU.L[i] * 1000) / 10) + '%' : '–') + td(anuN(ANU.MQ[i])) + td(anuN(ANU.HT[i])) + td(anuN(ANU.MS[i])) + td(anuN(ANU.WK[i])) + '</tr>';
   }
-  document.getElementById('anu-tb').innerHTML = '<thead><tr><th>Mês</th><th>Spark Sem.</th><th>Spark Anual</th><th>Growth</th><th>Mentoria LD</th><th>Legado Club</th><th>Total</th><th>Faturamento</th><th>Ticket médio</th><th>Fat./reunião</th><th>Reuniões</th><th>Fat. diagnóstico</th><th>Reuniões diag.</th><th>Reuniões workshop</th><th>Fat./reunião diag.</th><th>Conversão diag.</th><th>Fat. workshop</th><th>Tráfego diag.</th><th>Tráfego workshop</th><th>Impulsionamento</th><th>Leads reais</th><th>Completos</th><th>% completo</th><th>MQL</th><th>HT</th><th>MQL score</th><th>Ingressos</th></tr></thead><tbody>' + rows +
+  document.getElementById('anu-tb').innerHTML = '<thead><tr><th>Mês</th><th>Spark Sem.</th><th>Spark Anual</th><th>Growth</th><th>Mentoria LD</th><th>Legado Club</th><th>Total</th><th>Faturamento</th><th>Ticket médio</th><th>Fat./reunião</th><th>Reuniões</th><th>Fat. diagnóstico</th><th>Reuniões diag.</th><th>Reuniões workshop</th><th>Fat./reunião diag.</th><th>Conversão diag.</th><th>Fat. workshop</th><th>Tráfego diag.</th><th>Tráfego workshop</th><th>Impulsionamento</th><th>Leads reais</th><th>Orgânico</th><th>Pago</th><th>Completos</th><th>% completo</th><th>MQL</th><th>HT</th><th>MQL score</th><th>Ingressos</th></tr></thead><tbody>' + rows +
     '</tbody><tfoot><tr><td>Total</td>' + o.prod.map(function(p){ return td(p.q); }).join('') + td(o.vend) + td(anuR(o.fat)) + td(anuR(o.tm)) + td(anuR(o.fr)) + td(o.re) + td(o.FD ? anuR(o.FD.v) : '–') + td(o.rdg ? o.rdg.v : '–') + td(o.rws ? o.rws.v : '–') + td(o.fdg && o.rdg && o.rdg.v ? anuR(o.fdg.v / o.rdg.v) : '–') + td(o.vdg && o.rdg && o.rdg.v ? anuN(Math.round(o.vdg.v / o.rdg.v * 1000) / 10) + '%' : '–') + td(o.fws ? anuR(o.fws.v) : '–') + td(o.tdg ? anuR(o.tdg.v) : '–') + td(o.tws ? anuR(o.tws.v) : '–') + td(o.tim ? anuR(o.tim.v) : '–') +
-    td(anuN(o.L)) + td(anuN(o.LC)) + td(o.L ? anuN(Math.round(o.LC / o.L * 1000) / 10) + '%' : '–') + td(anuN(o.MQ)) + td(anuN(o.HT)) + td(o.MS ? anuN(o.MS.v) : '–') + td(o.WK ? anuN(o.WK.v) : '–') + '</tr></tfoot>';
+    td(anuN(o.L)) + td(o.lo ? anuN(o.lo.v) : '–') + td(o.lp ? anuN(o.lp.v) : '–') + td(anuN(o.LC)) + td(o.L ? anuN(Math.round(o.LC / o.L * 1000) / 10) + '%' : '–') + td(anuN(o.MQ)) + td(anuN(o.HT)) + td(o.MS ? anuN(o.MS.v) : '–') + td(o.WK ? anuN(o.WK.v) : '–') + '</tr></tfoot>';
 }
 </script>
 <!-- desempenho-anual:fim -->
