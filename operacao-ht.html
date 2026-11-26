@@ -149,7 +149,7 @@
     var h = '<div class="card"><h2>Painel do time · quem está trabalhando a lista</h2><div class="pg">';
     Object.keys(D.pessoas).forEach(function(k) { var c = conta(k); if (!c.t) return; var mt = (D.metas || {})[k] || {}, meta = mt.dia ? mt.dia * 3 : 0, pc = c.t ? Math.round(c.f / c.t * 100) : 0;
       var st = c.hoje >= 25 ? ['ok', 'no ritmo'] : c.hoje > 0 ? ['meio', 'começou'] : ['nao', 'parado hoje'];
-      h += '<div class="pp" style="cursor:pointer' + (EST.de === k ? ';border-color:rgba(246,163,80,.55)' : '') + '" onclick="de(\'' + k + '\')"><div class="pp-top"><div><b>' + esc(D.pessoas[k]) + '</b><small>' + esc(mt.txt || '') + '</small></div><span class="st ' + st[0] + '">' + st[1] + '</span></div>' +
+      h += '<div class="pp" style="cursor:pointer' + (EST.de === k ? ';border-color:rgba(246,163,80,.55)' : '') + '" onclick="de(\'' + k + '\')"><div class="pp-top"><div><b>' + esc(D.pessoas[k]) + '</b><small>' + (tipoDe(k) === 'ss' ? '<b style="display:inline;font-size:inherit;color:var(--accent)">📲 Social selling</b> · ' : '') + esc(mt.txt || '') + '</small></div><span class="st ' + st[0] + '">' + st[1] + '</span></div>' +
         '<div class="barra"><i style="width:' + pc + '%"></i></div>' +
         '<div class="pp-n"><div><small>Para chamar</small><b>' + c.pend + '</b></div><div><small>Hoje</small><b>' + c.hoje + '</b></div><div><small>Reuniões</small><b style="color:var(--green)">' + c.m + (meta ? '<span style="font-size:.7rem;color:var(--muted)"> /' + meta + '</span>' : '') + '</b></div></div>' +
         '<div class="pp-f">' + c.f + ' de ' + c.t + ' trabalhados' + (c.urg ? ' · <b style="color:#ffb4b4">' + c.urg + ' esperando resposta</b>' : '') + (c.v ? ' · <b>' + c.v + ' venda' + (c.v > 1 ? 's' : '') + ' · ' + rs(c.val) + '</b>' : '') + '</div>' +
@@ -200,7 +200,7 @@
   }
   function cartao(p) {
     var m = p.marc, r = p.res, id = esc(p.id), feito = !!((m && m.ok) || r), c = calor(p);
-    var tags = (p.cls ? '<span class="tag ' + (c === 1 ? 'alto' : c === 2 ? 'inv' : '') + '">' + (c === 1 ? '🔥 ' : '') + esc(p.cls) + '</span>' : '') + (p.urg ? '<span class="tag alto">⏰ esperando resposta nossa' + (p.urg === true || p.urg === 1 ? '' : ' · ' + esc(p.urg)) + '</span>' : '') + (p.ev ? '<span class="tag alto">🎓 ' + esc(p.ev) + '</span>' : '')
+    var tags = (p.tipo === 'ss' ? '<span class="tag inv">📲 Social selling</span>' : '') + (p.cls ? '<span class="tag ' + (c === 1 ? 'alto' : c === 2 ? 'inv' : '') + '">' + (c === 1 ? '🔥 ' : '') + esc(p.cls) + '</span>' : '') + (p.urg ? '<span class="tag alto">⏰ esperando resposta nossa' + (p.urg === true || p.urg === 1 ? '' : ' · ' + esc(p.urg)) + '</span>' : '') + (p.ev ? '<span class="tag alto">🎓 ' + esc(p.ev) + '</span>' : '')
       + (p.inv ? '<span class="tag inv">💰 ' + esc(p.inv) + '</span>' : '') + (p.seg ? '<span class="tag nota">' + Number(p.seg).toLocaleString('pt-BR') + ' seguidores</span>' : '') + (p.bol ? '<span class="tag ok">🧾 oferecer boleto</span>' : '') + (p.exc ? '<span class="tag nota">exceção: perfil forte</span>' : '')
       + (p.marcas || []).map(function(x) { return '<span class="tag">' + esc(x) + '</span>'; }).join('')
       + (r ? '<span class="tag ' + (r.vend ? 'ok' : 'inv') + '">' + (r.vend ? '💰 comprou · ' + rs(r.valor) : /no.?show/i.test(r.st) ? '🚫 faltou à reunião' : '📅 reunião · ' + esc(r.st || 'marcada')) + '</span>' : '')
@@ -230,7 +230,7 @@
     var h = '';
     if (D.gestor) h += painelGestor();
     else if (D.porLink) h += '<p class="nota" style="margin:0">Você entrou pelo seu link pessoal. Não encaminhe este link: ele abre a sua lista. <a href="#" onclick="sair();return false" style="color:var(--accent)">Sair deste acesso</a></p>';
-    if (D.gestor) h += '<div class="abas">' + Object.keys(D.pessoas).filter(function(k) { return conta(k).t; }).map(function(k) { var x = conta(k); return '<button type="button" class="aba" aria-selected="' + (EST.de === k) + '" onclick="de(\'' + k + '\')">' + esc(D.pessoas[k]) + ' <small>' + x.pend + '</small></button>'; }).join('') + '</div>';
+    if (D.gestor) h += '<div class="abas">' + Object.keys(D.pessoas).filter(function(k) { return conta(k).t; }).map(function(k) { var x = conta(k); return '<button type="button" class="aba" aria-selected="' + (EST.de === k) + '" onclick="de(\'' + k + '\')">' + esc(D.pessoas[k]) + (tipoDe(k) === 'ss' ? ' · Social selling' : '') + ' <small>' + x.pend + '</small></button>'; }).join('') + '</div>';
     h += '<div class="kpis"><div class="kpi q"><small>Para chamar</small><b>' + n.pend + '</b><span>' + (n.urg ? n.urg + ' esperando resposta nossa' : 'de ' + n.t + ' na lista') + '</span></div>'
       + '<div class="kpi"><small>🔥 Mais quentes</small><b>' + G.pend.filter(function(p) { return calor(p) === 1; }).length + '</b><span>borda vermelha na lista</span></div>'
       + '<div class="kpi v"><small>Trabalhados hoje</small><b>' + n.hoje + '</b><span>' + n.f + ' no total</span></div>'
