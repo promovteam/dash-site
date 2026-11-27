@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-27-1230';
+var VERSAO_DASH = '2026-11-27-1300';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46356,13 +46356,15 @@ function anuLeadsCanal(){
   try { _trfJuntarLD(S); } catch (e3) {}
   var lo = [], lp = [], visto = {}; for (var j = 0; j < n; j++) { lo.push(0); lp.push(0); }
   // 27/11/2026: por canal fino (pt = anúncio, pv = VSL do MCP, om = ManyChat, ob = bio/orgânico direto) com MQL (marcou investimento) e A/B (nota do lead)
-  var Q = {}; ['pt', 'pv', 'om', 'ob'].forEach(function(c){ Q[c] = { n: [], mql: [], ab: [] }; for (var k = 0; k < n; k++) { Q[c].n.push(0); Q[c].mql.push(0); Q[c].ab.push(0); } });
+  var Q = {}; ['pt', 'pv', 'om', 'ob'].forEach(function(c){ Q[c] = { n: [], mql: [], ab: [], sc: [], scn: [] }; for (var k = 0; k < n; k++) { Q[c].n.push(0); Q[c].mql.push(0); Q[c].ab.push(0); Q[c].sc.push(0); Q[c].scn.push(0); } });
+  var notaTel = {}; S.leads.forEach(function(x){ if (x.t8 && x.sc > 0) notaTel[x.t8] = x.sc; });   // a nota mais recente de cada telefone (a lista vem em ordem de data)
+  ANU.notaTel = notaTel;
   S.leads.forEach(function(x){
     if (!x.t) return; var d = new Date(x.t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
     var ch = x.t8 || ('n:' + v2norm(x.nome || '')); if (visto[ch]) return; visto[ch] = 1;
     var m = d.getMonth(); if (x.o === 'o') lo[m]++; else lp[m]++;
     var c = x.o === 'o' ? (x.src === 'manychat' ? 'om' : 'ob') : (x.o === 'v' ? 'pv' : 'pt');
-    Q[c].n[m]++; if (_vfMql(x.inv)) Q[c].mql[m]++; if (x.fx === 'A' || x.fx === 'B') Q[c].ab[m]++;
+    Q[c].n[m]++; if (_vfMql(x.inv)) Q[c].mql[m]++; if (x.fx === 'A' || x.fx === 'B') Q[c].ab[m]++; if (x.sc > 0) { Q[c].sc[m] += x.sc; Q[c].scn[m]++; }
   });
   for (var i = 0; i < n; i++) { ANU.LO[i] = lo[i]; ANU.LP[i] = lp[i]; }
   ANU.LQ = Q;
@@ -46434,7 +46436,7 @@ function anuRender(){
       '</div>' +
       '<div class="anu-card" id="anu-met"></div>' +
       '<div class="anu-card"><h3>Mês a mês no período</h3><div class="anu-tw"><table class="anu-tb" id="anu-tb"></table></div>' +
-        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. <b>Ao vivo da planilha:</b> “diagnóstico” (faturamento, reuniões, fat. por reunião e conversão) = só o funil do diagnóstico: origem [Org][Diag], [Ads][Diag], [Org][Diag][Mchat] ou social selling. Ficam de fora workshop (Workshop, Pré e Pós workshop), ILD/imersão, PV, indicação, recuperação e reuniões sem origem; começa em abril, quando a origem passou a ser preenchida; fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; reuniões do diagnóstico e do workshop = reuniões realizadas no mês (sem no-show), separadas pela origem; CPL pago = tráfego do diagnóstico ÷ leads do pago; CPL global = (tráfego do diagnóstico + impulsionamento) ÷ leads do pago + orgânico; custo por venda = todo o tráfego (diagnóstico + workshop + impulsionamento) ÷ todas as vendas do mês; custo por venda do diagnóstico = (tráfego do diagnóstico + impulsionamento) ÷ vendas do funil diagnóstico (sem workshop e sem ILD, desde abril); faturamento total = soma do valor das vendas com status Vendido no mês (pela data da venda), todos os produtos e origens, ao vivo; custo por venda de Spark Semestral, MLD e Growth = todo o tráfego do mês ÷ vendas daquele produto (todas as origens; o tráfego não é separado por produto); nos cartões do período, os custos somam só os meses que têm o gasto e o denominador; leads do orgânico × do tráfego pago = base do formulário (site + planilha antiga, a mesma da Gestão de funis), cada telefone uma vez no ano, no mês e no canal do 1º formulário; pago = link de anúncio ou VSL do MCP, orgânico = etiqueta [Org] (bio, ManyChat, link orgânico); ingressos = ingressos do Workshop Legado Digital (programa WLD) pelo mês da compra, ao vivo da aba “Workshop (Lovable)” (a base não guarda o valor do ingresso); tráfego = gasto no Meta pelo nome da campanha, a mesma regra da Gestão de funis: WLD/workshop = workshop; distribuição, engajamento e posts turbinados = impulsionamento; o resto (DIAGNOSTICO, MCP…) = funil diagnóstico; campanhas da imersão (ILD) ficam de fora; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
+        '<p class="anu-nota">Ticket médio = valor vendido ÷ vendas dos cinco produtos. Vendas “+ 2ª cadeira” contam no produto principal; estornos, entradas e não vendidos ficam de fora. Leads reais = pessoas novas no mês no formulário de diagnóstico, uma vez por telefone (sem as inscrições do evento ILD). Formulário completo = respondeu a faixa de investimento. MQL = marcou faixa de investimento (a partir de R$ 500/mês); HT = R$ 2 mil/mês ou mais; MQL score = faixa A ou B no lead score (a partir de outubro). Julho tem poucos leads porque o formulário mudou. Reuniões realizadas = reuniões do mês sem no-show, todas as origens. Faturamento por reunião = valor vendido ÷ reuniões realizadas. <b>Ao vivo da planilha:</b> “diagnóstico” (faturamento, reuniões, fat. por reunião e conversão) = só o funil do diagnóstico: origem [Org][Diag], [Ads][Diag], [Org][Diag][Mchat] ou social selling. Ficam de fora workshop (Workshop, Pré e Pós workshop), ILD/imersão, PV, indicação, recuperação e reuniões sem origem; começa em abril, quando a origem passou a ser preenchida; fat. por reunião = valor vendido no mês (pela data da venda) ÷ reuniões realizadas no mês (sem no-show); conversão = vendas ÷ reuniões realizadas; reuniões do diagnóstico e do workshop = reuniões realizadas no mês (sem no-show), separadas pela origem; CPL pago = tráfego do diagnóstico ÷ leads do pago; CPL global = (tráfego do diagnóstico + impulsionamento) ÷ leads do pago + orgânico; custo por venda = todo o tráfego (diagnóstico + workshop + impulsionamento) ÷ todas as vendas do mês; custo por venda do diagnóstico = (tráfego do diagnóstico + impulsionamento) ÷ vendas do funil diagnóstico (sem workshop e sem ILD, desde abril); faturamento total = soma do valor das vendas com status Vendido no mês (pela data da venda), todos os produtos e origens, ao vivo; custo por venda de Spark Semestral, MLD e Growth = todo o tráfego do mês ÷ vendas daquele produto (todas as origens; o tráfego não é separado por produto); nos cartões do período, os custos somam só os meses que têm o gasto e o denominador; nota lead score = média da nota (0 a 200) gravada no formulário desde o fim de setembro: nos funis com formulário, dos leads que chegaram no mês; nos demais (workshop, ILD, social selling…), de quem teve reunião no funil no mês, pelo telefone; leads do orgânico × do tráfego pago = base do formulário (site + planilha antiga, a mesma da Gestão de funis), cada telefone uma vez no ano, no mês e no canal do 1º formulário; pago = link de anúncio ou VSL do MCP, orgânico = etiqueta [Org] (bio, ManyChat, link orgânico); ingressos = ingressos do Workshop Legado Digital (programa WLD) pelo mês da compra, ao vivo da aba “Workshop (Lovable)” (a base não guarda o valor do ingresso); tráfego = gasto no Meta pelo nome da campanha, a mesma regra da Gestão de funis: WLD/workshop = workshop; distribuição, engajamento e posts turbinados = impulsionamento; o resto (DIAGNOSTICO, MCP…) = funil diagnóstico; campanhas da imersão (ILD) ficam de fora; faturamento do workshop = vendas das reuniões com origem Workshop, Pré ou Pós workshop. Ingressos = ingressos pagos do Workshop Legado Digital, a partir de julho. A comparação com o período anterior usa o mesmo número de meses logo antes.</p></div>' +
       '</div>';
     el.setAttribute('data-ok', '1');
     var ultimo = null;
@@ -46526,7 +46528,7 @@ function anuMcpCompras(){   // t8 → data da compra do MCP; e as compras por m�
 }
 function anuCamDados(){
   var rows = (typeof V2 !== 'undefined' && V2.rows) || [], n = ANU.M.length, ok = rows.length > 0;
-  var novo = function(){ var o = { re: [], vd: [], ft: [], q: {}, r: {} }; for (var i = 0; i < n; i++) { o.re.push(0); o.vd.push(0); o.ft.push(0); }
+  var novo = function(){ var o = { re: [], vd: [], ft: [], q: {}, r: {}, ns: [], nn: [], nv: {} }; for (var i = 0; i < n; i++) { o.re.push(0); o.vd.push(0); o.ft.push(0); o.ns.push(0); o.nn.push(0); }
     ANU_PRODS.concat([['OUT']]).forEach(function(p){ o.q[p[0]] = o.re.map(function(){ return 0; }); o.r[p[0]] = o.re.map(function(){ return 0; }); }); return o; };
   var F = { geral: novo(), diag: novo(), ws: novo(), ild: novo(), pago: novo(), org: novo(), bio: novo(), mcp: novo(), ss: novo(), ind: novo(), pp: novo(), out: novo(), dist: novo() }, MC = anuMcpCompras(); F.mcpMes = MC.mes;
   var funisDe = function(r, t){
@@ -46541,6 +46543,9 @@ function anuCamDados(){
   rows.forEach(function(r){
     var ks = funisDe(r, r.date ? r.date.getTime() : null);
     if (r.date && r.date.getFullYear() === 2026 && r.date.getMonth() < n && _fsRealizada(r.sn)) ks.forEach(function(k){ F[k].re[r.date.getMonth()]++; });
+    // ⭐ nota do lead score de quem teve reunião (marcada, realizada ou vendida) no funil, uma vez por pessoa no mês
+    var t8n = ldTel8(r.telefone || ''), nt = t8n && ANU.notaTel ? ANU.notaTel[t8n] : 0;
+    if (nt && r.date && r.date.getFullYear() === 2026 && r.date.getMonth() < n && r.sn !== 'remarcada') ks.forEach(function(k){ var ch = r.date.getMonth() + '|' + t8n; if (F[k].nv[ch]) return; F[k].nv[ch] = 1; F[k].ns[r.date.getMonth()] += nt; F[k].nn[r.date.getMonth()]++; });
     if (r.sn !== 'vendido') return;
     var t = plDataVenda(r); if (!t) return; var d = new Date(t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
     var m = d.getMonth(), v = r.valor || 0, p = anuProdK(r.produto);
@@ -46584,6 +46589,13 @@ function anuCamSeries(){
     add('reun', 'tm', 'Ticket médio', div(o.ft, o.vd), 't', 'r', C(7), '2 4');
   }
   if (st.c.leads) {
+    var media = function(cs){ return arr(function(i){ if (!LQ.pt) return null; var t = 0, q = 0; cs.forEach(function(c){ t += LQ[c].sc[i]; q += LQ[c].scn[i]; }); return q ? Math.round(t / q * 10) / 10 : null; }); };
+    var CHn = { geral: ['pt', 'pv', 'om', 'ob'], diag: ['pt', 'pv', 'om', 'ob'], pago: ['pt', 'pv'], org: ['om'], bio: ['ob'], mcp: ['pv'] }[f];
+    if (CHn) {
+      add('leads', 'nota', 'Nota lead score', media(CHn), 'w', 'n', C(33), '');
+      if (f === 'geral' || f === 'diag') { add('leads', 'notap', 'Nota · pago', media(['pt', 'pv']), 'w', 'n', C(25), '5 2'); add('leads', 'notao', 'Nota · orgânico', media(['om', 'ob']), 'w', 'n', C(24), '5 2'); }
+    }
+    add('leads', 'notar', CHn ? 'Nota de quem teve reunião' : 'Nota lead score', arr(function(i){ return o.nn[i] ? Math.round(o.ns[i] / o.nn[i] * 10) / 10 : null; }), 'w', 'n', CHn ? C(27) : C(33), CHn ? '2 2' : '');
     var CH = { geral: ['pt', 'pv', 'om', 'ob'], diag: ['pt', 'pv', 'om', 'ob'], pago: ['pt', 'pv'], org: ['om'], bio: ['ob'], mcp: ['pv'] }[f];
     if (CH) {
       if (f === 'geral' || f === 'diag') {
@@ -46687,7 +46699,7 @@ function anuGrafico(){
   var dMax = 0; V.forEach(function(z){ if (z.g === 'd') I.forEach(function(i){ var v = z.d[i]; if (v != null && v > dMax) dMax = v; }); });
   var dTop = dMax <= 60000 ? 60000 : dMax <= 150000 ? 150000 : dMax <= 300000 ? 300000 : dMax <= 600000 ? 600000 : dMax <= 900000 ? 900000 : 1200000;
   ANU.S.forEach(function(z){ if (z.g === 'd') z.top = dTop; });
-  var s = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Gráfico mensal de vendas, leads e faturamento"><text x="0" y="12"><tspan style="fill:var(--a8)">Ingressos e reuniões</tspan> · Vendas · <tspan style="fill:var(--a17)">%</tspan></text><text x="' + W + '" y="12" text-anchor="end"><tspan style="fill:var(--a5)">Leads</tspan> · <tspan style="fill:var(--a14)">Fat. e tráfego (R$)</tspan> · <tspan style="fill:var(--a7)">Ticket e custos (R$)</tspan></text>';
+  var s = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Gráfico mensal de vendas, leads e faturamento"><text x="0" y="12"><tspan style="fill:var(--a8)">Ingressos, reuniões e nota</tspan> · Vendas · <tspan style="fill:var(--a17)">%</tspan></text><text x="' + W + '" y="12" text-anchor="end"><tspan style="fill:var(--a5)">Leads</tspan> · <tspan style="fill:var(--a14)">Fat. e tráfego (R$)</tspan> · <tspan style="fill:var(--a7)">Ticket e custos (R$)</tspan></text>';
   for (var g = 0; g < 4; g++) {
     var gy = y(g, 3);
     s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + gy + '" y2="' + gy + '" stroke="rgba(255,255,255,.08)"/>' +
