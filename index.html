@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-27-1000';
+var VERSAO_DASH = '2026-11-27-1200';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46257,7 +46257,7 @@ var ANU = {
   WK: [null,null,null,null,null,null,374,503,661,648,191],
   RE: [71,36,69,73,57,46,109,113,193,178,106],
   FD: [null,null,null,227814,135023,227273,48356,148753,382087,263763,193067],
-  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [], RWS: [], TDG: [], TWS: [], TIM: [], metaOk: {}, LO: [], LP: [], CPLP: [], CPLG: [], CPV: [], CPVD: [], VTOT: [], CPSS: [], CPML: [], CPGR: [], FTOT: [], ILK: [], TIL: [], cam: null, VSS: [], VML: [], VGR: [],   // preenchidas por anuVivo()
+  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [], RWS: [], TDG: [], TWS: [], TIM: [], metaOk: {}, LO: [], LP: [], CPLP: [], CPLG: [], CPV: [], CPVD: [], VTOT: [], CPSS: [], CPML: [], CPGR: [], FTOT: [], ILK: [], TIL: [], cam: null, TPG: [], TMC: [], MCP: [], ILA: [], ILF: [], LQ: {}, VSS: [], VML: [], VGR: [],   // preenchidas por anuVivo()
   de: 0, ate_i: 10, X: null
 };
 (function(){
@@ -46313,7 +46313,10 @@ function anuF(z, v){ return v == null ? '–' : z.f === 'r' ? anuR(v) : z.f === 
 function anuEhWs(r){ return /workshop/.test(v2norm(r.origem || '')); }
 // 26/11/2026 (Bruno: "só o funil do diagnóstico, orgânico e pago · sem workshop e sem ILD"): origem com a etiqueta [Diag]
 // ([Org][Diag], [Ads][Diag], [Org][Diag][Mchat]) ou social selling. Fora: workshop, ILD/imersão, PV, indicação, recuperação, sem origem.
-function anuEhIld(r){ return /(^|[^a-z])ild([^a-z]|$)|imersao|goiania/.test(v2norm(r.origem || '')); }
+function anuEhIld(r){ return /(^|[^a-z])ild([^a-z]|$)|imersao|goiania/.test(v2norm(r.origem || '')) || /(^|[^a-z])ild([^a-z]|$)/i.test(String(r.obs || '')); }   // 27/11/2026: "ILD" na observação também é do ILD (vendas do evento de SP em maio)
+// 📍 ILD São Paulo (19 a 21/05/2026): planilha "Ingressos Compradores ILD" (Eduzz + formulário), fora da planilha de vendas. Evento encerrado:
+// totais do mês fixos aqui (sem dados de pessoas). Abr: 61 ingressos · R$ 26.612 · 52 aplicações; Mai: 69 · R$ 31.297 · 93; Jul: 1 aplicação.
+var ANU_ILD_SP = { ing: { 3: 61, 4: 69 }, fat: { 3: 26612, 4: 31297 }, apl: { 3: 52, 4: 93, 6: 1 } };
 function anuEhDiag(r){ var og = v2norm(r.origem || ''); if (!og || anuEhWs(r) || anuEhIld(r)) return false; return /diag/.test(og) || /social/.test(og); }
 var ANU_DIAG_DESDE = 3;   // abril: antes disso a origem não era preenchida na planilha
 // 🎟️ ingressos do workshop ao vivo: aba "Workshop (Lovable)", programa WLD, pelo mês do ingresso (a mesma conta do número fixo)
@@ -46327,10 +46330,10 @@ function anuIngressosVivo(){
 // 💸 gasto no Meta por mês (mesmos pedaços mensais e o mesmo cache da Gestão de funis): diagnóstico × workshop × impulsionamento
 function anuEhDistri(c){ var u = v2norm(c || ''); return (typeof metaOrigemDiag === 'function' && metaOrigemDiag(c) === 'distri') || /impulsion|boost|post do instagram|publicacao do instagram|instagram post|turbin/.test(u); }
 function anuMetaSomar(i, d){
-  var dg = 0, ws = 0, im = 0, il = 0;
+  var dg = 0, ws = 0, im = 0, il = 0, mc = 0;
   ((d && d.anuncios) || []).forEach(function(a){ var g = +a.gasto || 0, tp = metaTipoCampanha(a.campanha);
-    if (tp === 'workshop') ws += g; else if (tp === 'imersao') il += g; else if (tp === 'diagnostico') { if (anuEhDistri(a.campanha)) im += g; else dg += g; } });
-  ANU.TDG[i] = Math.round(dg); ANU.TWS[i] = Math.round(ws); ANU.TIM[i] = Math.round(im); ANU.TIL[i] = Math.round(il); ANU.metaOk[i] = 1;
+    if (tp === 'workshop') ws += g; else if (tp === 'imersao') il += g; else if (tp === 'diagnostico') { if (anuEhDistri(a.campanha)) im += g; else { dg += g; if (metaOrigemDiag(a.campanha) === 'mcp') mc += g; } } });
+  ANU.TDG[i] = Math.round(dg); ANU.TWS[i] = Math.round(ws); ANU.TIM[i] = Math.round(im); ANU.TIL[i] = Math.round(il); ANU.TMC[i] = Math.round(mc); ANU.TPG[i] = Math.round(dg - mc); ANU.metaOk[i] = 1;
 }
 function anuMetaCarregar(){
   if (typeof _metaPedacos !== 'function' || ANU.metaPed) return; ANU.metaPed = true;
@@ -46348,16 +46351,21 @@ function anuLeadsCanal(){
     try { trfSiteCarregar(false); } catch (e) {}
     if ((ANU.canalTent = (ANU.canalTent || 0) + 1) < 40) setTimeout(function(){ try { if (document.getElementById('s-anual').classList.contains('active')) anuAtualizar(); } catch (e2) {} }, 4000);
     for (var k = 0; k < n; k++) { ANU.LO[k] = null; ANU.LP[k] = null; }
-    return;
+    ANU.LQ = {}; return;
   }
   try { _trfJuntarLD(S); } catch (e3) {}
   var lo = [], lp = [], visto = {}; for (var j = 0; j < n; j++) { lo.push(0); lp.push(0); }
+  // 27/11/2026: por canal fino (pt = anúncio, pv = VSL do MCP, om = ManyChat, ob = bio/orgânico direto) com MQL (marcou investimento) e A/B (nota do lead)
+  var Q = {}; ['pt', 'pv', 'om', 'ob'].forEach(function(c){ Q[c] = { n: [], mql: [], ab: [] }; for (var k = 0; k < n; k++) { Q[c].n.push(0); Q[c].mql.push(0); Q[c].ab.push(0); } });
   S.leads.forEach(function(x){
     if (!x.t) return; var d = new Date(x.t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
     var ch = x.t8 || ('n:' + v2norm(x.nome || '')); if (visto[ch]) return; visto[ch] = 1;
-    if (x.o === 'o') lo[d.getMonth()]++; else lp[d.getMonth()]++;
+    var m = d.getMonth(); if (x.o === 'o') lo[m]++; else lp[m]++;
+    var c = x.o === 'o' ? (x.src === 'manychat' ? 'om' : 'ob') : (x.o === 'v' ? 'pv' : 'pt');
+    Q[c].n[m]++; if (_vfMql(x.inv)) Q[c].mql[m]++; if (x.fx === 'A' || x.fx === 'B') Q[c].ab[m]++;
   });
   for (var i = 0; i < n; i++) { ANU.LO[i] = lo[i]; ANU.LP[i] = lp[i]; }
+  ANU.LQ = Q;
 }
 function anuVivo(){
   try { anuIngressosVivo(); anuIngressosIld(); } catch (eI) {}
@@ -46381,7 +46389,7 @@ function anuVivo(){
     ANU.FDG[i] = dg ? fdg[i] : null; ANU.RDG[i] = dg ? rdg[i] : null; ANU.VDG[i] = dg ? vdg[i] : null;
     ANU.FD[i] = dg ? Math.round(fdg[i]) : (ok ? null : ANU.FD[i]);   /* "Faturamento do diagnóstico" ao vivo, com a mesma regra */
     ANU.FWS[i] = ok ? Math.round(fws[i]) : null; ANU.VWS[i] = ok ? vws[i] : null; ANU.RWS[i] = ok ? rws[i] : null;
-    if (!ANU.metaOk[i]) { ANU.TDG[i] = null; ANU.TWS[i] = null; ANU.TIM[i] = null; ANU.TIL[i] = null; }
+    if (!ANU.metaOk[i]) { ANU.TDG[i] = null; ANU.TWS[i] = null; ANU.TIM[i] = null; ANU.TIL[i] = null; ANU.TMC[i] = null; ANU.TPG[i] = null; }
     ANU.VTOT[i] = ok ? vtot[i] : null; ANU.FTOT[i] = ok ? Math.round(ftot[i]) : null;
     var lp = ANU.LP[i], lo = ANU.LO[i], tdg = ANU.TDG[i], tim = ANU.TIM[i], tws = ANU.TWS[i];
     ANU.CPLP[i] = tdg != null && lp ? Math.round(tdg / lp * 100) / 100 : null;
@@ -46498,7 +46506,7 @@ var ANU_LEG = [
 // faturamento por reunião, tráfego…"): 1) funil (Geral · Diagnóstico · Workshop · ILD) → 2) o que ver (vendas, faturamento,
 // reuniões e conversão, leads, tráfego e custos — dá para ligar vários) → 3) produtos. As linhas são calculadas POR FUNIL, ao vivo.
 // =====================================================================================================
-var ANU_FUNIS = [['geral', 'Geral'], ['diag', 'Diagnóstico'], ['ws', 'Workshop'], ['ild', 'ILD']];
+var ANU_FUNIS = [['geral', 'Geral'], ['diag', 'Diagnóstico'], ['pago', 'Tráfego pago'], ['org', 'Orgânico (ManyChat)'], ['bio', 'Link na bio'], ['mcp', 'MCP'], ['ws', 'Workshop'], ['ild', 'ILD']];
 var ANU_CAMS = [['vendas', '🛒 Vendas por produto'], ['fat', '💰 Faturamento'], ['reun', '🤝 Reuniões e conversão'], ['leads', '👥 Leads'], ['traf', '💸 Tráfego e custos']];
 var ANU_PRODS = [['SS', 'Spark Sem.', 0], ['SA', 'Spark Anual', 1], ['GR', 'Growth', 2], ['MLD', 'MLD', 3], ['LC', 'Legado Club', 4]];
 function anuProdK(t){ var n = v2norm(t || ''); if (/spark/.test(n)) return /semestr/.test(n) ? 'SS' : 'SA'; if (/growth/.test(n)) return 'GR'; if (/club/.test(n)) return 'LC'; if (/legado|mld/.test(n)) return 'MLD'; return 'OUT'; }
@@ -46509,18 +46517,32 @@ function anuCamEstado(){
 }
 function anuCamGuardar(){ try { localStorage.setItem('v2AnuCam', JSON.stringify(ANU.cam)); } catch (e) {} }
 // as contas por funil (uma passada na planilha)
+function anuMcpCompras(){   // t8 → data da compra do MCP; e as compras por mês
+  var por = {}, mes = []; for (var i = 0; i < ANU.M.length; i++) mes.push(0);
+  if (typeof WSL === 'undefined' || !WSL.carregado) return { por: por, mes: null };
+  Object.keys(WSL.porTel).forEach(function(k){ var x = WSL.porTel[k]; if (!/mcp/i.test(x.prog || '')) return; var d = x.ing instanceof Date ? x.ing : (x.ing ? new Date(x.ing) : null); if (!d || isNaN(d)) return;
+    por[k] = d.getTime(); if (d.getFullYear() === 2026 && d.getMonth() < ANU.M.length) mes[d.getMonth()]++; });
+  return { por: por, mes: mes };
+}
 function anuCamDados(){
   var rows = (typeof V2 !== 'undefined' && V2.rows) || [], n = ANU.M.length, ok = rows.length > 0;
   var novo = function(){ var o = { re: [], vd: [], ft: [], q: {}, r: {} }; for (var i = 0; i < n; i++) { o.re.push(0); o.vd.push(0); o.ft.push(0); }
     ANU_PRODS.concat([['OUT']]).forEach(function(p){ o.q[p[0]] = o.re.map(function(){ return 0; }); o.r[p[0]] = o.re.map(function(){ return 0; }); }); return o; };
-  var F = { geral: novo(), diag: novo(), ws: novo(), ild: novo() };
-  var funisDe = function(r){ var k = ['geral']; if (anuEhWs(r)) k.push('ws'); else if (anuEhIld(r)) k.push('ild'); else if (anuEhDiag(r)) k.push('diag'); return k; };
+  var F = { geral: novo(), diag: novo(), ws: novo(), ild: novo(), pago: novo(), org: novo(), bio: novo(), mcp: novo() }, MC = anuMcpCompras(); F.mcpMes = MC.mes;
+  var funisDe = function(r, t){
+    var k = ['geral'];
+    if (anuEhWs(r)) k.push('ws'); else if (anuEhIld(r)) k.push('ild');
+    else { if (anuEhDiag(r)) k.push('diag'); var c = _trfOrigemLinha0(r.origem); if (c === 'pago' || c === 'org' || c === 'bio') k.push(c); }
+    var t8 = ldTel8(r.telefone || ''), mc = t8 && MC.por[t8]; if (mc && t && t >= mc - 864e5) k.push('mcp');   // MCP: quem comprou o MCP e depois teve reunião ou comprou
+    return k;
+  };
   rows.forEach(function(r){
-    var ks = funisDe(r);
+    var ks = funisDe(r, r.date ? r.date.getTime() : null);
     if (r.date && r.date.getFullYear() === 2026 && r.date.getMonth() < n && _fsRealizada(r.sn)) ks.forEach(function(k){ F[k].re[r.date.getMonth()]++; });
     if (r.sn !== 'vendido') return;
     var t = plDataVenda(r); if (!t) return; var d = new Date(t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
     var m = d.getMonth(), v = r.valor || 0, p = anuProdK(r.produto);
+    ks = funisDe(r, t);
     ks.forEach(function(k){ var o = F[k]; o.vd[m]++; o.ft[m] += v; o.q[p][m]++; o.r[p][m] += v; });
   });
   F.ok = ok; return F;
@@ -46529,13 +46551,15 @@ function anuCamDados(){
 function anuCamSeries(){
   anuCamEstado();
   var st = ANU.cam, f = st.f, F = anuCamDados(), o = F[f], n = ANU.M.length, C = function(i){ return 'var(--a' + i + ')'; };
-  var desde = f === 'diag' ? ANU_DIAG_DESDE : 0;   // diagnóstico: a origem só é preenchida desde abril
+  var desde = (f === 'diag' || f === 'pago' || f === 'org' || f === 'bio') ? ANU_DIAG_DESDE : 0;   // a origem só é preenchida desde abril   // diagnóstico: a origem só é preenchida desde abril
   var arr = function(fn){ var a = []; for (var i = 0; i < n; i++) a.push(!F.ok || i < desde ? null : fn(i)); return a; };
   var div = function(a, b, mult){ return arr(function(i){ var x = typeof a === 'function' ? a(i) : a[i], y = typeof b === 'function' ? b(i) : b[i]; return x == null || !y ? null : Math.round(x / y * (mult || 1) * 100) / 100; }); };
+  var LQ = ANU.LQ || {}, soma = function(cs, k){ return arr(function(i){ if (!LQ.pt) return null; var t = 0; cs.forEach(function(c){ t += LQ[c][k][i]; }); return t; }); };
   var gasto = function(i){
     var g = function(a){ return a[i]; };
     if (f === 'diag') return g(ANU.TDG) == null ? null : g(ANU.TDG) + (g(ANU.TIM) || 0);
-    if (f === 'ws') return g(ANU.TWS); if (f === 'ild') return g(ANU.TIL);
+    if (f === 'ws') return g(ANU.TWS); if (f === 'ild') return g(ANU.TIL); if (f === 'pago') return g(ANU.TPG); if (f === 'mcp') return g(ANU.TMC);
+    if (f === 'org' || f === 'bio') return null;   // orgânico não tem gasto direto (o impulsionamento fica no diagnóstico)
     return g(ANU.TDG) == null ? null : g(ANU.TDG) + (g(ANU.TWS) || 0) + (g(ANU.TIM) || 0) + (g(ANU.TIL) || 0);
   };
   var nomeF = ANU_FUNIS.filter(function(x){ return x[0] === f; })[0][1], S = [], prods = ANU_PRODS.filter(function(p){ return st.p[p[0]]; });
@@ -46555,6 +46579,23 @@ function anuCamSeries(){
     add('reun', 'tm', 'Ticket médio', div(o.ft, o.vd), 't', 'r', C(7), '2 4');
   }
   if (st.c.leads) {
+    var CH = { geral: ['pt', 'pv', 'om', 'ob'], diag: ['pt', 'pv', 'om', 'ob'], pago: ['pt', 'pv'], org: ['om'], bio: ['ob'], mcp: ['pv'] }[f];
+    if (CH) {
+      if (f === 'geral' || f === 'diag') {
+        add('leads', 'mqlg', 'MQL geral', soma(CH, 'mql'), 'l', 'n', C(9));
+        add('leads', 'mqlp', 'MQL pago', soma(['pt', 'pv'], 'mql'), 'l', 'n', C(25), '8 3');
+        add('leads', 'mqlo', 'MQL orgânico', soma(['om', 'ob'], 'mql'), 'l', 'n', C(24), '8 3');
+        add('leads', 'abg', 'A/B geral', soma(CH, 'ab'), 'l', 'n', C(10));
+        add('leads', 'abp', 'A/B pago', soma(['pt', 'pv'], 'ab'), 'l', 'n', C(28), '3 3');
+        add('leads', 'abo', 'A/B orgânico', soma(['om', 'ob'], 'ab'), 'l', 'n', C(32), '3 3');
+      } else {
+        add('leads', 'ln', 'Leads', soma(CH, 'n'), 'l', 'n', C(5), '6 4');
+        add('leads', 'mql', 'MQL', soma(CH, 'mql'), 'l', 'n', C(9));
+        add('leads', 'ab', 'A/B (lead score)', soma(CH, 'ab'), 'l', 'n', C(10), '3 3');
+        add('leads', 'pmql', '% MQL', div(soma(CH, 'mql'), soma(CH, 'n'), 100), 'v', 'p', C(23), '2 2 6 2');
+        if (f === 'mcp') add('leads', 'cmcp', 'Compras do MCP', arr(function(i){ return F.mcpMes ? F.mcpMes[i] : null; }), 'w', 'n', C(8), '6 4');
+      }
+    }
     if (f === 'diag' || f === 'geral') {
       add('leads', 'L', 'Leads reais', ANU.L.slice(), 'l', 'n', C(5), '6 4');
       add('leads', 'LO', 'Orgânico', ANU.LO.slice(), 'l', 'n', C(24), '6 2');
@@ -46562,13 +46603,12 @@ function anuCamSeries(){
       if (f === 'diag') {
         add('leads', 'LC', 'Form. completo', ANU.LC.slice(), 'l', 'n', C(6), '6 4');
         add('leads', 'PFC', '% completo', ANU.L.map(function(v, i){ return v ? Math.round(ANU.LC[i] / v * 1000) / 10 : null; }), 'v', 'p', C(23), '2 2 6 2');
-        add('leads', 'MQ', 'MQL', ANU.MQ.slice(), 'l', 'n', C(9), '8 3 2 3');
         add('leads', 'HT', 'HT (2 mil+)', ANU.HT.slice(), 'l', 'n', C(11), '3 3');
-        add('leads', 'MS', 'Score A/B', ANU.MS.slice(), 'l', 'n', C(10), '4 2');
       }
     }
     if (f === 'ws' || f === 'geral') add('leads', 'WK', 'Ingressos workshop', ANU.WK.slice(), 'w', 'n', C(8), '6 4');
     if (f === 'ild' || f === 'geral') add('leads', 'ILK', 'Ingressos ILD', ANU.ILK.slice(), 'w', 'n', C(16), '6 4');
+    if (f === 'ild') { add('leads', 'ILA', 'Aplicações', ANU.ILA.slice(), 'w', 'n', C(19), '4 3 1 3'); add('leads', 'ILF', 'Valor dos ingressos', ANU.ILF.slice(), 'd', 'r', C(21), '6 3'); }
   }
   if (st.c.traf) {
     if (f === 'diag') { add('traf', 'tdg', 'Anúncios', ANU.TDG.slice(), 'd', 'r', C(20), '3 2'); add('traf', 'tim', 'Impulsionamento', ANU.TIM.slice(), 'd', 'r', C(22), '3 2'); }
@@ -46582,15 +46622,22 @@ function anuCamSeries(){
     }
     if (f === 'ws') add('traf', 'cpi', 'Custo/ingresso', div(ANU.TWS, ANU.WK), 't', 'r', C(27), '2 3');
     if (f === 'ild') add('traf', 'cpi', 'Custo/ingresso', div(ANU.TIL, ANU.ILK), 't', 'r', C(27), '2 3');
+    if (f === 'pago') add('traf', 'cplp', 'CPL', div(ANU.TPG, soma(['pt'], 'n')), 't', 'r', C(26), '2 3');
+    if (f === 'mcp') { add('traf', 'cpl', 'CPL (VSL)', div(ANU.TMC, soma(['pv'], 'n')), 't', 'r', C(26), '2 3'); add('traf', 'cpc', 'Custo/compra do MCP', div(ANU.TMC, function(i){ return F.mcpMes ? F.mcpMes[i] : null; }), 't', 'r', C(27), '2 3'); }
   }
   ANU.S = S;
 }
 // 🎟️ ingressos da ILD (mesma aba do workshop, programa ILD)
 function anuIngressosIld(){
-  if (typeof WSL === 'undefined' || !WSL.carregado) return;
+  if (typeof WSL === 'undefined' || !WSL.carregado) { for (var j = 0; j < ANU.M.length; j++) { ANU.ILK[j] = ANU_ILD_SP.ing[j] || null; ANU.ILA[j] = ANU_ILD_SP.apl[j] || null; ANU.ILF[j] = ANU_ILD_SP.fat[j] || null; } return; }
   var m = {}; Object.keys(WSL.porTel).forEach(function(k){ var x = WSL.porTel[k], d = x.ing instanceof Date ? x.ing : (x.ing ? new Date(x.ing) : null);
     if (!d || isNaN(d) || d.getFullYear() !== 2026 || !/ild/i.test(x.prog || '')) return; m[d.getMonth()] = (m[d.getMonth()] || 0) + 1; });
-  for (var i = 0; i < ANU.M.length; i++) ANU.ILK[i] = i >= 6 ? (m[i] || 0) : null;
+  var ap = {}; Object.keys(WSL.porTel).forEach(function(k){ var x = WSL.porTel[k]; if (!/ild/i.test(x.prog || '') || !(x.apl instanceof Date) || x.apl.getFullYear() !== 2026) return; ap[x.apl.getMonth()] = (ap[x.apl.getMonth()] || 0) + 1; });
+  for (var i = 0; i < ANU.M.length; i++) {
+    ANU.ILK[i] = (m[i] || 0) + (ANU_ILD_SP.ing[i] || 0);            // ingressos: Goiânia (app) + São Paulo (maio)
+    ANU.ILA[i] = (ap[i] || 0) + (ANU_ILD_SP.apl[i] || 0);           // aplicações
+    ANU.ILF[i] = ANU_ILD_SP.fat[i] != null ? ANU_ILD_SP.fat[i] : null; // valor dos ingressos (só SP tem o valor)
+  }
 }
 function anuCamControles(){
   anuCamEstado();
