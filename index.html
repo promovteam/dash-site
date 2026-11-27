@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-27-1200';
+var VERSAO_DASH = '2026-11-27-1230';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46506,7 +46506,7 @@ var ANU_LEG = [
 // faturamento por reunião, tráfego…"): 1) funil (Geral · Diagnóstico · Workshop · ILD) → 2) o que ver (vendas, faturamento,
 // reuniões e conversão, leads, tráfego e custos — dá para ligar vários) → 3) produtos. As linhas são calculadas POR FUNIL, ao vivo.
 // =====================================================================================================
-var ANU_FUNIS = [['geral', 'Geral'], ['diag', 'Diagnóstico'], ['pago', 'Tráfego pago'], ['org', 'Orgânico (ManyChat)'], ['bio', 'Link na bio'], ['mcp', 'MCP'], ['ws', 'Workshop'], ['ild', 'ILD']];
+var ANU_FUNIS = [['geral', 'Geral'], ['diag', 'Diagnóstico'], ['pago', 'Tráfego pago'], ['org', 'Orgânico (ManyChat)'], ['bio', 'Link na bio'], ['ss', 'Social Selling'], ['ind', 'Indicação'], ['mcp', 'MCP'], ['dist', 'Distribuição'], ['ws', 'Workshop'], ['pp', 'Pré e pós workshop'], ['ild', 'ILD'], ['out', 'Outras origens']];
 var ANU_CAMS = [['vendas', '🛒 Vendas por produto'], ['fat', '💰 Faturamento'], ['reun', '🤝 Reuniões e conversão'], ['leads', '👥 Leads'], ['traf', '💸 Tráfego e custos']];
 var ANU_PRODS = [['SS', 'Spark Sem.', 0], ['SA', 'Spark Anual', 1], ['GR', 'Growth', 2], ['MLD', 'MLD', 3], ['LC', 'Legado Club', 4]];
 function anuProdK(t){ var n = v2norm(t || ''); if (/spark/.test(n)) return /semestr/.test(n) ? 'SS' : 'SA'; if (/growth/.test(n)) return 'GR'; if (/club/.test(n)) return 'LC'; if (/legado|mld/.test(n)) return 'MLD'; return 'OUT'; }
@@ -46528,11 +46528,13 @@ function anuCamDados(){
   var rows = (typeof V2 !== 'undefined' && V2.rows) || [], n = ANU.M.length, ok = rows.length > 0;
   var novo = function(){ var o = { re: [], vd: [], ft: [], q: {}, r: {} }; for (var i = 0; i < n; i++) { o.re.push(0); o.vd.push(0); o.ft.push(0); }
     ANU_PRODS.concat([['OUT']]).forEach(function(p){ o.q[p[0]] = o.re.map(function(){ return 0; }); o.r[p[0]] = o.re.map(function(){ return 0; }); }); return o; };
-  var F = { geral: novo(), diag: novo(), ws: novo(), ild: novo(), pago: novo(), org: novo(), bio: novo(), mcp: novo() }, MC = anuMcpCompras(); F.mcpMes = MC.mes;
+  var F = { geral: novo(), diag: novo(), ws: novo(), ild: novo(), pago: novo(), org: novo(), bio: novo(), mcp: novo(), ss: novo(), ind: novo(), pp: novo(), out: novo(), dist: novo() }, MC = anuMcpCompras(); F.mcpMes = MC.mes;
   var funisDe = function(r, t){
     var k = ['geral'];
-    if (anuEhWs(r)) k.push('ws'); else if (anuEhIld(r)) k.push('ild');
-    else { if (anuEhDiag(r)) k.push('diag'); var c = _trfOrigemLinha0(r.origem); if (c === 'pago' || c === 'org' || c === 'bio') k.push(c); }
+    var c = _trfOrigemLinha0(r.origem);   // a mesma régua da Gestão de funis
+    if (anuEhWs(r)) { k.push('ws'); if (c === 'pp') k.push('pp'); }
+    else if (anuEhIld(r)) k.push('ild');
+    else { if (anuEhDiag(r)) k.push('diag'); if (c === 'pago' || c === 'org' || c === 'bio' || c === 'ss' || c === 'ind' || c === 'out' || c === 'pp') k.push(c); }
     var t8 = ldTel8(r.telefone || ''), mc = t8 && MC.por[t8]; if (mc && t && t >= mc - 864e5) k.push('mcp');   // MCP: quem comprou o MCP e depois teve reunião ou comprou
     return k;
   };
@@ -46559,11 +46561,14 @@ function anuCamSeries(){
     var g = function(a){ return a[i]; };
     if (f === 'diag') return g(ANU.TDG) == null ? null : g(ANU.TDG) + (g(ANU.TIM) || 0);
     if (f === 'ws') return g(ANU.TWS); if (f === 'ild') return g(ANU.TIL); if (f === 'pago') return g(ANU.TPG); if (f === 'mcp') return g(ANU.TMC);
-    if (f === 'org' || f === 'bio') return null;   // orgânico não tem gasto direto (o impulsionamento fica no diagnóstico)
+    if (f === 'dist') return g(ANU.TIM);   // distribuição de conteúdo = impulsionamento de posts
+    if (f !== 'geral' && f !== 'diag') return null;   // orgânico, social selling, indicação, pré/pós e outras não têm gasto direto
     return g(ANU.TDG) == null ? null : g(ANU.TDG) + (g(ANU.TWS) || 0) + (g(ANU.TIM) || 0) + (g(ANU.TIL) || 0);
   };
+  if (!ANU_FUNIS.some(function(x){ return x[0] === f; })) f = st.f = 'geral';
   var nomeF = ANU_FUNIS.filter(function(x){ return x[0] === f; })[0][1], S = [], prods = ANU_PRODS.filter(function(p){ return st.p[p[0]]; });
-  var add = function(cam, id, nome, d, g, fm, cor, da){ S.push({ id: f + ':' + id, cam: cam, n: nome, nl: nomeF + ' · ' + nome, c: cor, d: d, g: g, f: fm, top: { v: 60, w: 900, t: 30000, d: 600000, l: 1800 }[g], da: da || '' }); };
+  var add = function(cam, id, nome, d, g, fm, cor, da){ if (f === 'dist' && cam !== 'traf') return;   // distribuição: só gasto (não tem reunião nem venda própria)
+    S.push({ id: f + ':' + id, cam: cam, n: nome, nl: nomeF + ' · ' + nome, c: cor, d: d, g: g, f: fm, top: { v: 60, w: 900, t: 30000, d: 600000, l: 1800 }[g], da: da || '' }); };
   if (st.c.vendas) {
     prods.forEach(function(p){ add('vendas', 'q' + p[0], p[1], arr(function(i){ return o.q[p[0]][i]; }), 'v', 'n', C(p[2])); });
     add('vendas', 'vd', 'Total de vendas', arr(function(i){ return o.vd[i]; }), 'v', 'n', C(12), '1 3');
