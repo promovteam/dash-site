@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-27-1300';
+var VERSAO_DASH = '2026-11-27-1400';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -45343,6 +45343,53 @@ function _trfOrigemLinha0(o) {
   if (/(^|[^a-z])ads([^a-z]|$)/.test(n)) return 'pago'; if (/mchat|manychat/.test(n)) return 'org'; if (/(^|[^a-z])org([^a-z]|$)/.test(n)) return 'bio';
   if (/(^|[^a-z])ild([^a-z]|$)|imers/.test(n)) return 'pres'; if (/call ?meet/.test(n) || (/workshop/.test(n) && /(^|[^a-z])(pre|pos)([^a-z]|$)/.test(n))) return 'pp'; if (/workshop/.test(n)) return 'ws'; if (/social/.test(n)) return 'ss'; if (/indica/.test(n)) return 'ind'; return 'out';
 }
+// =====================================================================================================
+// 💰 GESTÃO DE FUNIS → API DO FINANCEIRO (27/11/2026 · Bruno: "envie para a api do financeiro a gestão de funis, os mesmos números do
+// dashboard · investido em tráfego e receita do funil"). Com um ADMIN logado (senha própria), o dash calcula o "Todos" da Gestão de
+// funis para cada mês do ano (a mesma conta da tela) e manda ao robô (action funisSalvar). O financeiro lê com parte=funis.
+// Meses fechados: 1 envio por dia; o mês atual e o anterior: a cada 2 horas. Só manda quando todas as fontes chegaram.
+// =====================================================================================================
+var FUN_API = { rodando: false, tent: 0 };
+function _funApiMeses() { var h = new Date(), L = []; for (var m = 0; m <= h.getMonth(); m++) L.push(h.getFullYear() + '-' + ('0' + (m + 1)).slice(-2)); return L; }
+function _funApiCalcular(mes) {   // roda a conta do "Todos" para o mês, sem mexer na tela
+  var sv = { per: TRF.per, de: TRF.de, ate: TRF.ate, tprod: TRF.tprod }, a = +mes.slice(0, 4), m = +mes.slice(5, 7), ult = new Date(a, m, 0).getDate();
+  TRF.per = 'pers'; TRF.de = mes + '-01'; TRF.ate = mes + '-' + ('0' + ult).slice(-2); TRF.tprod = '';
+  window._trfTodosUlt = null;
+  try { _trfRenderTodos(document.createElement('div')); } catch (e) {}
+  TRF.per = sv.per; TRF.de = sv.de; TRF.ate = sv.ate; TRF.tprod = sv.tprod;
+  var R = window._trfTodosUlt; window._trfTodosUlt = null; return R;
+}
+function funApiEnviar(forcar) {
+  try { if (FUN_API.rodando || typeof ehAdm !== 'function' || !ehAdm() || typeof _cmTok !== 'function' || !_cmTok()) return; } catch (e0) { return; }
+  FUN_API.rodando = true;
+  var hoje = new Date(), atual = hoje.getFullYear() + '-' + ('0' + (hoje.getMonth() + 1)).slice(-2), ant = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+  var antK = ant.getFullYear() + '-' + ('0' + (ant.getMonth() + 1)).slice(-2), falta = [], fila = [];
+  _funApiMeses().forEach(function(mes) {
+    var ultimo = 0; try { ultimo = +localStorage.getItem('v2FunApi_' + mes) || 0; } catch (e) {}
+    var vale = (mes === atual || mes === antK) ? 2 * 3600e3 : 24 * 3600e3;
+    if (!forcar && Date.now() - ultimo < vale) return;
+    var R = _funApiCalcular(mes);
+    if (!R || !R.ok) { falta.push(mes); return; }
+    // compacto (o pedido vai no endereço): [investido, impressões, cliques, entradas, qualificados, reuniões, realizadas, compareceram, vendas, receita]
+    var F = {}; Object.keys(R.L).forEach(function(k) { var x = R.L[k];
+      F[k] = [Math.round((x.gasto || 0) * 100) / 100, x.imp || 0, x.cli || 0, x.entr == null ? null : x.entr, x.qual == null ? null : x.qual, x.reun || 0, x.real || 0, x.apar || 0, x.vend || 0, Math.round((x.valor || 0) * 100) / 100]; });
+    fila.push({ mes: mes, F: F });
+  });
+  var andar = function() {
+    var it = fila.shift();
+    if (!it) { FUN_API.rodando = false; if (falta.length && FUN_API.tent++ < 20) setTimeout(function() { funApiEnviar(false); }, 30000); return; }
+    // pela porta do financeiro (action=financeiro, parte=funisSalvar): resposta em JSON comum, lida com fetch (sem a conta Google do navegador)
+    var url = APPS_SCRIPT_URL + '?action=financeiro&parte=funisSalvar&token=' + encodeURIComponent(_cmTok()) + '&mes=' + it.mes + '&funis=' + encodeURIComponent(JSON.stringify(it.F));
+    fetch(url, { credentials: 'omit' }).then(function(r) { return r.json(); }).then(function(r) {
+      if (r && r.success) { try { localStorage.setItem('v2FunApi_' + it.mes, String(Date.now())); } catch (e) {} }
+      else FUN_API.erro = (r && r.error) || 'sem resposta';
+    }).catch(function(e) { FUN_API.erro = String(e); }).then(function() { setTimeout(andar, 400); });
+  };
+  andar();
+}
+// arranque: 40 s depois de abrir (as planilhas, a base do site e o Meta chegam primeiro) e depois a cada 2 horas
+setTimeout(function() { try { funApiEnviar(false); } catch (e) {} }, 40000);
+setInterval(function() { try { if (!document.hidden) { FUN_API.tent = 0; funApiEnviar(false); } } catch (e) {} }, 2 * 3600e3);
 function _trfRenderTodos(el) {
   trfSiteCarregar(false); try { if (!WSL.carregado && !WSL.buscando) carregarWS(); } catch (e) {}
   _trfJuntarLD(TRF.site);
@@ -45381,6 +45428,7 @@ function _trfRenderTodos(el) {
     if (L.pres.listaN != null) { L.pres.entr = L.pres.listaN; L.pres.ent = 'na lista do evento'; } }
   var ks = ['pago', 'org', 'bio', 'pp', 'ws', 'pres', 'mcp', 'ss', 'ind', 'out', 'dist'].filter(function(k) { return !G || G[k]; }), T = { gasto: 0, reun: 0, real: 0, apar: 0, vend: 0, valor: 0 };
   ks.forEach(function(k) { ['gasto', 'reun', 'real', 'apar', 'vend', 'valor'].forEach(function(c) { T[c] += L[k][c]; }); });
+  try { if (!G) window._trfTodosUlt = { ini: P.ini, fim: P.fim, ok: !!M && !!S && !!okWs && !!okV, L: L }; } catch (eCap) {}   // 💰 API do financeiro: os mesmos números da tela
   trfContCarregar(); var impAds = 0, vwOrg = 0, nPosts = 0, vwTodos = 0; (TRF.cont || []).forEach(function(x) { if (x.t >= P.ini && x.t < P.fim) { vwTodos += x.v; nPosts++; } }); if (TRF.tprod !== 'ws') vwOrg = vwTodos;
   var semEnt = true; zf.imp = 0; zf.cli = 0; zf.ent = 0; ks.forEach(function(k) { zf.imp += L[k].imp; zf.cli += L[k].cli; if (L[k].entr != null) { zf.ent += L[k].entr; semEnt = false; } });
   impAds = zf.imp; zf.imp += vwOrg;
