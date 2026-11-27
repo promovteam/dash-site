@@ -2999,7 +2999,7 @@ document.querySelectorAll('.nav-item[data-s]').forEach(function(item){
 // vendo a versão antiga e as novidades "não apareciam" — foi o que aconteceu
 // com a Sarah em 20/08/2026. Agora o dash confere sozinho se saiu versão nova
 // e avisa na tela, com um botão para pegar a nova na hora.
-var VERSAO_DASH = '2026-11-27-0900';
+var VERSAO_DASH = '2026-11-27-1000';
 // ⚡ 03/10/2026 (Bruno: "ainda não mudou, ainda está a animação minha" / a busca antiga): a página abre da cópia guardada no
 // aparelho (gv-sw.js, para abrir na hora) e por isso podia ficar UMA versão atrás. Agora, logo na abertura, pergunta ao site
 // a versão do ar; se a cópia estiver velha, recarrega já com a nova — ainda na tela de abertura, antes de a pessoa mexer.
@@ -46204,15 +46204,18 @@ try { viMostrarMenu(); } catch (eViM2) {}
 #s-anual .anu-mes.on{background:rgba(110,168,255,.18);border-color:rgba(110,168,255,.55);color:var(--text);font-weight:700}
 #s-anual .anu-mes.ponta{background:rgba(110,168,255,.32)}
 #s-anual .anu-dica{font-size:.7rem;color:var(--text2);margin-top:6px}
-#s-anual .anu-lg{display:flex;flex-wrap:wrap;gap:6px;font-size:.76rem;margin:8px 0 4px}
+#s-anual .anu-lg{display:flex;flex-direction:column;gap:8px;font-size:.76rem;margin:8px 0 4px}
+#s-anual .anu-cam{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:rgba(246,163,80,.05);border:1px solid rgba(246,163,80,.22)}
+#s-anual .anu-cam .anu-rot{min-width:92px}
+#s-anual .anu-grupos{display:flex;flex-wrap:wrap;gap:6px}
 #s-anual .anu-lg .grp{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:5px 10px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07)}
 #s-anual .anu-lg .gt{font-size:.62rem!important;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text2)!important;margin-right:2px}
 #s-anual .anu-lg .gt small{font-weight:600;opacity:.7;margin-left:3px;letter-spacing:0}
 #s-anual .anu-lg .gt:hover{color:var(--text)!important}
 #s-anual .anu-lg .m{color:var(--text2);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-right:2px}
 #s-anual .anu-lg .br{flex-basis:100%;height:0}
-#s-anual .anu-lg button{all:unset;cursor:pointer;display:inline-flex;align-items:center;color:var(--text)}
-#s-anual .anu-lg button.off{opacity:.38;text-decoration:line-through}
+#s-anual .anu-lg .grp button{all:unset;cursor:pointer;display:inline-flex;align-items:center;color:var(--text)}
+#s-anual .anu-lg .grp button.off{opacity:.38;text-decoration:line-through}
 #s-anual i.b{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;flex:none}
 #s-anual .anu-ch{position:relative;touch-action:pan-y;margin-top:6px}
 #s-anual .anu-ch svg{display:block}#s-anual .anu-ch svg text{font-size:12px;fill:var(--text2)}
@@ -46254,7 +46257,7 @@ var ANU = {
   WK: [null,null,null,null,null,null,374,503,661,648,191],
   RE: [71,36,69,73,57,46,109,113,193,178,106],
   FD: [null,null,null,227814,135023,227273,48356,148753,382087,263763,193067],
-  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [], RWS: [], TDG: [], TWS: [], TIM: [], metaOk: {}, LO: [], LP: [], CPLP: [], CPLG: [], CPV: [], CPVD: [], VTOT: [], CPSS: [], CPML: [], CPGR: [], FTOT: [], VSS: [], VML: [], VGR: [],   // preenchidas por anuVivo()
+  FRD: [], CVD: [], FWS: [], FDG: [], RDG: [], VDG: [], VWS: [], RWS: [], TDG: [], TWS: [], TIM: [], metaOk: {}, LO: [], LP: [], CPLP: [], CPLG: [], CPV: [], CPVD: [], VTOT: [], CPSS: [], CPML: [], CPGR: [], FTOT: [], ILK: [], TIL: [], cam: null, VSS: [], VML: [], VGR: [],   // preenchidas por anuVivo()
   de: 0, ate_i: 10, X: null
 };
 (function(){
@@ -46324,10 +46327,10 @@ function anuIngressosVivo(){
 // 💸 gasto no Meta por mês (mesmos pedaços mensais e o mesmo cache da Gestão de funis): diagnóstico × workshop × impulsionamento
 function anuEhDistri(c){ var u = v2norm(c || ''); return (typeof metaOrigemDiag === 'function' && metaOrigemDiag(c) === 'distri') || /impulsion|boost|post do instagram|publicacao do instagram|instagram post|turbin/.test(u); }
 function anuMetaSomar(i, d){
-  var dg = 0, ws = 0, im = 0;
+  var dg = 0, ws = 0, im = 0, il = 0;
   ((d && d.anuncios) || []).forEach(function(a){ var g = +a.gasto || 0, tp = metaTipoCampanha(a.campanha);
-    if (tp === 'workshop') ws += g; else if (tp === 'diagnostico') { if (anuEhDistri(a.campanha)) im += g; else dg += g; } });
-  ANU.TDG[i] = Math.round(dg); ANU.TWS[i] = Math.round(ws); ANU.TIM[i] = Math.round(im); ANU.metaOk[i] = 1;
+    if (tp === 'workshop') ws += g; else if (tp === 'imersao') il += g; else if (tp === 'diagnostico') { if (anuEhDistri(a.campanha)) im += g; else dg += g; } });
+  ANU.TDG[i] = Math.round(dg); ANU.TWS[i] = Math.round(ws); ANU.TIM[i] = Math.round(im); ANU.TIL[i] = Math.round(il); ANU.metaOk[i] = 1;
 }
 function anuMetaCarregar(){
   if (typeof _metaPedacos !== 'function' || ANU.metaPed) return; ANU.metaPed = true;
@@ -46357,7 +46360,7 @@ function anuLeadsCanal(){
   for (var i = 0; i < n; i++) { ANU.LO[i] = lo[i]; ANU.LP[i] = lp[i]; }
 }
 function anuVivo(){
-  try { anuIngressosVivo(); } catch (eI) {}
+  try { anuIngressosVivo(); anuIngressosIld(); } catch (eI) {}
   try { anuLeadsCanal(); } catch (eC) {}
   try { anuMetaCarregar(); } catch (eM) {}
   var rows = (typeof V2 !== 'undefined' && V2.rows) || [], n = ANU.M.length, z = function(){ var a = []; for (var i = 0; i < n; i++) a.push(0); return a; };
@@ -46378,7 +46381,7 @@ function anuVivo(){
     ANU.FDG[i] = dg ? fdg[i] : null; ANU.RDG[i] = dg ? rdg[i] : null; ANU.VDG[i] = dg ? vdg[i] : null;
     ANU.FD[i] = dg ? Math.round(fdg[i]) : (ok ? null : ANU.FD[i]);   /* "Faturamento do diagnóstico" ao vivo, com a mesma regra */
     ANU.FWS[i] = ok ? Math.round(fws[i]) : null; ANU.VWS[i] = ok ? vws[i] : null; ANU.RWS[i] = ok ? rws[i] : null;
-    if (!ANU.metaOk[i]) { ANU.TDG[i] = null; ANU.TWS[i] = null; ANU.TIM[i] = null; }
+    if (!ANU.metaOk[i]) { ANU.TDG[i] = null; ANU.TWS[i] = null; ANU.TIM[i] = null; ANU.TIL[i] = null; }
     ANU.VTOT[i] = ok ? vtot[i] : null; ANU.FTOT[i] = ok ? Math.round(ftot[i]) : null;
     var lp = ANU.LP[i], lo = ANU.LO[i], tdg = ANU.TDG[i], tim = ANU.TIM[i], tws = ANU.TWS[i];
     ANU.CPLP[i] = tdg != null && lp ? Math.round(tdg / lp * 100) / 100 : null;
@@ -46419,7 +46422,7 @@ function anuRender(){
       '<div class="anu-card"><div class="anu-cab"><h3 style="margin:0">Vendas, leads e ticket médio por mês</h3>' +
         '<div class="anu-linha" id="anu-pre"></div></div>' +
         '<div class="anu-lg" id="anu-lg"></div><div class="anu-ch" id="anu-ch"></div>' +
-        '<p class="anu-nota" style="margin-top:6px">Linhas cheias = vendas por produto (eixo da esquerda). Tracejadas têm escala própria, no eixo da mesma cor. Clique numa linha da legenda para ocultar ou mostrar.</p>' +
+        '<p class="anu-nota" style="margin-top:6px">Escolha o funil, o que ver e os produtos. Cada linha usa o eixo da mesma cor (os eixos se ajustam ao que está ligado). Clique numa linha da legenda para ocultar ou mostrar, ou no título do grupo para o grupo inteiro.</p>' +
       '</div>' +
       '<div class="anu-card" id="anu-met"></div>' +
       '<div class="anu-card"><h3>Mês a mês no período</h3><div class="anu-tw"><table class="anu-tb" id="anu-tb"></table></div>' +
@@ -46439,9 +46442,14 @@ function anuRender(){
       var a = b.getAttribute('data-a').split('-'); ANU.de = +a[0]; ANU.ate_i = +a[1]; ANU.esperaFim = false; ultimo = null; anuAtualizar();
     });
     document.getElementById('anu-lg').addEventListener('click', function(e){
+      var cf = e.target.closest('button[data-f],button[data-c],button[data-p]');
+      if (cf) { anuCamEstado(); var st = ANU.cam;
+        if (cf.hasAttribute('data-f')) st.f = cf.getAttribute('data-f');
+        if (cf.hasAttribute('data-c')) { var c = cf.getAttribute('data-c'); if (st.c[c]) delete st.c[c]; else st.c[c] = 1; }
+        if (cf.hasAttribute('data-p')) { var pk = cf.getAttribute('data-p'); if (st.p[pk]) delete st.p[pk]; else st.p[pk] = 1; }
+        anuCamGuardar(); anuAtualizar(); return; }
       var gt = e.target.closest('button[data-g]');
-      if (gt) { var G = ANU_LEG.filter(function(x){ return x[0] === gt.getAttribute('data-g'); })[0]; if (!G) return;
-        var ids = G[1].map(function(x){ return x[0]; }).filter(function(id){ return anuSerie(id); }), algum = ids.some(function(id){ return !ANU.X[id]; });
+      if (gt) { var ids = ANU.S.filter(function(z){ return z.cam === gt.getAttribute('data-g'); }).map(function(z){ return z.id; }), algum = ids.some(function(id){ return !ANU.X[id]; });
         ids.forEach(function(id){ if (algum) ANU.X[id] = 1; else delete ANU.X[id]; }); anuGuardarX(); anuLegenda(); anuGrafico(); return; }
       var b = e.target.closest('button[data-id]'); if (!b) return;
       var id = b.getAttribute('data-id'); if (ANU.X[id]) delete ANU.X[id]; else ANU.X[id] = 1; anuGuardarX(); anuLegenda(); anuGrafico();
@@ -46473,9 +46481,7 @@ function anuAtalhos(){
   document.getElementById('anu-dica').innerHTML = ANU.esperaFim
     ? 'Agora clique no mês final para formar o período (ou deixe assim para ver só ' + ANU.M[ANU.de] + ').'
     : 'Clique num mês e depois em outro para escolher o período. Período atual: <b>' + ANU.M[ANU.de] + (ANU.de !== ANU.ate_i ? ' a ' + ANU.M[ANU.ate_i] : '') + ' de 2026</b>.';
-  document.getElementById('anu-pre').innerHTML = [['todas','Todas'],['vendas','Só vendas'],['leads','Só leads'],['dinheiro','Ticket e faturamento'],['nenhuma','Limpar']].map(function(p){
-    return '<button type="button" class="anu-chip" data-p="' + p[0] + '">' + p[1] + '</button>';
-  }).join('');
+  document.getElementById('anu-pre').innerHTML = '<button type="button" class="anu-chip" onclick="ANU.X={};anuGuardarX();anuLegenda();anuGrafico()">Mostrar todas</button>';
 }
 // 26/11/2026 (Bruno: "nomes menores e agrupados por contexto"): a legenda em grupos; clicar no título liga/desliga o grupo inteiro
 var ANU_LEG = [
@@ -46487,19 +46493,127 @@ var ANU_LEG = [
   ['Custos', [['CPLP', 'CPL pago'], ['CPLG', 'CPL global'], ['CPV', 'Custo/venda'], ['CPVD', 'Custo/venda diag.'], ['CPSS', 'Custo/venda Spark Sem.'], ['CPML', 'Custo/venda MLD'], ['CPGR', 'Custo/venda Growth']]],
   ['Geral', [['FTOT', 'Faturamento'], ['TM', 'Ticket médio'], ['FR', 'Fat./reunião'], ['RE', 'Reuniões']]]
 ];
+// =====================================================================================================
+// 🧭 CAMADAS (27/11/2026 · Bruno: "organizar por camadas de contexto: escolho o funil, depois os produtos, e aparecem conversão,
+// faturamento por reunião, tráfego…"): 1) funil (Geral · Diagnóstico · Workshop · ILD) → 2) o que ver (vendas, faturamento,
+// reuniões e conversão, leads, tráfego e custos — dá para ligar vários) → 3) produtos. As linhas são calculadas POR FUNIL, ao vivo.
+// =====================================================================================================
+var ANU_FUNIS = [['geral', 'Geral'], ['diag', 'Diagnóstico'], ['ws', 'Workshop'], ['ild', 'ILD']];
+var ANU_CAMS = [['vendas', '🛒 Vendas por produto'], ['fat', '💰 Faturamento'], ['reun', '🤝 Reuniões e conversão'], ['leads', '👥 Leads'], ['traf', '💸 Tráfego e custos']];
+var ANU_PRODS = [['SS', 'Spark Sem.', 0], ['SA', 'Spark Anual', 1], ['GR', 'Growth', 2], ['MLD', 'MLD', 3], ['LC', 'Legado Club', 4]];
+function anuProdK(t){ var n = v2norm(t || ''); if (/spark/.test(n)) return /semestr/.test(n) ? 'SS' : 'SA'; if (/growth/.test(n)) return 'GR'; if (/club/.test(n)) return 'LC'; if (/legado|mld/.test(n)) return 'MLD'; return 'OUT'; }
+function anuCamEstado(){
+  if (ANU.cam) return;
+  var g = null; try { g = JSON.parse(localStorage.getItem('v2AnuCam') || 'null'); } catch (e) {}
+  ANU.cam = g && g.f ? g : { f: 'geral', c: { fat: 1 }, p: { SS: 1, SA: 1, GR: 1, MLD: 1, LC: 1 } };
+}
+function anuCamGuardar(){ try { localStorage.setItem('v2AnuCam', JSON.stringify(ANU.cam)); } catch (e) {} }
+// as contas por funil (uma passada na planilha)
+function anuCamDados(){
+  var rows = (typeof V2 !== 'undefined' && V2.rows) || [], n = ANU.M.length, ok = rows.length > 0;
+  var novo = function(){ var o = { re: [], vd: [], ft: [], q: {}, r: {} }; for (var i = 0; i < n; i++) { o.re.push(0); o.vd.push(0); o.ft.push(0); }
+    ANU_PRODS.concat([['OUT']]).forEach(function(p){ o.q[p[0]] = o.re.map(function(){ return 0; }); o.r[p[0]] = o.re.map(function(){ return 0; }); }); return o; };
+  var F = { geral: novo(), diag: novo(), ws: novo(), ild: novo() };
+  var funisDe = function(r){ var k = ['geral']; if (anuEhWs(r)) k.push('ws'); else if (anuEhIld(r)) k.push('ild'); else if (anuEhDiag(r)) k.push('diag'); return k; };
+  rows.forEach(function(r){
+    var ks = funisDe(r);
+    if (r.date && r.date.getFullYear() === 2026 && r.date.getMonth() < n && _fsRealizada(r.sn)) ks.forEach(function(k){ F[k].re[r.date.getMonth()]++; });
+    if (r.sn !== 'vendido') return;
+    var t = plDataVenda(r); if (!t) return; var d = new Date(t); if (d.getFullYear() !== 2026 || d.getMonth() >= n) return;
+    var m = d.getMonth(), v = r.valor || 0, p = anuProdK(r.produto);
+    ks.forEach(function(k){ var o = F[k]; o.vd[m]++; o.ft[m] += v; o.q[p][m]++; o.r[p][m] += v; });
+  });
+  F.ok = ok; return F;
+}
+// as linhas do funil e das camadas escolhidas
+function anuCamSeries(){
+  anuCamEstado();
+  var st = ANU.cam, f = st.f, F = anuCamDados(), o = F[f], n = ANU.M.length, C = function(i){ return 'var(--a' + i + ')'; };
+  var desde = f === 'diag' ? ANU_DIAG_DESDE : 0;   // diagnóstico: a origem só é preenchida desde abril
+  var arr = function(fn){ var a = []; for (var i = 0; i < n; i++) a.push(!F.ok || i < desde ? null : fn(i)); return a; };
+  var div = function(a, b, mult){ return arr(function(i){ var x = typeof a === 'function' ? a(i) : a[i], y = typeof b === 'function' ? b(i) : b[i]; return x == null || !y ? null : Math.round(x / y * (mult || 1) * 100) / 100; }); };
+  var gasto = function(i){
+    var g = function(a){ return a[i]; };
+    if (f === 'diag') return g(ANU.TDG) == null ? null : g(ANU.TDG) + (g(ANU.TIM) || 0);
+    if (f === 'ws') return g(ANU.TWS); if (f === 'ild') return g(ANU.TIL);
+    return g(ANU.TDG) == null ? null : g(ANU.TDG) + (g(ANU.TWS) || 0) + (g(ANU.TIM) || 0) + (g(ANU.TIL) || 0);
+  };
+  var nomeF = ANU_FUNIS.filter(function(x){ return x[0] === f; })[0][1], S = [], prods = ANU_PRODS.filter(function(p){ return st.p[p[0]]; });
+  var add = function(cam, id, nome, d, g, fm, cor, da){ S.push({ id: f + ':' + id, cam: cam, n: nome, nl: nomeF + ' · ' + nome, c: cor, d: d, g: g, f: fm, top: { v: 60, w: 900, t: 30000, d: 600000, l: 1800 }[g], da: da || '' }); };
+  if (st.c.vendas) {
+    prods.forEach(function(p){ add('vendas', 'q' + p[0], p[1], arr(function(i){ return o.q[p[0]][i]; }), 'v', 'n', C(p[2])); });
+    add('vendas', 'vd', 'Total de vendas', arr(function(i){ return o.vd[i]; }), 'v', 'n', C(12), '1 3');
+  }
+  if (st.c.fat) {
+    add('fat', 'ft', 'Faturamento', arr(function(i){ return Math.round(o.ft[i]); }), 'd', 'r', C(33));
+    prods.forEach(function(p){ add('fat', 'r' + p[0], 'Fat. ' + p[1], arr(function(i){ return Math.round(o.r[p[0]][i]); }), 'd', 'r', C(p[2]), '6 3'); });
+  }
+  if (st.c.reun) {
+    add('reun', 're', 'Reuniões realizadas', arr(function(i){ return o.re[i]; }), 'w', 'n', C(18), '4 3');
+    add('reun', 'cv', 'Conversão %', div(o.vd, o.re, 100), 'v', 'p', C(13), '1 2');
+    add('reun', 'fr', 'Fat./reunião', div(o.ft, o.re), 't', 'r', C(6), '6 2 2 2');
+    add('reun', 'tm', 'Ticket médio', div(o.ft, o.vd), 't', 'r', C(7), '2 4');
+  }
+  if (st.c.leads) {
+    if (f === 'diag' || f === 'geral') {
+      add('leads', 'L', 'Leads reais', ANU.L.slice(), 'l', 'n', C(5), '6 4');
+      add('leads', 'LO', 'Orgânico', ANU.LO.slice(), 'l', 'n', C(24), '6 2');
+      add('leads', 'LP', 'Pago', ANU.LP.slice(), 'l', 'n', C(25), '6 2');
+      if (f === 'diag') {
+        add('leads', 'LC', 'Form. completo', ANU.LC.slice(), 'l', 'n', C(6), '6 4');
+        add('leads', 'PFC', '% completo', ANU.L.map(function(v, i){ return v ? Math.round(ANU.LC[i] / v * 1000) / 10 : null; }), 'v', 'p', C(23), '2 2 6 2');
+        add('leads', 'MQ', 'MQL', ANU.MQ.slice(), 'l', 'n', C(9), '8 3 2 3');
+        add('leads', 'HT', 'HT (2 mil+)', ANU.HT.slice(), 'l', 'n', C(11), '3 3');
+        add('leads', 'MS', 'Score A/B', ANU.MS.slice(), 'l', 'n', C(10), '4 2');
+      }
+    }
+    if (f === 'ws' || f === 'geral') add('leads', 'WK', 'Ingressos workshop', ANU.WK.slice(), 'w', 'n', C(8), '6 4');
+    if (f === 'ild' || f === 'geral') add('leads', 'ILK', 'Ingressos ILD', ANU.ILK.slice(), 'w', 'n', C(16), '6 4');
+  }
+  if (st.c.traf) {
+    if (f === 'diag') { add('traf', 'tdg', 'Anúncios', ANU.TDG.slice(), 'd', 'r', C(20), '3 2'); add('traf', 'tim', 'Impulsionamento', ANU.TIM.slice(), 'd', 'r', C(22), '3 2'); }
+    else add('traf', 'gs', 'Gasto em tráfego', arr(gasto), 'd', 'r', C(20), '3 2');
+    if (f === 'geral') { add('traf', 'tws', 'Tráfego workshop', ANU.TWS.slice(), 'd', 'r', C(21), '3 2'); add('traf', 'til', 'Tráfego ILD', ANU.TIL.slice(), 'd', 'r', C(16), '3 2'); }
+    add('traf', 'cpv', 'Custo/venda', div(gasto, o.vd), 't', 'r', C(28), '2 3');
+    prods.forEach(function(p){ add('traf', 'cp' + p[0], 'Custo/venda ' + p[1], div(gasto, o.q[p[0]]), 't', 'r', C(p[2]), '2 3'); });
+    if (f === 'diag') {
+      add('traf', 'cplp', 'CPL pago', div(ANU.TDG, ANU.LP), 't', 'r', C(26), '2 3');
+      add('traf', 'cplg', 'CPL global', div(function(i){ return ANU.TDG[i] == null ? null : ANU.TDG[i] + (ANU.TIM[i] || 0); }, function(i){ return ANU.LO[i] == null || ANU.LP[i] == null ? null : ANU.LO[i] + ANU.LP[i]; }), 't', 'r', C(27), '2 3');
+    }
+    if (f === 'ws') add('traf', 'cpi', 'Custo/ingresso', div(ANU.TWS, ANU.WK), 't', 'r', C(27), '2 3');
+    if (f === 'ild') add('traf', 'cpi', 'Custo/ingresso', div(ANU.TIL, ANU.ILK), 't', 'r', C(27), '2 3');
+  }
+  ANU.S = S;
+}
+// 🎟️ ingressos da ILD (mesma aba do workshop, programa ILD)
+function anuIngressosIld(){
+  if (typeof WSL === 'undefined' || !WSL.carregado) return;
+  var m = {}; Object.keys(WSL.porTel).forEach(function(k){ var x = WSL.porTel[k], d = x.ing instanceof Date ? x.ing : (x.ing ? new Date(x.ing) : null);
+    if (!d || isNaN(d) || d.getFullYear() !== 2026 || !/ild/i.test(x.prog || '')) return; m[d.getMonth()] = (m[d.getMonth()] || 0) + 1; });
+  for (var i = 0; i < ANU.M.length; i++) ANU.ILK[i] = i >= 6 ? (m[i] || 0) : null;
+}
+function anuCamControles(){
+  anuCamEstado();
+  var st = ANU.cam, chip = function(on, txt, attr){ return '<button type="button" class="anu-chip' + (on ? ' on' : '') + '" aria-pressed="' + on + '" ' + attr + '>' + txt + '</button>'; };
+  var rot = function(t){ return '<span class="anu-rot">' + t + '</span>'; };
+  return '<div class="anu-cam">'
+    + '<div class="anu-linha">' + rot('1 · Funil') + ANU_FUNIS.map(function(x){ return chip(st.f === x[0], x[1], 'data-f="' + x[0] + '"'); }).join('') + '</div>'
+    + '<div class="anu-linha">' + rot('2 · Ver') + ANU_CAMS.map(function(x){ return chip(!!st.c[x[0]], x[1], 'data-c="' + x[0] + '"'); }).join('') + '</div>'
+    + ((st.c.vendas || st.c.fat || st.c.traf) ? '<div class="anu-linha">' + rot('3 · Produtos') + ANU_PRODS.map(function(x){ return chip(!!st.p[x[0]], '<i class="b" style="background:var(--a' + x[2] + ')"></i>' + x[1], 'data-p="' + x[0] + '"'); }).join('') + '</div>' : '')
+    + '</div>';
+}
 function anuSerie(id){ for (var i = 0; i < ANU.S.length; i++) if (ANU.S[i].id === id) return ANU.S[i]; return null; }
 function anuNomeLongo(z){ if (z.nl) return z.nl; for (var g = 0; g < ANU_LEG.length; g++) for (var k = 0; k < ANU_LEG[g][1].length; k++) if (ANU_LEG[g][1][k][0] === z.id) return (z.nl = (g ? ANU_LEG[g][0] + ' · ' : '') + ANU_LEG[g][1][k][1]); return (z.nl = z.n); }
 function anuLegenda(){
-  var usados = {};
-  var h = ANU_LEG.map(function(G){
-    var ids = G[1].filter(function(x){ return anuSerie(x[0]); }); if (!ids.length) return '';
-    var on = ids.filter(function(x){ return !ANU.X[x[0]]; }).length;
-    return '<div class="grp"><button type="button" class="gt" data-g="' + G[0] + '" title="Ligar ou desligar todas as linhas de ' + G[0] + '">' + G[0] + ' <small>' + on + '/' + ids.length + '</small></button>'
-      + ids.map(function(x){ var z = anuSerie(x[0]); usados[z.id] = 1; return '<button type="button" data-id="' + z.id + '" aria-pressed="' + !ANU.X[z.id] + '" class="' + (ANU.X[z.id] ? 'off' : '') + '" title="' + anuNomeLongo(z).replace(/"/g, '&quot;') + '"><i class="b" style="background:' + z.c + '"></i>' + x[1] + '</button>'; }).join('') + '</div>';
+  anuCamEstado();
+  var st = ANU.cam, h = anuCamControles();
+  var grupos = ANU_CAMS.filter(function(c){ return st.c[c[0]]; }).map(function(c){
+    var L = ANU.S.filter(function(z){ return z.cam === c[0]; }); if (!L.length) return '';
+    var on = L.filter(function(z){ return !ANU.X[z.id]; }).length;
+    return '<div class="grp"><button type="button" class="gt" data-g="' + c[0] + '" title="Ligar ou desligar todas">' + c[1].replace(/^\S+\s/, '') + ' <small>' + on + '/' + L.length + '</small></button>'
+      + L.map(function(z){ return '<button type="button" data-id="' + z.id + '" aria-pressed="' + !ANU.X[z.id] + '" class="' + (ANU.X[z.id] ? 'off' : '') + '" title="' + z.nl.replace(/"/g, '&quot;') + '"><i class="b" style="background:' + z.c + '"></i>' + z.n + '</button>'; }).join('') + '</div>';
   }).join('');
-  var resto = ANU.S.filter(function(z){ return !usados[z.id]; });   // linha nova ainda sem grupo
-  if (resto.length) h += '<div class="grp"><span class="gt">Outras</span>' + resto.map(function(z){ return '<button type="button" data-id="' + z.id + '" class="' + (ANU.X[z.id] ? 'off' : '') + '"><i class="b" style="background:' + z.c + '"></i>' + z.n + '</button>'; }).join('') + '</div>';
-  document.getElementById('anu-lg').innerHTML = h;
+  document.getElementById('anu-lg').innerHTML = h + (grupos ? '<div class="anu-grupos">' + grupos + '</div>' : '<p class="anu-nota" style="margin:6px 0 0">Escolha em “2 · Ver” o que mostrar no gráfico.</p>');
 }
 function anuGrafico(){
   var el = document.getElementById('anu-ch'); if (!el) return;
@@ -46575,7 +46689,7 @@ function anuRazao(a, b, nums, den){
   for (var i = a; i <= b; i++) { var d = den[i]; if (d == null || !d) continue; var t = 0, tem = true; nums.forEach(function(arr){ if (arr[i] == null) tem = false; else t += arr[i]; }); if (!tem) continue; N += t; D += d; ok = true; }
   return ok && D ? { v: N / D, d: D } : null;
 }
-function anuAtualizar(){ try { anuVivo(); } catch (e) {} anuAtalhos(); anuLegenda(); anuGrafico(); anuMetricas(); anuTabela(); }
+function anuAtualizar(){ try { anuVivo(); } catch (e) {} try { anuCamSeries(); } catch (eC) { try { console.warn('anuCamSeries', eC); } catch (x) {} } anuAtalhos(); anuLegenda(); anuGrafico(); anuMetricas(); anuTabela(); }
 function anuMetricas(){
   var a = ANU.de, b = ANU.ate_i, o = anuPer(a, b), len = b - a + 1, pa = a - len, ant = pa >= 0 ? anuPer(pa, a - 1) : null;
   var rotP = ANU.M[a] + (a !== b ? ' a ' + ANU.M[b] : '') + ' de 2026', rotA = ant ? ANU.M[pa] + (len > 1 ? ' a ' + ANU.M[a - 1] : '') : '';
